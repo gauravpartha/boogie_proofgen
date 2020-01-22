@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28803.202
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.329
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Provers", "Provers", "{B758C1E3-824A-439F-AA2F-0BA1143E8C8D}"
 EndProject
@@ -49,6 +49,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestUtil", "UnitTests\TestUtil\TestUtil.csproj", "{59118E35-4236-495E-AF6E-0D641302ED2C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BasetypesTests", "UnitTests\BasetypesTests\BasetypesTests.csproj", "{D00C3F22-1EDA-4781-8F0E-81991E9CB0D9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProofGeneration", "ProofGeneration\ProofGeneration.csproj", "{8F6517B5-87D6-4281-9F9D-74288AA36A14}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -183,6 +185,12 @@ Global
 		{D00C3F22-1EDA-4781-8F0E-81991E9CB0D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D00C3F22-1EDA-4781-8F0E-81991E9CB0D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D00C3F22-1EDA-4781-8F0E-81991E9CB0D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F6517B5-87D6-4281-9F9D-74288AA36A14}.Checked|Any CPU.ActiveCfg = Release|Any CPU
+		{8F6517B5-87D6-4281-9F9D-74288AA36A14}.Checked|Any CPU.Build.0 = Release|Any CPU
+		{8F6517B5-87D6-4281-9F9D-74288AA36A14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F6517B5-87D6-4281-9F9D-74288AA36A14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F6517B5-87D6-4281-9F9D-74288AA36A14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F6517B5-87D6-4281-9F9D-74288AA36A14}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
