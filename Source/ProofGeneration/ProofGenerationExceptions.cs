@@ -1,12 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProofGeneration
 {
-    class TODOException : Exception
+    class ProofGenUnexpectedStateException<T> : Exception
     {
+        Type TriggeringClass
+        { get; }
+
+        public ProofGenUnexpectedStateException(Type triggeringClass, string message) : base(message)
+        {
+            this.TriggeringClass = triggeringClass;
+        }
+
+        public ProofGenUnexpectedStateException(Type triggeringClass)
+        {
+            this.TriggeringClass = triggeringClass;
+        }
     }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace ProofGeneration
 {
@@ -47,6 +43,8 @@ namespace ProofGeneration
         public abstract R VisitTermTuple(TermTuple t);
 
         public abstract R VisitTermIdent(TermIdent t);
+
+        public abstract R VisitTermNAry(TermNAry t);
 
         public abstract R VisitBoolConst(BoolConst t);
 

@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProofGeneration
 {
@@ -121,6 +119,53 @@ namespace ProofGeneration
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
             return visitor.VisitTermRecord(this);
+        }
+    }
+
+    public class TermNAry : Term
+    {
+        public readonly IList<Term> args;
+
+        public readonly TermOpCode op;
+
+        public enum TermOpCode
+        {
+            EQ,
+            LE,
+            AND, OR, IMPLIES, NOT,
+            ADD
+        }
+
+        public TermNAry(IList<Term> args, TermOpCode op)
+        {
+            this.args = args;
+            this.op = op;
+            if(NumOfArgs(op) != args.Count())
+            {
+                throw new ProofGenUnexpectedStateException<TermNAry>(this.GetType(), 
+                    "expected " + NumOfArgs(op) + " arguments, but only have " + args.Count);
+            }
+        }
+
+        protected int NumOfArgs(TermOpCode op)
+        {
+            switch(op)
+            {
+                case TermOpCode.AND:
+                case TermOpCode.IMPLIES:
+                case TermOpCode.OR:
+                case TermOpCode.ADD:
+                    return 2;
+                case TermOpCode.NOT:
+                    return 1;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        public override T Dispatch<T>(TermVisitor<T> visitor)
+        {
+            return visitor.VisitTermNAry(this);
         }
     }
 

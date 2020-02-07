@@ -4,24 +4,23 @@ using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using Microsoft.Boogie;
+using ProofGeneration.CFGRepresentation;
 
 namespace ProofGeneration
 {
     class IsaProgramGenerator
     {
 
-        public Theory GetIsaProgram(Implementation impl, string thyName)
+        public Theory GetIsaProgram(Implementation impl, CFGRepr cfg, string thyName)
         {
-            string methodName = impl.Proc.Name;
+            string methodName = impl.Proc.Name;            
 
-            AlternateCFGRepr(impl, out Block entryBlock, out IDictionary<Block, IList<Block>> outgoingBlocks, out IDictionary<Block, int> labeling);
+            Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(cfg.labeling[cfg.entry]));
 
-            Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(labeling[entryBlock]));
+            OuterDecl outEdges = GetOutEdgesIsa(methodName, cfg.outgoingBlocks, cfg.labeling);
+            OuterDecl nodesToBlocks = GetNodeToBlocksIsa(methodName, cfg.labeling);
 
-            OuterDecl outEdges = GetOutEdgesIsa(methodName, outgoingBlocks, labeling);
-            OuterDecl nodesToBlocks = GetNodeToBlocksIsa(methodName, labeling);
-
-            Term nodes = GetNodeSet(labeling);
+            Term nodes = GetNodeSet(cfg.labeling);
 
             Term parameters = GetVariableDeclarationsIsa(impl.InParams);
             Term localVariables = GetVariableDeclarationsIsa(impl.LocVars);
@@ -49,75 +48,7 @@ namespace ProofGeneration
                 };
 
             return new Theory(thyName, new List<string>() { "Lang" }, outerDecls);
-        }
-
-        private void AlternateCFGRepr(Implementation impl, out Block entryBlock, out IDictionary<Block, IList<Block>> outgoingBlocks, out IDictionary<Block, int> labeling)
-        {
-            Contract.Ensures(entryBlock != null);
-            Contract.Ensures(labeling.ContainsKey(entryBlock));
-            Contract.Ensures(outgoingBlocks.Count == labeling.Count);
-
-            entryBlock = null;
-            int blockNum = 0;
-            outgoingBlocks = new Dictionary<Block, IList<Block>>();
-            labeling = new Dictionary<Block, int>();
-
-            foreach (var block in impl.Blocks)
-            {
-                if (block.Predecessors.Count == 0)
-                {
-                    if (entryBlock != null)
-                    {
-                        throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.CFG_NOT_UNIQUE_ENTRY);
-                    }
-                    entryBlock = block;
-                }
-                List<Block> curOutgoing = new List<Block>();
-
-                if (block.TransferCmd is GotoCmd gotoCmd)
-                {
-                    curOutgoing.AddRange(gotoCmd.labelTargets);
-                }
-
-                outgoingBlocks.Add(block, curOutgoing);
-
-                labeling.Add(block, blockNum);
-                blockNum++;
-            }
-
-            if(entryBlock == null)
-            {
-                throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.CFG_NO_ENTRY);
-            }
-        }
-
-        //could test if it gives the same results as when using TransferCmd
-        private void AlternateCFGReprOther(Implementation impl, out Block entryBlock, out IDictionary<Block, IList<Block>> outgoingBlocks, out IDictionary<Block, int> labeling)
-        {
-            entryBlock = null;
-            int blockNum = 0;
-            outgoingBlocks = new Dictionary<Block, IList<Block>>();
-            labeling = new Dictionary<Block, int>();
-
-            foreach (var block in impl.Blocks)
-            {
-                if (block.Predecessors.Count == 0)
-                {
-                    if (entryBlock != null)
-                    {
-                        throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.CFG_NOT_UNIQUE_ENTRY);
-                    }
-                    entryBlock = block;
-                }
-
-                foreach (Block pre in block.Predecessors)
-                {
-                    Util.Add(pre, block, outgoingBlocks);
-                }
-                labeling.Add(block, blockNum);
-                blockNum++;
-            }
-        }
+        }       
 
         private OuterDecl GetOutEdgesIsa(string methodName, IDictionary<Block, IList<Block>> outgoingBlocks, IDictionary<Block, int> labeling)
         {

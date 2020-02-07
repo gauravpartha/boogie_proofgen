@@ -1,20 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿//#define PROOFGENACTIVE
+
 using Microsoft.Boogie;
+using Microsoft.Boogie.VCExprAST;
+using ProofGeneration.CFGRepresentation;
+using ProofGeneration.IsaPrettyPrint;
+using ProofGeneration.VCProofGen;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
+using System.IO;
 
 namespace ProofGeneration
 {
     public class ProofGenerationLayer
     {
 
+
+        [Conditional("PROOFGENACTIVE")]
         public static void StoreTheory(Implementation impl)
         {
             var programGenerator = new IsaProgramGenerator();
-            Theory theory = programGenerator.GetIsaProgram(impl, impl.Proc.Name);
+            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
+            Theory theory = programGenerator.GetIsaProgram(impl, cfg, impl.Proc.Name);
 
             var sw = new StreamWriter(impl.Proc.Name + ".thy");
 
@@ -24,5 +31,17 @@ namespace ProofGeneration
             sw.Close();
         }
 
+        public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Implementation impl)
+        {
+            VCExpr vcNoLabels = VCExprLabelRemover.RemoveLabels(vc, gen);
+            VCExprLet vcNoLabelLet = vcNoLabels as VCExprLet;
+            Contract.Assert(vcNoLabelLet != null);
+
+            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
+
+            IDictionary<Block, VCExpr> blockToVCExpr = VCBlockExtractor.BlockToVCMapping(vcNoLabelLet, cfg);            
+        }
+
     }
+
 }

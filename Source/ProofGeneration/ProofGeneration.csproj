@@ -56,18 +56,26 @@
     <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
     <Compile Include="BoogieIsaInterface\IsaProgramGenerator.cs" />
     <Compile Include="BoogieIsaInterface\TypeIsaVisitor.cs" />
+    <Compile Include="CFGRepr\CFGRepr.cs" />
+    <Compile Include="CFGRepr\CFGReprTransformer.cs" />
+    <Compile Include="IsaPrettyPrint\IsaPrettyPrinterHelper.cs" />
+    <Compile Include="IsaPrettyPrint\OuterDeclPrettyPrinter.cs" />
+    <Compile Include="IsaPrettyPrint\TermPrettyPrinter.cs" />
+    <Compile Include="IsaPrettyPrint\TypeIsaPrettyPrinter.cs" />
     <Compile Include="Isa\InnerAst.cs" />
     <Compile Include="Isa\IsaCommonTerms.cs" />
     <Compile Include="Isa\IsaCommonTypes.cs" />
-    <Compile Include="Isa\IsaPrettyPrinter.cs" />
+    <Compile Include="IsaPrettyPrint\IsaPrettyPrinter.cs" />
     <Compile Include="Isa\IsaVisitor.cs" />
     <Compile Include="Isa\OuterAst.cs" />
-    <Compile Include="Program.cs" />
     <Compile Include="ProofGenerationExceptions.cs" />
     <Compile Include="ProofGenerationLayer.cs" />
     <Compile Include="ResultReadOnlyVisitor.cs" />
-    <Compile Include="TypeIsaVisitor.cs" />
     <Compile Include="Util.cs" />
+    <Compile Include="VCProofGen\VCBlockExtractor.cs" />
+    <Compile Include="VCProofGen\VCExprLabelRemover.cs" />
+    <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
+    <Compile Include="VCProofGen\VCToIsa.cs" />
     <Compile Include="version.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -78,6 +86,14 @@
     <ProjectReference Include="..\Core\Core.csproj">
       <Project>{b230a69c-c466-4065-b9c1-84d80e76d802}</Project>
       <Name>Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Graph\Graph.csproj">
+      <Project>{69A2B0B8-BCAC-4101-AE7A-556FCC58C06E}</Project>
+      <Name>Graph</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\VCExpr\VCExpr.csproj">
+      <Project>{56ffdbca-7d14-43b8-a6ca-22a20e417ee1}</Project>
+      <Name>VCExpr</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

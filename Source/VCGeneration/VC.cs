@@ -16,6 +16,8 @@ using System.Diagnostics.Contracts;
 using Microsoft.Basetypes;
 using Microsoft.Boogie.VCExprAST;
 
+using ProofGeneration.VCProofGen;
+
 namespace VC {
   using Bpl = Microsoft.Boogie;
   using System.Threading.Tasks;
@@ -1390,6 +1392,13 @@ namespace VC {
         VCExpr vc = parent.GenerateVCAux(impl, controlFlowVariableExpr, label2absy, checker.TheoremProver.Context);
         Contract.Assert(vc != null);
         
+                #region proofgen
+                //var eraser = new Bpl.TypeErasure.TypeEraserPremisses((Bpl.TypeErasure.TypeAxiomBuilderPremisses)AxBuilder, checker.VCExprGen);
+
+                //TODO: VCExpr exprWithoutTypes = eraser == null ? expr : eraser.Erase(expr, polarity);
+                ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, impl);                
+                #endregion
+
         VCExpr controlFlowFunctionAppl = exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
         VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(impl.Blocks[0].UniqueId)));
         vc = exprGen.Implies(eqExpr, vc);
