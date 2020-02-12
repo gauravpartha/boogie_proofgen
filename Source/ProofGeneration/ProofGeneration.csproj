@@ -5,7 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{8F6517B5-87D6-4281-9F9D-74288AA36A14}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <RootNamespace>ProofGeneration</RootNamespace>
     <AssemblyName>ProofGeneration</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -20,7 +20,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -38,6 +38,9 @@
   </PropertyGroup>
   <PropertyGroup>
     <AssemblyOriginatorKeyFile>InterimKey.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -72,10 +75,13 @@
     <Compile Include="ProofGenerationLayer.cs" />
     <Compile Include="ResultReadOnlyVisitor.cs" />
     <Compile Include="Util.cs" />
+    <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
     <Compile Include="VCProofGen\VCBlockExtractor.cs" />
     <Compile Include="VCProofGen\VCExprLabelRemover.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
-    <Compile Include="VCProofGen\VCToIsa.cs" />
+    <Compile Include="VCProofGen\VCExprToIsaTranslator.cs" />
+    <Compile Include="VCProofGen\VCToIsaInterface.cs" />
+    <Compile Include="VCProofGen\VCBlockToIsaTranslator.cs" />
     <Compile Include="version.cs" />
   </ItemGroup>
   <ItemGroup>

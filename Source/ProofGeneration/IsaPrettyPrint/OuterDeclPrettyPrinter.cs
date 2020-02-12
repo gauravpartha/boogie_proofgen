@@ -1,7 +1,10 @@
-﻿using System.Text;
+﻿using ProofGeneration.Isa;
+using System;
+using System.Text;
 
 namespace ProofGeneration.IsaPrettyPrint
 {
+    //return value is ignored
     public class OuterDeclPrettyPrinter : OuterDeclVisitor<int>
     {
         StringBuilder _sb
@@ -71,6 +74,42 @@ namespace ProofGeneration.IsaPrettyPrint
             return 0;
         }
 
+        public override int VisitLocaleDecl(LocaleDecl d)
+        {
+            _sb.AppendLine();
+            _sb.Append("locale ").Append(d.name).Append(" = ");
+            _sb.AppendLine();
+            _sb.Append("fixes ");
 
+            bool first = true;
+            foreach(Tuple<TermIdent, TypeIsa> fix in d.fixedVariables)
+            {
+                if (first)
+                    first = false;
+                else
+                    _sb.Append(" and ");
+
+                _sb.Append(fix.Item1.Dispatch(_termPrinter));
+                _sb.Append(" :: ");
+                _sb.Append("\"");
+                _sb.Append(fix.Item2.Dispatch(_typeIsaPrinter));
+                _sb.Append("\"");
+            }
+
+            _sb.AppendLine();
+            _sb.Append("begin");
+            _sb.AppendLine(); _sb.AppendLine();
+
+            foreach (DefDecl def in d.body)
+            {
+                def.Dispatch(this);
+            }
+
+            _sb.AppendLine(); _sb.AppendLine();            
+
+            _sb.AppendLine("end");
+
+            return 0;
+        }
     }
 }

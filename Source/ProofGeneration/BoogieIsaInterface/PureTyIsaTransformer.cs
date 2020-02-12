@@ -1,23 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 
-namespace ProofGeneration
+namespace ProofGeneration.VCProofGen
 {
-    class TypeIsaVisitor : ResultReadOnlyVisitor<Term>
+    class PureTyIsaTransformer : ResultReadOnlyVisitor<TypeIsa>
     {
-        [ContractInvariantMethod]
-        void ObjectInvariant()
-        {
-            Contract.Invariant(Results != null);
-            Contract.Invariant(Results.Count <= 1);
-        }
-
         protected override bool TranslatePrecondition(Absy node)
         {
             return node is Microsoft.Boogie.Type;
@@ -30,13 +22,15 @@ namespace ProofGeneration
 
         public override Microsoft.Boogie.Type VisitBasicType(BasicType node)
         {
-            if(node.IsBool)
+            if (node.IsBool)
             {
-                ReturnResult(IsaBoogieType.BoolType());
-            } else if(node.IsInt)
+                ReturnResult(new PrimitiveType(Isa.SimpleType.Bool));
+            }
+            else if (node.IsInt)
             {
-                ReturnResult(IsaBoogieType.IntType());
-            } else
+                ReturnResult(new PrimitiveType(Isa.SimpleType.Int));
+            }
+            else
             {
                 throw new NotImplementedException();
             }

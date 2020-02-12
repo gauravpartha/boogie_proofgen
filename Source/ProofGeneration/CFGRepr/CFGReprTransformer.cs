@@ -2,6 +2,7 @@
 using Microsoft.Boogie.GraphUtil;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 
 namespace ProofGeneration.CFGRepresentation
 {
@@ -17,8 +18,6 @@ namespace ProofGeneration.CFGRepresentation
 
         static private void AlternateCFGRepr(Implementation impl, out Block entryBlock, out IDictionary<Block, IList<Block>> outgoingBlocks)
         {
-            Contract.Ensures(entryBlock != null);
-
             entryBlock = null;
             int blockNum = 0;
             outgoingBlocks = new Dictionary<Block, IList<Block>>();
@@ -53,7 +52,10 @@ namespace ProofGeneration.CFGRepresentation
 
         static private IDictionary<Block, int> GetTopologicalLabeling(Implementation impl)
         {
+            Contract.Requires(impl != null);
             Contract.Ensures(impl.Blocks.Count == Contract.Result<IDictionary<Block, int>>().Count);
+            Contract.Ensures(Contract.Result<IDictionary<Block, int>>().Values.Min() == 0 && 
+                             Contract.Result<IDictionary<Block, int>>().Values.Max() == impl.Blocks.Count-1);
 
             //adusted code from VC.cs
             Graph<Block> dag = new Graph<Block>();
@@ -79,6 +81,7 @@ namespace ProofGeneration.CFGRepresentation
             int curLabel = 0;
             foreach(Block block in sortedNodes) {
                 retLabels.Add(block, curLabel);
+                curLabel++;
             }
 
             return retLabels;

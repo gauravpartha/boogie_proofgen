@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Boogie;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration
 {

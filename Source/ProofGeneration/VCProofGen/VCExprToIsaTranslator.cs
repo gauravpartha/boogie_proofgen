@@ -1,5 +1,6 @@
 ﻿using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
+using ProofGeneration.Isa;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
@@ -8,10 +9,10 @@ using System.Linq;
 namespace ProofGeneration.VCProofGen
 {
     // argument is not used
-    class VCToIsa : IVCExprVisitor<Term, bool>
+    class VCExprToIsaTranslator : IVCExprVisitor<Term, bool>
     {
 
-        private readonly IDictionary<string, Term> successorToVC;
+        private readonly IDictionary<Block, DefDecl> successorToVC;
 
         protected readonly ISet<VCExprOp> criticalOps;
 
@@ -19,7 +20,7 @@ namespace ProofGeneration.VCProofGen
 
         protected readonly ISet<string> programVariables;
 
-        public VCToIsa(IDictionary<string, Term> successorToVC, ISet<string> programVariables)
+        public VCExprToIsaTranslator(IDictionary<Block, DefDecl> successorToVC, ISet<string> programVariables)
         {
             this.successorToVC = successorToVC;
             this.programVariables = programVariables;
@@ -31,6 +32,12 @@ namespace ProofGeneration.VCProofGen
                 VCExpressionGenerator.AndOp,
                 VCExpressionGenerator.OrOp
             };
+        }
+
+        public Term Translate(VCExpr node)
+        {
+            Contract.Requires(node != null);
+            return node.Accept(this, true);
         }
 
         public Term Visit(VCExprLiteral node, bool arg)
@@ -58,19 +65,18 @@ namespace ProofGeneration.VCProofGen
             }
 
             var todoStack = new Stack<VCExpr>();
-            var activeNAryStack = new Stack<VCExprNAry>();
+            var activeNAryStack = new Stack<Tuple<VCExprNAry, List<Term>>>();
             //invariant: operation of nodes in activeNAryStack are critical
+            todoStack.Push(node);
 
-
-            IList<Term> activeResults = new List<Term>();
-
-            todoStack.Push(node);     
+            Term result = null;
 
             while(todoStack.Count > 0)
             {                
                 VCExpr curExpr = todoStack.Pop();
                 if(curExpr is VCExprNAry curNAry && IsCriticalOp(curNAry.Op)) {
-                    activeNAryStack.Push(curNAry);
+                    activeNAryStack.Push(Tuple.Create(curNAry, new List<Term>()));
+
                     foreach (var child in curNAry)
                     {
                         todoStack.Push(child);
@@ -78,21 +84,37 @@ namespace ProofGeneration.VCProofGen
                 }
                 else
                 {
-                    activeResults.Add(curExpr.Accept(this, arg));
-                    if(activeNAryStack.Peek().Count() == activeResults.Count)
+                    activeNAryStack.Peek().Item2.Add(curExpr.Accept(this, arg));
+
+                    //collapse activeNAry stack as much as possible
+                    do
                     {
-                        VCExprNAry topNAry = activeNAryStack.Pop();
-                        //reverse children, since first one is added last
-                        Term result = getTermFromNAry(topNAry, activeResults.Reverse().ToList());
-                        activeResults = new List<Term>() { result };                        
-                    }
+                        Tuple<VCExprNAry, List<Term>> top = activeNAryStack.Peek();
+
+                        if (top.Item1.Count() == top.Item2.Count())
+                        {
+                            activeNAryStack.Pop();
+
+                            //reverse children, since first one is added last
+                            top.Item2.Reverse();
+                            var newResult = getTermFromNAry(top.Item1, top.Item2);
+                            if (activeNAryStack.Count() > 0)
+                                activeNAryStack.Peek().Item2.Add(newResult);
+                            else
+                                result = newResult;
+                        } else
+                        {
+                            Contract.Assert(todoStack.Count > 0);
+                            break;
+                        }
+                    } while (activeNAryStack.Count > 0);
                 }
             }
 
             Contract.Assert(activeNAryStack.Count == 0);
-            Contract.Assert(activeResults.Count == 1);
+            Contract.Assert(result != null);
 
-            return activeResults.First();
+            return result;
         }
 
         private Term VisitRecursive(VCExprNAry node, bool arg)
@@ -118,11 +140,12 @@ namespace ProofGeneration.VCProofGen
 
         public Term Visit(VCExprVar node, bool arg)
         {
-            bool success = successorToVC.TryGetValue(node.Name.Split('_')[0], out Term result);
-            if (success)
-                return result;
+            if (programVariables.Contains(node.Name))
+                return IsaCommonTerms.TermIdentFromName(node.Name);
+            else if (TryGetDefFromBlock(node.Name.Split('_')[0], out DefDecl result))
+                return IsaCommonTerms.TermIdentFromName(result.name);
             else
-                throw new ProofGenUnexpectedStateException<VCToIsa>(this.GetType(), "cannot resolve variable");
+                throw new ProofGenUnexpectedStateException<VCExprToIsaTranslator>(this.GetType(), "cannot resolve variable");
         }
 
         public Term Visit(VCExprQuantifier node, bool arg)
@@ -133,6 +156,21 @@ namespace ProofGeneration.VCProofGen
         public Term Visit(VCExprLet node, bool arg)
         {
             throw new NotImplementedException();
+        }
+
+        private bool TryGetDefFromBlock(string blockName, out DefDecl result)
+        {
+            foreach(var kv in successorToVC)
+            {
+                if(kv.Key.Label.Equals(blockName))
+                {
+                    result = kv.Value;
+                    return true;
+                }
+            }
+
+            result = null;
+            return false;
         }
     }
 }

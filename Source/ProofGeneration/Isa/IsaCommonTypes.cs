@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ProofGeneration
+namespace ProofGeneration.Isa
 {
     class IsaCommonTypes
     {

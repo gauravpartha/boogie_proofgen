@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ProofGeneration.Isa;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -87,9 +88,55 @@ namespace ProofGeneration.IsaPrettyPrint
             return IsaPrettyPrinterHelper.Parenthesis(IsaPrettyPrinterHelper.CommaAggregate(res));
         }
 
-        public override string VisitTermNAry(TermNAry t)
+        public override string VisitTermBinary(TermBinary t)
         {
-            throw new NotImplementedException();
+            //TODO: for critical operations, use a stack
+            string isaSymbol = GetStringFromBinary(t.op);
+            string leftString = t.argLeft.Dispatch(this);
+            string rightString = t.argRight.Dispatch(this);
+
+            return IsaPrettyPrinterHelper.Parenthesis(leftString + " " + isaSymbol + " " + rightString);
+        }
+
+        public string GetStringFromBinary(TermBinary.BinaryOpCode bop)
+        {
+            switch (bop)
+            {
+                case TermBinary.BinaryOpCode.ADD:
+                    return "+";
+                case TermBinary.BinaryOpCode.AND:
+                    return "\\<and>";
+                case TermBinary.BinaryOpCode.EQ:
+                    return "=";
+                case TermBinary.BinaryOpCode.IMPLIES:
+                    return "\\<longrightarrow>";
+                case TermBinary.BinaryOpCode.LE:
+                    return "\\<le>";
+                case TermBinary.BinaryOpCode.OR:
+                    return "\\<or>";
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        public override string VisitTermUnary(TermUnary t)
+        {
+            string isaSymbol = GetStringFromUnary(t.op);
+
+            string argString = t.arg.Dispatch(this);
+
+            return IsaPrettyPrinterHelper.Parenthesis(isaSymbol + " " + argString);
+        }
+
+        public string GetStringFromUnary(TermUnary.UnaryOpCode uop)
+        {
+            switch(uop)
+            {
+                case TermUnary.UnaryOpCode.NOT:
+                    return "\\<not>";
+                default:
+                    throw new NotImplementedException();
+            }
         }
     }
 }

@@ -1,25 +1,45 @@
 ﻿using Microsoft.Boogie.VCExprAST;
+using ProofGeneration.Isa;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 
 namespace ProofGeneration.VCProofGen
 {
     class VCExprOpIsaVisitor : IVCExprOpVisitor<Term, List<Term>>
     {
+
+        public Term HandleBinaryOp(TermBinary.BinaryOpCode bop, List<Term> arg)
+        {
+            Contract.Assert(arg.Count == 2);
+            return new TermBinary(arg[0], arg[1], bop);
+        }
+
+        public Term HandleUnaryOp(TermUnary.UnaryOpCode up, List<Term> arg)
+        {
+            Contract.Assert(arg.Count == 1);
+            return new TermUnary(arg[0]);
+        }
+
         public Term VisitAddOp(VCExprNAry node, List<Term> arg)
         {
-            return new TermNAry(arg, TermNAry.TermOpCode.ADD);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.ADD, arg);
         }
 
         public Term VisitAndOp(VCExprNAry node, List<Term> arg)
         {
-            return new TermNAry(arg, TermNAry.TermOpCode.AND);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.AND, arg);
         }
 
         public Term VisitBoogieFunctionOp(VCExprNAry node, List<Term> arg)
         {
-            //TODO
-            throw new NotImplementedException();
+            if(node.Op is VCExprBoogieFunctionOp funOp) {
+                return new TermApp(IsaCommonTerms.TermIdentFromName(funOp.Func.Name), arg);
+            }
+
+            //should never reach this code
+            Contract.Assert(false);
+            return null;
         }
 
         public Term VisitBvConcatOp(VCExprNAry node, List<Term> arg)
@@ -54,7 +74,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitEqOp(VCExprNAry node, List<Term> arg)
         {
-            return new TermNAry(arg, TermNAry.TermOpCode.EQ);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.EQ, arg);
         }
 
         public Term VisitFloatAddOp(VCExprNAry node, List<Term> arg)
@@ -124,7 +144,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitImpliesOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.IMPLIES, arg);
         }
 
         public Term VisitLabelOp(VCExprNAry node, List<Term> arg)
@@ -134,7 +154,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitLeOp(VCExprNAry node, List<Term> arg)
         {
-            return new TermNAry(arg, TermNAry.TermOpCode.LE);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.LE, arg);
         }
 
         public Term VisitLtOp(VCExprNAry node, List<Term> arg)
@@ -159,12 +179,12 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitNotOp(VCExprNAry node, List<Term> arg)
         {
-            return new TermNAry(arg, TermNAry.TermOpCode.NOT);
+            return HandleUnaryOp(TermUnary.UnaryOpCode.NOT, arg);
         }
 
         public Term VisitOrOp(VCExprNAry node, List<Term> arg)
         {
-            return new TermNAry(arg, TermNAry.TermOpCode.OR);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.OR, arg);
         }
 
         public Term VisitPowOp(VCExprNAry node, List<Term> arg)

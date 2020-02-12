@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ProofGeneration
+namespace ProofGeneration.Isa
 {
     class IsaCommonTerms
     {
@@ -17,6 +17,6 @@ namespace ProofGeneration
         public static TermIdent TermIdentFromName(string name)
         {
             return new TermIdent(new SimpleIdentifier(name));
-        }
+        }        
     }
 }

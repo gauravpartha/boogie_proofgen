@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ProofGeneration
+namespace ProofGeneration.Isa
 {
 
     public abstract class OuterDeclVisitor<R>
@@ -13,6 +13,8 @@ namespace ProofGeneration
         public abstract R VisitFunDecl(FunDecl d);
           
         public abstract R VisitDefDecl(DefDecl d);
+
+        public abstract R VisitLocaleDecl(LocaleDecl d);
     }
 
     public abstract class TermVisitor<R>
@@ -44,7 +46,9 @@ namespace ProofGeneration
 
         public abstract R VisitTermIdent(TermIdent t);
 
-        public abstract R VisitTermNAry(TermNAry t);
+        public abstract R VisitTermBinary(TermBinary t);
+
+        public abstract R VisitTermUnary(TermUnary t);
 
         public abstract R VisitBoolConst(BoolConst t);
 

@@ -2,9 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
 
-namespace ProofGeneration
+namespace ProofGeneration.Isa
 {
 
     public abstract class Identifier
@@ -28,6 +27,11 @@ namespace ProofGeneration
     public abstract class Term {
 
         public abstract T Dispatch<T>(TermVisitor<T> visitor);
+
+        public override string ToString()
+        {
+            return (new IsaPrettyPrint.TermPrettyPrinter()).Visit(this);
+        }
     }
 
     public class TermIdent : Term
@@ -122,50 +126,53 @@ namespace ProofGeneration
         }
     }
 
-    public class TermNAry : Term
+    public class TermBinary : Term
     {
-        public readonly IList<Term> args;
+        public readonly Term argLeft;
+        public readonly Term argRight;
 
-        public readonly TermOpCode op;
+        public readonly BinaryOpCode op;
 
-        public enum TermOpCode
+        public enum BinaryOpCode
         {
             EQ,
             LE,
-            AND, OR, IMPLIES, NOT,
+            AND, OR, IMPLIES,
             ADD
         }
 
-        public TermNAry(IList<Term> args, TermOpCode op)
+        public TermBinary(Term argLeft, Term argRight, BinaryOpCode op)
         {
-            this.args = args;
+            this.argLeft = argLeft;
+            this.argRight = argRight;
             this.op = op;
-            if(NumOfArgs(op) != args.Count())
-            {
-                throw new ProofGenUnexpectedStateException<TermNAry>(this.GetType(), 
-                    "expected " + NumOfArgs(op) + " arguments, but only have " + args.Count);
-            }
-        }
-
-        protected int NumOfArgs(TermOpCode op)
-        {
-            switch(op)
-            {
-                case TermOpCode.AND:
-                case TermOpCode.IMPLIES:
-                case TermOpCode.OR:
-                case TermOpCode.ADD:
-                    return 2;
-                case TermOpCode.NOT:
-                    return 1;
-                default:
-                    throw new NotImplementedException();
-            }
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
-            return visitor.VisitTermNAry(this);
+            return visitor.VisitTermBinary(this);
+        }
+    }
+
+    public class TermUnary : Term
+    {
+        public readonly Term arg;
+
+        public readonly UnaryOpCode op;
+
+        public enum UnaryOpCode
+        {
+            NOT
+        }
+
+        public TermUnary(Term arg)
+        {
+            this.arg = arg;
+        }
+
+        public override T Dispatch<T>(TermVisitor<T> visitor)
+        {
+            return visitor.VisitTermUnary(this);
         }
     }
 

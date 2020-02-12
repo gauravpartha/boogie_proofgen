@@ -1,12 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProofGeneration
+namespace ProofGeneration.Isa
 {
-    public enum commonTheories
-    {
-        MAIN, LANG
-    }
 
     public class Theory
     {
@@ -64,6 +60,25 @@ namespace ProofGeneration
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
            return visitor.VisitDefDecl(this);
+        }
+    }
+
+    public class LocaleDecl : OuterDecl
+    {
+        public readonly IList<Tuple<TermIdent, TypeIsa>> fixedVariables;
+        //TODO: support for assumptions, etc...
+
+        public readonly IList<OuterDecl> body;
+
+        public LocaleDecl(string name, IList<Tuple<TermIdent, TypeIsa>> fixedVariables, IList<OuterDecl> body) : base(name)
+        {
+            this.fixedVariables = fixedVariables;
+            this.body = body;
+        }
+
+        public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
+        {
+            return visitor.VisitLocaleDecl(this);
         }
     }
 

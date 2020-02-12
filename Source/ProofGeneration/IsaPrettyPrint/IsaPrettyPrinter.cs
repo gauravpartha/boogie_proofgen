@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using ProofGeneration.Isa;
+using System.Text;
 
 namespace ProofGeneration.IsaPrettyPrint
 {

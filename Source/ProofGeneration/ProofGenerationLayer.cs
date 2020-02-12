@@ -3,6 +3,7 @@
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.Isa;
 using ProofGeneration.IsaPrettyPrint;
 using ProofGeneration.VCProofGen;
 using System.Collections.Generic;
@@ -23,23 +24,28 @@ namespace ProofGeneration
             var cfg = CFGReprTransformer.getCFGRepresentation(impl);
             Theory theory = programGenerator.GetIsaProgram(impl, cfg, impl.Proc.Name);
 
-            var sw = new StreamWriter(impl.Proc.Name + ".thy");
+            StoreTheory(theory);
+        }
+
+        public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Program p, Implementation impl)
+        {
+           
+            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, p, impl);
+            var theory = new Theory("vc_" + impl.Proc.Name,
+                new List<string> { "Main" },
+                new List<OuterDecl> { locale });
+
+            StoreTheory(theory);
+        }
+
+        private static void StoreTheory(Theory theory)
+        {
+            var sw = new StreamWriter(theory.theoryName + ".thy");
 
             string theoryString = IsaPrettyPrinter.PrintTheory(theory);
 
             sw.WriteLine(theoryString);
             sw.Close();
-        }
-
-        public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Implementation impl)
-        {
-            VCExpr vcNoLabels = VCExprLabelRemover.RemoveLabels(vc, gen);
-            VCExprLet vcNoLabelLet = vcNoLabels as VCExprLet;
-            Contract.Assert(vcNoLabelLet != null);
-
-            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
-
-            IDictionary<Block, VCExpr> blockToVCExpr = VCBlockExtractor.BlockToVCMapping(vcNoLabelLet, cfg);            
         }
 
     }
