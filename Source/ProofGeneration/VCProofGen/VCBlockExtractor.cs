@@ -1,6 +1,7 @@
 ﻿using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -21,10 +22,17 @@ namespace ProofGeneration.VCProofGen
             foreach (VCExprLetBinding binding in letExpr)
             {
                 string[] split = binding.V.Name.Split(new char[] { '_' });
-                if (split.Count() == 2 && split[1].Equals("correct"))
+                if (split.Count() >= 2 && split[split.Length - 1].Equals("correct"))
                 {
-                    var blockKV = cfg.outgoingBlocks.Single(kv => kv.Key.Label.Equals(split[0]));
-                    blockToVC.Add(blockKV.Key, binding.E);
+                    try
+                    {
+                        string predictedBlockName = split.Take(split.Length - 1).Concat("_");
+                        var blockKV = cfg.outgoingBlocks.Single(kv => kv.Key.Label.Equals(predictedBlockName));
+                        blockToVC.Add(blockKV.Key, binding.E);
+                    } catch(Exception e)
+                    {
+                        throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), e.Message);
+                    }                   
                 } else
                 {
                     throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), "let binding does not correspond to block");
