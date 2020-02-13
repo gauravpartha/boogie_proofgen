@@ -71,6 +71,7 @@
     <Compile Include="IsaPrettyPrint\IsaPrettyPrinter.cs" />
     <Compile Include="Isa\IsaVisitor.cs" />
     <Compile Include="Isa\OuterAst.cs" />
+    <Compile Include="Isa\ProofAst.cs" />
     <Compile Include="ProofGenerationExceptions.cs" />
     <Compile Include="ProofGenerationLayer.cs" />
     <Compile Include="ResultReadOnlyVisitor.cs" />

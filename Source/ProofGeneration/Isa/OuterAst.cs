@@ -63,22 +63,52 @@ namespace ProofGeneration.Isa
         }
     }
 
-    public class LocaleDecl : OuterDecl
+    public class ContextElem 
     {
         public readonly IList<Tuple<TermIdent, TypeIsa>> fixedVariables;
-        //TODO: support for assumptions, etc...
+        public readonly IList<Term> assumptions;
+
+        public ContextElem(IList<Tuple<TermIdent, TypeIsa>> fixedVariables, IList<Term> assumptions) 
+        {
+            this.fixedVariables = fixedVariables;
+            this.assumptions = assumptions;
+        }
+    }
+
+    public class LocaleDecl : OuterDecl
+    {
+        public readonly ContextElem contextElem;
 
         public readonly IList<OuterDecl> body;
 
-        public LocaleDecl(string name, IList<Tuple<TermIdent, TypeIsa>> fixedVariables, IList<OuterDecl> body) : base(name)
+        public LocaleDecl(string name, ContextElem contextElem, IList<OuterDecl> body) : base(name)
         {
-            this.fixedVariables = fixedVariables;
+            this.contextElem = contextElem;
             this.body = body;
         }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitLocaleDecl(this);
+        }
+    }
+
+    public class LemmaDecl : OuterDecl
+    {
+        public readonly ContextElem contextElem;
+        public readonly Term statement;
+        public readonly Proof proof;
+
+        public LemmaDecl(string name, ContextElem contextElem, Term statement, Proof proof) : base(name)
+        {
+            this.contextElem = contextElem;
+            this.statement = statement;
+            this.proof = proof;
+        }
+
+        public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
+        {
+            return visitor.VisitLemmaDecl(this);
         }
     }
 

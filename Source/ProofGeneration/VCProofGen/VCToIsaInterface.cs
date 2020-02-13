@@ -34,7 +34,7 @@ namespace ProofGeneration.VCProofGen
                 vcBlockDefs.Add(blockToVCExpr[block]);
             }
 
-            LocaleDecl locale = new LocaleDecl("vc", varsInVC, vcBlockDefs);
+            LocaleDecl locale = new LocaleDecl("vc", new ContextElem(varsInVC, new List<Term>()), vcBlockDefs);
             return locale;
         }
 
