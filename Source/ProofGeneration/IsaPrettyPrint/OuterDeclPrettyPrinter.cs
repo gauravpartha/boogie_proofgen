@@ -31,23 +31,21 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override int VisitDefDecl(DefDecl d)
         {
-            _sb.AppendLine();
             _sb.Append("definition ").Append(d.name);
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(2));
 
             string args = IsaPrettyPrinterHelper.SpaceAggregate(_termPrinter.VisitList(d.equation.Item1));
 
-            _sb.Append("\"");
-            _sb.Append(d.name).Append(" ").Append(args).Append(" = ").Append(_termPrinter.Visit(d.equation.Item2));
-            _sb.Append("\"");
+            AppendInner(
+               () => _sb.Append(d.name).Append(" ").Append(args).Append(" = ").Append(_termPrinter.Visit(d.equation.Item2))
+            );
 
             return 0;
         }
 
         public override int VisitFunDecl(FunDecl d)
         {
-            _sb.AppendLine();
             _sb.Append("fun ").Append(d.name);
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
 
@@ -67,30 +65,34 @@ namespace ProofGeneration.IsaPrettyPrint
 
                 string args = IsaPrettyPrinterHelper.SpaceAggregate(_termPrinter.VisitList(tuple.Item1));
 
-                _sb.Append("\"");
-                _sb.Append(d.name).Append(" ").Append(args).Append(" = ").Append(_termPrinter.Visit(tuple.Item2));
-                _sb.Append("\"");
+                AppendInner( () =>
+                    _sb.Append(d.name).Append(" ").Append(args).Append(" = ").Append(_termPrinter.Visit(tuple.Item2))
+                );
             }
             return 0;
         }
 
         public override int VisitLemmaDecl(LemmaDecl d)
         {
-            _sb.AppendLine("lemma ").Append(d.name).Append(":");
+            _sb.Append("lemma ").Append(d.name).Append(":");
             _sb.AppendLine();
 
             PrintContextElem(d.contextElem);
 
             _sb.AppendLine();
 
+            _sb.Append("shows ");
+            AppendInner(_termPrinter.Visit(d.statement));
+
+            _sb.AppendLine();
             PrintProof(d.proof);
 
             return 0;
         }
 
         public override int VisitLocaleDecl(LocaleDecl d)
-        {
-            _sb.AppendLine("locale ").Append(d.name).Append(" = ");
+        {            
+            _sb.Append("locale ").Append(d.name).Append(" = ");
             _sb.AppendLine();
 
             PrintContextElem(d.contextElem);
@@ -102,9 +104,10 @@ namespace ProofGeneration.IsaPrettyPrint
             foreach (DefDecl def in d.body)
             {
                 def.Dispatch(this);
+                _sb.AppendLine();
             }
 
-            _sb.AppendLine(); _sb.AppendLine();            
+            _sb.AppendLine();            
 
             _sb.AppendLine("end");
 
@@ -126,9 +129,7 @@ namespace ProofGeneration.IsaPrettyPrint
 
                     _sb.Append(fix.Item1.Dispatch(_termPrinter));
                     _sb.Append(" :: ");
-                    _sb.Append("\"");
-                    _sb.Append(fix.Item2.Dispatch(_typeIsaPrinter));
-                    _sb.Append("\"");
+                    AppendInner(fix.Item2.Dispatch(_typeIsaPrinter));
                 }
             }
 
@@ -142,24 +143,38 @@ namespace ProofGeneration.IsaPrettyPrint
                     if (first)
                         first = false;
                     else
+                    {                        
                         _sb.Append(" and ");
+                        _sb.AppendLine();
+                    }
 
-                    _sb.Append(t.Dispatch(_termPrinter));
+
+                    AppendInner(t.Dispatch(_termPrinter));
                 }
             }
 
             return 0;
         }
 
-        public int PrintProof(Proof p)
+        public void AppendInner(string s)
         {
-            foreach(var v in p.methods) {
-                _sb.AppendLine("apply  " + IsaPrettyPrinterHelper.Parenthesis(v));
+            _sb.Append("\"");
+            _sb.Append(s);
+            _sb.Append("\"");
+        }
+
+        public void AppendInner(Action action)
+        {
+            _sb.Append("\"");
+            action.Invoke();
+            _sb.Append("\"");
+        }
+
+        public void PrintProof(Proof p)
+        {
+            foreach(var m in p.methods) {
+                _sb.AppendLine(m);
             }
-
-            _sb.AppendLine("done");
-
-            return 0;
         }
     }
 }

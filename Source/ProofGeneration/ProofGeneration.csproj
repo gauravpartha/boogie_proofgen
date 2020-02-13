@@ -72,6 +72,8 @@
     <Compile Include="Isa\IsaVisitor.cs" />
     <Compile Include="Isa\OuterAst.cs" />
     <Compile Include="Isa\ProofAst.cs" />
+    <Compile Include="ProgramToVCProof\ProgramToVCProof.cs" />
+    <Compile Include="ProgramToVCProof\PureToBoogieValConverter.cs" />
     <Compile Include="ProofGenerationExceptions.cs" />
     <Compile Include="ProofGenerationLayer.cs" />
     <Compile Include="ResultReadOnlyVisitor.cs" />

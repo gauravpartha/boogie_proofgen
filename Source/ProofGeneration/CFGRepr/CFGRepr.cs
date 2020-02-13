@@ -9,7 +9,7 @@ using System.Linq;
 
 namespace ProofGeneration.CFGRepresentation
 {
-    class CFGRepr
+    public class CFGRepr
     {
         public readonly IDictionary<Block, IList<Block>> outgoingBlocks;
         public readonly IDictionary<Block, int> labeling;

@@ -88,16 +88,7 @@ namespace ProofGeneration
                 //right side of equation is command
                 Term lhs = new NatConst(kv.Value);
 
-                IList<Term> cmdsIsa = new List<Term>();
-
-                foreach(Cmd cmd in kv.Key.cmds)
-                {
-                    cmdsIsa.Add(cmdIsaVisitor.Translate(cmd));
-                    if(!cmdIsaVisitor.StateIsFresh())
-                    {
-                        throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.VISITOR_NOT_FRESH);
-                    }
-                }
+                IList<Term> cmdsIsa = cmdIsaVisitor.Translate(kv.Key.Cmds);
 
                 Term rhs = IsaCommonTerms.SomeOption(new TermList(cmdsIsa));
 

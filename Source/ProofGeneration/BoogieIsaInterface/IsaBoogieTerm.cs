@@ -11,6 +11,13 @@ namespace ProofGeneration
     class IsaBoogieTerm
     {
 
+        public readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
+        public readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
+        public readonly static TermIdent magicStateId = IsaCommonTerms.TermIdentFromName("Magic");
+        public readonly static TermIdent failureStateId = IsaCommonTerms.TermIdentFromName("Failure");
+
+        //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
+
         public static Term ExprFromVal(Term val)
         {
             return new TermApp(IsaCommonTerms.TermIdentFromName("Val"), new List<Term>() { val });
@@ -25,13 +32,23 @@ namespace ProofGeneration
         public static Term IntVal(Microsoft.Basetypes.BigNum num)
         {
             Term intConst = new IntConst(num);
-            return new TermApp(IsaCommonTerms.TermIdentFromName("IntV"), new List<Term>() { intConst });
+            return IntVal(intConst);
+        }
+
+        public static Term IntVal(Term i)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("IntV"), new List<Term>() { i });
         }
 
         public static Term BoolVal(bool b)
         {
             Term boolConst = new BoolConst(b);
-            return new TermApp(IsaCommonTerms.TermIdentFromName("BoolV"), new List<Term>() { boolConst });
+            return BoolVal(boolConst);
+        }
+
+        public static Term BoolVal(Term b)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("BoolV"), new List<Term>() { b });
         }
 
         public static Term Assert(Term arg)
@@ -113,5 +130,35 @@ namespace ProofGeneration
 
             return new TermApp(IsaCommonTerms.TermIdentFromName("Program"), new List<Term>() { fdeclsTerm, mdeclsTerm });
         }
+
+        public static Term Normal(Term n_s)
+        {
+            return new TermApp(normalStateId, new List<Term>() { n_s });
+        }
+
+        public static Term Magic()
+        {
+            return magicStateId;
+        }
+
+        public static Term Failure()
+        {
+            return failureStateId;
+        }
+
+        public static Term RedCmdList(Term context, Term cmdList, Term initState, Term finalState)
+        {
+            return
+                new TermApp(redCmdListId,
+                new List<Term>()
+                {
+                    context,
+                    cmdList,
+                    initState,
+                    finalState
+                }
+                );
+        }
+
     }
 }

@@ -14,13 +14,11 @@ namespace ProofGeneration.VCProofGen
     class VCToIsaInterface
     {
 
-        public static LocaleDecl ConvertVC(VCExpr vc, VCExpressionGenerator gen, Program p, Implementation impl)
+        public static LocaleDecl ConvertVC(VCExpr vc, VCExpressionGenerator gen, Program p, Implementation impl, CFGRepr cfg)
         {
             VCExpr vcNoLabels = VCExprLabelRemover.RemoveLabels(vc, gen);
             VCExprLet vcNoLabelLet = vcNoLabels as VCExprLet;
             Contract.Assert(vcNoLabelLet != null);
-
-            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
 
             IDictionary<Block, DefDecl> blockToVCExpr = VCBlockToIsaTranslator.IsaDefsFromVC(vcNoLabelLet, cfg, impl.InParams, impl.LocVars);
 
@@ -38,7 +36,7 @@ namespace ProofGeneration.VCProofGen
             return locale;
         }
 
-        //order: parameters, local variables, functions (no global variables for now)
+        //no global variables for now
         private static IList<Tuple<TermIdent, TypeIsa>> getVarsInVC(Program p, Implementation impl)
         {
             var pureTyIsaTransformer = new PureTyIsaTransformer();

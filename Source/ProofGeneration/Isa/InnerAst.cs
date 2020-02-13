@@ -126,6 +126,32 @@ namespace ProofGeneration.Isa
         }
     }
 
+    public class TermQuantifier : Term
+    {
+        public readonly IList<string> boundVars;
+        public readonly Term term;
+
+        public readonly QuantifierKind quantifier;
+
+        public enum QuantifierKind
+        {
+            ALL, EX
+        }
+
+        public TermQuantifier(IList<string> boundVars, Term term, QuantifierKind quantifier)
+        {
+            this.boundVars = boundVars;
+            this.quantifier = quantifier;
+            this.term = term;
+        }
+
+        public override T Dispatch<T>(TermVisitor<T> visitor)
+        {
+            return visitor.VisitTermQuantifier(this);
+        }
+    }
+
+
     public class TermBinary : Term
     {
         public readonly Term argLeft;
@@ -135,7 +161,7 @@ namespace ProofGeneration.Isa
 
         public enum BinaryOpCode
         {
-            EQ,
+            EQ, NEQ,
             LE,
             AND, OR, IMPLIES,
             ADD

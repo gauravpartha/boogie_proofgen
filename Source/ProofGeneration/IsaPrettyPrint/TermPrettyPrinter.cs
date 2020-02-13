@@ -88,6 +88,36 @@ namespace ProofGeneration.IsaPrettyPrint
             return IsaPrettyPrinterHelper.Parenthesis(IsaPrettyPrinterHelper.CommaAggregate(res));
         }
 
+        public override string VisitTermQuantifier(TermQuantifier t)
+        {
+            string qIsa = GetStringFromQuantifier(t.quantifier);
+            StringBuilder sb = new StringBuilder();
+            sb.Append("(");
+            sb.Append(qIsa);
+            sb.Append(" ");
+            sb.Append(IsaPrettyPrinterHelper.SpaceAggregate(t.boundVars));
+            sb.Append(".");
+
+            sb.Append(" ");
+            sb.Append(t.term.Dispatch(this));
+            sb.Append(")");
+
+            return sb.ToString();
+        }
+
+        public string GetStringFromQuantifier(TermQuantifier.QuantifierKind q)
+        {
+            switch(q)
+            {
+                case TermQuantifier.QuantifierKind.ALL:
+                    return "\\<forall>";
+                case TermQuantifier.QuantifierKind.EX:
+                    return "\\<exists>";
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
         public override string VisitTermBinary(TermBinary t)
         {
             //TODO: for critical operations, use a stack
@@ -108,6 +138,8 @@ namespace ProofGeneration.IsaPrettyPrint
                     return "\\<and>";
                 case TermBinary.BinaryOpCode.EQ:
                     return "=";
+                case TermBinary.BinaryOpCode.NEQ:
+                    return "\\<noteq>";
                 case TermBinary.BinaryOpCode.IMPLIES:
                     return "\\<longrightarrow>";
                 case TermBinary.BinaryOpCode.LE:
@@ -138,5 +170,6 @@ namespace ProofGeneration.IsaPrettyPrint
                     throw new NotImplementedException();
             }
         }
+
     }
 }

@@ -6,6 +6,7 @@ using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.IsaPrettyPrint;
 using ProofGeneration.VCProofGen;
+using ProofGeneration.ProgramToVCProof;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
@@ -29,11 +30,20 @@ namespace ProofGeneration
 
         public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Program p, Implementation impl)
         {
-           
-            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, p, impl);
+            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
+
+            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, p, impl, cfg);
+
+            List<OuterDecl> res = new List<OuterDecl>();
+            res.Add(locale);
+
+            IList<OuterDecl> lemmas = ProgramToVCProof.ProgramToVCProof.GenerateLemmas(p, impl, cfg);
+            res.AddRange(lemmas);
+
             var theory = new Theory("vc_" + impl.Proc.Name,
-                new List<string> { "Main" },
-                new List<OuterDecl> { locale });
+                new List<string> { "Semantics", "Util" },
+                res);
+
 
             StoreTheory(theory);
         }

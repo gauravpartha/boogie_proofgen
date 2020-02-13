@@ -17,6 +17,6 @@ namespace ProofGeneration.Isa
         public static TermIdent TermIdentFromName(string name)
         {
             return new TermIdent(new SimpleIdentifier(name));
-        }        
+        }
     }
 }

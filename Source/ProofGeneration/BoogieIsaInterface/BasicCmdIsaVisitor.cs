@@ -20,6 +20,22 @@ namespace ProofGeneration
             Contract.Invariant(Results.Count <= 1);
         }
 
+        public IList<Term> Translate(IList<Cmd> cmds)
+        {
+            IList<Term> cmdsIsa = new List<Term>();
+
+            foreach (Cmd cmd in cmds)
+            {
+                cmdsIsa.Add(Translate(cmd));
+                if (!StateIsFresh())
+                {
+                    throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.VISITOR_NOT_FRESH);
+                }
+            }
+
+            return cmdsIsa;
+        }
+
         protected override bool TranslatePrecondition(Absy node)
         {
             return node is Cmd || node is Expr;

@@ -73,6 +73,16 @@ namespace ProofGeneration.Isa
             this.fixedVariables = fixedVariables;
             this.assumptions = assumptions;
         }
+
+        public static ContextElem CreateWithFixedVars(IList<Tuple<TermIdent, TypeIsa>> fixedVariables)
+        {
+            return new ContextElem(fixedVariables, new List<Term>());
+        }
+
+        public static ContextElem CreateWithAssumptions(IList<Term> assumptions)
+        {
+            return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), assumptions);
+        }
     }
 
     public class LocaleDecl : OuterDecl
