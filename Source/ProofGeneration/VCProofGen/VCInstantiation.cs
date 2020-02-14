@@ -10,13 +10,28 @@ using System.Diagnostics.Contracts;
 namespace ProofGeneration.VCProofGen
 {
     //instantiates vc block definitions correctly
-    class VCInstantiation
+    public class VCInstantiation
     {
-        private readonly string prefix;
+        private readonly string LocaleName;        
 
         private readonly IDictionary<Block, DefDecl> blockToDef;
 
         private readonly IList<NamedDeclaration> holeSpec;
+
+        public VCInstantiation(IDictionary<Block, DefDecl> blockToDef, IList<NamedDeclaration> holeSpec) : this(blockToDef, holeSpec, "")
+        {
+        }
+
+        public VCInstantiation(IDictionary<Block, DefDecl> blockToDef, IList<NamedDeclaration> holeSpec, string LocaleName)
+        {
+            Contract.Requires(blockToDef != null);
+            Contract.Requires(holeSpec != null);
+            Contract.Requires(LocaleName != null);
+            
+            this.blockToDef = blockToDef;
+            this.holeSpec = holeSpec;
+            this.LocaleName = LocaleName;
+        }
 
         public Term GetVCBlockInstantiation(Block block, IDictionary<NamedDeclaration, Term> declToVC)
         {    
@@ -39,7 +54,7 @@ namespace ProofGeneration.VCProofGen
             Contract.Requires(block != null);
             Contract.Requires(blockToDef.ContainsKey(block));
 
-            return IsaCommonTerms.TermIdentFromName(prefix + blockToDef[block].name);
+            return IsaCommonTerms.TermIdentFromName((LocaleName.Count() > 0 ? LocaleName + "." : "") + blockToDef[block].name);
         }
 
     }

@@ -83,6 +83,7 @@
     <Compile Include="VCProofGen\VCExprLabelRemover.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
     <Compile Include="VCProofGen\VCExprToIsaTranslator.cs" />
+    <Compile Include="VCProofGen\VCInstantiation.cs" />
     <Compile Include="VCProofGen\VCToIsaInterface.cs" />
     <Compile Include="VCProofGen\VCBlockToIsaTranslator.cs" />
     <Compile Include="version.cs" />

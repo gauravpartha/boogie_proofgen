@@ -1,6 +1,7 @@
 ﻿using Microsoft.Boogie;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.VCProofGen;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,13 +10,13 @@ namespace ProofGeneration.ProgramToVCProof
 {
     public class ProgramToVCProof
     {
-        public static IList<OuterDecl> GenerateLemmas(Program p, Implementation impl, CFGRepr r)
+        public static IList<OuterDecl> GenerateLemmas(Program p, Implementation impl, CFGRepr cfg, VCInstantiation vcinst)
         {
             BasicCmdIsaVisitor basicCmdVisitor = new BasicCmdIsaVisitor();
 
             IList<OuterDecl> lemmaDecls = new List<OuterDecl>();
 
-            foreach(Block b in r.GetBlocksBackwards())
+            foreach(Block b in cfg.GetBlocksBackwards())
             {
                 Term context = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
                 Term normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
@@ -33,17 +34,70 @@ namespace ProofGeneration.ProgramToVCProof
                 IDictionary<Function, Term> funToInterpMapping = FunctionInterpMapping(p);
 
                 assumptions.AddRange(FunctionAssumptions(p, funToInterpMapping, declToVCMapping));
+                assumptions.Add(vcinst.GetVCBlockInstantiation(b, declToVCMapping));
 
-                //TODO: vc assumption
+                Term conclusion = ConclusionBlock(b, cfg.outgoingBlocks[b], normalInitState, finalState, declToVCMapping, vcinst);
 
-                Term statement = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+                Proof proof = BlockCorrectProof();
 
-                Proof oops = new Proof(new List<string>() { "oops" });
-
-                lemmaDecls.Add(new LemmaDecl(b.Label + "_" + "correct", ContextElem.CreateWithAssumptions(assumptions), statement, oops));
+                lemmaDecls.Add(new LemmaDecl(b.Label + "_" + "correct", ContextElem.CreateWithAssumptions(assumptions), conclusion, proof));
             }
 
             return lemmaDecls;
+        }
+
+        public static Proof BlockCorrectProof()
+        {
+            List<string> methods = new List<string>
+            {
+                "using assms",
+                "apply cases",
+                "apply (handle_cmd_list P: assms)",
+                "using assms",
+                "apply (metis (no_types, lifting) binop_lessOrEqual.simps(1) list.collapse option.inject val.inject(1))?",
+                "done"
+            };
+
+            return new Proof(methods);
+        }
+
+        public static Term ConclusionBlock(Block b, 
+            IEnumerable<Block> b_successors, 
+            Term normalInitState, 
+            Term finalState, 
+            IDictionary<NamedDeclaration, Term> declToVCMapping,
+            VCInstantiation vcinst)
+        {
+            Term nonFailureConclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+
+            string normalFinalState = "n_s'";
+            Term normalFinalStateTerm = IsaCommonTerms.TermIdentFromName(normalFinalState);
+
+            Term ifNormalConclusionLhs = new TermBinary(finalState, IsaBoogieTerm.Normal(normalFinalStateTerm), TermBinary.BinaryOpCode.EQ);
+
+            Term ifNormalConclusionRhs1 = new TermBinary(normalFinalStateTerm, normalInitState, TermBinary.BinaryOpCode.EQ);
+
+            Term ifNormalConclusionRhs = 
+                b_successors.Count() == 0 ? 
+                ifNormalConclusionRhs1 :
+                new TermBinary(
+                    ifNormalConclusionRhs1,
+                    b_successors.
+                        Select(b_suc => vcinst.GetVCBlockInstantiation(b, declToVCMapping)).
+                        Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.AND)),
+                    TermBinary.BinaryOpCode.AND);
+
+            Term ifNormalConclusion =
+                new TermQuantifier(
+                    TermQuantifier.QuantifierKind.ALL,
+                    new List<string>() { normalFinalState },
+                    new TermBinary(
+                        ifNormalConclusionLhs,
+                        ifNormalConclusionRhs,
+                        TermBinary.BinaryOpCode.IMPLIES)
+                    );
+
+            return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);        
         }
 
         public static IDictionary<NamedDeclaration, Term> FunAndVariableToVCMapping(Program p, Implementation impl)
@@ -75,7 +129,7 @@ namespace ProofGeneration.ProgramToVCProof
             {
 
                 //TODO: unique naming scheme
-                List<string> boundVars = getNames("farg", f.InParams.Count);
+                List<string> boundVars = GetNames("farg", f.InParams.Count);
 
                 List<Term> constructedTerms =
                     f.InParams.Select(
@@ -91,13 +145,13 @@ namespace ProofGeneration.ProgramToVCProof
 
                 Term equation = new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
 
-                assumptions.Add(new TermQuantifier(boundVars, equation, TermQuantifier.QuantifierKind.ALL));
+                assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundVars, equation));
             }
 
             return assumptions;
         }
 
-        public static List<string> getNames(string baseName, int count)
+        public static List<string> GetNames(string baseName, int count)
         {            
             var result = new List<string>();
             for(int i = 0; i < count; i++)

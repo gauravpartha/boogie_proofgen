@@ -138,10 +138,10 @@ namespace ProofGeneration.Isa
             ALL, EX
         }
 
-        public TermQuantifier(IList<string> boundVars, Term term, QuantifierKind quantifier)
+        public TermQuantifier(QuantifierKind quantifier, IList<string> boundVars, Term term)
         {
-            this.boundVars = boundVars;
             this.quantifier = quantifier;
+            this.boundVars = boundVars;
             this.term = term;
         }
 

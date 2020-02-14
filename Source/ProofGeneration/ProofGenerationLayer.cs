@@ -32,16 +32,16 @@ namespace ProofGeneration
         {
             var cfg = CFGReprTransformer.getCFGRepresentation(impl);
 
-            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, p, impl, cfg);
+            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, p, impl, cfg, out VCInstantiation vcinst);
 
             List<OuterDecl> res = new List<OuterDecl>();
             res.Add(locale);
 
-            IList<OuterDecl> lemmas = ProgramToVCProof.ProgramToVCProof.GenerateLemmas(p, impl, cfg);
+            IList<OuterDecl> lemmas = ProgramToVCProof.ProgramToVCProof.GenerateLemmas(p, impl, cfg, vcinst);
             res.AddRange(lemmas);
 
             var theory = new Theory("vc_" + impl.Proc.Name,
-                new List<string> { "Semantics", "Util" },
+                new List<string> { "Semantics", "Util"},
                 res);
 
 

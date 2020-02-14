@@ -6,7 +6,7 @@ namespace ProofGeneration.IsaPrettyPrint
 {
     //return value is ignored
     public class OuterDeclPrettyPrinter : OuterDeclVisitor<int>
-    {
+    {        
         StringBuilder _sb
         {
             get;
@@ -76,7 +76,7 @@ namespace ProofGeneration.IsaPrettyPrint
         {
             _sb.Append("lemma ").Append(d.name).Append(":");
             _sb.AppendLine();
-
+            
             PrintContextElem(d.contextElem);
 
             _sb.AppendLine();
