@@ -129,12 +129,12 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitGeOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.GE, arg);
         }
 
         public Term VisitGtOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.GT, arg);
         }
 
         public Term VisitIfThenElseOp(VCExprNAry node, List<Term> arg)
@@ -159,7 +159,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitLtOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.LT, arg);
         }
 
         public Term VisitModOp(VCExprNAry node, List<Term> arg)

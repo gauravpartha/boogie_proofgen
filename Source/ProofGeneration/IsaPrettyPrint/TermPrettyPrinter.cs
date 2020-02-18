@@ -142,8 +142,14 @@ namespace ProofGeneration.IsaPrettyPrint
                     return "\\<noteq>";
                 case TermBinary.BinaryOpCode.IMPLIES:
                     return "\\<longrightarrow>";
+                case TermBinary.BinaryOpCode.LT:
+                    return "<";
                 case TermBinary.BinaryOpCode.LE:
                     return "\\<le>";
+                case TermBinary.BinaryOpCode.GT:
+                    return ">";
+                case TermBinary.BinaryOpCode.GE:
+                    return "\\<ge>";
                 case TermBinary.BinaryOpCode.OR:
                     return "\\<or>";
                 default:

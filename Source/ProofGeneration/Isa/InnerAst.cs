@@ -60,6 +60,11 @@ namespace ProofGeneration.Isa
             this.arg = arg;
         }
 
+        public TermApp(Term fun, Term arg) : this(fun, new List<Term>() { arg })
+        {
+
+        }
+
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
             return visitor.VisitTermApp(this);
@@ -162,7 +167,7 @@ namespace ProofGeneration.Isa
         public enum BinaryOpCode
         {
             EQ, NEQ,
-            LE,
+            LT, LE, GT, GE,
             AND, OR, IMPLIES,
             ADD
         }

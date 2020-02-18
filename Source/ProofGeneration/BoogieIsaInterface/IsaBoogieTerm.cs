@@ -73,8 +73,17 @@ namespace ProofGeneration
                 case BinaryOperator.Opcode.Add:
                     bopIsa = "Add";
                     break;
+                case BinaryOperator.Opcode.Lt:
+                    bopIsa = "Lt";
+                    break;
                 case BinaryOperator.Opcode.Le:
                     bopIsa = "Le";
+                    break;
+                case BinaryOperator.Opcode.Gt:
+                    bopIsa = "Gt";
+                    break;
+                case BinaryOperator.Opcode.Ge:
+                    bopIsa = "Ge";
                     break;
                 case BinaryOperator.Opcode.And:
                     bopIsa = "And";
