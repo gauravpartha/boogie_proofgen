@@ -83,7 +83,7 @@ namespace ProofGeneration.ProgramToVCProof
                 new TermBinary(
                     ifNormalConclusionRhs1,
                     b_successors.
-                        Select(b_suc => vcinst.GetVCBlockInstantiation(b, declToVCMapping)).
+                        Select(b_suc => vcinst.GetVCBlockInstantiation(b_suc, declToVCMapping)).
                         Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.AND)),
                     TermBinary.BinaryOpCode.AND);
 
