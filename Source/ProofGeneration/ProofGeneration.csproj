@@ -80,6 +80,7 @@
     <Compile Include="Util.cs" />
     <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
     <Compile Include="VCProofGen\VCBlockExtractor.cs" />
+    <Compile Include="VCProofGen\VCExprDeclCollector.cs" />
     <Compile Include="VCProofGen\VCExprLabelRemover.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
     <Compile Include="VCProofGen\VCExprToIsaTranslator.cs" />

@@ -20,9 +20,11 @@ namespace ProofGeneration.VCProofGen
             VCExprLet vcNoLabelLet = vcNoLabels as VCExprLet;
             Contract.Assert(vcNoLabelLet != null);
 
-            IDictionary<Block, DefDecl> blockToVCExpr = VCBlockToIsaTranslator.IsaDefsFromVC(vcNoLabelLet, cfg, impl.InParams, impl.LocVars);
-
             IList<Tuple<TermIdent, TypeIsa>> varsInVC = GetVarsInVC(p, impl, out IList<NamedDeclaration> holeSpec);
+
+            IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcNoLabelLet, cfg);
+
+            IDictionary<Block, DefDecl> blockToVCExpr = VCBlockToIsaTranslator.IsaDefsFromVC(blockToVC, cfg, impl.InParams, impl.LocVars);
 
             //order vc definitions of blocks in correct order
             IList<OuterDecl> vcBlockDefs = new List<OuterDecl>();
@@ -34,7 +36,9 @@ namespace ProofGeneration.VCProofGen
 
             LocaleDecl locale = new LocaleDecl("vc", new ContextElem(varsInVC, new List<Term>()), vcBlockDefs);
 
-            vcinst = new VCInstantiation(blockToVCExpr, holeSpec, locale.name);
+
+
+            vcinst = new VCInstantiation(blockToVCExpr, holeSpec, GetActiveDeclsPerBlock(blockToVC, holeSpec, cfg), locale.name);
 
             return locale;
         }
@@ -51,8 +55,7 @@ namespace ProofGeneration.VCProofGen
             {
                 holeSpec.Add(v);
                 result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(v.Name), pureTyIsaTransformer.Translate(v.TypedIdent.Type)));                
-            }
-            
+            }            
 
             foreach(Function f in p.Functions)  {
                 holeSpec.Add(f);
@@ -68,6 +71,38 @@ namespace ProofGeneration.VCProofGen
 
             //TODO better interface
             return result;
+        }
+
+        private static IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(
+            IDictionary<Block, VCExpr> blockToVC, 
+            IList<NamedDeclaration> decls, 
+            CFGRepr cfg)
+        {
+            var blockToDecls = new Dictionary<Block, ISet<NamedDeclaration>>();
+
+            var nameToDecl = new Dictionary<string, NamedDeclaration>();
+            foreach (var decl in decls) {
+                nameToDecl.Add(decl.Name, decl);
+            }
+     
+            var declCollector = new VCExprDeclCollector();
+
+            foreach (Block b in cfg.GetBlocksBackwards())
+            {
+                ISet<NamedDeclaration> bDecls = declCollector.CollectNamedDeclarations(blockToVC[b], nameToDecl);
+                foreach(Block b_succ in cfg.outgoingBlocks[b])
+                {
+                    //flattening
+                    foreach (var sucDecl in blockToDecls[b_succ])
+                    {
+                        bDecls.Add(sucDecl);
+                    }
+                }
+
+                blockToDecls[b] = bDecls;
+            }
+
+            return blockToDecls;
         }
 
     }

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 using System.Diagnostics.Contracts;
@@ -18,18 +17,30 @@ namespace ProofGeneration.VCProofGen
 
         private readonly IList<NamedDeclaration> holeSpec;
 
-        public VCInstantiation(IDictionary<Block, DefDecl> blockToDef, IList<NamedDeclaration> holeSpec) : this(blockToDef, holeSpec, "")
+        //blocks are only parameterized by those declarations which appear in them, i.e. this should a subset of holeSpec
+        private readonly IDictionary<Block, ISet<NamedDeclaration>> blockToDecls;
+
+        public VCInstantiation(
+            IDictionary<Block, DefDecl> blockToDef, 
+            IList<NamedDeclaration> holeSpec, 
+            IDictionary<Block, ISet<NamedDeclaration>> blockToDecls) : this(blockToDef, holeSpec, blockToDecls, "")
         {
         }
 
-        public VCInstantiation(IDictionary<Block, DefDecl> blockToDef, IList<NamedDeclaration> holeSpec, string LocaleName)
+        public VCInstantiation(
+            IDictionary<Block, DefDecl> blockToDef, 
+            IList<NamedDeclaration> holeSpec, 
+            IDictionary<Block, ISet<NamedDeclaration>> blockToDecls, 
+            string LocaleName)
         {
             Contract.Requires(blockToDef != null);
             Contract.Requires(holeSpec != null);
+            Contract.Requires(blockToDecls != null);
             Contract.Requires(LocaleName != null);
             
             this.blockToDef = blockToDef;
             this.holeSpec = holeSpec;
+            this.blockToDecls = blockToDecls;
             this.LocaleName = LocaleName;
         }
 
@@ -43,7 +54,10 @@ namespace ProofGeneration.VCProofGen
             IList<Term> args = new List<Term>();
             foreach(NamedDeclaration decl in holeSpec)
             {
-                args.Add(declToVC[decl]);
+                if (blockToDecls[block].Contains(decl))
+                {                    
+                    args.Add(declToVC[decl]);
+                }
             }
 
             return new TermApp(GetVCBlockRef(block), args);

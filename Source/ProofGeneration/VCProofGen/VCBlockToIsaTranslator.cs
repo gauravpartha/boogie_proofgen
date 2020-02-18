@@ -11,11 +11,9 @@ namespace ProofGeneration.VCProofGen
 {
     class VCBlockToIsaTranslator
     {
-        public static IDictionary<Block, DefDecl> IsaDefsFromVC(VCExprLet vcLet, CFGRepr cfg, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
+        public static IDictionary<Block, DefDecl> IsaDefsFromVC(IDictionary<Block, VCExpr> blockToVC, CFGRepr cfg, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
         {
             Contract.Ensures(Contract.Result<IDictionary<Block, DefDecl>>().Count == cfg.GetBlocksBackwards().Count());
-
-            IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);          
 
             ISet<string> programVariables = new HashSet<string>(inParams.Select(v => v.Name).Concat(localVars.Select(v => v.Name)));
 
