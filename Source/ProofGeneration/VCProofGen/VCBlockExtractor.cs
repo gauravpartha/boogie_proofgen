@@ -21,12 +21,11 @@ namespace ProofGeneration.VCProofGen
 
             foreach (VCExprLetBinding binding in letExpr)
             {
-                string[] split = binding.V.Name.Split(new char[] { '_' });
-                if (split.Count() >= 2 && split[split.Length - 1].Equals("correct"))
+                bool predictionSuccess = PredictBlockName(binding.V.Name, out string predictedBlockName);
+                if (predictionSuccess)
                 {
                     try
                     {
-                        string predictedBlockName = split.Take(split.Length - 1).Concat("_");
                         var blockKV = cfg.outgoingBlocks.Single(kv => kv.Key.Label.Equals(predictedBlockName));
                         blockToVC.Add(blockKV.Key, binding.E);
                     } catch(Exception e)
@@ -47,6 +46,19 @@ namespace ProofGeneration.VCProofGen
             return blockToVC;
         }
 
+        public static bool PredictBlockName(string vcName, out string predictedBlockName)
+        {
+            string[] split = vcName.Split(new char[] { '_' });
+            if (split.Count() >= 2 && split[split.Length - 1].Equals("correct"))
+            {
+                predictedBlockName = split.Take(split.Length - 1).Concat("_");
+                return true;
+            } else
+            {
+                predictedBlockName = null;
+                return false;
+            }
+        }
 
     }
 }

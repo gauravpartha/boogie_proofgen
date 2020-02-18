@@ -142,7 +142,8 @@ namespace ProofGeneration.VCProofGen
         {
             if (programVariables.Contains(node.Name))
                 return IsaCommonTerms.TermIdentFromName(node.Name);
-            else if (TryGetDefFromBlock(node.Name.Split('_')[0], out DefDecl result))
+            else if (VCBlockExtractor.PredictBlockName(node.Name, out string predictedBlockName) &&
+                     TryGetDefFromBlock(predictedBlockName, out DefDecl result))
                 return IsaCommonTerms.TermIdentFromName(result.name);
             else
                 throw new ProofGenUnexpectedStateException<VCExprToIsaTranslator>(this.GetType(), "cannot resolve variable");
