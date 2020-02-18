@@ -33,7 +33,7 @@ namespace ProofGeneration.ProgramToVCProof
 
                 IDictionary<Function, Term> funToInterpMapping = FunctionInterpMapping(p);
 
-                assumptions.AddRange(FunctionAssumptions(p, funToInterpMapping, declToVCMapping));
+                assumptions.AddRange(FunctionAssumptions(p, funToInterpMapping, declToVCMapping, context));
                 assumptions.Add(vcinst.GetVCBlockInstantiation(b, declToVCMapping));
 
                 Term conclusion = ConclusionBlock(b, cfg.outgoingBlocks[b], normalInitState, finalState, declToVCMapping, vcinst);
@@ -116,9 +116,10 @@ namespace ProofGeneration.ProgramToVCProof
             return dict;
         }
 
-        public static IList<Term> FunctionAssumptions(Program p, 
+        public static IList<Term> FunctionAssumptions(Program p,                
                 IDictionary<Function, Term> funInterpMapping, 
-                IDictionary<NamedDeclaration, Term> declToVCMapping
+                IDictionary<NamedDeclaration, Term> declToVCMapping,
+                Term context
             )
         {
             IList<Term> assumptions = new List<Term>();
@@ -126,8 +127,15 @@ namespace ProofGeneration.ProgramToVCProof
             var converter = new PureToBoogieValConverter();
 
             foreach(Function f in p.Functions)
-            {
+            {               
+                #region context well-formed
+                Term ctxWfLeft = new TermApp(IsaCommonTerms.Snd(context), new List<Term>() { new StringConst(f.Name) });
+                Term ctxWfRight = IsaCommonTerms.SomeOption(funInterpMapping[f]);
 
+                assumptions.Add(new TermBinary(ctxWfLeft, ctxWfRight, TermBinary.BinaryOpCode.EQ));
+                #endregion                
+
+                #region relation interpretation and pure function
                 //TODO: unique naming scheme
                 List<string> boundVars = GetNames("farg", f.InParams.Count);
 
@@ -139,13 +147,18 @@ namespace ProofGeneration.ProgramToVCProof
                 Term left = new TermApp(funInterpMapping[f], new List<Term>() { new TermList(constructedTerms) });
 
                 Term right = IsaCommonTerms.SomeOption(
-                    new TermApp(declToVCMapping[f], 
-                    boundVars.Select(bv => (Term) IsaCommonTerms.TermIdentFromName(bv)).ToList())
+                    converter.ConvertToBoogieVal(f.OutParams.First().TypedIdent.Type,
+                        new TermApp(declToVCMapping[f], 
+                            boundVars.Select(bv => (Term) IsaCommonTerms.TermIdentFromName(bv)).ToList()
+                        )
+                    )
                     );
 
                 Term equation = new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
 
                 assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundVars, equation));
+                #endregion
+
             }
 
             return assumptions;
