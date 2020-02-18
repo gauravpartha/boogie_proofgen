@@ -38,7 +38,7 @@ namespace ProofGeneration.ProgramToVCProof
 
                 Term conclusion = ConclusionBlock(b, cfg.outgoingBlocks[b], normalInitState, finalState, declToVCMapping, vcinst);
 
-                Proof proof = BlockCorrectProof();
+                Proof proof = BlockCorrectProof(b, vcinst);
 
                 lemmaDecls.Add(new LemmaDecl(b.Label + "_" + "correct", ContextElem.CreateWithAssumptions(assumptions), conclusion, proof));
             }
@@ -46,16 +46,15 @@ namespace ProofGeneration.ProgramToVCProof
             return lemmaDecls;
         }
 
-        public static Proof BlockCorrectProof()
+        public static Proof BlockCorrectProof(Block b, VCInstantiation vcinst)
         {
             List<string> methods = new List<string>
             {
                 "using assms",
                 "apply cases",
-                "apply (handle_cmd_list P: assms)",
-                "using assms",
-                "apply (metis (no_types, lifting) binop_lessOrEqual.simps(1) list.collapse option.inject val.inject(1))?",
-                "done"
+                "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + ")",
+                "apply (handle_cmd_list_full)",
+                "apply by (auto?)"
             };
 
             return new Proof(methods);
@@ -158,7 +157,6 @@ namespace ProofGeneration.ProgramToVCProof
 
                 assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundVars, equation));
                 #endregion
-
             }
 
             return assumptions;

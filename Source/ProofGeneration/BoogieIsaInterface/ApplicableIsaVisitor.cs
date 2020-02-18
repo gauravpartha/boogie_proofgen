@@ -19,7 +19,12 @@ namespace ProofGeneration
 
         public Term Visit(UnaryOperator unaryOperator)
         {
-            throw new NotImplementedException();
+            if(_args.Count != 1)
+            {
+                throw new ExprArgException();
+            }
+
+            return IsaBoogieTerm.Unop(unaryOperator.Op, _args[0]);
         }
 
         public Term Visit(BinaryOperator binaryOperator)

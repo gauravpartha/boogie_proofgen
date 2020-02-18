@@ -73,6 +73,12 @@ namespace ProofGeneration
                 case BinaryOperator.Opcode.Add:
                     bopIsa = "Add";
                     break;
+                case BinaryOperator.Opcode.Sub:
+                    bopIsa = "Sub";
+                    break;
+                case BinaryOperator.Opcode.Mul:
+                    bopIsa = "Mul";
+                    break;
                 case BinaryOperator.Opcode.Lt:
                     bopIsa = "Lt";
                     break;
@@ -94,6 +100,23 @@ namespace ProofGeneration
 
             var list = new List<Term>() { arg1, IsaCommonTerms.TermIdentFromName(bopIsa), arg2 };
             return new TermApp(IsaCommonTerms.TermIdentFromName("BinOp"), list);
+        }
+
+        public static Term Unop(UnaryOperator.Opcode opcode, Term arg)
+        {
+            string uopIsa;
+
+            switch (opcode)
+            {
+                case UnaryOperator.Opcode.Not:
+                    uopIsa = "Not";
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            var list = new List<Term>() { IsaCommonTerms.TermIdentFromName(uopIsa), arg };
+            return new TermApp(IsaCommonTerms.TermIdentFromName("UnOp"), list);
         }
 
         public static Term FunCall(string fname, IList<Term> args)

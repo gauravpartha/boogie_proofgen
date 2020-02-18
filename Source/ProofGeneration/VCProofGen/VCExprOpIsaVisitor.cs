@@ -169,7 +169,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitMulOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.MUL, arg);
         }
 
         public Term VisitNeqOp(VCExprNAry node, List<Term> arg)
@@ -209,7 +209,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitSubOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.SUB, arg);
         }
 
         public Term VisitSubtype3Op(VCExprNAry node, List<Term> arg)

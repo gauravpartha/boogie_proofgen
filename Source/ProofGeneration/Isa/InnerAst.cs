@@ -169,7 +169,7 @@ namespace ProofGeneration.Isa
             EQ, NEQ,
             LT, LE, GT, GE,
             AND, OR, IMPLIES,
-            ADD
+            ADD, SUB, MUL
         }
 
         public TermBinary(Term argLeft, Term argRight, BinaryOpCode op)

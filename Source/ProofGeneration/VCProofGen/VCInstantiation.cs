@@ -68,7 +68,15 @@ namespace ProofGeneration.VCProofGen
             Contract.Requires(block != null);
             Contract.Requires(blockToDef.ContainsKey(block));
 
-            return IsaCommonTerms.TermIdentFromName((LocaleName.Count() > 0 ? LocaleName + "." : "") + blockToDef[block].name);
+            return IsaCommonTerms.TermIdentFromName(GetVCBlockNameRef(block));
+        }
+
+        public string GetVCBlockNameRef(Block block)
+        {
+            Contract.Requires(block != null);
+            Contract.Requires(blockToDef.ContainsKey(block));
+
+            return (LocaleName.Count() > 0 ? LocaleName + "." : "") + blockToDef[block].name;
         }
 
     }

@@ -134,6 +134,10 @@ namespace ProofGeneration.IsaPrettyPrint
             {
                 case TermBinary.BinaryOpCode.ADD:
                     return "+";
+                case TermBinary.BinaryOpCode.SUB:
+                    return "-";
+                case TermBinary.BinaryOpCode.MUL:
+                    return "*";
                 case TermBinary.BinaryOpCode.AND:
                     return "\\<and>";
                 case TermBinary.BinaryOpCode.EQ:
