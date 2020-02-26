@@ -38,6 +38,8 @@ namespace ProofGeneration.Isa
 
         public abstract R VisitTermApp(TermApp t);
 
+        public abstract R VisitTermWithExplicitType(TermWithExplicitType t);
+
         public abstract R VisitTermList(TermList t);
 
         public abstract R VisitTermSet(TermSet t);

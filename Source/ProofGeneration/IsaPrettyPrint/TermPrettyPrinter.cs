@@ -8,6 +8,8 @@ namespace ProofGeneration.IsaPrettyPrint
 {
     public class TermPrettyPrinter : TermVisitor<string>
     {
+        private readonly TypeIsaPrettyPrinter typePrettyPrinter = new TypeIsaPrettyPrinter();
+
         public override string VisitBoolConst(BoolConst t)
         {
             return t.b ? "True" : "False";
@@ -49,6 +51,14 @@ namespace ProofGeneration.IsaPrettyPrint
             IList<string> rArgs = VisitList(t.arg);
 
             return IsaPrettyPrinterHelper.Parenthesis(rFun + " " + IsaPrettyPrinterHelper.SpaceAggregate(rArgs));
+        }
+
+        public override string VisitTermWithExplicitType(TermWithExplicitType t)
+        {
+            string rTerm = Visit(t.term);
+            string rType = typePrettyPrinter.Visit(t.type);
+
+            return IsaPrettyPrinterHelper.Parenthesis(rTerm + "::" + rType);
         }
 
         public override string VisitTermIdent(TermIdent t)
@@ -180,6 +190,5 @@ namespace ProofGeneration.IsaPrettyPrint
                     throw new NotImplementedException();
             }
         }
-
     }
 }

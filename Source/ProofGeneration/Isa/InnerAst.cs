@@ -71,6 +71,23 @@ namespace ProofGeneration.Isa
         }
     }
 
+    public class TermWithExplicitType : Term
+    {
+        public readonly Term term;
+        public readonly TypeIsa type;
+
+        public TermWithExplicitType(Term term, TypeIsa type)
+        {
+            this.term = term;
+            this.type = type;
+        }
+
+        public override T Dispatch<T>(TermVisitor<T> visitor)
+        {
+            return visitor.VisitTermWithExplicitType(this);
+        }
+    }
+
     public class TermList : Term
     {
         public readonly IList<Term> list;
