@@ -94,6 +94,12 @@ namespace ProofGeneration
                 case BinaryOperator.Opcode.And:
                     bopIsa = "And";
                     break;
+                case BinaryOperator.Opcode.Or:
+                    bopIsa = "Or";
+                    break;
+                case BinaryOperator.Opcode.Imp:
+                    bopIsa = "Imp";
+                    break;
                 default:
                     throw new NotImplementedException();
             }
