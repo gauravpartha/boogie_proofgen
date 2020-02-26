@@ -101,9 +101,9 @@ namespace ProofGeneration.IsaPrettyPrint
             _sb.Append("begin");
             _sb.AppendLine(); _sb.AppendLine();
 
-            foreach (DefDecl def in d.body)
+            foreach (OuterDecl decl in d.body)
             {
-                def.Dispatch(this);
+                decl.Dispatch(this);
                 _sb.AppendLine();
             }
 

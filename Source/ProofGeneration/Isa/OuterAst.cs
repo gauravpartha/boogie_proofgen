@@ -116,6 +116,12 @@ namespace ProofGeneration.Isa
             this.proof = proof;
         }
 
+        public LemmaDecl(string name, Term statement, Proof proof) : 
+            this(name, new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), new List<Term>()), statement, proof)
+        {
+
+        }
+
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitLemmaDecl(this);
