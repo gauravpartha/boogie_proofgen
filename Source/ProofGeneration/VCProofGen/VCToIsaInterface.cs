@@ -14,37 +14,79 @@ namespace ProofGeneration.VCProofGen
     class VCToIsaInterface
     {
 
-        public static LocaleDecl ConvertVC(VCExpr vc, VCExpressionGenerator gen, Program p, Implementation impl, CFGRepr cfg, out VCInstantiation vcinst)
+        public static LocaleDecl ConvertVC(
+            VCExpr vc, 
+            VCExpressionGenerator gen, 
+            Boogie2VCExprTranslator translator, 
+            Program p, 
+            Implementation impl, 
+            CFGRepr cfg, 
+            out VCInstantiation vcinst)
         {
             VCExpr vcNoLabels = VCExprLabelRemover.RemoveLabels(vc, gen);
             VCExprLet vcNoLabelLet = vcNoLabels as VCExprLet;
             Contract.Assert(vcNoLabelLet != null);
 
-            IList<Tuple<TermIdent, TypeIsa>> varsInVC = GetVarsInVC(p, impl, out IList<NamedDeclaration> holeSpec);
+            UniqueNamer uniqueNamer = new UniqueNamer();
+            uniqueNamer.Spacer = "_";
+
+            IList<Tuple<TermIdent, TypeIsa>> varsInVC = GetVarsInVC(p, impl, translator, uniqueNamer, out IList<NamedDeclaration> holeSpec);
 
             IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcNoLabelLet, cfg);
 
-            IDictionary<Block, DefDecl> blockToVCExpr = VCBlockToIsaTranslator.IsaDefsFromVC(blockToVC, cfg, impl.InParams, impl.LocVars);
+            var blockToIsaTranslator = new VCBlockToIsaTranslator(uniqueNamer);
+            IDictionary<Block, DefDecl> blockToVCExpr = blockToIsaTranslator.IsaDefsFromVC(blockToVC, cfg, impl.InParams, impl.LocVars);
 
             //order vc definitions of blocks in correct order
-            IList<OuterDecl> vcBlockDefs = new List<OuterDecl>();
+            IList<OuterDecl> vcOuterDecls = new List<OuterDecl>();
 
             foreach(var block in cfg.GetBlocksBackwards())
             {
-                vcBlockDefs.Add(blockToVCExpr[block]);
+                vcOuterDecls.Add(blockToVCExpr[block]);
             }
 
-            LocaleDecl locale = new LocaleDecl("vc", new ContextElem(varsInVC, new List<Term>()), vcBlockDefs);
+            IDictionary<VCExprVar, Variable> vcToBoogieVar = VCExprToBoogieVar(translator, holeSpec);
 
+            //reason for using two references: cannot use out paramaters in lambda expressions
+            vcinst = new VCInstantiation(blockToVCExpr, holeSpec, GetActiveDeclsPerBlock(blockToVC, vcToBoogieVar, holeSpec, cfg), "vc");
+            var vcinstInternal = vcinst;
 
+            var blah = cfg.GetBlocksForwards().Select(b => vcinstInternal.GetVCBlockNameRef(b, false) + "_def").Concat(" ");
 
-            vcinst = new VCInstantiation(blockToVCExpr, holeSpec, GetActiveDeclsPerBlock(blockToVC, holeSpec, cfg), locale.name);
+            LemmaDecl vcCorrectLemma = new LemmaDecl("vc_correct",
+                vcinstInternal.GetVCBlockRef(cfg.entry, false),
+                new Proof(
+                  new List<string>() {
+                      "apply (simp only: " +
+                      cfg.GetBlocksForwards().Select(b => vcinstInternal.GetVCBlockNameRef(b, false) + "_def").Concat(" ")
+                      + ")",
+                      "oops"
+                  }
+                ));
 
-            return locale;
+            vcOuterDecls.Add(vcCorrectLemma);
+
+            return new LocaleDecl("vc", new ContextElem(varsInVC, new List<Term>()), vcOuterDecls);
+        }
+
+        private static IDictionary<VCExprVar, Variable> VCExprToBoogieVar(Boogie2VCExprTranslator translator, IList<NamedDeclaration> decls)
+        {
+            var vcToBoogieVar = new Dictionary<VCExprVar, Variable>();
+            foreach(var decl in decls)
+            {
+                if(decl is Variable boogieVar)
+                {
+                    VCExprVar result = translator.TryLookupVariable(boogieVar);
+                    if (result != null)
+                        vcToBoogieVar.Add(result, boogieVar);
+                }
+            }
+
+            return vcToBoogieVar;
         }
 
         //no global variables for now
-        private static IList<Tuple<TermIdent, TypeIsa>> GetVarsInVC(Program p, Implementation impl, out IList<NamedDeclaration> holeSpec)
+        private static IList<Tuple<TermIdent, TypeIsa>> GetVarsInVC(Program p, Implementation impl, Boogie2VCExprTranslator translator, UniqueNamer uniqueNamer, out IList<NamedDeclaration> holeSpec)
         {
             var pureTyIsaTransformer = new PureTyIsaTransformer();
 
@@ -52,9 +94,16 @@ namespace ProofGeneration.VCProofGen
             holeSpec = new List<NamedDeclaration>(); 
 
             foreach(Variable v in impl.InParams.Concat(impl.LocVars))
-            {
+            {                
                 holeSpec.Add(v);
-                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(v.Name), pureTyIsaTransformer.Translate(v.TypedIdent.Type)));                
+
+                VCExprVar vcVar = translator.TryLookupVariable(v);
+                if(v == null)
+                {
+                    throw new ProofGenUnexpectedStateException<VCToIsaInterface>(typeof(VCToIsaInterface), "Could not find VC counterpart of Boogie variable.");
+                }
+
+                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(vcVar, vcVar.Name)), pureTyIsaTransformer.Translate(v.TypedIdent.Type)));                
             }            
 
             foreach(Function f in p.Functions)  {
@@ -69,27 +118,22 @@ namespace ProofGeneration.VCProofGen
                 result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(f.Name), funType));
             }
 
-            //TODO better interface
             return result;
         }
 
         private static IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(
-            IDictionary<Block, VCExpr> blockToVC, 
+            IDictionary<Block, VCExpr> blockToVC,
+            IDictionary<VCExprVar, Variable> vcToBoogieVar,
             IList<NamedDeclaration> decls, 
             CFGRepr cfg)
         {
             var blockToDecls = new Dictionary<Block, ISet<NamedDeclaration>>();
-
-            var nameToDecl = new Dictionary<string, NamedDeclaration>();
-            foreach (var decl in decls) {
-                nameToDecl.Add(decl.Name, decl);
-            }
      
             var declCollector = new VCExprDeclCollector();
 
             foreach (Block b in cfg.GetBlocksBackwards())
             {
-                ISet<NamedDeclaration> bDecls = declCollector.CollectNamedDeclarations(blockToVC[b], nameToDecl);
+                ISet<NamedDeclaration> bDecls = declCollector.CollectNamedDeclarations(blockToVC[b], vcToBoogieVar);
                 foreach(Block b_succ in cfg.outgoingBlocks[b])
                 {
                     //flattening

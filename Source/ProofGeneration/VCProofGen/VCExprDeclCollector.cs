@@ -10,12 +10,13 @@ namespace ProofGeneration.VCProofGen
 {
     class VCExprDeclCollector : TraversingVCExprVisitor<bool, bool>
     {
-        private ISet<NamedDeclaration> NamedDeclarations;
-        private IDictionary<string, NamedDeclaration> NameToDecl;
+        private ISet<NamedDeclaration> NamedDeclarations;        
 
-        public ISet<NamedDeclaration> CollectNamedDeclarations(VCExpr node, IDictionary<string, NamedDeclaration> NameToDecl)
+        private IDictionary<VCExprVar, Variable> VcToVar;
+
+        public ISet<NamedDeclaration> CollectNamedDeclarations(VCExpr node, IDictionary<VCExprVar, Variable> vcToVar)
         {
-            this.NameToDecl = NameToDecl;
+            this.VcToVar = vcToVar;
             this.NamedDeclarations = new HashSet<NamedDeclaration>();
 
             node.Accept(this, true);
@@ -24,11 +25,12 @@ namespace ProofGeneration.VCProofGen
 
         protected override bool StandardResult(VCExpr node, bool arg)
         {
-            if(node is VCExprVar varNode)
+            if(node is VCExprVar varNode && VcToVar.TryGetValue(varNode, out Variable boogieVar))
             {
-                bool success = NameToDecl.TryGetValue(varNode.Name, out NamedDeclaration result);
-                if (success)
-                    NamedDeclarations.Add(result);                
+                 NamedDeclarations.Add(boogieVar);
+            } else if(node is VCExprNAry vcExprNAry && vcExprNAry.Op is VCExprBoogieFunctionOp boogieFunOp)
+            {
+                NamedDeclarations.Add(boogieFunOp.Func);
             }
 
             return true;

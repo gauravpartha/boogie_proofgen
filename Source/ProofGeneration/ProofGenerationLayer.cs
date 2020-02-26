@@ -27,12 +27,12 @@ namespace ProofGeneration
 
             StoreTheory(theory);
         }
-
-        public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Program p, Implementation impl)
+       
+        public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator, Program p, Implementation impl)
         {
             var cfg = CFGReprTransformer.getCFGRepresentation(impl);
 
-            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, p, impl, cfg, out VCInstantiation vcinst);
+            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, translator, p, impl, cfg, out VCInstantiation vcinst);
 
             List<OuterDecl> res = new List<OuterDecl>();
             res.Add(locale);

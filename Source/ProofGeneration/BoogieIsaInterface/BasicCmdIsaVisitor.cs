@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Basetypes;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 
@@ -12,6 +9,18 @@ namespace ProofGeneration
 {
     class BasicCmdIsaVisitor : ResultReadOnlyVisitor<Term>
     {
+
+        private readonly Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer;
+
+        public BasicCmdIsaVisitor(Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer)
+        {
+            this.uniqueNamer = uniqueNamer;
+        }
+
+        public BasicCmdIsaVisitor() : this(new Microsoft.Boogie.VCExprAST.UniqueNamer())
+        {
+            uniqueNamer.Spacer = "_";
+        }
 
         [ContractInvariantMethod]
         void ObjectInvariant()
@@ -49,6 +58,19 @@ namespace ProofGeneration
             return node;
         }
 
+        public override Cmd VisitAssertEnsuresCmd(AssertEnsuresCmd node)
+        {
+            //ignore ensures node for now, TODO
+            return VisitAssertCmd(node);
+        }
+
+
+        public override Cmd VisitAssertRequiresCmd(AssertRequiresCmd node)
+        {
+            //ignore requires node for now, TODO
+            return VisitAssertCmd(node);
+        }
+
         public override Cmd VisitAssumeCmd(AssumeCmd node)
         {
             Term result = Translate(node.Expr);
@@ -75,7 +97,7 @@ namespace ProofGeneration
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            ReturnResult(IsaBoogieTerm.Var(node.Name));
+            ReturnResult(IsaBoogieTerm.Var(uniqueNamer.GetName(node.Decl, node.Name)));
             //TODO: also look at decl?
             return node;
         }

@@ -12,7 +12,10 @@ namespace ProofGeneration.ProgramToVCProof
     {
         public static IList<OuterDecl> GenerateLemmas(Program p, Implementation impl, CFGRepr cfg, VCInstantiation vcinst)
         {
-            BasicCmdIsaVisitor basicCmdVisitor = new BasicCmdIsaVisitor();
+            var uniqueNamer = new Microsoft.Boogie.VCExprAST.UniqueNamer();
+            uniqueNamer.Spacer = "_";           
+
+            BasicCmdIsaVisitor basicCmdVisitor = new BasicCmdIsaVisitor(uniqueNamer);
 
             IList<OuterDecl> lemmaDecls = new List<OuterDecl>();
 
@@ -26,10 +29,11 @@ namespace ProofGeneration.ProgramToVCProof
                 Term cmds = new TermList(basicCmdVisitor.Translate(b.Cmds));
                 Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
 
-                IDictionary<NamedDeclaration, Term> declToVCMapping = FunAndVariableToVCMapping(p, impl);
+                //separate unique namer for raw VC values
+                IDictionary<NamedDeclaration, Term> declToVCMapping = FunAndVariableToVCMapping(p, impl, new Microsoft.Boogie.VCExprAST.UniqueNamer());
 
                 List<Term> assumptions = new List<Term>() { cmdsReduce };
-                assumptions.AddRange(VariableAssumptions(impl, normalInitState, declToVCMapping));
+                assumptions.AddRange(VariableAssumptions(impl, normalInitState, declToVCMapping, uniqueNamer));
 
                 IDictionary<Function, Term> funToInterpMapping = FunctionInterpMapping(p);
 
@@ -52,9 +56,9 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 "using assms",
                 "apply cases",
-                "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + ")",
-                "apply (handle_cmd_list_full)",
-                "apply by (auto?)"
+                "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
+                "apply (handle_cmd_list_full?)",
+                "by (auto?)"
             };
 
             return new Proof(methods);
@@ -99,7 +103,7 @@ namespace ProofGeneration.ProgramToVCProof
             return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);        
         }
 
-        public static IDictionary<NamedDeclaration, Term> FunAndVariableToVCMapping(Program p, Implementation impl)
+        public static IDictionary<NamedDeclaration, Term> FunAndVariableToVCMapping(Program p, Implementation impl, Microsoft.Boogie.VCExprAST.UniqueNamer vcNamer)
         {
             var dict = new Dictionary<NamedDeclaration, Term>();
             foreach(Function f in p.Functions)
@@ -109,7 +113,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             foreach(Variable v in impl.InParams.Union(impl.LocVars))
             {
-                dict.Add(v, IsaCommonTerms.TermIdentFromName("vc_" + v.Name));
+                dict.Add(v, IsaCommonTerms.TermIdentFromName(vcNamer.GetName(v, "vc_" + v.Name)));
             }
 
             return dict;
@@ -182,7 +186,7 @@ namespace ProofGeneration.ProgramToVCProof
             return dict;
         }
 
-        public static IList<Term> VariableAssumptions(Implementation impl, Term initialState, IDictionary<NamedDeclaration, Term> declToVCMapping)
+        public static IList<Term> VariableAssumptions(Implementation impl, Term initialState, IDictionary<NamedDeclaration, Term> declToVCMapping, Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer)
         {
             var result = new List<Term>();
 
@@ -190,7 +194,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             foreach (Variable v in impl.InParams.Union(impl.LocVars))
             {
-                Term left = new TermApp(initialState, new List<Term>() { new StringConst(v.Name) });
+                Term left = new TermApp(initialState, new List<Term>() { new StringConst(uniqueNamer.GetName(v, v.Name)) });
                 Term right = IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, declToVCMapping[v]));
                 result.Add(new TermBinary(left, right, TermBinary.BinaryOpCode.EQ));
             }

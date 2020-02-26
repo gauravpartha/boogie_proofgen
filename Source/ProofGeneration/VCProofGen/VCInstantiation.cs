@@ -63,20 +63,22 @@ namespace ProofGeneration.VCProofGen
             return new TermApp(GetVCBlockRef(block), args);
         }
 
-        public Term GetVCBlockRef(Block block)
+        public Term GetVCBlockRef(Block block, bool qualified = true)
         {
             Contract.Requires(block != null);
             Contract.Requires(blockToDef.ContainsKey(block));
 
-            return IsaCommonTerms.TermIdentFromName(GetVCBlockNameRef(block));
+            return IsaCommonTerms.TermIdentFromName(GetVCBlockNameRef(block, qualified));
         }
 
-        public string GetVCBlockNameRef(Block block)
+        public string GetVCBlockNameRef(Block block, bool qualified = true)
         {
             Contract.Requires(block != null);
             Contract.Requires(blockToDef.ContainsKey(block));
 
-            return (LocaleName.Count() > 0 ? LocaleName + "." : "") + blockToDef[block].name;
+            string prefix = (qualified && LocaleName.Count() > 0) ? LocaleName + "." : "";
+
+            return prefix + blockToDef[block].name;
         }
 
     }

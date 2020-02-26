@@ -11,7 +11,19 @@ namespace ProofGeneration.VCProofGen
 {
     class VCBlockToIsaTranslator
     {
-        public static IDictionary<Block, DefDecl> IsaDefsFromVC(IDictionary<Block, VCExpr> blockToVC, CFGRepr cfg, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
+        private readonly UniqueNamer uniqueNamer;
+
+        public VCBlockToIsaTranslator(UniqueNamer uniqueNamer)
+        {
+            this.uniqueNamer = uniqueNamer;            
+        }
+
+        public VCBlockToIsaTranslator() : this(new UniqueNamer())
+        {
+            uniqueNamer.Spacer = "_";
+        }
+
+        public IDictionary<Block, DefDecl> IsaDefsFromVC(IDictionary<Block, VCExpr> blockToVC, CFGRepr cfg, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
         {
             Contract.Ensures(Contract.Result<IDictionary<Block, DefDecl>>().Count == cfg.GetBlocksBackwards().Count());
 
@@ -24,7 +36,7 @@ namespace ProofGeneration.VCProofGen
                 // might be more efficient to hand over this:
                 // IEnumerable<Tuple<Block, DefDecl>> successorDefs = cfg.outgoingBlocks[block].Select(b => new Tuple<Block, DefDecl>(b, blockToDefVC[b]));
 
-                var vcExprIsaVisitor = new VCExprToIsaTranslator(blockToDefVC, programVariables);
+                var vcExprIsaVisitor = new VCExprToIsaTranslator(uniqueNamer, blockToDefVC);
 
                 Term term = vcExprIsaVisitor.Translate(blockToVC[block]);
 

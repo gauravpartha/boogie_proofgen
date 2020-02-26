@@ -18,12 +18,12 @@ namespace ProofGeneration.VCProofGen
 
         protected readonly VCExprOpIsaVisitor vcExprOpIsaVisitor = new VCExprOpIsaVisitor();
 
-        protected readonly ISet<string> programVariables;
+        private readonly UniqueNamer uniqueNamer;
 
-        public VCExprToIsaTranslator(IDictionary<Block, DefDecl> successorToVC, ISet<string> programVariables)
+        public VCExprToIsaTranslator(UniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC)
         {
+            this.uniqueNamer = uniqueNamer;
             this.successorToVC = successorToVC;
-            this.programVariables = programVariables;
 
             criticalOps = new HashSet<VCExprOp>
             {
@@ -48,7 +48,7 @@ namespace ProofGeneration.VCProofGen
                 return new BoolConst(false);
             else if (node is VCExprIntLit lit)
             {
-                return new IntConst(lit.Val);
+                return new TermWithExplicitType(new IntConst(lit.Val), new PrimitiveType(Isa.SimpleType.Int));
             } else
             {
                 throw new NotImplementedException();
@@ -140,13 +140,11 @@ namespace ProofGeneration.VCProofGen
 
         public Term Visit(VCExprVar node, bool arg)
         {
-            if (programVariables.Contains(node.Name))
-                return IsaCommonTerms.TermIdentFromName(node.Name);
-            else if (VCBlockExtractor.PredictBlockName(node.Name, out string predictedBlockName) &&
+            if (VCBlockExtractor.PredictBlockName(node.Name, out string predictedBlockName) &&
                      TryGetDefFromBlock(predictedBlockName, out DefDecl result))
                 return IsaCommonTerms.TermIdentFromName(result.name);
             else
-                throw new ProofGenUnexpectedStateException<VCExprToIsaTranslator>(this.GetType(), "cannot resolve variable");
+                return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(node, node.Name));
         }
 
         public Term Visit(VCExprQuantifier node, bool arg)

@@ -1396,7 +1396,7 @@ namespace VC {
                 //var eraser = new Bpl.TypeErasure.TypeEraserPremisses((Bpl.TypeErasure.TypeAxiomBuilderPremisses)AxBuilder, checker.VCExprGen);
 
                 //TODO: VCExpr exprWithoutTypes = eraser == null ? expr : eraser.Erase(expr, polarity);
-                ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, parent.program, impl);                
+                ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator, parent.program, impl);                
                 #endregion
 
         VCExpr controlFlowFunctionAppl = exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
