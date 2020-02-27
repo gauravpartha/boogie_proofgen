@@ -1388,8 +1388,8 @@ namespace VC {
 
         var exprGen = ctx.ExprGen;
         VCExpr controlFlowVariableExpr = exprGen.Integer(BigNum.ZERO);
-
-        VCExpr vc = parent.GenerateVCAux(impl, controlFlowVariableExpr, label2absy, checker.TheoremProver.Context);
+        
+        VCExpr vc = parent.GenerateVCAux(impl, null, label2absy, checker.TheoremProver.Context);
         Contract.Assert(vc != null);
         
                 #region proofgen
@@ -1398,10 +1398,12 @@ namespace VC {
                 //TODO: VCExpr exprWithoutTypes = eraser == null ? expr : eraser.Erase(expr, polarity);
                 ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator, parent.program, impl);                
                 #endregion
-
+        
+        /*
         VCExpr controlFlowFunctionAppl = exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
         VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(impl.Blocks[0].UniqueId)));
         vc = exprGen.Implies(eqExpr, vc);
+        */
         reporter = new ErrorReporter(gotoCmdOrigins, label2absy, impl.Blocks, parent.incarnationOriginMap, callback, mvInfo, this.Checker.TheoremProver.Context, parent.program);
 
         if (CommandLineOptions.Clo.TraceVerify && no >= 0)

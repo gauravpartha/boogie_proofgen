@@ -23,16 +23,15 @@ namespace ProofGeneration.VCProofGen
             CFGRepr cfg, 
             out VCInstantiation vcinst)
         {
-            VCExpr vcNoLabels = VCExprLabelRemover.RemoveLabels(vc, gen);
-            VCExprLet vcNoLabelLet = vcNoLabels as VCExprLet;
-            Contract.Assert(vcNoLabelLet != null);
+            VCExprLet vcLet = vc as VCExprLet;
+            Contract.Assert(vcLet != null);
 
             UniqueNamer uniqueNamer = new UniqueNamer();
             uniqueNamer.Spacer = "_";
 
             IList<Tuple<TermIdent, TypeIsa>> varsInVC = GetVarsInVC(p, impl, translator, uniqueNamer, out IList<NamedDeclaration> holeSpec);
 
-            IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcNoLabelLet, cfg);
+            IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
 
             var blockToIsaTranslator = new VCBlockToIsaTranslator(uniqueNamer);
             IDictionary<Block, DefDecl> blockToVCExpr = blockToIsaTranslator.IsaDefsFromVC(blockToVC, cfg, impl.InParams, impl.LocVars);
