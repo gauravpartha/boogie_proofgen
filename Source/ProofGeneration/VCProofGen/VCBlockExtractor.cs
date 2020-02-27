@@ -49,7 +49,7 @@ namespace ProofGeneration.VCProofGen
         public static bool PredictBlockName(string vcName, out string predictedBlockName)
         {
             string[] split = vcName.Split(new char[] { '_' });
-            if (split.Count() >= 2 && split[split.Length - 1].Equals("correct"))
+            if (split.Length >= 2 && split[split.Length - 1].Equals("correct"))
             {
                 predictedBlockName = split.Take(split.Length - 1).Concat("_");
                 return true;
