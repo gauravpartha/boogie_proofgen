@@ -25,7 +25,7 @@ namespace ProofGeneration.VCProofGen
 
         public IDictionary<Block, DefDecl> IsaDefsFromVC(IDictionary<Block, VCExpr> blockToVC, CFGRepr cfg, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
         {
-            Contract.Ensures(Contract.Result<IDictionary<Block, DefDecl>>().Count == cfg.GetBlocksBackwards().Count());
+            Contract.Ensures(Contract.Result<IDictionary<Block, DefDecl>>().Count == cfg.NumOfBlocks());
 
             ISet<string> programVariables = new HashSet<string>(inParams.Select(v => v.Name).Concat(localVars.Select(v => v.Name)));
 

@@ -16,12 +16,12 @@ namespace ProofGeneration
         {
             string methodName = impl.Proc.Name;            
 
-            Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(cfg.labeling[cfg.entry]));
+            Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
 
-            OuterDecl outEdges = GetOutEdgesIsa(methodName, cfg.outgoingBlocks, cfg.labeling);
-            OuterDecl nodesToBlocks = GetNodeToBlocksIsa(methodName, cfg.labeling);
+            OuterDecl outEdges = GetOutEdgesIsa(methodName, cfg);
+            OuterDecl nodesToBlocks = GetNodeToBlocksIsa(methodName, cfg);
 
-            Term nodes = GetNodeSet(cfg.labeling);
+            Term nodes = GetNodeSet(cfg);
 
             Term parameters = GetVariableDeclarationsIsa(impl.InParams);
             Term localVariables = GetVariableDeclarationsIsa(impl.LocVars);
@@ -51,20 +51,20 @@ namespace ProofGeneration
             return new Theory(thyName, new List<string>() { "Lang" }, outerDecls);
         }       
 
-        private OuterDecl GetOutEdgesIsa(string methodName, IDictionary<Block, IList<Block>> outgoingBlocks, IDictionary<Block, int> labeling)
+        private OuterDecl GetOutEdgesIsa(string methodName, CFGRepr cfg)
         {
             var equations = new List<Tuple<IList<Term>, Term>>();
 
-            foreach(KeyValuePair<Block, int> kv in labeling)
+            foreach(Block b in cfg.GetBlocksForwards())
             {
                 //left side of equation is block number expressed using constructors
                 //right side of equation is set repr
 
-                Term lhs = new NatConst(kv.Value);
+                Term lhs = new NatConst(cfg.GetUniqueIntLabel(b));
 
-                IList<Block> outgoing = outgoingBlocks[kv.Key];
+                IEnumerable<Block> outgoing = cfg.GetSuccessorBlocks(b);
 
-                Term rhs = new TermSet(outgoing.Select(b => new NatConst(labeling[b])));
+                Term rhs = new TermSet(outgoing.Select(b_succ => new NatConst(cfg.GetUniqueIntLabel(b_succ))));
 
                 Util.AddEquation(lhs, rhs, equations);
             }
@@ -75,20 +75,20 @@ namespace ProofGeneration
             return new FunDecl("outEdges_"+methodName, new ArrowType(IsaBoogieType.getCFGNodeType(), IsaCommonTypes.getSetType(IsaBoogieType.getCFGNodeType())), equations);
         }
 
-        private OuterDecl GetNodeToBlocksIsa(string methodName, IDictionary<Block, int> labeling)
+        private OuterDecl GetNodeToBlocksIsa(string methodName, CFGRepr cfg)
         {
             var cmdIsaVisitor = new BasicCmdIsaVisitor();
 
             var equations = new List<Tuple<IList<Term>, Term>>();
 
-            foreach (KeyValuePair<Block, int> kv in labeling)
+            foreach (Block b in cfg.GetBlocksForwards())
             {
 
                 //left side of equation is block number expressed using constructors
                 //right side of equation is command
-                Term lhs = new NatConst(kv.Value);
+                Term lhs = new NatConst(cfg.GetUniqueIntLabel(b));
 
-                IList<Term> cmdsIsa = cmdIsaVisitor.Translate(kv.Key.Cmds);
+                IList<Term> cmdsIsa = cmdIsaVisitor.Translate(b.Cmds);
 
                 Term rhs = IsaCommonTerms.SomeOption(new TermList(cmdsIsa));
 
@@ -118,9 +118,9 @@ namespace ProofGeneration
             return new TermList(result);
         }
 
-        private Term GetNodeSet(IDictionary<Block, int> labeling)
+        private Term GetNodeSet(CFGRepr cfg)
         {
-            var labels = labeling.Values;
+            var labels = cfg.GetBlocksForwards().Select(b => cfg.GetUniqueIntLabel(b));
             var labelTerms = labels.Select(i => new NatConst(i));
 
             return new TermSet(labelTerms);

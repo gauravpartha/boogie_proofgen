@@ -26,8 +26,8 @@ namespace ProofGeneration.VCProofGen
                 {
                     try
                     {
-                        var blockKV = cfg.outgoingBlocks.Single(kv => kv.Key.Label.Equals(predictedBlockName));
-                        blockToVC.Add(blockKV.Key, binding.E);
+                        var block = cfg.GetBlocksForwards().Single(b => b.Label.Equals(predictedBlockName));
+                        blockToVC.Add(block, binding.E);
                     } catch(Exception e)
                     {
                         throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), e.Message);
@@ -38,7 +38,7 @@ namespace ProofGeneration.VCProofGen
                 }
             }
 
-            if (blockToVC.Count != cfg.outgoingBlocks.Count)
+            if (blockToVC.Count != cfg.NumOfBlocks())
             {
                 throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), "could not find let binding for all blocks");
             }

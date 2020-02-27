@@ -133,7 +133,7 @@ namespace ProofGeneration.VCProofGen
             foreach (Block b in cfg.GetBlocksBackwards())
             {
                 ISet<NamedDeclaration> bDecls = declCollector.CollectNamedDeclarations(blockToVC[b], vcToBoogieVar);
-                foreach(Block b_succ in cfg.outgoingBlocks[b])
+                foreach(Block b_succ in cfg.GetSuccessorBlocks(b))
                 {
                     //flattening
                     foreach (var sucDecl in blockToDecls[b_succ])

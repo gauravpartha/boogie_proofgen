@@ -10,9 +10,9 @@ using System.Linq;
 namespace ProofGeneration.CFGRepresentation
 {
     public class CFGRepr
-    {
-        public readonly IDictionary<Block, IList<Block>> outgoingBlocks;
-        public readonly IDictionary<Block, int> labeling;
+    {        
+        private readonly IDictionary<Block, IList<Block>> outgoingBlocks;
+        private readonly IDictionary<Block, int> labeling;
         private readonly Block [] blocks;
         public readonly Block entry;
 
@@ -36,15 +36,35 @@ namespace ProofGeneration.CFGRepresentation
             this.entry = entry;
         }
 
+        public IEnumerable<Block> GetSuccessorBlocks(Block b)
+        {
+            return outgoingBlocks[b];
+        }
+
+        public int NumOfSuccessors(Block b)
+        {
+            return outgoingBlocks[b].Count;
+        }
+
+        public int GetUniqueIntLabel(Block b)
+        {
+            return labeling[b];
+        }
+
+        public int NumOfBlocks()
+        {
+            return blocks.Length;
+        }
+
         public IEnumerable<Block> GetBlocksBackwards()
         {
-            for (int i = 0; i < blocks.Count(); i++)
+            for (int i = 0; i < blocks.Length; i++)
                 yield return blocks[i];
         }
 
         public IEnumerable<Block> GetBlocksForwards()
         {
-            for (int i = blocks.Count() - 1; i >= 0; i--)
+            for (int i = blocks.Length - 1; i >= 0; i--)
                 yield return blocks[i];
         }
 
