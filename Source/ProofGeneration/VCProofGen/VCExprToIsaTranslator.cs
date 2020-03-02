@@ -1,6 +1,7 @@
 ﻿using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
@@ -18,9 +19,9 @@ namespace ProofGeneration.VCProofGen
 
         protected readonly VCExprOpIsaVisitor vcExprOpIsaVisitor = new VCExprOpIsaVisitor();
 
-        private readonly UniqueNamer uniqueNamer;
+        private readonly IsaUniqueNamer uniqueNamer;
 
-        public VCExprToIsaTranslator(UniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC)
+        public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC)
         {
             this.uniqueNamer = uniqueNamer;
             this.successorToVC = successorToVC;

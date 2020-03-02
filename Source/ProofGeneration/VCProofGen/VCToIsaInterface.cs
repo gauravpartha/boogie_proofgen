@@ -2,6 +2,7 @@
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
@@ -18,23 +19,23 @@ namespace ProofGeneration.VCProofGen
             VCExpr vc, 
             VCExpressionGenerator gen, 
             Boogie2VCExprTranslator translator, 
-            Program p, 
-            Implementation impl, 
+            IEnumerable<Function> functions,
+            IEnumerable<Variable> inParams,
+            IEnumerable<Variable> localVars,
             CFGRepr cfg, 
             out VCInstantiation vcinst)
         {
             VCExprLet vcLet = vc as VCExprLet;
             Contract.Assert(vcLet != null);
 
-            UniqueNamer uniqueNamer = new UniqueNamer();
-            uniqueNamer.Spacer = "_";
+            var uniqueNamer = new IsaUniqueNamer();
 
-            IList<Tuple<TermIdent, TypeIsa>> varsInVC = GetVarsInVC(p, impl, translator, uniqueNamer, out IList<NamedDeclaration> holeSpec);
+            IList<Tuple<TermIdent, TypeIsa>> varsInVC = GetVarsInVC(functions, inParams, localVars, translator, uniqueNamer, out IList<NamedDeclaration> holeSpec);
 
             IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
 
             var blockToIsaTranslator = new VCBlockToIsaTranslator(uniqueNamer);
-            IDictionary<Block, DefDecl> blockToVCExpr = blockToIsaTranslator.IsaDefsFromVC(blockToVC, cfg, impl.InParams, impl.LocVars);
+            IDictionary<Block, DefDecl> blockToVCExpr = blockToIsaTranslator.IsaDefsFromVC(blockToVC, cfg, inParams, localVars);
 
             //order vc definitions of blocks in correct order
             IList<OuterDecl> vcOuterDecls = new List<OuterDecl>();
@@ -65,7 +66,7 @@ namespace ProofGeneration.VCProofGen
 
             vcOuterDecls.Add(vcCorrectLemma);
 
-            return new LocaleDecl("vc", new ContextElem(varsInVC, new List<Term>()), vcOuterDecls);
+            return new LocaleDecl("vc", ContextElem.CreateWithFixedVars(varsInVC), vcOuterDecls);
         }
 
         private static IDictionary<VCExprVar, Variable> VCExprToBoogieVar(Boogie2VCExprTranslator translator, IList<NamedDeclaration> decls)
@@ -85,35 +86,33 @@ namespace ProofGeneration.VCProofGen
         }
 
         //no global variables for now
-        private static IList<Tuple<TermIdent, TypeIsa>> GetVarsInVC(Program p, Implementation impl, Boogie2VCExprTranslator translator, UniqueNamer uniqueNamer, out IList<NamedDeclaration> holeSpec)
+        private static IList<Tuple<TermIdent, TypeIsa>> GetVarsInVC(
+            IEnumerable<Function> functions, 
+            IEnumerable<Variable> inParams,
+            IEnumerable<Variable> localVars,
+            Boogie2VCExprTranslator translator, 
+            IsaUniqueNamer uniqueNamer, 
+            out IList<NamedDeclaration> holeSpec)
         {
             var pureTyIsaTransformer = new PureTyIsaTransformer();
 
             var result = new List<Tuple<TermIdent, TypeIsa>>();
             holeSpec = new List<NamedDeclaration>(); 
 
-            foreach(Variable v in impl.InParams.Concat(impl.LocVars))
+            foreach(Variable v in inParams.Concat(localVars))
             {                
-                holeSpec.Add(v);
 
                 VCExprVar vcVar = translator.TryLookupVariable(v);
-                if(v == null)
+                if(vcVar != null)
                 {
-                    throw new ProofGenUnexpectedStateException<VCToIsaInterface>(typeof(VCToIsaInterface), "Could not find VC counterpart of Boogie variable.");
+                    holeSpec.Add(v);
+                    result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(vcVar, vcVar.Name)), pureTyIsaTransformer.TranslateDeclType(v)));
                 }
-
-                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(vcVar, vcVar.Name)), pureTyIsaTransformer.Translate(v.TypedIdent.Type)));                
-            }            
-
-            foreach(Function f in p.Functions)  {
+            }       
+        
+            foreach(Function f in functions)  {
                 holeSpec.Add(f);
-                IList<TypeIsa> types = f.InParams.Select(v => pureTyIsaTransformer.Translate(v.TypedIdent.Type)).ToList();
-                
-
-                TypeIsa retType = pureTyIsaTransformer.Translate(f.OutParams[0].TypedIdent.Type);
-                types.Add(retType);
-
-                TypeIsa funType = types.Reverse().Aggregate((res, arg) => new ArrowType(arg, res));
+                TypeIsa funType = pureTyIsaTransformer.TranslateDeclType(f);
                 result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(f.Name), funType));
             }
 

@@ -6,21 +6,21 @@ using System.Linq;
 using System.Diagnostics.Contracts;
 using System;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
     class VCBlockToIsaTranslator
     {
-        private readonly UniqueNamer uniqueNamer;
+        private readonly IsaUniqueNamer uniqueNamer;
 
-        public VCBlockToIsaTranslator(UniqueNamer uniqueNamer)
+        public VCBlockToIsaTranslator(IsaUniqueNamer uniqueNamer)
         {
             this.uniqueNamer = uniqueNamer;            
         }
 
-        public VCBlockToIsaTranslator() : this(new UniqueNamer())
+        public VCBlockToIsaTranslator() : this(new IsaUniqueNamer())
         {
-            uniqueNamer.Spacer = "_";
         }
 
         public IDictionary<Block, DefDecl> IsaDefsFromVC(IDictionary<Block, VCExpr> blockToVC, CFGRepr cfg, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
