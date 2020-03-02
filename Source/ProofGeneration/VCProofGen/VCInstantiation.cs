@@ -44,11 +44,11 @@ namespace ProofGeneration.VCProofGen
             this.LocaleName = LocaleName;
         }
 
-        public Term GetVCBlockInstantiation(Block block, IDictionary<NamedDeclaration, Term> declToVC)
+        public Term GetVCBlockInstantiation(Block block, IDictionary<NamedDeclaration, TermIdent> declToVC)
         {    
             if(!blockToDef.ContainsKey(block))
             {
-                throw new ProofGenUnexpectedStateException<VCInstantiation>(this.GetType(), "block unknown by vc");
+                throw new ProofGenUnexpectedStateException(this.GetType(), "block unknown by vc");
             }
 
             IList<Term> args = new List<Term>();

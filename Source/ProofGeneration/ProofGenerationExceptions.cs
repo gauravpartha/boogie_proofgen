@@ -2,7 +2,7 @@
 
 namespace ProofGeneration
 {
-    class ProofGenUnexpectedStateException<T> : Exception
+    class ProofGenUnexpectedStateException : Exception
     {
         Type TriggeringClass
         { get; }

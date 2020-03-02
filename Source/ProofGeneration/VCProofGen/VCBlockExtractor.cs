@@ -30,17 +30,17 @@ namespace ProofGeneration.VCProofGen
                         blockToVC.Add(block, binding.E);
                     } catch(Exception e)
                     {
-                        throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), e.Message);
+                        throw new ProofGenUnexpectedStateException(typeof(VCBlockExtractor), e.Message);
                     }                   
                 } else
                 {
-                    throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), "let binding does not correspond to block");
+                    throw new ProofGenUnexpectedStateException(typeof(VCBlockExtractor), "let binding does not correspond to block");
                 }
             }
 
             if (blockToVC.Count != cfg.NumOfBlocks())
             {
-                throw new ProofGenUnexpectedStateException<VCBlockExtractor>(typeof(VCBlockExtractor), "could not find let binding for all blocks");
+                throw new ProofGenUnexpectedStateException(typeof(VCBlockExtractor), "could not find let binding for all blocks");
             }
 
             return blockToVC;
