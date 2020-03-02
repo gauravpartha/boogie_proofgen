@@ -90,6 +90,14 @@ namespace ProofGeneration.IsaPrettyPrint
             return 0;
         }
 
+        public override int VisitLemmasDecl(LemmasDecl d)
+        {
+            _sb.Append("lemmas ").Append(d.name).Append(" = ");
+            _sb.Append(IsaPrettyPrinterHelper.SpaceAggregate(d.thmNames));
+
+            return 0;
+        }
+
         public override int VisitLocaleDecl(LocaleDecl d)
         {            
             _sb.Append("locale ").Append(d.name).Append(" = ");
@@ -135,6 +143,14 @@ namespace ProofGeneration.IsaPrettyPrint
 
             if (c.assumptions.Count > 0)
             {
+                bool useAssmLabels = c.assmLabels.Count == c.assumptions.Count;
+
+                var assmLabelEnumerator = c.assmLabels.GetEnumerator();
+                assmLabelEnumerator.MoveNext();
+
+                if(c.fixedVariables.Count > 0)
+                    _sb.AppendLine();
+
                 _sb.AppendLine("assumes ");
                 bool first = true;
 
@@ -148,7 +164,13 @@ namespace ProofGeneration.IsaPrettyPrint
                         _sb.AppendLine();
                     }
 
-
+                    if (useAssmLabels)
+                    {
+                        _sb.Append(assmLabelEnumerator.Current);
+                        _sb.Append(": ");
+                        assmLabelEnumerator.MoveNext();
+                    }
+                   
                     AppendInner(t.Dispatch(_termPrinter));
                 }
             }
@@ -176,5 +198,6 @@ namespace ProofGeneration.IsaPrettyPrint
                 _sb.AppendLine(m);
             }
         }
+
     }
 }
