@@ -4,26 +4,30 @@ namespace ProofGeneration.Isa
 {
     class IsaCommonTypes
     {
-        public static TypeIsa getOptionType(TypeIsa elemType)
+        public static TypeIsa GetOptionType(TypeIsa elemType)
         {
-            return getDataTypeSingle("option", elemType);
+            return GetDataTypeSingle("option", elemType);
         }
 
-        public static TypeIsa getSetType(TypeIsa elemType)
+        public static TypeIsa GetSetType(TypeIsa elemType)
         {
-            return getDataTypeSingle("set", elemType);
+            return GetDataTypeSingle("set", elemType);
         }
 
-        public static TypeIsa getListType(TypeIsa elemType)
+        public static TypeIsa GetListType(TypeIsa elemType)
         {
-            return getDataTypeSingle("list", elemType);
+            return GetDataTypeSingle("list", elemType);
         }
 
-        public static TypeIsa getDataTypeSingle(string name, TypeIsa arg)
+        public static TypeIsa GetDataTypeSingle(string name, TypeIsa arg)
         {
             var list = new List<TypeIsa>() { arg };
-            return new DataType("name", list);
+            return new DataType(name, list);
         }
 
+        public static TypeIsa GetDataTypeNoArg(string name)
+        {
+            return new DataType(name, new List<TypeIsa>() { });
+        }
     }
 }
