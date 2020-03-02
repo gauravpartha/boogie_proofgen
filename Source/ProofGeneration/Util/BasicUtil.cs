@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProofGeneration
+namespace ProofGeneration.Util
 {
-    class Util
+    class BasicUtil
     {
 
         public static void Add<T, R>(T key, R val, IDictionary<T, IList<R>> dict)
         {
-            IList<R> list;
-
-            bool success = dict.TryGetValue(key, out list);
+            bool success = dict.TryGetValue(key, out IList<R> list);
             if (!success)
             {
                 list = new List<R>();

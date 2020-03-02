@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.Boogie;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
@@ -66,13 +67,13 @@ namespace ProofGeneration
 
                 Term rhs = new TermSet(outgoing.Select(b_succ => new NatConst(cfg.GetUniqueIntLabel(b_succ))));
 
-                Util.AddEquation(lhs, rhs, equations);
+                BasicUtil.AddEquation(lhs, rhs, equations);
             }
 
             //empty set for remaining cases
-            Util.AddEquation(new TermIdent(new Wildcard()), new TermSet(new List<Term>()), equations);
+            BasicUtil.AddEquation(new TermIdent(new Wildcard()), new TermSet(new List<Term>()), equations);
 
-            return new FunDecl("outEdges_"+methodName, new ArrowType(IsaBoogieType.getCFGNodeType(), IsaCommonTypes.getSetType(IsaBoogieType.getCFGNodeType())), equations);
+            return new FunDecl("outEdges_"+methodName, new ArrowType(IsaBoogieType.getCFGNodeType(), IsaCommonTypes.GetSetType(IsaBoogieType.getCFGNodeType())), equations);
         }
 
         private OuterDecl GetNodeToBlocksIsa(string methodName, CFGRepr cfg)
@@ -92,11 +93,11 @@ namespace ProofGeneration
 
                 Term rhs = IsaCommonTerms.SomeOption(new TermList(cmdsIsa));
 
-                Util.AddEquation(lhs, rhs, equations);
+                BasicUtil.AddEquation(lhs, rhs, equations);
             }
 
             //None for remaining cases
-            Util.AddEquation(new TermIdent(new Wildcard()), IsaCommonTerms.NoneOption(), equations);
+            BasicUtil.AddEquation(new TermIdent(new Wildcard()), IsaCommonTerms.NoneOption(), equations);
 
             return new FunDecl("nodeToBlocks_"+methodName, new ArrowType(IsaBoogieType.getCFGNodeType(), IsaBoogieType.getBlockType()), equations);
         }

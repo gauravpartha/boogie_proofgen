@@ -77,8 +77,9 @@
     <Compile Include="ProofGenerationExceptions.cs" />
     <Compile Include="ProofGenerationLayer.cs" />
     <Compile Include="ResultReadOnlyVisitor.cs" />
-    <Compile Include="Util.cs" />
+    <Compile Include="Util\BasicUtil.cs" />
     <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
+    <Compile Include="Util\IsaUniqueNamer.cs" />
     <Compile Include="VCProofGen\VCBlockExtractor.cs" />
     <Compile Include="VCProofGen\VCExprDeclCollector.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
