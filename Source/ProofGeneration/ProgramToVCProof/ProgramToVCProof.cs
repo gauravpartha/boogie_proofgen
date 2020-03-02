@@ -1,6 +1,7 @@
 ﻿using Microsoft.Boogie;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 using System;
 using System.Collections.Generic;
@@ -8,53 +9,126 @@ using System.Linq;
 
 namespace ProofGeneration.ProgramToVCProof
 {
-    public class ProgramToVCProof
+    public class PassifiedProgToVCManager
     {
-        public static IList<OuterDecl> GenerateLemmas(Program p, Implementation impl, CFGRepr cfg, VCInstantiation vcinst)
+        private readonly TermIdent context = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
+        private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
+        private readonly Term initState;
+        private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
+
+
+
+        private readonly VCInstantiation vcinst;
+        private readonly IEnumerable<Function> functions;
+        private readonly IEnumerable<Variable> inParams;
+        private readonly IEnumerable<Variable> localVars;
+
+        private readonly IDictionary<NamedDeclaration, TermIdent> declToVCMapping;
+        private readonly IDictionary<Function, TermIdent> funToInterpMapping;
+
+        private readonly BasicCmdIsaVisitor basicCmdVisitor;
+
+        private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
+
+        public PassifiedProgToVCManager(VCInstantiation vcinst, IEnumerable<Function> functions, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars)
         {
-            var uniqueNamer = new Microsoft.Boogie.VCExprAST.UniqueNamer();
-            uniqueNamer.Spacer = "_";           
+            this.vcinst = vcinst;
+            this.functions = functions;
+            this.inParams = inParams;
+            this.localVars = localVars;
+            initState = IsaBoogieTerm.Normal(normalInitState);
+            basicCmdVisitor = new BasicCmdIsaVisitor(uniqueNamer);
+            declToVCMapping = FunAndVariableToVCMapping(functions, inParams, localVars, new IsaUniqueNamer());
+            funToInterpMapping = FunctionInterpMapping(functions);
+        }
 
-            BasicCmdIsaVisitor basicCmdVisitor = new BasicCmdIsaVisitor(uniqueNamer);
-
-            IList<OuterDecl> lemmaDecls = new List<OuterDecl>();
-
-            foreach(Block b in cfg.GetBlocksBackwards())
+        public IList<Term> GetStateAssumptions()
+        {
+            IList<Term> assumptions = VariableAssumptions(inParams, localVars, normalInitState, declToVCMapping, uniqueNamer);
+            foreach(Term assm in FunctionAssumptions(functions, funToInterpMapping, declToVCMapping, context))
             {
-                Term context = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
-                Term normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
-                Term initState = IsaBoogieTerm.Normal(normalInitState);
-                Term finalState = IsaCommonTerms.TermIdentFromName("s'");
-
-                Term cmds = new TermList(basicCmdVisitor.Translate(b.Cmds));
-                Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
-
-                //separate unique namer for raw VC values
-                IDictionary<NamedDeclaration, Term> declToVCMapping = FunAndVariableToVCMapping(p, impl, new Microsoft.Boogie.VCExprAST.UniqueNamer());
-
-                List<Term> assumptions = new List<Term>() { cmdsReduce };
-                assumptions.AddRange(VariableAssumptions(impl, normalInitState, declToVCMapping, uniqueNamer));
-
-                IDictionary<Function, Term> funToInterpMapping = FunctionInterpMapping(p);
-
-                assumptions.AddRange(FunctionAssumptions(p, funToInterpMapping, declToVCMapping, context));
-                assumptions.Add(vcinst.GetVCBlockInstantiation(b, declToVCMapping));
-
-                Term conclusion = ConclusionBlock(b, cfg.outgoingBlocks[b], normalInitState, finalState, declToVCMapping, vcinst);
-
-                Proof proof = BlockCorrectProof(b, vcinst);
-
-                lemmaDecls.Add(new LemmaDecl(b.Label + "_" + "correct", ContextElem.CreateWithAssumptions(assumptions), conclusion, proof));
+                assumptions.Add(assm);
             }
 
-            return lemmaDecls;
+            return assumptions;
+        }
+
+        public IList<Tuple<TermIdent, TypeIsa>> GetFixedVariables()
+        {
+
+            PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
+
+            var result = new List<Tuple<TermIdent, TypeIsa>>
+            {
+                Tuple.Create(normalInitState, IsaBoogieType.NormalStateType())
+            };
+
+            foreach (KeyValuePair<Function, TermIdent> kv in funToInterpMapping)
+            {
+                TypeIsa typeIsa = new ArrowType(IsaCommonTypes.GetListType(IsaBoogieType.ValType()),
+                   IsaCommonTypes.GetOptionType(IsaBoogieType.ValType()));
+                result.Add(Tuple.Create(kv.Value, typeIsa));
+            }
+
+            foreach (KeyValuePair<NamedDeclaration, TermIdent> kv in declToVCMapping)
+            {
+                TypeIsa typeIsa = pureTyIsaTransformer.TranslateDeclType(kv.Key);
+                result.Add(Tuple.Create(kv.Value, typeIsa));
+            }
+
+            return result;
+        }
+
+        public LemmaDecl GenerateVCBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
+        {
+            Term cmds = new TermList(basicCmdVisitor.Translate(block.Cmds));
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
+
+            List<Term> assumptions = new List<Term>() { cmdsReduce };
+            assumptions.Add(vcinst.GetVCBlockInstantiation(block, declToVCMapping));
+
+            bool isTrivialBlock = block.Cmds.Any(cmd =>
+            {
+                return cmd != null && (cmd is PredicateCmd predCmd && predCmd.Expr is LiteralExpr predCond && (predCond != null && predCond.IsFalse));
+            }
+            );
+
+            Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst, isTrivialBlock);
+
+            Proof proof = BlockCorrectProof(block, vcinst);
+
+            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
+        }
+
+
+        public LemmaDecl GenerateEmptyBlockLemma(Block block, ISet<Block> nonEmptySuccessors, string lemmaName)
+        {
+            Term cmds = new TermList(basicCmdVisitor.Translate(block.Cmds));
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
+
+            List<Term> assumptions = new List<Term>() { cmdsReduce };
+            if(nonEmptySuccessors.Any())
+                assumptions.Add(ConjunctionOfSuccessorBlocks(nonEmptySuccessors, declToVCMapping, vcinst));
+
+            Term conclusion = ConclusionBlock(block,nonEmptySuccessors, normalInitState, finalState, declToVCMapping, vcinst);
+
+            Proof proof = new Proof(
+                new List<string>()
+                {
+                    "using assms",
+                    "apply cases",
+                    "by auto"
+                }
+              );
+
+            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
         }
 
         public static Proof BlockCorrectProof(Block b, VCInstantiation vcinst)
         {
             List<string> methods = new List<string>
             {
-                "using assms",
+                "using assms state_assms",
                 "apply cases",
                 "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
                 "apply (handle_cmd_list_full?)",
@@ -68,9 +142,15 @@ namespace ProofGeneration.ProgramToVCProof
             IEnumerable<Block> b_successors, 
             Term normalInitState, 
             Term finalState, 
-            IDictionary<NamedDeclaration, Term> declToVCMapping,
-            VCInstantiation vcinst)
+            IDictionary<NamedDeclaration, TermIdent> declToVCMapping,
+            VCInstantiation vcinst,
+            bool useMagicFinalState = false)
         {
+            if(useMagicFinalState)
+            {
+                return new TermBinary(finalState, IsaBoogieTerm.Magic(), TermBinary.BinaryOpCode.EQ);
+            }
+
             Term nonFailureConclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
             string normalFinalState = "n_s'";
@@ -85,9 +165,7 @@ namespace ProofGeneration.ProgramToVCProof
                 ifNormalConclusionRhs1 :
                 new TermBinary(
                     ifNormalConclusionRhs1,
-                    b_successors.
-                        Select(b_suc => vcinst.GetVCBlockInstantiation(b_suc, declToVCMapping)).
-                        Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.AND)),
+                    ConjunctionOfSuccessorBlocks(b_successors, declToVCMapping, vcinst),
                     TermBinary.BinaryOpCode.AND);
 
             Term ifNormalConclusion =
@@ -103,15 +181,27 @@ namespace ProofGeneration.ProgramToVCProof
             return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);        
         }
 
-        public static IDictionary<NamedDeclaration, Term> FunAndVariableToVCMapping(Program p, Implementation impl, Microsoft.Boogie.VCExprAST.UniqueNamer vcNamer)
+        public static Term ConjunctionOfSuccessorBlocks(IEnumerable<Block> successorBlocks, IDictionary<NamedDeclaration, TermIdent> declToVCMapping, VCInstantiation vcinst)
         {
-            var dict = new Dictionary<NamedDeclaration, Term>();
-            foreach(Function f in p.Functions)
+            return
+            successorBlocks.
+                Select(b_suc => vcinst.GetVCBlockInstantiation(b_suc, declToVCMapping)).
+                Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.AND));
+        }
+
+        public IDictionary<NamedDeclaration, TermIdent> FunAndVariableToVCMapping(
+            IEnumerable<Function> functions,
+            IEnumerable<Variable> inParams,
+            IEnumerable<Variable> localVars,
+            IsaUniqueNamer vcNamer)
+        {
+            var dict = new Dictionary<NamedDeclaration, TermIdent>();
+            foreach(Function f in functions)
             {
                 dict.Add(f, IsaCommonTerms.TermIdentFromName("vc_"+f.Name) );
             }
 
-            foreach(Variable v in impl.InParams.Union(impl.LocVars))
+            foreach(Variable v in inParams.Union(localVars))
             {
                 dict.Add(v, IsaCommonTerms.TermIdentFromName(vcNamer.GetName(v, "vc_" + v.Name)));
             }
@@ -119,9 +209,20 @@ namespace ProofGeneration.ProgramToVCProof
             return dict;
         }
 
-        public static IList<Term> FunctionAssumptions(Program p,                
-                IDictionary<Function, Term> funInterpMapping, 
-                IDictionary<NamedDeclaration, Term> declToVCMapping,
+        public IDictionary<Function, TermIdent> FunctionInterpMapping(IEnumerable<Function> functions)
+        {
+            var dict = new Dictionary<Function, TermIdent>();
+            foreach(Function f in functions)
+            {
+                dict.Add(f, IsaCommonTerms.TermIdentFromName("isa_" + f.Name));
+            }
+            return dict;
+        }
+
+        private IList<Term> FunctionAssumptions(
+                IEnumerable<Function> functions,
+                IDictionary<Function, TermIdent> funInterpMapping,
+                IDictionary<NamedDeclaration, TermIdent> declToVCMapping,
                 Term context
             )
         {
@@ -129,8 +230,8 @@ namespace ProofGeneration.ProgramToVCProof
 
             var converter = new PureToBoogieValConverter();
 
-            foreach(Function f in p.Functions)
-            {               
+            foreach (Function f in functions)
+            {
                 #region context well-formed
                 Term ctxWfLeft = new TermApp(IsaCommonTerms.Snd(context), new List<Term>() { new StringConst(f.Name) });
                 Term ctxWfRight = IsaCommonTerms.SomeOption(funInterpMapping[f]);
@@ -151,8 +252,8 @@ namespace ProofGeneration.ProgramToVCProof
 
                 Term right = IsaCommonTerms.SomeOption(
                     converter.ConvertToBoogieVal(f.OutParams.First().TypedIdent.Type,
-                        new TermApp(declToVCMapping[f], 
-                            boundVars.Select(bv => (Term) IsaCommonTerms.TermIdentFromName(bv)).ToList()
+                        new TermApp(declToVCMapping[f],
+                            boundVars.Select(bv => (Term)IsaCommonTerms.TermIdentFromName(bv)).ToList()
                         )
                     )
                     );
@@ -166,33 +267,18 @@ namespace ProofGeneration.ProgramToVCProof
             return assumptions;
         }
 
-        public static List<string> GetNames(string baseName, int count)
-        {            
-            var result = new List<string>();
-            for(int i = 0; i < count; i++)
-            {
-                result.Add(baseName + i);
-            }
-            return result;
-        }
-
-        public static IDictionary<Function, Term> FunctionInterpMapping(Program p)
-        {
-            var dict = new Dictionary<Function, Term>();
-            foreach(Function f in p.Functions)
-            {
-                dict.Add(f, IsaCommonTerms.TermIdentFromName("isa_" + f.Name));
-            }
-            return dict;
-        }
-
-        public static IList<Term> VariableAssumptions(Implementation impl, Term initialState, IDictionary<NamedDeclaration, Term> declToVCMapping, Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer)
+        private IList<Term> VariableAssumptions(
+            IEnumerable<Variable> inParams,
+            IEnumerable<Variable> localVars,
+            Term initialState, 
+            IDictionary<NamedDeclaration, TermIdent> declToVCMapping, 
+            IsaUniqueNamer uniqueNamer)
         {
             var result = new List<Term>();
 
             var pureToBoogieValConverter = new PureToBoogieValConverter();
 
-            foreach (Variable v in impl.InParams.Union(impl.LocVars))
+            foreach (Variable v in inParams.Union(localVars))
             {
                 Term left = new TermApp(initialState, new List<Term>() { new StringConst(uniqueNamer.GetName(v, v.Name)) });
                 Term right = IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, declToVCMapping[v]));
@@ -201,6 +287,16 @@ namespace ProofGeneration.ProgramToVCProof
 
             return result;
         }
-   
+
+        private List<string> GetNames(string baseName, int count)
+        {
+            var result = new List<string>();
+            for (int i = 0; i < count; i++)
+            {
+                result.Add(baseName + i);
+            }
+            return result;
+        }
+
     }
 }

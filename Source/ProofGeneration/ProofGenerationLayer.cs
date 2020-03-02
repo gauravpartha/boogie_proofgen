@@ -1,4 +1,5 @@
-﻿//#define PROOFGENACTIVE
+﻿
+//#define PROOFGENACTIVE
 
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
@@ -11,12 +12,23 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.IO;
+using System;
+using System.Linq;
+using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
     public class ProofGenerationLayer
     {
+        private static Implementation afterPassificationImpl;
 
+        private static CFGRepr passificationCfg;    
+        private static CFGRepr noEmptyBlocksCfg;
+        private static CFGRepr afterUnreachablePruningCfg;
+
+        private static IEnumerable<Function> functions;       
+        private static IEnumerable<Variable> inParams;
+        private static IEnumerable<Variable> localVars;
 
         [Conditional("PROOFGENACTIVE")]
         public static void StoreTheory(Implementation impl)
@@ -27,27 +39,142 @@ namespace ProofGeneration
 
             StoreTheory(theory);
         }
-       
-        public static void ConvertVC(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator, Program p, Implementation impl)
+
+        public static void Program(Program p)
         {
-            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
+            functions = p.Functions;            
+        }
 
-            LocaleDecl locale = VCToIsaInterface.ConvertVC(vc, gen, translator, p, impl, cfg, out VCInstantiation vcinst);
+        public static void AfterPassification(Implementation impl)
+        {
+            inParams = impl.InParams;
+            localVars = impl.LocVars;
+            afterPassificationImpl = impl;
+            passificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
+        }
 
-            List<OuterDecl> res = new List<OuterDecl>();
-            res.Add(locale);
+        public static void AfterEmptyBlockRemoval(Implementation impl)
+        {
+            noEmptyBlocksCfg = CFGReprTransformer.getCFGRepresentation(impl);
+        }
 
-            IList<OuterDecl> lemmas = ProgramToVCProof.ProgramToVCProof.GenerateLemmas(p, impl, cfg, vcinst);
-            res.AddRange(lemmas);
+        public static void AfterUnreachablePruning(Implementation impl)
+        {
+            afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
+        }
 
-            var theory = new Theory("vc_" + impl.Proc.Name,
-                new List<string> { "Semantics", "Util"},
-                res);
+        public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
+        {
+            LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
+                vc, 
+                gen, 
+                translator, 
+                functions, 
+                inParams,
+                localVars,
+                afterUnreachablePruningCfg,
+                out VCInstantiation vcinst);
 
+            var lemmaNamer = new IsaUniqueNamer();
+
+            var programToVCManager = new PassifiedProgToVCManager(vcinst, functions, inParams, localVars);
+            IDictionary<Block, LemmaDecl> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
+            IDictionary<Block, LemmaDecl> beforePeepholeLemmas = GetAdjustedLemmas(passificationCfg, afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
+
+            Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeLemmas.Keys).Any());
+
+            IList<Tuple<TermIdent, TypeIsa>> fixedVariables = programToVCManager.GetFixedVariables();
+            IList<Term> stateAssumptions = programToVCManager.GetStateAssumptions();
+            IList<string> stateAssumptionLabels = stateAssumptions.Select((_, i) => "S" + i).ToList();
+            var stateAssmsLemmas = new LemmasDecl("state_assms", stateAssumptionLabels);
+
+            List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { stateAssmsLemmas };
+            afterPassificationDecls.AddRange(finalProgramLemmas.Values);
+            afterPassificationDecls.AddRange(beforePeepholeLemmas.Values);
+
+
+            LocaleDecl afterPassificationLocale = new LocaleDecl("passification",
+                new ContextElem(fixedVariables, stateAssumptions, stateAssumptionLabels),
+                afterPassificationDecls);
+
+            Theory theory = new Theory(afterPassificationImpl.Name,
+                new List<string>() { "Semantics", "Util" },
+                new List<OuterDecl>() { vcLocale, afterPassificationLocale });
 
             StoreTheory(theory);
         }
 
+        public static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassifiedProgToVCManager progToVCManager, IsaUniqueNamer lemmaNamer)
+        {
+            var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
+
+            foreach (Block b in cfg.GetBlocksBackwards())
+            {
+                blockToLemmaDecls.Add(b, progToVCManager.GenerateVCBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b))));
+            }
+
+            return blockToLemmaDecls;
+        }
+
+        //assume that block identities in beforePruning and afterPruning are the same (only edges may be different)
+        public static IDictionary<Block, LemmaDecl> GetAdjustedLemmas(CFGRepr beforePeepholeCfg, 
+            CFGRepr afterPeepholeCfg, 
+            PassifiedProgToVCManager progToVCManager, 
+            IsaUniqueNamer lemmaNamer)
+        {
+            var blocksToLemmas = new Dictionary<Block, LemmaDecl>();
+            //TODO locale with state assumptions, adjustment of proofs etc...
+
+            foreach(Block block in beforePeepholeCfg.GetBlocksBackwards())
+            {
+                if(!afterPeepholeCfg.ContainsBlock(block))               
+                {
+                    //block is unreachable after peephole
+
+                    if(block.Cmds.Count == 0)
+                    {
+                        ISet<Block> nonEmptySuccessors = new HashSet<Block>();
+
+                        if (beforePeepholeCfg.NumOfSuccessors(block) > 0)
+                        {
+                            //find first reachable blocks that are not empty
+                            Queue<Block> toVisit = new Queue<Block>();
+                            toVisit.Enqueue(block);
+                            while (toVisit.Count > 0)
+                            {
+                                Block curBlock = toVisit.Dequeue();
+
+                                if (curBlock.Cmds.Count != 0 || beforePeepholeCfg.NumOfSuccessors(curBlock) == 0)
+                                {
+                                    nonEmptySuccessors.Add(curBlock);
+                                }
+                                else
+                                {
+                                    foreach (Block succ in beforePeepholeCfg.GetSuccessorBlocks(curBlock))
+                                    {
+                                        toVisit.Enqueue(succ);
+                                    }
+                                }
+                            }
+                        } else
+                        {
+                            //empty exit block is removed, hence no assumptions required
+                        }
+
+                        //add lemma
+                        blocksToLemmas.Add(block, progToVCManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));
+                    }
+                }        
+            }
+
+            return blocksToLemmas;
+        }
+
+        private static string GetLemmaName(Block b)
+        {
+            return "block_" + b.Label;
+        }
+        
         private static void StoreTheory(Theory theory)
         {
             var sw = new StreamWriter(theory.theoryName + ".thy");

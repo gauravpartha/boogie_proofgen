@@ -1391,12 +1391,15 @@ namespace VC {
         
         VCExpr vc = parent.GenerateVCAux(impl, null, label2absy, checker.TheoremProver.Context);
         Contract.Assert(vc != null);
-        
+
                 #region proofgen
                 //var eraser = new Bpl.TypeErasure.TypeEraserPremisses((Bpl.TypeErasure.TypeAxiomBuilderPremisses)AxBuilder, checker.VCExprGen);
 
                 //TODO: VCExpr exprWithoutTypes = eraser == null ? expr : eraser.Erase(expr, polarity);
-                ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator, parent.program, impl);                
+                ProofGeneration.ProofGenerationLayer.Program(parent.program);
+                ProofGeneration.ProofGenerationLayer.AfterUnreachablePruning(impl);
+                ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator);
+                //ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator, parent.program, impl);                
                 #endregion
         
         /*
@@ -2747,7 +2750,11 @@ namespace VC {
       mvInfo = new ModelViewInfo(program, impl);
       Convert2PassiveCmd(impl, mvInfo);
 
-      if (QKeyValue.FindBoolAttribute(impl.Attributes, "may_unverified_instrumentation"))
+      #region proofgen
+      ProofGeneration.ProofGenerationLayer.AfterPassification(impl);
+      #endregion
+
+            if (QKeyValue.FindBoolAttribute(impl.Attributes, "may_unverified_instrumentation"))
       {
         InstrumentWithMayUnverifiedConditions(impl, exitBlock);
       }
@@ -2757,21 +2764,30 @@ namespace VC {
         #region Get rid of empty blocks
         {
           RemoveEmptyBlocks(impl.Blocks);
+            #region proofgen
+            ProofGeneration.ProofGenerationLayer.AfterEmptyBlockRemoval(impl);
+            #endregion
+
           impl.PruneUnreachableBlocks();
+            #region proofgen
+            ProofGeneration.ProofGenerationLayer.AfterUnreachablePruning(impl);
+            #endregion
         }
         #endregion Get rid of empty blocks
-        
-        #region Debug Tracing
-        if (CommandLineOptions.Clo.TraceVerify) 
+
+
+                #region Debug Tracing
+                if (CommandLineOptions.Clo.TraceVerify) 
         {
           Console.WriteLine("after peep-hole optimizations");
           EmitImpl(impl, true);
         }
-        #endregion
-      }
-      #endregion Peep-hole optimizations
+                #endregion
 
-      HandleSelectiveChecking(impl);
+            }
+            #endregion Peep-hole optimizations
+
+            HandleSelectiveChecking(impl);
 
 
 //      #region Constant Folding

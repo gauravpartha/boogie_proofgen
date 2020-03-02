@@ -56,6 +56,11 @@ namespace ProofGeneration.CFGRepresentation
             return blocks.Length;
         }
 
+        public bool ContainsBlock(Block b)
+        {
+            return outgoingBlocks.ContainsKey(b);
+        }
+
         public IEnumerable<Block> GetBlocksBackwards()
         {
             for (int i = 0; i < blocks.Length; i++)

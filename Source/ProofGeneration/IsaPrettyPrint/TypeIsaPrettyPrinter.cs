@@ -18,7 +18,10 @@ namespace ProofGeneration.IsaPrettyPrint
         public override string VisitDataType(DataType t)
         {
             IList<string> rArgs = VisitList(t.args);
-            return IsaPrettyPrinterHelper.Parenthesis(t.name + " " + IsaPrettyPrinterHelper.SpaceAggregate(rArgs));
+            if (t.args.Count == 0)
+                return IsaPrettyPrinterHelper.Parenthesis(t.name);
+            else
+                return IsaPrettyPrinterHelper.Parenthesis(IsaPrettyPrinterHelper.SpaceAggregate(rArgs) + t.name);
         }
 
         public override string VisitPrimitiveType(PrimitiveType t)

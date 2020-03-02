@@ -4,24 +4,22 @@ using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
     class BasicCmdIsaVisitor : ResultReadOnlyVisitor<Term>
     {
 
-        private readonly Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer;
+        private readonly IsaUniqueNamer uniqueNamer;
 
-        public BasicCmdIsaVisitor(Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer)
+        public BasicCmdIsaVisitor(IsaUniqueNamer uniqueNamer)
         {
             this.uniqueNamer = uniqueNamer;
         }
 
-        public BasicCmdIsaVisitor() : this(new Microsoft.Boogie.VCExprAST.UniqueNamer())
-        {
-            uniqueNamer.Spacer = "_";
-        }
-
+        public BasicCmdIsaVisitor() : this(new IsaUniqueNamer()) { }
+   
         [ContractInvariantMethod]
         void ObjectInvariant()
         {
