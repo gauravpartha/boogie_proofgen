@@ -19,6 +19,21 @@ namespace ProofGeneration
             return IsaCommonTerms.TermIdentFromName("TInt");
         }
 
+        public static TypeIsa ValType()
+        {
+            return new DataType("val", new List<TypeIsa>());
+        }
+
+        public static TypeIsa NormalStateType()
+        {
+            return new ArrowType(IsaCommonTypes.GetDataTypeNoArg("vname"), IsaCommonTypes.GetOptionType(ValType()));
+        }
+
+        public static TypeIsa StateType()
+        {
+            return IsaCommonTypes.GetDataTypeNoArg("state");
+        }
+
         public static TypeIsa getCFGNodeType()
         {
             return new DataType("node", new List<TypeIsa>());
