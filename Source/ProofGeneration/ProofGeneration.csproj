@@ -58,6 +58,7 @@
     <Compile Include="BoogieIsaInterface\IsaBoogieTerm.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
     <Compile Include="BoogieIsaInterface\IsaProgramGenerator.cs" />
+    <Compile Include="BoogieIsaInterface\MultiCmdIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\TypeIsaVisitor.cs" />
     <Compile Include="CFGRepr\CFGRepr.cs" />
     <Compile Include="CFGRepr\CFGReprTransformer.cs" />

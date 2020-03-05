@@ -61,6 +61,16 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("Assume"), new List<Term>() { arg });
         }
 
+        public static Term Assign(Term lhs, Term rhs)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Assign"), new List<Term>() { lhs, rhs });
+        }
+
+        public static Term Havoc(Term var)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Havoc"), new List<Term>() { var });
+        }
+
         public static Term Binop(BinaryOperator.Opcode opcode, Term arg1, Term arg2)
         {
             string bopIsa;

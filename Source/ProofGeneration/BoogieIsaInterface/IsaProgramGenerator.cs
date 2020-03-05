@@ -4,6 +4,7 @@ using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -78,7 +79,7 @@ namespace ProofGeneration
 
         private OuterDecl GetNodeToBlocksIsa(string methodName, CFGRepr cfg)
         {
-            var cmdIsaVisitor = new BasicCmdIsaVisitor();
+            var cmdIsaVisitor = new MultiCmdIsaVisitor();
 
             var equations = new List<Tuple<IList<Term>, Term>>();
 

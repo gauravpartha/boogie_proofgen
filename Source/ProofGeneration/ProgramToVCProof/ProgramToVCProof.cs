@@ -1,4 +1,5 @@
 ﻿using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -26,7 +27,7 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IDictionary<NamedDeclaration, TermIdent> declToVCMapping;
         private readonly IDictionary<Function, TermIdent> funToInterpMapping;
 
-        private readonly BasicCmdIsaVisitor basicCmdVisitor;
+        private readonly MultiCmdIsaVisitor cmdIsaVisitor;        
 
         private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
 
@@ -37,7 +38,7 @@ namespace ProofGeneration.ProgramToVCProof
             this.inParams = inParams;
             this.localVars = localVars;
             initState = IsaBoogieTerm.Normal(normalInitState);
-            basicCmdVisitor = new BasicCmdIsaVisitor(uniqueNamer);
+            cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer);
             declToVCMapping = FunAndVariableToVCMapping(functions, inParams, localVars, new IsaUniqueNamer());
             funToInterpMapping = FunctionInterpMapping(functions);
         }
@@ -81,7 +82,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         public LemmaDecl GenerateVCBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
         {
-            Term cmds = new TermList(basicCmdVisitor.Translate(block.Cmds));
+            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };
@@ -103,7 +104,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         public LemmaDecl GenerateEmptyBlockLemma(Block block, ISet<Block> nonEmptySuccessors, string lemmaName)
         {
-            Term cmds = new TermList(basicCmdVisitor.Translate(block.Cmds));
+            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };

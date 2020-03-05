@@ -11,8 +11,10 @@ namespace ProofGeneration
     class BasicCmdIsaVisitor : ResultReadOnlyVisitor<Term>
     {
 
+        //It's possible that the AST has two different variables which have the same name. Therefore we use an IsaUniqueNamer to 
+        //avoid name clashes between different variables.
         private readonly IsaUniqueNamer uniqueNamer;
-
+   
         public BasicCmdIsaVisitor(IsaUniqueNamer uniqueNamer)
         {
             this.uniqueNamer = uniqueNamer;
@@ -77,6 +79,12 @@ namespace ProofGeneration
             return node;
         }
 
+        public override AssignLhs VisitSimpleAssignLhs(SimpleAssignLhs node)
+        {
+            ReturnResult(new StringConst(GetStringFromIdentifierExpr(node.AssignedVariable)));
+            return node;
+        }
+
         public override Expr VisitNAryExpr(NAryExpr node)
         {
             IList<Term> args = new List<Term>();
@@ -93,9 +101,15 @@ namespace ProofGeneration
             return node;
         }
 
+        //potential side effect
+        public string GetStringFromIdentifierExpr(IdentifierExpr node)
+        {
+            return uniqueNamer.GetName(node.Decl, node.Name);
+        }
+
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            ReturnResult(IsaBoogieTerm.Var(uniqueNamer.GetName(node.Decl, node.Name)));
+            ReturnResult(IsaBoogieTerm.Var(GetStringFromIdentifierExpr(node)));
             //TODO: also look at decl?
             return node;
         }
