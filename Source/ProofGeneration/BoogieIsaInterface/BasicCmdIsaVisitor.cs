@@ -127,5 +127,91 @@ namespace ProofGeneration
             return node;
         }
 
+
+        //not implemented cmds
+        public override Cmd VisitCallCmd(CallCmd node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Cmd VisitParCallCmd(ParCallCmd node)
+        {
+            throw new NotImplementedException();
+        }
+        public override List<Cmd> VisitCmdSeq(List<Cmd> cmdSeq)
+        {
+            throw new NotImplementedException();
+        }
+        public override Choice VisitChoice(Choice node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Cmd VisitCommentCmd(CommentCmd node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Cmd VisitRE(RE node)
+        {
+            throw new NotImplementedException();
+        }
+        public override List<RE> VisitRESeq(List<RE> reSeq)
+        {
+            throw new NotImplementedException();
+        }
+        public override YieldCmd VisitYieldCmd(YieldCmd node)
+        {
+            throw new NotImplementedException();
+        }
+
+
+        //not implemented exprs
+        public override Expr VisitBvConcatExpr(BvConcatExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitCodeExpr(CodeExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitExistsExpr(ExistsExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitBvExtractExpr(BvExtractExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitExpr(Expr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override IList<Expr> VisitExprSeq(IList<Expr> exprSeq)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitForallExpr(ForallExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitLambdaExpr(LambdaExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitLetExpr(LetExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override Expr VisitOldExpr(OldExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override BinderExpr VisitBinderExpr(BinderExpr node)
+        {
+            throw new NotImplementedException();
+        }
+        public override QuantifierExpr VisitQuantifierExpr(QuantifierExpr node)
+        {
+            throw new NotImplementedException();
+        }
+
     }
 }
