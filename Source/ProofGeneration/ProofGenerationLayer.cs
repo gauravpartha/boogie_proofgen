@@ -22,7 +22,10 @@ namespace ProofGeneration
     {
         private static Implementation afterPassificationImpl;
 
-        private static CFGRepr passificationCfg;    
+        private static IDictionary<Block, Block> beforePassiveOrigBlock;
+        private static CFGRepr beforePassificationCfg;
+
+        private static CFGRepr afterPassificationCfg;
         private static CFGRepr noEmptyBlocksCfg;
         private static CFGRepr afterUnreachablePruningCfg;
 
@@ -45,12 +48,17 @@ namespace ProofGeneration
             functions = p.Functions;            
         }
 
+        public static void BeforePassification(Implementation impl)
+        {
+            beforePassificationCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforePassiveOrigBlock);
+        }
+
         public static void AfterPassification(Implementation impl)
         {
             inParams = impl.InParams;
             localVars = impl.LocVars;
             afterPassificationImpl = impl;
-            passificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
+            afterPassificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
 
         public static void AfterEmptyBlockRemoval(Implementation impl)
@@ -61,7 +69,7 @@ namespace ProofGeneration
         public static void AfterUnreachablePruning(Implementation impl)
         {
             afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
-        }
+        }        
 
         public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
         {
@@ -79,9 +87,9 @@ namespace ProofGeneration
 
             var programToVCManager = new PassifiedProgToVCManager(vcinst, functions, inParams, localVars);
             IDictionary<Block, LemmaDecl> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
-            IDictionary<Block, LemmaDecl> beforePeepholeLemmas = GetAdjustedLemmas(passificationCfg, afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
+            IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
 
-            Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeLemmas.Keys).Any());
+            Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
 
             IList<Tuple<TermIdent, TypeIsa>> fixedVariables = programToVCManager.GetFixedVariables();
             IList<Term> stateAssumptions = programToVCManager.GetStateAssumptions();
@@ -90,21 +98,68 @@ namespace ProofGeneration
 
             List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { stateAssmsLemmas };
             afterPassificationDecls.AddRange(finalProgramLemmas.Values);
-            afterPassificationDecls.AddRange(beforePeepholeLemmas.Values);
+            afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
 
 
             LocaleDecl afterPassificationLocale = new LocaleDecl("passification",
                 new ContextElem(fixedVariables, stateAssumptions, stateAssumptionLabels),
                 afterPassificationDecls);
 
+            #region WIP
+
+            // Generate before passification block lemmas to try out things
+            var beforePassiveNamer = new IsaUniqueNamer();            
+
+            IDictionary<Block, LemmaDecl> beforePassiveLemmas = 
+                GenerateBeforePassiveLemmas(beforePassificationCfg, afterUnreachablePruningCfg, beforePeepholeEmptyLemmas, programToVCManager, beforePassiveNamer);
+
+            List<OuterDecl> beforePassiveDecls = new List<OuterDecl>() { stateAssmsLemmas };
+            beforePassiveDecls.AddRange(beforePassiveLemmas.Values);
+
+            LocaleDecl beforePassiveLocale = new LocaleDecl("beforePassive",
+               new ContextElem(fixedVariables, stateAssumptions, stateAssumptionLabels),
+               beforePassiveDecls);
+
+            #endregion
+
+
             Theory theory = new Theory(afterPassificationImpl.Name,
                 new List<string>() { "Semantics", "Util" },
-                new List<OuterDecl>() { vcLocale, afterPassificationLocale });
+                new List<OuterDecl>() { vcLocale, beforePassiveLocale });
 
             StoreTheory(theory);
         }
 
-        public static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassifiedProgToVCManager progToVCManager, IsaUniqueNamer lemmaNamer)
+        private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(CFGRepr beforePassiveCfg,
+            CFGRepr finalCfg,
+            IDictionary<Block, LemmaDecl> emptyBlockLemmas,
+            PassifiedProgToVCManager progToVCManager, IsaUniqueNamer lemmaNamer)
+        {
+            var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
+
+            foreach (Block b in beforePassiveCfg.GetBlocksBackwards())
+            {
+                Block origBlock = beforePassiveOrigBlock[b];
+                if (finalCfg.ContainsBlock(origBlock))
+                {
+                    LemmaDecl lemma = progToVCManager.GenerateVCPassiveBlockLemma(
+                        b,
+                        origBlock,
+                        finalCfg.GetSuccessorBlocks(origBlock),
+                        lemmaNamer.GetName(b, GetLemmaName(b)));
+                    blockToLemmaDecls.Add(b, lemma);
+                }
+
+                if(emptyBlockLemmas.TryGetValue(b, out LemmaDecl emptyBlockLemma))
+                {
+                    blockToLemmaDecls.Add(b, emptyBlockLemma);
+                }
+            }
+
+            return blockToLemmaDecls;
+        }
+
+            private static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassifiedProgToVCManager progToVCManager, IsaUniqueNamer lemmaNamer)
         {
             var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
 
@@ -114,10 +169,10 @@ namespace ProofGeneration
             }
 
             return blockToLemmaDecls;
-        }
+        }        
 
         //assume that block identities in beforePruning and afterPruning are the same (only edges may be different)
-        public static IDictionary<Block, LemmaDecl> GetAdjustedLemmas(CFGRepr beforePeepholeCfg, 
+        private static IDictionary<Block, LemmaDecl> GetAdjustedLemmas(CFGRepr beforePeepholeCfg, 
             CFGRepr afterPeepholeCfg, 
             PassifiedProgToVCManager progToVCManager, 
             IsaUniqueNamer lemmaNamer)

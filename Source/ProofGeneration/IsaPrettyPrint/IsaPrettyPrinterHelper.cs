@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace ProofGeneration.IsaPrettyPrint
@@ -43,6 +44,18 @@ namespace ProofGeneration.IsaPrettyPrint
             else
             {
                 return list.Aggregate((s1, s2) => s1 + ", " + s2);
+            }
+        }
+
+        public static string CommaNewLineAggregate(IList<string> list)
+        {
+            if (list.Count == 0)
+            {
+                return "";
+            }
+            else
+            {
+                return list.Aggregate((s1, s2) => s1 + ", " + Environment.NewLine + s2);
             }
         }
 

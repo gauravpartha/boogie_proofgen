@@ -2747,6 +2747,10 @@ namespace VC {
         Microsoft.Boogie.LiveVariableAnalysis.ComputeLiveVariables(impl);
       }
 
+      #region proofgen
+      ProofGeneration.ProofGenerationLayer.BeforePassification(impl);
+      #endregion
+
       mvInfo = new ModelViewInfo(program, impl);
       Convert2PassiveCmd(impl, mvInfo);
 

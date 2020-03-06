@@ -77,7 +77,7 @@ namespace ProofGeneration.IsaPrettyPrint
         public override string VisitTermList(TermList t)
         {
             var rArgs = VisitList(t.list);
-            return IsaPrettyPrinterHelper.Brackets(IsaPrettyPrinterHelper.CommaAggregate(rArgs));
+            return IsaPrettyPrinterHelper.Brackets(IsaPrettyPrinterHelper.CommaNewLineAggregate(rArgs));
         }
 
         public override string VisitTermRecord(TermRecord t)

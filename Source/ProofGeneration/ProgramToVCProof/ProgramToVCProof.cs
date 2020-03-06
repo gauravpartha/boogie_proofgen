@@ -100,6 +100,28 @@ namespace ProofGeneration.ProgramToVCProof
 
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
         }
+        
+        public LemmaDecl GenerateVCPassiveBlockLemma(Block block, 
+            Block origBlock,
+            IEnumerable<Block> origSuccessors,
+            string lemmaName)
+        {
+            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(context, cmds, initState, finalState);
+
+            List<Term> assumptions = new List<Term>() { cmdsReduce };
+            assumptions.Add(vcinst.GetVCBlockInstantiation(origBlock, declToVCMapping));
+
+            bool isTrivialBlock = block.Cmds.Any(cmd =>
+                {
+                    return cmd != null && (cmd is PredicateCmd predCmd && predCmd.Expr is LiteralExpr predCond && (predCond != null && predCond.IsFalse));
+                }
+            );
+
+            Term conclusion = ConclusionBlock(origBlock, origSuccessors, normalInitState, finalState, declToVCMapping, vcinst, isTrivialBlock);
+
+            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, new Proof(new List<string>() { "oops" }));
+        }
 
 
         public LemmaDecl GenerateEmptyBlockLemma(Block block, ISet<Block> nonEmptySuccessors, string lemmaName)
