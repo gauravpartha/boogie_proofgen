@@ -63,15 +63,7 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTermIdent(TermIdent t)
         {
-            switch (t.id)
-            {
-                case SimpleIdentifier id:
-                    return id.name;
-                case Wildcard w:
-                    return "_";
-                default:
-                    throw new NotImplementedException();
-            }
+            return GetStringFromIdentifier(t.id);
         }
 
         public override string VisitTermList(TermList t)
@@ -105,7 +97,7 @@ namespace ProofGeneration.IsaPrettyPrint
             sb.Append("(");
             sb.Append(qIsa);
             sb.Append(" ");
-            sb.Append(IsaPrettyPrinterHelper.SpaceAggregate(t.boundVars));
+            sb.Append(IsaPrettyPrinterHelper.SpaceAggregate(t.boundVars.Select(id => GetStringFromIdentifier(id)).ToList()));
             sb.Append(".");
 
             sb.Append(" ");
@@ -136,6 +128,19 @@ namespace ProofGeneration.IsaPrettyPrint
             string rightString = t.argRight.Dispatch(this);
 
             return IsaPrettyPrinterHelper.Parenthesis(leftString + " " + isaSymbol + " " + rightString);
+        }
+
+        public string GetStringFromIdentifier(Identifier id)
+        {
+            switch (id)
+            {
+                case SimpleIdentifier sid:
+                    return sid.name;
+                case Wildcard w:
+                    return "_";
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
         public string GetStringFromBinary(TermBinary.BinaryOpCode bop)

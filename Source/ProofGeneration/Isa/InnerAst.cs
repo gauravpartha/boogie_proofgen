@@ -150,7 +150,9 @@ namespace ProofGeneration.Isa
 
     public class TermQuantifier : Term
     {
-        public readonly IList<string> boundVars;
+        public readonly IList<Identifier> boundVars;
+        //if non-null,
+        public readonly IList<TypeIsa> boundVarsTypes;
         public readonly Term term;
 
         public readonly QuantifierKind quantifier;
@@ -160,11 +162,19 @@ namespace ProofGeneration.Isa
             ALL, EX
         }
 
-        public TermQuantifier(QuantifierKind quantifier, IList<string> boundVars, Term term)
+        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
         {
+            Contract.Requires(boundVars != null); Contract.Requires(term != null);
+            Contract.Requires(boundVarsTypes == null || boundVars.Count == boundVarsTypes.Count);
             this.quantifier = quantifier;
             this.boundVars = boundVars;
+            this.boundVarsTypes = boundVarsTypes;
             this.term = term;
+        }
+
+        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, Term term) : this(quantifier, boundVars, null, term)
+        {
+
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
