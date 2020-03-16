@@ -74,7 +74,7 @@ namespace ProofGeneration
             //empty set for remaining cases
             BasicUtil.AddEquation(new TermIdent(new Wildcard()), new TermSet(new List<Term>()), equations);
 
-            return new FunDecl("outEdges_"+methodName, new ArrowType(IsaBoogieType.getCFGNodeType(), IsaCommonTypes.GetSetType(IsaBoogieType.getCFGNodeType())), equations);
+            return new FunDecl("outEdges_"+methodName, new ArrowType(IsaBoogieType.GetCFGNodeType(), IsaCommonTypes.GetSetType(IsaBoogieType.GetCFGNodeType())), equations);
         }
 
         private OuterDecl GetNodeToBlocksIsa(string methodName, CFGRepr cfg)
@@ -100,7 +100,7 @@ namespace ProofGeneration
             //None for remaining cases
             BasicUtil.AddEquation(new TermIdent(new Wildcard()), IsaCommonTerms.NoneOption(), equations);
 
-            return new FunDecl("nodeToBlocks_"+methodName, new ArrowType(IsaBoogieType.getCFGNodeType(), IsaBoogieType.getBlockType()), equations);
+            return new FunDecl("nodeToBlocks_"+methodName, new ArrowType(IsaBoogieType.GetCFGNodeType(), IsaBoogieType.GetBlockType()), equations);
         }
 
         private Term GetVariableDeclarationsIsa(IList<Variable> variables)

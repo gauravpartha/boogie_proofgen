@@ -203,13 +203,14 @@ namespace ProofGeneration
             return failureStateId;
         }
 
-        public static Term RedCmdList(Term context, Term cmdList, Term initState, Term finalState)
+        public static Term RedCmdList(Term varContext, Term funContext, Term cmdList, Term initState, Term finalState)
         {
             return
                 new TermApp(redCmdListId,
                 new List<Term>()
                 {
-                    context,
+                    varContext,
+                    funContext,
                     cmdList,
                     initState,
                     finalState

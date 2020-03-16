@@ -1,9 +1,5 @@
 ﻿using ProofGeneration.Isa;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProofGeneration
 {
@@ -34,14 +30,29 @@ namespace ProofGeneration
             return IsaCommonTypes.GetDataTypeNoArg("state");
         }
 
-        public static TypeIsa getCFGNodeType()
+        public static TypeIsa GetCFGNodeType()
         {
             return new DataType("node", new List<TypeIsa>());
         }
 
-        public static TypeIsa getBlockType()
+        public static TypeIsa GetBlockType()
         {
             return new DataType("block", new List<TypeIsa>());
+        }
+
+        public static TypeIsa BoogieFuncInterpType()
+        {
+            return new ArrowType(IsaCommonTypes.GetListType(ValType()), IsaCommonTypes.GetOptionType(ValType()));
+        }
+
+        public static TypeIsa VarContextType()
+        {
+            return new DataType("var_context", new List<TypeIsa>());
+        }
+
+        public static TypeIsa FunContextType()
+        {
+            return new DataType("fun_context", new List<TypeIsa>());
         }
 
     }
