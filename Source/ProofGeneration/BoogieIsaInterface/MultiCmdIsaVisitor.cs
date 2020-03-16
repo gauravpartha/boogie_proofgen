@@ -29,10 +29,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public IList<Term> Translate(Absy cmd)
         {            
-            if(cmd is AssignCmd assignCmd)
-            {
-                return TranslateAssignCmd(assignCmd);
-            } else if(cmd is HavocCmd havocCmd)
+            if(cmd is HavocCmd havocCmd)
             {
                 return TranslateHavocCmd(havocCmd);
             } else            
@@ -51,23 +48,6 @@ namespace ProofGeneration.BoogieIsaInterface
             }
 
             return cmdsIsa;
-        }
-
-        //desugar into single assignments
-        private IList<Term> TranslateAssignCmd(AssignCmd node)
-        {
-            if ((node.Lhss.Count != node.Rhss.Count))
-            {
-                throw new ProofGenUnexpectedStateException(typeof(MultiCmdIsaVisitor), "different number of lhs and rhs");
-            }
-
-            IEnumerable<Term> lhsResults = node.Lhss.Select(lhs => basicCmdVisitor.Translate(lhs));
-            IEnumerable<Term> rhsResults = node.Rhss.Select(rhs => basicCmdVisitor.Translate(rhs));
-
-            IList<Term> results = new List<Term>();
-            lhsResults.ZipDo(rhsResults, (lhs, rhs) => results.Add(IsaBoogieTerm.Assign(lhs, rhs)));
-
-            return results;
         }
 
         //desugar into single havoc commands

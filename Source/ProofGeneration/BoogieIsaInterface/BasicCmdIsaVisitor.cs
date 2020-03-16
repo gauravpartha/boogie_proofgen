@@ -79,6 +79,23 @@ namespace ProofGeneration
             return node;
         }
 
+        public override Cmd VisitAssignCmd(AssignCmd node)
+        {
+            if ((node.Lhss.Count != node.Rhss.Count))
+            {
+                throw new ProofGenUnexpectedStateException(typeof(BasicCmdIsaVisitor), "different number of lhs and rhs");
+            }
+
+            var lhsResults = node.Lhss.Select(lhs => Translate(lhs)).ToList();
+            var rhsResults = node.Rhss.Select(rhs => Translate(rhs)).ToList();
+
+            IList<Term> results = new List<Term>();
+            lhsResults.ZipDo(rhsResults, (lhs, rhs) => results.Add(new TermTuple(new List<Term>() { lhs, rhs })));
+
+            ReturnResult(IsaBoogieTerm.Assign(lhsResults, rhsResults));
+            return node;
+        }
+
         public override AssignLhs VisitSimpleAssignLhs(SimpleAssignLhs node)
         {
             ReturnResult(new StringConst(GetStringFromIdentifierExpr(node.AssignedVariable)));
@@ -127,8 +144,12 @@ namespace ProofGeneration
             return node;
         }
 
-
         //not implemented cmds
+        public override Cmd VisitHavocCmd(HavocCmd node)
+        {
+            //handled elsewhere, since havoc of multiple variables is desugared into multiple basic havoc commands
+            throw new NotImplementedException();
+        }
         public override Cmd VisitCallCmd(CallCmd node)
         {
             throw new NotImplementedException();

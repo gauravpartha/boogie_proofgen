@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
@@ -61,9 +62,17 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("Assume"), new List<Term>() { arg });
         }
 
-        public static Term Assign(Term lhs, Term rhs)
+        public static Term Assign(IList<Term> lhsTerms, IList<Term> rhsTerms)
         {
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Assign"), new List<Term>() { lhs, rhs });
+            if ((lhsTerms.Count !=rhsTerms.Count))
+            {
+                throw new ProofGenUnexpectedStateException(typeof(BasicCmdIsaVisitor), "different number of lhs and rhs");
+            }
+
+            IList<Term> results = new List<Term>();
+            lhsTerms.ZipDo(rhsTerms, (lhs, rhs) => results.Add(new TermTuple(new List<Term>() { lhs, rhs })));
+
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Assign"), new List<Term> { new TermList(results) });
         }
 
         public static Term Havoc(Term var)
