@@ -99,9 +99,14 @@ namespace ProofGeneration.IsaPrettyPrint
         }
 
         public override int VisitLocaleDecl(LocaleDecl d)
-        {            
-            _sb.Append("locale ").Append(d.name).Append(" = ");
-            _sb.AppendLine();
+        {
+            _sb.Append("locale ").Append(d.name);
+            
+            if(d.contextElem.fixedVariables.Count > 0 || d.contextElem.assumptions.Count > 0)
+            {
+                _sb.Append(" = ");
+                _sb.AppendLine();
+            }
 
             PrintContextElem(d.contextElem);
 
