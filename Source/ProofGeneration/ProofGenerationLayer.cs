@@ -24,14 +24,22 @@ namespace ProofGeneration
 
         private static IDictionary<Block, Block> beforePassiveOrigBlock;
         private static CFGRepr beforePassificationCfg;
+        private static IEnumerable<Variable> beforePassiveInParams;
+        private static IEnumerable<Variable> beforePassiveLocalVars;
+        private static IEnumerable<Variable> beforePassiveOutParams;
 
         private static CFGRepr afterPassificationCfg;
         private static CFGRepr noEmptyBlocksCfg;
         private static CFGRepr afterUnreachablePruningCfg;
 
-        private static IEnumerable<Function> functions;       
+        private static IEnumerable<Function> functions;
         private static IEnumerable<Variable> inParams;
         private static IEnumerable<Variable> localVars;
+        private static IEnumerable<Variable> outParams;
+
+        private static IDictionary<Block, IDictionary<Variable, Variable>> finalVarMapping = new Dictionary<Block, IDictionary<Variable, Variable>>();
+        private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
+
 
         [Conditional("PROOFGENACTIVE")]
         public static void StoreTheory(Implementation impl)
@@ -45,18 +53,54 @@ namespace ProofGeneration
 
         public static void Program(Program p)
         {
-            functions = p.Functions;            
+            functions = p.Functions;
         }
 
         public static void BeforePassification(Implementation impl)
         {
             beforePassificationCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforePassiveOrigBlock);
+
+            beforePassiveInParams = new List<Variable>(impl.InParams);
+            beforePassiveLocalVars = new List<Variable>(impl.LocVars);
+            beforePassiveOutParams = new List<Variable>(impl.OutParams);
+
+            foreach (Variable v in impl.LocVars.Union(impl.InParams).Union(impl.OutParams))
+            {
+                passiveToOrigVar.Add(v, v);
+            }
+        }
+
+        public static void RecordFinalVariableMapping(Block b, IDictionary<Variable, Expr> variableToExpr)
+        {
+            Contract.Requires(b != null);
+            Contract.Requires(variableToExpr != null);
+
+            var origVarToPassiveVar = new Dictionary<Variable, Variable>();
+
+            foreach (var kv in variableToExpr)
+            {
+                if (kv.Value is IdentifierExpr ie && ie.Decl is Variable vPassive)
+                {
+                    origVarToPassiveVar.Add(kv.Key, vPassive);
+                    if (passiveToOrigVar.TryGetValue(vPassive, out Variable origVarInMap))
+                    {
+                        if (origVarInMap != kv.Key)
+                            throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer), "passive variable corresponds to more than one original variables");
+                    } else
+                    {
+                        passiveToOrigVar.Add(vPassive, kv.Key);
+                    }
+                }
+            }
+
+            finalVarMapping.Add(b, origVarToPassiveVar);
         }
 
         public static void AfterPassification(Implementation impl)
         {
             inParams = impl.InParams;
             localVars = impl.LocVars;
+            outParams = impl.OutParams;
             afterPassificationImpl = impl;
             afterPassificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
@@ -69,63 +113,76 @@ namespace ProofGeneration
         public static void AfterUnreachablePruning(Implementation impl)
         {
             afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
-        }        
+        }
 
         public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
         {
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
-                vc, 
-                gen, 
-                translator, 
-                functions, 
+                "vc",
+                vc,
+                new StandardActiveDecl(),
+                gen,
+                translator,
+                functions,
                 inParams,
                 localVars,
                 afterUnreachablePruningCfg,
                 out VCInstantiation vcinst);
 
+            LocaleDecl vcPassiveLocale = VCToIsaInterface.ConvertVC(
+                "vc_passive",
+                vc,
+                new PassiveActiveDecl(),
+                gen,
+                translator,
+                functions,
+                inParams,
+                localVars,
+                afterUnreachablePruningCfg,
+                out VCInstantiation vcPassiveInst);
+
             var lemmaNamer = new IsaUniqueNamer();
 
-            var programToVCManager = new PassifiedProgToVCManager(vcinst, functions, inParams, localVars);
-            IDictionary<Block, LemmaDecl> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
-            IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, programToVCManager, lemmaNamer);
+            var passiveLemmaManager = new PassiveLemmaManager(vcinst, functions, inParams, localVars, outParams);
+            IDictionary<Block, LemmaDecl> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
+            IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
 
             Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
 
-            IList<Tuple<TermIdent, TypeIsa>> fixedVariables = programToVCManager.GetFixedVariables();
-            IList<Term> stateAssumptions = programToVCManager.GetStateAssumptions();
-            IList<string> stateAssumptionLabels = stateAssumptions.Select((_, i) => "S" + i).ToList();
-            var stateAssmsLemmas = new LemmasDecl("state_assms", stateAssumptionLabels);
-
-            List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { stateAssmsLemmas };
+            List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
             afterPassificationDecls.AddRange(finalProgramLemmas.Values);
             afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
 
+            LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
-            LocaleDecl afterPassificationLocale = new LocaleDecl("passification",
-                new ContextElem(fixedVariables, stateAssumptions, stateAssumptionLabels),
-                afterPassificationDecls);
 
             #region WIP
 
             // Generate before passification block lemmas to try out things
-            var beforePassiveNamer = new IsaUniqueNamer();            
+            var beforePassiveNamer = new IsaUniqueNamer();
 
-            IDictionary<Block, LemmaDecl> beforePassiveLemmas = 
-                GenerateBeforePassiveLemmas(beforePassificationCfg, afterUnreachablePruningCfg, beforePeepholeEmptyLemmas, programToVCManager, beforePassiveNamer);
+            var prePassiveLemmaManager = new PrePassiveLemmaManager(
+                vcPassiveInst,
+                beforePassiveOrigBlock,
+                passiveToOrigVar,
+                functions,
+                beforePassiveLocalVars,
+                beforePassiveInParams,
+                beforePassiveOutParams
+                );
 
-            List<OuterDecl> beforePassiveDecls = new List<OuterDecl>() { stateAssmsLemmas };
+            IDictionary<Block, LemmaDecl> beforePassiveLemmas =
+                GenerateBeforePassiveLemmas(beforePassificationCfg, afterUnreachablePruningCfg, beforePeepholeEmptyLemmas, prePassiveLemmaManager, beforePassiveNamer);
+
+            List<OuterDecl> beforePassiveDecls = new List<OuterDecl>();
             beforePassiveDecls.AddRange(beforePassiveLemmas.Values);
 
-            LocaleDecl beforePassiveLocale = new LocaleDecl("beforePassive",
-               new ContextElem(fixedVariables, stateAssumptions, stateAssumptionLabels),
-               beforePassiveDecls);
-
+            LocaleDecl beforePassiveLocale = GenerateLocale("beforePassive", prePassiveLemmaManager, beforePassiveDecls);
             #endregion
-
 
             Theory theory = new Theory(afterPassificationImpl.Name,
                 new List<string>() { "Semantics", "Util" },
-                new List<OuterDecl>() { vcLocale, beforePassiveLocale });
+                new List<OuterDecl>() { vcLocale, vcPassiveLocale, beforePassiveLocale });
 
             StoreTheory(theory);
         }
@@ -133,7 +190,7 @@ namespace ProofGeneration
         private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(CFGRepr beforePassiveCfg,
             CFGRepr finalCfg,
             IDictionary<Block, LemmaDecl> emptyBlockLemmas,
-            PassifiedProgToVCManager progToVCManager, IsaUniqueNamer lemmaNamer)
+            PrePassiveLemmaManager prePassiveLemmaManager, IsaUniqueNamer lemmaNamer)
         {
             var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
 
@@ -142,15 +199,14 @@ namespace ProofGeneration
                 Block origBlock = beforePassiveOrigBlock[b];
                 if (finalCfg.ContainsBlock(origBlock))
                 {
-                    LemmaDecl lemma = progToVCManager.GenerateVCPassiveBlockLemma(
+                    LemmaDecl lemma = prePassiveLemmaManager.GenerateBlockLemma(
                         b,
-                        origBlock,
                         finalCfg.GetSuccessorBlocks(origBlock),
                         lemmaNamer.GetName(b, GetLemmaName(b)));
                     blockToLemmaDecls.Add(b, lemma);
                 }
 
-                if(emptyBlockLemmas.TryGetValue(b, out LemmaDecl emptyBlockLemma))
+                if (emptyBlockLemmas.TryGetValue(b, out LemmaDecl emptyBlockLemma))
                 {
                     blockToLemmaDecls.Add(b, emptyBlockLemma);
                 }
@@ -159,22 +215,22 @@ namespace ProofGeneration
             return blockToLemmaDecls;
         }
 
-            private static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassifiedProgToVCManager progToVCManager, IsaUniqueNamer lemmaNamer)
+        private static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassiveLemmaManager passiveLemmaManager, IsaUniqueNamer lemmaNamer)
         {
             var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
 
             foreach (Block b in cfg.GetBlocksBackwards())
             {
-                blockToLemmaDecls.Add(b, progToVCManager.GenerateVCBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b))));
+                blockToLemmaDecls.Add(b, passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b))));
             }
 
             return blockToLemmaDecls;
-        }        
+        }
 
         //assume that block identities in beforePruning and afterPruning are the same (only edges may be different)
         private static IDictionary<Block, LemmaDecl> GetAdjustedLemmas(CFGRepr beforePeepholeCfg, 
             CFGRepr afterPeepholeCfg, 
-            PassifiedProgToVCManager progToVCManager, 
+            IBlockLemmaManager lemmaManager, 
             IsaUniqueNamer lemmaNamer)
         {
             var blocksToLemmas = new Dictionary<Block, LemmaDecl>();
@@ -217,12 +273,19 @@ namespace ProofGeneration
                         }
 
                         //add lemma
-                        blocksToLemmas.Add(block, progToVCManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));
+                        blocksToLemmas.Add(block, lemmaManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));
                     }
-                }        
+                }     
             }
 
             return blocksToLemmas;
+        }
+
+        private static LocaleDecl GenerateLocale(string localeName, IBlockLemmaManager lemmaManager, IList<OuterDecl> coreLemmas)
+        {
+            IList<OuterDecl> prelude = lemmaManager.Prelude();
+            prelude.AddRange(coreLemmas);
+            return new LocaleDecl(localeName, lemmaManager.Context(), prelude);
         }
 
         private static string GetLemmaName(Block b)

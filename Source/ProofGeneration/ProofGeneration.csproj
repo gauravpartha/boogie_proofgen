@@ -73,7 +73,10 @@
     <Compile Include="Isa\IsaVisitor.cs" />
     <Compile Include="Isa\OuterAst.cs" />
     <Compile Include="Isa\ProofAst.cs" />
-    <Compile Include="ProgramToVCProof\ProgramToVCProof.cs" />
+    <Compile Include="ProgramToVCProof\IBlockLemmaGenerator.cs" />
+    <Compile Include="ProgramToVCProof\LemmaHelper.cs" />
+    <Compile Include="ProgramToVCProof\PassiveLemmaManager.cs" />
+    <Compile Include="ProgramToVCProof\PrePassiveLemmaManager.cs" />
     <Compile Include="ProgramToVCProof\PureToBoogieValConverter.cs" />
     <Compile Include="ProofGenerationExceptions.cs" />
     <Compile Include="ProofGenerationLayer.cs" />
@@ -81,6 +84,9 @@
     <Compile Include="Util\BasicUtil.cs" />
     <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
     <Compile Include="Util\IsaUniqueNamer.cs" />
+    <Compile Include="VCProofGen\IActiveDeclGenerator.cs" />
+    <Compile Include="VCProofGen\PassiveActiveDecl.cs" />
+    <Compile Include="VCProofGen\StandardActiveDecl.cs" />
     <Compile Include="VCProofGen\VCBlockExtractor.cs" />
     <Compile Include="VCProofGen\VCExprDeclCollector.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />

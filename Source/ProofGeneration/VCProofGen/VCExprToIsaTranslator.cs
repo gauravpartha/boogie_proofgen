@@ -19,12 +19,15 @@ namespace ProofGeneration.VCProofGen
 
         protected readonly VCExprOpIsaVisitor vcExprOpIsaVisitor = new VCExprOpIsaVisitor();
 
+        private readonly IDictionary<Block, IList<VCExprVar>> blockToActiveVars;
+
         private readonly IsaUniqueNamer uniqueNamer;
 
-        public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC)
+        public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC, IDictionary<Block, IList<VCExprVar>> blockToActiveVars)
         {
             this.uniqueNamer = uniqueNamer;
             this.successorToVC = successorToVC;
+            this.blockToActiveVars = blockToActiveVars;
 
             criticalOps = new HashSet<VCExprOp>
             {
@@ -98,7 +101,7 @@ namespace ProofGeneration.VCProofGen
 
                             //reverse children, since first one is added last
                             top.Item2.Reverse();
-                            var newResult = getTermFromNAry(top.Item1, top.Item2);
+                            var newResult = GetTermFromNAry(top.Item1, top.Item2);
                             if (activeNAryStack.Count() > 0)
                                 activeNAryStack.Peek().Item2.Add(newResult);
                             else
@@ -126,10 +129,10 @@ namespace ProofGeneration.VCProofGen
                 term.Add(childNode.Accept(this, arg));
             }
 
-            return getTermFromNAry(node, term);
+            return GetTermFromNAry(node, term);
         }
 
-        private Term getTermFromNAry(VCExprNAry node, List<Term> args)
+        private Term GetTermFromNAry(VCExprNAry node, List<Term> args)
         {
             return node.Accept(this.vcExprOpIsaVisitor, args);
         }
@@ -142,8 +145,10 @@ namespace ProofGeneration.VCProofGen
         public Term Visit(VCExprVar node, bool arg)
         {
             if (VCBlockExtractor.PredictBlockName(node.Name, out string predictedBlockName) &&
-                     TryGetDefFromBlock(predictedBlockName, out DefDecl result))
-                return IsaCommonTerms.TermIdentFromName(result.name);
+                     TryGetDefFromBlock(predictedBlockName, out Block block, out DefDecl def))
+            {
+                return new TermApp(IsaCommonTerms.TermIdentFromName(def.name), blockToActiveVars[block].Select(v => Translate(v)).ToList());
+            }
             else
                 return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(node, node.Name));
         }
@@ -158,18 +163,19 @@ namespace ProofGeneration.VCProofGen
             throw new NotImplementedException();
         }
 
-        private bool TryGetDefFromBlock(string blockName, out DefDecl result)
+        private bool TryGetDefFromBlock(string blockName, out Block block, out DefDecl blockDef)
         {
             foreach(var kv in successorToVC)
             {
                 if(kv.Key.Label.Equals(blockName))
                 {
-                    result = kv.Value;
+                    block = kv.Key;
+                    blockDef = kv.Value;
                     return true;
                 }
             }
 
-            result = null;
+            block = null; blockDef = null;
             return false;
         }
     }
