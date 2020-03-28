@@ -133,14 +133,7 @@ namespace ProofGeneration
 
         public override Expr VisitLiteralExpr(LiteralExpr node)
         {
-            if (node.Type.IsBool)
-            {
-                ReturnResult(IsaBoogieTerm.ExprFromVal(IsaBoogieTerm.BoolVal(node.asBool)));
-            } else if(node.Type.IsInt)
-            {
-                ReturnResult(IsaBoogieTerm.ExprFromVal(IsaBoogieTerm.IntVal(node.asBigNum)));
-            }
-
+            ReturnResult(IsaBoogieTerm.ExprFromVal(IsaBoogieTerm.ValFromLiteral(node)));
             return node;
         }
 

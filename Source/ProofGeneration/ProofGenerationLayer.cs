@@ -64,12 +64,17 @@ namespace ProofGeneration
             beforePassiveLocalVars = new List<Variable>(impl.LocVars);
             beforePassiveOutParams = new List<Variable>(impl.OutParams);
 
+            CFGRepr temp = beforePassificationCfg;
+
+            /*
             foreach (Variable v in impl.LocVars.Union(impl.InParams).Union(impl.OutParams))
             {
                 passiveToOrigVar.Add(v, v);
             }
+            */
         }
 
+        /*
         public static void RecordFinalVariableMapping(Block b, IDictionary<Variable, Expr> variableToExpr)
         {
             Contract.Requires(b != null);
@@ -95,6 +100,7 @@ namespace ProofGeneration
 
             finalVarMapping.Add(b, origVarToPassiveVar);
         }
+        */
 
         public static void AfterPassification(Implementation impl)
         {
@@ -103,6 +109,26 @@ namespace ProofGeneration
             outParams = impl.OutParams;
             afterPassificationImpl = impl;
             afterPassificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
+
+            var nameToVar = new Dictionary<string, Variable>();
+
+            foreach(Variable v in beforePassiveInParams.Union(beforePassiveLocalVars).Union(beforePassiveOutParams))
+            {
+                nameToVar.Add(v.Name, v);
+            }
+
+            foreach(Variable vPassive in inParams.Union(localVars).Union(outParams))
+            {
+                //heuristic to get mapping
+                string [] split = vPassive.Name.Split('@');
+                if(nameToVar.TryGetValue(split[0], out Variable vOrig))
+                {
+                    passiveToOrigVar.Add(vPassive, vOrig);
+                } else
+                {
+                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer), "Cannot predict mapping between passive and original variable");
+                }
+            } 
         }
 
         public static void AfterEmptyBlockRemoval(Implementation impl)
@@ -161,10 +187,16 @@ namespace ProofGeneration
             // Generate before passification block lemmas to try out things
             var beforePassiveNamer = new IsaUniqueNamer();
 
+            IDictionary<Block, IDictionary<Variable, Expr>> constantEntry =
+                ConstantPropInformation.ConstantVariableInformation(beforePassificationCfg, out IDictionary<Block, IDictionary <Variable, Expr>> constantExit);           
+
             var prePassiveLemmaManager = new PrePassiveLemmaManager(
                 vcPassiveInst,
+                beforePassificationCfg,
                 beforePassiveOrigBlock,
                 passiveToOrigVar,
+                constantEntry,
+                constantExit,
                 functions,
                 beforePassiveLocalVars,
                 beforePassiveInParams,
@@ -172,13 +204,18 @@ namespace ProofGeneration
                 );
 
             IDictionary<Block, LemmaDecl> beforePassiveLemmas =
-                GenerateBeforePassiveLemmas(beforePassificationCfg, afterUnreachablePruningCfg, beforePeepholeEmptyLemmas, prePassiveLemmaManager, beforePassiveNamer);
+                GenerateBeforePassiveLemmas(beforePassificationCfg, afterUnreachablePruningCfg, afterPassificationCfg, prePassiveLemmaManager, beforePassiveNamer);
 
             List<OuterDecl> beforePassiveDecls = new List<OuterDecl>();
             beforePassiveDecls.AddRange(beforePassiveLemmas.Values);
 
             LocaleDecl beforePassiveLocale = GenerateLocale("beforePassive", prePassiveLemmaManager, beforePassiveDecls);
             #endregion
+            Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
+                new List<string>() { "Semantics", "Util" },
+                new List<OuterDecl>() { vcLocale, afterPassificationLocale });
+
+            StoreTheory(theoryPassive);
 
             Theory theory = new Theory(afterPassificationImpl.Name,
                 new List<string>() { "Semantics", "Util" },
@@ -187,12 +224,16 @@ namespace ProofGeneration
             StoreTheory(theory);
         }
 
-        private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(CFGRepr beforePassiveCfg,
+        private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(
+            CFGRepr beforePassiveCfg,
             CFGRepr finalCfg,
-            IDictionary<Block, LemmaDecl> emptyBlockLemmas,
-            PrePassiveLemmaManager prePassiveLemmaManager, IsaUniqueNamer lemmaNamer)
+            CFGRepr beforePeephole,         
+            PrePassiveLemmaManager prePassiveLemmaManager, 
+            IsaUniqueNamer lemmaNamer)
         {
             var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
+
+            ISet<Block> beforePeepholeReachable = ComputeReachableEmptyBlocks(beforePeephole);
 
             foreach (Block b in beforePassiveCfg.GetBlocksBackwards())
             {
@@ -204,15 +245,43 @@ namespace ProofGeneration
                         finalCfg.GetSuccessorBlocks(origBlock),
                         lemmaNamer.GetName(b, GetLemmaName(b)));
                     blockToLemmaDecls.Add(b, lemma);
-                }
-
-                if (emptyBlockLemmas.TryGetValue(b, out LemmaDecl emptyBlockLemma))
+                } else if (beforePeepholeReachable.Contains(origBlock))
                 {
-                    blockToLemmaDecls.Add(b, emptyBlockLemma);
-                }
+                    var nonEmptySuccessors = GetNonEmptySuccessors(origBlock, beforePeephole);
+                    LemmaDecl lemma = prePassiveLemmaManager.GenerateEmptyBlockLemma(
+                        b, 
+                        nonEmptySuccessors, 
+                        lemmaNamer.GetName(b, GetLemmaName(b)));
+                    blockToLemmaDecls.Add(b, lemma);
+                }                
             }
 
             return blockToLemmaDecls;
+        }
+
+        private static ISet<Block> ComputeReachableEmptyBlocks(CFGRepr beforePeephole)
+        {
+            var result = new HashSet<Block>();
+
+            Queue<Block> queue = new Queue<Block>();
+            queue.Enqueue(beforePeephole.entry);
+
+            while(queue.Any())
+            {
+                Block curBlock = queue.Dequeue();
+                if(!LemmaHelper.FinalStateIsMagic(curBlock))
+                {
+                    if (curBlock.Cmds.Count == 0)
+                        result.Add(curBlock);
+
+                    foreach(Block bSucc in beforePeephole.GetSuccessorBlocks(curBlock))
+                    {
+                        queue.Enqueue(bSucc);
+                    }
+                }
+            }
+
+            return result;
         }
 
         private static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassiveLemmaManager passiveLemmaManager, IsaUniqueNamer lemmaNamer)
@@ -227,6 +296,61 @@ namespace ProofGeneration
             return blockToLemmaDecls;
         }
 
+        //return first reachable blocks from block which are non-empty
+        private static IEnumerable<Block> GetNonEmptySuccessors(Block block, CFGRepr cfg)
+        {            
+            //block is unreachable after peephole
+                var nonEmptySuccessors = new List<Block>();
+
+                if (cfg.NumOfSuccessors(block) > 0)
+                {
+                    //find first reachable blocks that are not empty
+                    Queue<Block> toVisit = new Queue<Block>();
+                    toVisit.Enqueue(block);
+                    while (toVisit.Count > 0)
+                    {
+                        Block curBlock = toVisit.Dequeue();
+
+                        if (curBlock.Cmds.Count != 0 || cfg.NumOfSuccessors(curBlock) == 0)
+                        {
+                            nonEmptySuccessors.Add(curBlock);
+                        }
+                        else
+                        {
+                            foreach (Block succ in cfg.GetSuccessorBlocks(curBlock))
+                            {
+                                toVisit.Enqueue(succ);
+                            }
+                        }
+                    }
+                }
+                        
+            return nonEmptySuccessors;
+        }
+
+        private static IDictionary<Block, LemmaDecl> GetAdjustedPassiveLemmas(
+            CFGRepr beforePassification, 
+            IDictionary<Block, Block> beforePassiveToOrig, 
+            CFGRepr beforePeephole,
+            IBlockLemmaManager lemmaManager,
+            IsaUniqueNamer lemmaNamer)
+        {
+            var blocksToLemmas = new Dictionary<Block, LemmaDecl>();
+
+            foreach (Block block in beforePassification.GetBlocksBackwards())
+            {
+                Block origBlock = beforePassiveToOrig[block];
+
+                if(origBlock.Cmds.Count == 0)
+                {
+                    var nonEmptySuccessors = GetNonEmptySuccessors(origBlock, beforePeephole);
+                    blocksToLemmas.Add(block, lemmaManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));
+                }
+            }
+
+            return blocksToLemmas;
+        }
+
         //assume that block identities in beforePruning and afterPruning are the same (only edges may be different)
         private static IDictionary<Block, LemmaDecl> GetAdjustedLemmas(CFGRepr beforePeepholeCfg, 
             CFGRepr afterPeepholeCfg, 
@@ -234,7 +358,6 @@ namespace ProofGeneration
             IsaUniqueNamer lemmaNamer)
         {
             var blocksToLemmas = new Dictionary<Block, LemmaDecl>();
-            //TODO locale with state assumptions, adjustment of proofs etc...
 
             foreach(Block block in beforePeepholeCfg.GetBlocksBackwards())
             {
@@ -244,33 +367,7 @@ namespace ProofGeneration
 
                     if(block.Cmds.Count == 0)
                     {
-                        ISet<Block> nonEmptySuccessors = new HashSet<Block>();
-
-                        if (beforePeepholeCfg.NumOfSuccessors(block) > 0)
-                        {
-                            //find first reachable blocks that are not empty
-                            Queue<Block> toVisit = new Queue<Block>();
-                            toVisit.Enqueue(block);
-                            while (toVisit.Count > 0)
-                            {
-                                Block curBlock = toVisit.Dequeue();
-
-                                if (curBlock.Cmds.Count != 0 || beforePeepholeCfg.NumOfSuccessors(curBlock) == 0)
-                                {
-                                    nonEmptySuccessors.Add(curBlock);
-                                }
-                                else
-                                {
-                                    foreach (Block succ in beforePeepholeCfg.GetSuccessorBlocks(curBlock))
-                                    {
-                                        toVisit.Enqueue(succ);
-                                    }
-                                }
-                            }
-                        } else
-                        {
-                            //empty exit block is removed, hence no assumptions required
-                        }
+                        var nonEmptySuccessors = GetNonEmptySuccessors(block, beforePeepholeCfg);
 
                         //add lemma
                         blocksToLemmas.Add(block, lemmaManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));

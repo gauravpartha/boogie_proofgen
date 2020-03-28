@@ -10,9 +10,9 @@ namespace ProofGeneration.ProgramToVCProof
 {
     interface IBlockLemmaManager
     {
-        LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName);
+        LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> sucPassive, string lemmaName);
 
-        LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName);
+        LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> sucPassive, string lemmaName);
 
         ContextElem Context();
 

@@ -73,6 +73,7 @@
     <Compile Include="Isa\IsaVisitor.cs" />
     <Compile Include="Isa\OuterAst.cs" />
     <Compile Include="Isa\ProofAst.cs" />
+    <Compile Include="ProgramToVCProof\ConstantPropInformation.cs" />
     <Compile Include="ProgramToVCProof\IBlockLemmaGenerator.cs" />
     <Compile Include="ProgramToVCProof\LemmaHelper.cs" />
     <Compile Include="ProgramToVCProof\PassiveLemmaManager.cs" />

@@ -37,24 +37,30 @@ namespace ProofGeneration.ProgramToVCProof
 
         public static IList<Term> VariableAssumptions(
             IEnumerable<Variable> programVars,
-            Term initialState,
+            Term state,
             IDictionary<NamedDeclaration, TermIdent> declToVCMapping,
             IsaUniqueNamer uniqueNamer)
         {
             var result = new List<Term>();
             foreach (Variable v in programVars)
             {
-                result.Add(VariableAssumption(v, initialState, declToVCMapping[v], uniqueNamer));
+                result.Add(VariableAssumption(v, state, declToVCMapping[v], uniqueNamer));
             }
 
             return result;
         }
 
-        public static Term VariableAssumption(Variable v, Term initialState, TermIdent vcVar, IsaUniqueNamer uniqueNamer)
+        public static Term VariableAssumption(Variable v, Term state, TermIdent vcVar, IsaUniqueNamer uniqueNamer)
         {
-            Term left = new TermApp(initialState, new StringConst(uniqueNamer.GetName(v, v.Name)));
+            Term left = new TermApp(state, new StringConst(uniqueNamer.GetName(v, v.Name)));
             Term right = IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
             return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
+        }
+
+        public static Term VariableAssumptionExplicit(Variable v, Term state, Term rhs, IsaUniqueNamer uniqueNamer)
+        {
+            Term left = new TermApp(state, new StringConst(uniqueNamer.GetName(v, v.Name)));
+            return new TermBinary(left, rhs, TermBinary.BinaryOpCode.EQ);
         }
 
         public static Term VariableTypeAssumption(Variable v, Term varContext, IsaUniqueNamer uniqueNamer)
@@ -130,7 +136,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             foreach (Function fun in funcs)
             {
-                dict.Add(fun, IsaCommonTerms.TermIdentFromName(namer.GetName(fun, "vc_" + fun.Name)));
+                dict.Add(fun, IsaCommonTerms.TermIdentFromName(namer.GetName(fun, fun.Name)));
             }
 
             return dict;

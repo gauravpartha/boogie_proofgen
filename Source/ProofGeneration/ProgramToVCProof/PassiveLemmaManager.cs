@@ -38,7 +38,8 @@ namespace ProofGeneration.ProgramToVCProof
             initState = IsaBoogieTerm.Normal(normalInitState);
             cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer);
             declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>)functions).Union(programVariables), uniqueNamer);
-            funToInterpMapping = LemmaHelper.FunToTerm(functions, uniqueNamer);
+            //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
+            funToInterpMapping = LemmaHelper.FunToTerm(functions, new IsaUniqueNamer());
         }
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
@@ -119,7 +120,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<string> AssumptionLabels()
         {
-            return LemmaHelper.AssumptionLabels("S", 0, functions.Count() + programVariables.Count());
+            return LemmaHelper.AssumptionLabels("G", 0, 2*functions.Count() + programVariables.Count());
         }
 
         private IList<Term> GlobalAssumptions()

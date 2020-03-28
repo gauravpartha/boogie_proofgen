@@ -50,10 +50,15 @@ namespace ProofGeneration.BoogieIsaInterface
             return cmdsIsa;
         }
 
+        public Term TranslateIdentifierExpr(IdentifierExpr id)
+        {
+            return new StringConst(basicCmdVisitor.GetStringFromIdentifierExpr(id));
+        }
+
         //desugar into single havoc commands
         private IList<Term> TranslateHavocCmd(HavocCmd node)
         {
-            IEnumerable<Term> varResults = node.Vars.Select(var => new StringConst(basicCmdVisitor.GetStringFromIdentifierExpr(var)));
+            IEnumerable<Term> varResults = node.Vars.Select(var => TranslateIdentifierExpr(var));
 
             IList<Term> results = new List<Term>();
 

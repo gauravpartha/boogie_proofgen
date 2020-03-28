@@ -9,7 +9,7 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
-    class IsaBoogieTerm
+    public static class IsaBoogieTerm
     {
 
         public readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
@@ -28,6 +28,21 @@ namespace ProofGeneration
         {
             Term stringConst = new StringConst(v);
             return new TermApp(IsaCommonTerms.TermIdentFromName("Var"), new List<Term>() { stringConst });
+        }
+
+        public static Term ValFromLiteral(LiteralExpr node)
+        {
+            if (node.Type.IsBool)
+            {
+               return BoolVal(node.asBool);
+            }
+            else if (node.Type.IsInt)
+            {
+                return IntVal(node.asBigNum);
+            } else
+            {
+                throw new NotImplementedException();
+            }
         }
 
         public static Term IntVal(Microsoft.Basetypes.BigNum num)
