@@ -16,7 +16,7 @@ namespace ProofGeneration.CFGRepresentation
         private readonly Block [] blocks;
         public readonly Block entry;
 
-        //labeling must give topological order from 0 to num_of_blocks-1
+        //labeling must give topological order from 0 to num_of_blocks-1, if the CFG is acyclic
         //FIXME: make this more robust
         public CFGRepr(IDictionary<Block, IList<Block>> outgoingBlocks, IDictionary<Block, int> labeling, Block entry)
         {

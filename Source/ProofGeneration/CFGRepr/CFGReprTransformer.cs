@@ -22,7 +22,7 @@ namespace ProofGeneration.CFGRepresentation
         }
 
         //if "generateCopy", then blocks will be copied and the mapping from the copied blocks to the original blocks is given by "newToOldBlocks"
-        public static CFGRepr getCFGRepresentation(Implementation impl, bool generateCopy, out IDictionary<Block, Block> newToOldBlocks)
+        public static CFGRepr getCFGRepresentation(Implementation impl, bool generateCopy, out IDictionary<Block, Block> newToOldBlocks, bool isAcyclic = true)
         {
             Contract.Requires(impl != null);
             Contract.Ensures((generateCopy && newToOldBlocks != null) || (!generateCopy && newToOldBlocks == null));
@@ -43,8 +43,21 @@ namespace ProofGeneration.CFGRepresentation
             }                
 
             AlternateCFGRepr(blocksToConvert, out Block entryBlock, out IDictionary < Block, IList < Block >> outgoingBlocks);
-            IDictionary<Block, int> labeling = GetTopologicalLabeling(blocksToConvert);
- 
+            IDictionary<Block, int> labeling;
+            if (isAcyclic)
+            {
+                labeling = GetTopologicalLabeling(blocksToConvert);
+            } else
+            {
+                labeling = new Dictionary<Block, int>();
+                int idx = 0;
+                foreach(Block b in blocksToConvert)
+                {
+                    labeling.Add(b, idx);
+                    idx++;
+                }
+            }
+
             return new CFGRepr(outgoingBlocks, labeling, entryBlock);
         }
 
@@ -129,7 +142,15 @@ namespace ProofGeneration.CFGRepresentation
 
             foreach (Block b in blocks)
             {
+                List<Cmd> copyCmds = new List<Cmd>();
+                foreach(var cmd in b.Cmds)
+                {
+                    copyCmds.Add((Cmd) CloneMethod.Invoke(cmd,null));
+                }
+
                 Block copyBlock = (Block)CloneMethod.Invoke(b, null);
+                copyBlock.Cmds = copyCmds;
+
                 copyBlocks.Add(copyBlock);
                 oldToNewBlock.Add(b, copyBlock);
             }
