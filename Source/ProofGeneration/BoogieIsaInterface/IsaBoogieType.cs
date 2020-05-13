@@ -5,6 +5,11 @@ namespace ProofGeneration
 {
     class IsaBoogieType
     {
+        public static TypeIsa BoogieType()
+        {
+            return IsaCommonTypes.GetDataTypeNoArg("ty");
+        }
+
         public static Term BoolType()
         {
             return IsaCommonTerms.TermIdentFromName("TBool");
@@ -22,7 +27,7 @@ namespace ProofGeneration
 
         public static TypeIsa NormalStateType()
         {
-            return new ArrowType(IsaCommonTypes.GetDataTypeNoArg("vname"), IsaCommonTypes.GetOptionType(ValType()));
+            return new ArrowType(VnameType(), IsaCommonTypes.GetOptionType(ValType()));
         }
 
         public static TypeIsa StateType()
@@ -43,6 +48,16 @@ namespace ProofGeneration
         public static TypeIsa BoogieFuncInterpType()
         {
             return new ArrowType(IsaCommonTypes.GetListType(ValType()), IsaCommonTypes.GetOptionType(ValType()));
+        }
+
+        public static TypeIsa VnameType()
+        {
+            return IsaCommonTypes.GetDataTypeNoArg("vname");
+        }
+
+        public static TypeIsa FnameType()
+        {
+            return IsaCommonTypes.GetDataTypeNoArg("fname");
         }
 
         public static TypeIsa VarContextType()

@@ -13,29 +13,36 @@ namespace ProofGeneration
 {
     class IsaProgramGenerator
     {
+        MultiCmdIsaVisitor cmdIsaVisitor = new MultiCmdIsaVisitor();
 
-        public Theory GetIsaProgram(Implementation impl, CFGRepr cfg, string thyName)
+        public LocaleDecl GetIsaProgram(
+            string localeName, 
+            string procName,
+            IEnumerable<Function> functions,
+            IEnumerable<Variable> inParams, 
+            IEnumerable<Variable> localVars, 
+            IEnumerable<Variable> outParams, 
+            CFGRepr cfg)
         {
-            string methodName = impl.Proc.Name;            
-
             Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
 
-            OuterDecl outEdges = GetOutEdgesIsa(methodName, cfg);
-            OuterDecl nodesToBlocks = GetNodeToBlocksIsa(methodName, cfg);
+            OuterDecl outEdges = GetOutEdgesIsa(procName, cfg);
+            OuterDecl nodesToBlocks = GetNodeToBlocksIsa(procName, cfg);
 
             Term nodes = GetNodeSet(cfg);
 
-            Term parameters = GetVariableDeclarationsIsa(impl.InParams);
-            Term localVariables = GetVariableDeclarationsIsa(impl.LocVars);
+            OuterDecl funcs = GetFunctionDeclarationsIsa(procName, functions);
+            OuterDecl parameters = GetVariableDeclarationsIsa("inParams", procName, inParams);
+            OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, localVars);
 
             Term methodBodyCFG = 
                 IsaBoogieTerm.MethodCFGBody(
                     entry, nodes, IsaCommonTerms.TermIdentFromName(outEdges.name), IsaCommonTerms.TermIdentFromName(nodesToBlocks.name)
                 );
 
-            Term method = IsaBoogieTerm.Method(methodName, parameters, localVariables, methodBodyCFG);
+            Term method = IsaBoogieTerm.Method(procName, IsaCommonTerms.TermIdentFromName(parameters.name), IsaCommonTerms.TermIdentFromName(localVariables.name), methodBodyCFG);
 
-            Term program = IsaBoogieTerm.Program(new List<Term>(), new List<Term>() { method });
+            Term program = IsaBoogieTerm.Program(IsaCommonTerms.TermIdentFromName(funcs.name), new List<Term>() { method });
 
             var list = new List<Tuple<IList<Term>, Term>>
             {
@@ -47,11 +54,11 @@ namespace ProofGeneration
             IList<OuterDecl> outerDecls =
                 new List<OuterDecl>()
                 {
-                    outEdges, nodesToBlocks, programDefinition
+                    outEdges, nodesToBlocks, funcs, parameters, localVariables, programDefinition
                 };
 
-            return new Theory(thyName, new List<string>() { "Lang" }, outerDecls);
-        }       
+            return new LocaleDecl(localeName, ContextElem.CreateEmptyContext(), outerDecls);
+        }
 
         private OuterDecl GetOutEdgesIsa(string methodName, CFGRepr cfg)
         {
@@ -79,8 +86,6 @@ namespace ProofGeneration
 
         private OuterDecl GetNodeToBlocksIsa(string methodName, CFGRepr cfg)
         {
-            var cmdIsaVisitor = new MultiCmdIsaVisitor();
-
             var equations = new List<Tuple<IList<Term>, Term>>();
 
             foreach (Block b in cfg.GetBlocksForwards())
@@ -103,21 +108,44 @@ namespace ProofGeneration
             return new FunDecl("nodeToBlocks_"+methodName, new ArrowType(IsaBoogieType.GetCFGNodeType(), IsaBoogieType.GetBlockType()), equations);
         }
 
-        private Term GetVariableDeclarationsIsa(IList<Variable> variables)
+        private OuterDecl GetFunctionDeclarationsIsa(string methodName, IEnumerable<Function> functions)
         {
-            IList<Term> result = new List<Term>();
-
             var typeIsaVisitor = new TypeIsaVisitor();
+            var equations = new List<Tuple<IList<Term>, Term>>();
+
+            /* TODO
+
+            foreach(var f in functions)
+            {
+                Term lhs = new StringConst(f.Name);
+                Term rhs = IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(f.))
+            }
+
+            */
+            BasicUtil.AddEquation(new TermIdent(new Wildcard()), IsaCommonTerms.NoneOption(), equations);
+
+            return new FunDecl("funDecl" + "_" + methodName, new ArrowType(IsaBoogieType.FnameType(), IsaCommonTypes.GetOptionType(IsaBoogieType.BoogieType())), equations);
+        }
+
+        private OuterDecl GetVariableDeclarationsIsa(string varKind, string methodName, IEnumerable<Variable> variables)
+        {
+            var typeIsaVisitor = new TypeIsaVisitor();
+
+            var equations = new List<Tuple<IList<Term>, Term>>();
 
             foreach (var v in variables)
             {
-                Term vIsa = new StringConst(v.Name);
-                Term tyIsa = typeIsaVisitor.Translate(v.TypedIdent.Type);
+                Term lhs = new StringConst(v.Name);
+                Term rhs = IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(v.TypedIdent.Type));
 
-                result.Add(new TermTuple(new List<Term>() { vIsa, tyIsa }));
+                
+                BasicUtil.AddEquation(lhs, rhs, equations);
             }
 
-            return new TermList(result);
+            //None for remaining cases
+            BasicUtil.AddEquation(new TermIdent(new Wildcard()), IsaCommonTerms.NoneOption(), equations);
+
+            return new FunDecl(varKind + "_" + methodName, new ArrowType(IsaBoogieType.VnameType(), IsaCommonTypes.GetOptionType(IsaBoogieType.BoogieType())), equations);
         }
 
         private Term GetNodeSet(CFGRepr cfg)

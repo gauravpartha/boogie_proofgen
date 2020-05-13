@@ -279,6 +279,11 @@ namespace ProofGeneration.Isa
             this.i = i;
         }
 
+        public IntConst(int i)
+        {
+            this.i = BigNum.FromInt(i);
+        }
+
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
             return visitor.VisitIntConst(this);

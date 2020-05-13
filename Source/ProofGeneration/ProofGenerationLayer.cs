@@ -1,7 +1,4 @@
-﻿
-//#define PROOFGENACTIVE
-
-using Microsoft.Boogie;
+﻿using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
@@ -9,10 +6,8 @@ using ProofGeneration.IsaPrettyPrint;
 using ProofGeneration.VCProofGen;
 using ProofGeneration.ProgramToVCProof;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.IO;
-using System;
 using System.Linq;
 using ProofGeneration.Util;
 
@@ -21,6 +16,13 @@ namespace ProofGeneration
     public class ProofGenerationLayer
     {
         private static Implementation afterPassificationImpl;
+
+        private static IDictionary<Block, Block> beforeDagOrigBlock;
+        private static CFGRepr beforeDagCfg;
+        private static IEnumerable<Variable> beforeDagInParams;
+        private static IEnumerable<Variable> beforeDagLocalVars;
+        private static IEnumerable<Variable> beforeDagOutParams;
+
 
         private static IDictionary<Block, Block> beforePassiveOrigBlock;
         private static CFGRepr beforePassificationCfg;
@@ -40,20 +42,18 @@ namespace ProofGeneration
         private static IDictionary<Block, IDictionary<Variable, Variable>> finalVarMapping = new Dictionary<Block, IDictionary<Variable, Variable>>();
         private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
 
-
-        [Conditional("PROOFGENACTIVE")]
-        public static void StoreTheory(Implementation impl)
-        {
-            var programGenerator = new IsaProgramGenerator();
-            var cfg = CFGReprTransformer.getCFGRepresentation(impl);
-            Theory theory = programGenerator.GetIsaProgram(impl, cfg, impl.Proc.Name);
-
-            StoreTheory(theory);
-        }
-
         public static void Program(Program p)
         {
             functions = p.Functions;
+        }
+
+        public static void BeforeCFGToDAG(Implementation impl)
+        {
+            beforeDagCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforeDagOrigBlock, false);
+
+            beforeDagInParams = new List<Variable>(impl.InParams);
+            beforeDagLocalVars = new List<Variable>(impl.LocVars);
+            beforeDagOutParams = new List<Variable>(impl.OutParams);
         }
 
         public static void BeforePassification(Implementation impl)
@@ -63,15 +63,6 @@ namespace ProofGeneration
             beforePassiveInParams = new List<Variable>(impl.InParams);
             beforePassiveLocalVars = new List<Variable>(impl.LocVars);
             beforePassiveOutParams = new List<Variable>(impl.OutParams);
-
-            CFGRepr temp = beforePassificationCfg;
-
-            /*
-            foreach (Variable v in impl.LocVars.Union(impl.InParams).Union(impl.OutParams))
-            {
-                passiveToOrigVar.Add(v, v);
-            }
-            */
         }
 
         /*
@@ -211,6 +202,8 @@ namespace ProofGeneration
 
             LocaleDecl beforePassiveLocale = GenerateLocale("beforePassive", prePassiveLemmaManager, beforePassiveDecls);
             #endregion
+
+            LocaleDecl progamLocale = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg);
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
                 new List<string>() { "Semantics", "Util" },
                 new List<OuterDecl>() { vcLocale, afterPassificationLocale });
@@ -219,7 +212,7 @@ namespace ProofGeneration
 
             Theory theory = new Theory(afterPassificationImpl.Name,
                 new List<string>() { "Semantics", "Util" },
-                new List<OuterDecl>() { vcLocale, vcPassiveLocale, beforePassiveLocale });
+                new List<OuterDecl>() { vcLocale, vcPassiveLocale, beforePassiveLocale, progamLocale });
 
             StoreTheory(theory);
         }

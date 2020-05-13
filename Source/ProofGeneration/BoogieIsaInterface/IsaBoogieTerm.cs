@@ -195,12 +195,11 @@ namespace ProofGeneration
             return new TermTuple(elements);                            
         }
 
-        public static Term Program(List<Term> fdecls, List<Term> mdecls)
+        public static Term Program(Term fdecls, List<Term> mdecls)
         {
-            Term fdeclsTerm = new TermList(fdecls);
             Term mdeclsTerm = new TermList(mdecls);
 
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Program"), new List<Term>() { fdeclsTerm, mdeclsTerm });
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Program"), new List<Term>() { fdecls, mdeclsTerm });
         }
 
         public static Term Normal(Term n_s)
