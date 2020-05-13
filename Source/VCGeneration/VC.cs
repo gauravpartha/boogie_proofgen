@@ -1577,6 +1577,10 @@ namespace VC {
       watch.Start();
 #endif
 
+      #region proofgen
+      ProofGeneration.ProofGenerationLayer.BeforeCFGToDAG(impl);
+      #endregion
+
       ConvertCFG2DAG(impl);
 
       SmokeTester smoke_tester = null;
@@ -1587,10 +1591,6 @@ namespace VC {
 
       ModelViewInfo mvInfo;
       var gotoCmdOrigins = PassifyImpl(impl, out mvInfo);
-
-     /* proofgen */
-     ProofGeneration.ProofGenerationLayer.StoreTheory(impl);
-     /* endproofgen */
 
       // If "expand" attribute is supplied, expand any assertion of conjunctions into multiple assertions, one per conjunct
       foreach (var b in impl.Blocks)
