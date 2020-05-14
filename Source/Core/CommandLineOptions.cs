@@ -533,27 +533,15 @@ namespace Microsoft.Boogie {
     public bool ShowVerifiedProcedureCount = true;
     [ContractInvariantMethod]
     void ObjectInvariant3() {
-      Contract.Invariant(-1 <= LoopFrameConditions && LoopFrameConditions < 3);
-      Contract.Invariant(0 <= ModifiesDefault && ModifiesDefault < 7);
       Contract.Invariant((0 <= PrintErrorModel && PrintErrorModel <= 2) || PrintErrorModel == 4);
       Contract.Invariant(0 <= EnhancedErrorMessages && EnhancedErrorMessages < 2);
-      Contract.Invariant(0 <= StepsBeforeWidening && StepsBeforeWidening <= 9);
+      Contract.Invariant(0 <= Ai.StepsBeforeWidening && Ai.StepsBeforeWidening <= 9);
       Contract.Invariant(-1 <= this.bracketIdsInVC && this.bracketIdsInVC <= 1);
       Contract.Invariant(cce.NonNullElements(this.proverOptions));
     }
 
     public int LoopUnrollCount = -1;  // -1 means don't unroll loops
     public bool SoundLoopUnrolling = false;
-    public int LoopFrameConditions = -1;  // -1 means not specified -- this will be replaced by the "implications" section below
-    public int ModifiesDefault = 5;
-    public bool LocalModifiesChecks = true;
-    public bool NoVerifyByDefault = false;
-    public enum OwnershipModelOption {
-      Standard,
-      Experimental,
-      Trivial
-    }
-    public OwnershipModelOption OwnershipModelEncoding = OwnershipModelOption.Standard;
     public int PrintErrorModel = 0;
     public string PrintErrorModelFile = null;
     public string/*?*/ ModelViewFile = null;
@@ -561,7 +549,6 @@ namespace Microsoft.Boogie {
     public string PrintCFGPrefix = null;
     public bool ForceBplErrors = false; // if true, boogie error is shown even if "msg" attribute is present
     public bool UseArrayTheory = false;
-    public bool WeakArrayTheory = false;
     public bool RunDiagnosticsOnTimeout = false;
     public bool TraceDiagnosticsOnTimeout = false;
     public int TimeLimitPerAssertionInPercent = 10;
@@ -573,22 +560,7 @@ namespace Microsoft.Boogie {
     }
     public bool ExpandLambdas = true; // not useful from command line, only to be set to false programatically
     public bool DoModSetAnalysis = false;
-    public bool UseAbstractInterpretation = true;          // true iff the user want to use abstract interpretation
-    private int  /*0..9*/stepsBeforeWidening = 0;           // The number of steps that must be done before applying a widen operator
-
-    public int StepsBeforeWidening
-    {
-      get
-      {
-        Contract.Ensures(0 <= Contract.Result<int>() && Contract.Result<int>() <= 9);
-        return this.stepsBeforeWidening;
-      }
-      set
-      {
-        Contract.Requires(0 <= value && value <= 9);
-        this.stepsBeforeWidening = value;
-      }
-    }
+    public bool UseAbstractInterpretation = false;
 
     public string CivlDesugaredFile = null;
     public bool TrustAtomicityTypes = false;
@@ -624,20 +596,6 @@ namespace Microsoft.Boogie {
       }
     }
 
-    [Obsolete("use the setter for 'ProverOptions' directly")]
-    public void AddProverOption(string option)
-    {
-      Contract.Requires(option != null);
-
-      this.ProverOptions = this.ProverOptions.Concat1(option);
-    }
-
-    [Obsolete("use the setter for 'ProverOptions' directly")]
-    public void RemoveAllProverOptions(Predicate<string> match)
-    {
-      this.ProverOptions = this.ProverOptions.Where(s => !match(s));
-    }
-
     private int bracketIdsInVC = -1;  // -1 - not specified, 0 - no, 1 - yes
 
     public int BracketIdsInVC {
@@ -650,8 +608,6 @@ namespace Microsoft.Boogie {
         this.bracketIdsInVC = value;
       }
     }
-
-    public bool CausalImplies = false;
 
     public int ProverKillTime = -1;  // -1 means not specified
     public int Resourcelimit = 0; // default to 0
@@ -780,6 +736,7 @@ namespace Microsoft.Boogie {
     public class AiFlags {
       public bool J_Trivial = false;
       public bool J_Intervals = false;
+      public int  /*0..9*/StepsBeforeWidening = 0;
       public bool DebugStatistics = false;
     }
     public readonly AiFlags/*!*/ Ai = new AiFlags();
@@ -799,19 +756,17 @@ namespace Microsoft.Boogie {
       switch (name) {
         case "infer":
           if (ps.ConfirmArgumentCount(1)) {
+            UseAbstractInterpretation = true;
             foreach (char c in cce.NonNull(args[ps.i])) {
               switch (c) {
                 case 't':
                   Ai.J_Trivial = true;
-                  UseAbstractInterpretation = true;
                   break;
                 case 'j':
                   Ai.J_Intervals = true;
-                  UseAbstractInterpretation = true;
                   break;
                 case 's':
                   Ai.DebugStatistics = true;
-                  UseAbstractInterpretation = true;
                   break;
                 case '0':
                 case '1':
@@ -823,19 +778,17 @@ namespace Microsoft.Boogie {
                 case '7':
                 case '8':
                 case '9':
-                  StepsBeforeWidening = (int)char.GetNumericValue(c);
+                  Ai.StepsBeforeWidening = (int)char.GetNumericValue(c);
                   break;
                 default:
                   ps.Error("Invalid argument '{0}' to option {1}", c.ToString(), ps.s);
                   break;
               }
             }
-          }
-          return true;
-
-        case "noinfer":
-          if (ps.ConfirmArgumentCount(0)) {
-            UseAbstractInterpretation = false;
+            if (Ai.J_Trivial == Ai.J_Intervals)
+            {
+              ps.Error("Option {0} requires the selection of exactly one abstract domain", ps.s);
+            }
           }
           return true;
 
@@ -1492,11 +1445,9 @@ namespace Microsoft.Boogie {
               ps.CheckBooleanFlag("smoke", ref SoundnessSmokeTest) ||
               ps.CheckBooleanFlag("vcsDumpSplits", ref VcsDumpSplits) ||
               ps.CheckBooleanFlag("dbgRefuted", ref DebugRefuted) ||
-              ps.CheckBooleanFlag("causalImplies", ref CausalImplies) ||
               ps.CheckBooleanFlag("reflectAdd", ref ReflectAdd) ||
               ps.CheckBooleanFlag("monomorphize", ref Monomorphize) ||
               ps.CheckBooleanFlag("useArrayTheory", ref UseArrayTheory) ||
-              ps.CheckBooleanFlag("weakArrayTheory", ref WeakArrayTheory) ||
               ps.CheckBooleanFlag("doModSetAnalysis", ref DoModSetAnalysis) ||
               ps.CheckBooleanFlag("runDiagnosticsOnTimeout", ref RunDiagnosticsOnTimeout) ||
               ps.CheckBooleanFlag("traceDiagnosticsOnTimeout", ref TraceDiagnosticsOnTimeout) ||
@@ -1802,27 +1753,12 @@ namespace Microsoft.Boogie {
 
   /infer:<flags>
                 use abstract interpretation to infer invariants
-                The default is /infer:i"
-        // This is not 100% true, as the /infer ALWAYS creates
-        // a multilattice, whereas if nothing is specified then
-        // intervals are isntantiated WITHOUT being embedded in
-        // a multilattice
-                                          + @"
-                   <flags> are as follows (missing <flags> means all)
-                   i = intervals
-                   c = constant propagation
-                   d = dynamic type
-                   n = nullness
-                   p = polyhedra for linear inequalities
-                   t = trivial bottom/top lattice (cannot be combined with
-                       other domains)
-                   j = stronger intervals (cannot be combined with other
-                       domains)
-                or the following (which denote options, not domains):
+                <flags> must specify exactly one of the following domains:
+                   t = trivial bottom/top lattice
+                   j = stronger intervals
+                together with any of the following options:
                    s = debug statistics
                 0..9 = number of iterations before applying a widen (default=0)
-  /noinfer      turn off the default inference, and overrides the /infer
-                switch on its left
   /checkInfer   instrument inferred invariants as asserts to be checked by
                 theorem prover
   /interprocInfer
@@ -1845,8 +1781,6 @@ namespace Microsoft.Boogie {
   /traceTimes   output timing information at certain points in the pipeline
   /tracePOs     output information about the number of proof obligations
                 (also included in the /trace output)
-  /log[:method] Print debug output during translation
-
   /break        launch and break into debugger
 
   ---- CIVL options ----------------------------------------------------------
@@ -1910,8 +1844,6 @@ namespace Microsoft.Boogie {
   /printInlined
                 print the implementation after inlining calls to
                 procedures with the :inline attribute (works with /inline)
-  /lazyInline:1
-                Use the lazy inlining algorithm
   /stratifiedInline:1
                 Use the stratified inlining algorithm
   /fixedPointEngine:<engine>

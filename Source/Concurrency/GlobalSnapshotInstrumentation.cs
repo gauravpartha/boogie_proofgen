@@ -11,7 +11,7 @@ namespace Microsoft.Boogie
         {
             newLocalVars = new List<Variable>();
             oldGlobalMap = new Dictionary<Variable, Variable>();
-            foreach (Variable g in civlTypeChecker.sharedVariables)
+            foreach (Variable g in civlTypeChecker.GlobalVariables)
             {
                 LocalVariable l = OldGlobalLocal(g);
                 oldGlobalMap[g] = l;
@@ -60,7 +60,7 @@ namespace Microsoft.Boogie
         private LocalVariable OldGlobalLocal(Variable v)
         {
             return new LocalVariable(Token.NoToken,
-                new TypedIdent(Token.NoToken, $"og_global_old_{v.Name}", v.TypedIdent.Type));
+                new TypedIdent(Token.NoToken, $"civl_global_old_{v.Name}", v.TypedIdent.Type));
         }
     }
 }

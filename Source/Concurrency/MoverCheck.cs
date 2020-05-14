@@ -26,9 +26,6 @@ namespace Microsoft.Boogie
 
         public static void AddCheckers(LinearTypeChecker linearTypeChecker, CivlTypeChecker civlTypeChecker, List<Declaration> decls)
         {
-            if (civlTypeChecker.procToAtomicAction.Count == 0)
-                return;
-
             MoverCheck moverChecking = new MoverCheck(linearTypeChecker, civlTypeChecker, decls);
 
             // TODO: make enumeration of mover checks more efficient / elegant
@@ -61,46 +58,32 @@ namespace Microsoft.Boogie
             }
 
             // Here we include IS abstractions
-            foreach (AtomicAction atomicAction in civlTypeChecker.AllActions.Where(a => a.IsLeftMover))
+            foreach (var atomicAction in civlTypeChecker.AllActions.Where(a => a.IsLeftMover))
             {
                 moverChecking.CreateNonBlockingChecker(atomicAction);
             }
 
             // IS abstractions are marked left movers, so here we select regular atomic actions
             // that are not marked left mover but used as abstraction in IS.
-            foreach (AtomicAction atomicAction in civlTypeChecker.inductiveSequentializations.SelectMany(IS => IS.elim.Values).Where(a => !a.IsLeftMover).Distinct())
+            foreach (var atomicAction in civlTypeChecker.inductiveSequentializations.SelectMany(IS => IS.elim.Values).Where(a => !a.IsLeftMover).Distinct())
             {
                 moverChecking.CreateNonBlockingChecker(atomicAction);
             }
-        }
 
-        private IEnumerable<Expr> DisjointnessExpr(IEnumerable<Variable> paramVars, HashSet<Variable> frame)
-        {
-            Dictionary<string, HashSet<Variable>> domainNameToScope = new Dictionary<string, HashSet<Variable>>();
-            foreach (var domainName in linearTypeChecker.linearDomains.Keys)
+            foreach (var introductionAction in civlTypeChecker.procToIntroductionAction.Values)
             {
-                domainNameToScope[domainName] = new HashSet<Variable>();
-            }
-            foreach (Variable v in paramVars.Union(frame))
-            {
-                var domainName = linearTypeChecker.FindDomainName(v);
-                if (domainName == null) continue;
-                domainNameToScope[domainName].Add(v);
-            }
-            foreach (string domainName in domainNameToScope.Keys)
-            {
-                yield return linearTypeChecker.DisjointnessExpr(domainName, domainNameToScope[domainName]);
+                moverChecking.CreateNonBlockingChecker(introductionAction);
             }
         }
 
         private Requires DisjointnessRequires(IEnumerable<Variable> paramVars, HashSet<Variable> frame)
         {
-            return new Requires(false, Expr.And(DisjointnessExpr(paramVars, frame)));
+            return new Requires(false, Expr.And(linearTypeChecker.DisjointnessExprForEachDomain(paramVars.Union(frame))));
         }
 
         private void AddChecker(string checkerName, List<Variable> inputs, List<Variable> outputs, List<Variable> locals, List<Requires> requires, List<Ensures> ensures, List<Block> blocks)
         {
-            Procedure proc = new Procedure(Token.NoToken, checkerName, new List<TypeVariable>(), inputs, outputs, requires, civlTypeChecker.sharedVariableIdentifiers, ensures);
+            Procedure proc = new Procedure(Token.NoToken, checkerName, new List<TypeVariable>(), inputs, outputs, requires, civlTypeChecker.GlobalVariables.Select(v => Expr.Ident(v)).ToList(), ensures);
             Implementation impl = new Implementation(Token.NoToken, checkerName, new List<TypeVariable>(), inputs, outputs, locals, blocks);
             impl.Proc = proc;
             this.decls.Add(impl);
@@ -147,8 +130,7 @@ namespace Microsoft.Boogie
             foreach (AssertCmd assertCmd in Enumerable.Union(first.firstGate, second.secondGate))
                 requires.Add(new Requires(false, assertCmd.Expr));
 
-            civlTypeChecker.atomicActionPairToWitnessFunctions.TryGetValue(
-                Tuple.Create(first, second), out List<WitnessFunction> witnesses);
+            var witnesses = civlTypeChecker.commutativityHints.GetWitnesses(first, second);
             var transitionRelation = TransitionRelationComputation.
                 Commutativity(second, first, frame, witnesses);
 
@@ -165,12 +147,16 @@ namespace Microsoft.Boogie
                         second.secondImpl.OutParams.Select(Expr.Ident).ToList()
                     ) { Proc = second.proc }
             };
+            foreach (var lemma in civlTypeChecker.commutativityHints.GetLemmas(first,second))
+            {
+                cmds.Add(CmdHelper.AssumeCmd(ExprHelper.FunctionCall(lemma.function, lemma.args.ToArray())));
+            }
             var block = new Block(Token.NoToken, "init", cmds, new ReturnCmd(Token.NoToken));
 
             var secondInParamsFiltered = second.secondImpl.InParams.Where(v => linearTypeChecker.FindLinearKind(v) != LinearKind.LINEAR_IN);
             IEnumerable<Expr> linearityAssumes = Enumerable.Union(
-                DisjointnessExpr(first.firstImpl.OutParams.Union(secondInParamsFiltered), frame),
-                DisjointnessExpr(first.firstImpl.OutParams.Union(second.secondImpl.OutParams), frame));
+                linearTypeChecker.DisjointnessExprForEachDomain(first.firstImpl.OutParams.Union(secondInParamsFiltered).Union(frame)),
+                linearTypeChecker.DisjointnessExprForEachDomain(first.firstImpl.OutParams.Union(second.secondImpl.OutParams).Union(frame)));
             // TODO: add further disjointness expressions?
             Ensures ensureCheck = new Ensures(first.proc.tok, false, Expr.Imp(Expr.And(linearityAssumes), transitionRelation), null)
             {
@@ -204,7 +190,7 @@ namespace Microsoft.Boogie
             foreach (AssertCmd assertCmd in second.secondGate)
                 requires.Add(new Requires(false, assertCmd.Expr));
 
-            IEnumerable<Expr> linearityAssumes = DisjointnessExpr(first.firstImpl.InParams.Union(second.secondImpl.OutParams), frame);
+            IEnumerable<Expr> linearityAssumes = linearTypeChecker.DisjointnessExprForEachDomain(first.firstImpl.InParams.Union(second.secondImpl.OutParams).Union(frame));
             foreach (AssertCmd assertCmd in first.firstGate)
             {
                 requires.Add(new Requires(false, assertCmd.Expr));
@@ -254,7 +240,7 @@ namespace Microsoft.Boogie
             foreach (AssertCmd assertCmd in second.secondGate)
                 requires.Add(new Requires(false, assertCmd.Expr));
 
-            IEnumerable<Expr> linearityAssumes = DisjointnessExpr(first.firstImpl.InParams.Union(second.secondImpl.OutParams), frame);
+            IEnumerable<Expr> linearityAssumes = linearTypeChecker.DisjointnessExprForEachDomain(first.firstImpl.InParams.Union(second.secondImpl.OutParams).Union(frame));
             Ensures ensureCheck = new Ensures(first.proc.tok, false, Expr.Imp(Expr.And(linearityAssumes), firstNegatedGate), null)
             {
                 ErrorData = $"Gate failure of {first.proc.Name} not preserved by {second.proc.Name}"
@@ -279,7 +265,7 @@ namespace Microsoft.Boogie
             AddChecker(checkerName, inputs, outputs, new List<Variable>(), requires, ensures, new List<Block> { block });
         }
 
-        private void CreateNonBlockingChecker(AtomicAction action)
+        private void CreateNonBlockingChecker(Action action)
         {
             if (!action.HasAssumeCmd) return;
 

@@ -1,4 +1,4 @@
-// RUN: %boogie -noinfer -typeEncoding:m -useArrayTheory "%s" > "%t"
+// RUN: %boogie -typeEncoding:m -useArrayTheory "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 type X;
@@ -92,7 +92,7 @@ procedure {:yields} {:layer 1} {:refines "AtomicLowerLeave"} LowerLeave()
   yield;
 }
 
-procedure {:layer 1} {:inline 1} SetLock(v: X)
+procedure {:intro} {:layer 1} SetLock(v: X)
 modifies lock;
 { lock := v; }
 

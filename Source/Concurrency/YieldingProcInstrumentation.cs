@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Diagnostics.Contracts;
 using Microsoft.Boogie.GraphUtil;
@@ -13,81 +14,89 @@ namespace Microsoft.Boogie
             LinearTypeChecker linearTypeChecker,
             int layerNum,
             Dictionary<Absy, Absy> absyMap,
-            Dictionary<Implementation, Implementation> implMap,
             HashSet<Procedure> yieldingProcs)
         {
-            var yieldingProcInstrumentation = new YieldingProcInstrumentation(civlTypeChecker, linearTypeChecker, layerNum,
-                absyMap, implMap, yieldingProcs);
-            foreach (var kv in implMap)
+            var linearHelper = new LinearPermissionInstrumentation(civlTypeChecker, linearTypeChecker, layerNum, absyMap);
+            var yieldingProcInstrumentation = new YieldingProcInstrumentation(
+                civlTypeChecker, 
+                linearTypeChecker, 
+                linearHelper,
+                layerNum,
+                absyMap,
+                yieldingProcs);
+            foreach (var impl in absyMap.Keys.OfType<Implementation>())
             {
-                var impl = kv.Value;
-                var newImpl = kv.Key;
-                var proc = civlTypeChecker.procToYieldingProc[impl.Proc];
+                // Add disjointness assumptions at beginning, loop headers, and after each call or parallel call.
+                // These are added for each duplicate implementation of yielding procedures.
+                // Disjointness assumptions after yields are added inside TransformImpl which is called for 
+                // all implementations except for a mover procedure at its disappearing layer.
+                // But this is fine because a mover procedure at its disappearing layer does not have a yield in it.
+                linearHelper.AddDisjointnessAssumptions(impl, yieldingProcs);
+                var originalImpl = absyMap[impl] as Implementation;
+                var proc = civlTypeChecker.procToYieldingProc[originalImpl.Proc];
                 if (!(proc is MoverProc && proc.upperLayer == layerNum))
                 {
-                    yieldingProcInstrumentation.TransformImpl(newImpl);
+                    yieldingProcInstrumentation.TransformImpl(originalImpl, impl);
                 }
             }
 
-            List<Declaration> decls = new List<Declaration>(yieldingProcInstrumentation.yieldCheckerDecls);
-            foreach (Procedure proc in yieldingProcInstrumentation.asyncAndParallelCallDesugarings.Values)
+            List<Declaration> decls = new List<Declaration>(yieldingProcInstrumentation.noninterferenceCheckerDecls);
+            foreach (Procedure proc in yieldingProcInstrumentation.parallelCallPreconditionCheckers.Values)
             {
                 decls.Add(proc);
             }
-            decls.Add(yieldingProcInstrumentation.yieldProc);
-            decls.Add(yieldingProcInstrumentation.YieldImpl());
+            decls.Add(yieldingProcInstrumentation.wrapperNoninterferenceCheckerProc);
+            decls.Add(yieldingProcInstrumentation.WrapperNoninterferenceCheckerImpl());
             return decls;
         }
+        
+        private CivlTypeChecker civlTypeChecker;
+        private LinearTypeChecker linearTypeChecker;
+        private int layerNum;
+        private Dictionary<Absy, Absy> absyMap;
+        private HashSet<Procedure> yieldingProcs;
 
+        private Dictionary<string, Procedure> parallelCallPreconditionCheckers;
+        private List<Declaration> noninterferenceCheckerDecls;
+        private Procedure wrapperNoninterferenceCheckerProc;
+
+        private GlobalSnapshotInstrumentation globalSnapshotInstrumentation;
+        private RefinementInstrumentation refinementInstrumentation;
+        private LinearPermissionInstrumentation linearPermissionInstrumentation;
+        private NoninterferenceInstrumentation noninterferenceInstrumentation;
+        
         private YieldingProcInstrumentation(
             CivlTypeChecker civlTypeChecker,
             LinearTypeChecker linearTypeChecker,
+            LinearPermissionInstrumentation linearPermissionInstrumentation,
             int layerNum,
             Dictionary<Absy, Absy> absyMap,
-            Dictionary<Implementation, Implementation> implMap,
             HashSet<Procedure> yieldingProcs)
         {
             this.civlTypeChecker = civlTypeChecker;
             this.linearTypeChecker = linearTypeChecker;
             this.layerNum = layerNum;
             this.absyMap = absyMap;
-            this.implMap = implMap;
             this.yieldingProcs = yieldingProcs;
-            asyncAndParallelCallDesugarings = new Dictionary<string, Procedure>();
-            yieldCheckerDecls = new List<Declaration>();
+            this.linearPermissionInstrumentation = linearPermissionInstrumentation;
+            parallelCallPreconditionCheckers = new Dictionary<string, Procedure>();
+            noninterferenceCheckerDecls = new List<Declaration>();
 
             List<Variable> inputs = new List<Variable>();
             foreach (string domainName in linearTypeChecker.linearDomains.Keys)
             {
                 inputs.Add(linearTypeChecker.LinearDomainInFormal(domainName));
             }
-
-            foreach (Variable g in civlTypeChecker.sharedVariables)
+            foreach (Variable g in civlTypeChecker.GlobalVariables)
             {
                 inputs.Add(OldGlobalFormal(g));
             }
-
-            yieldProc = new Procedure(Token.NoToken, $"og_yield_{layerNum}", new List<TypeVariable>(),
+            wrapperNoninterferenceCheckerProc = new Procedure(Token.NoToken, $"Wrapper_NoninterferenceChecker_{layerNum}", new List<TypeVariable>(),
                 inputs, new List<Variable>(), new List<Requires>(), new List<IdentifierExpr>(), new List<Ensures>());
-            CivlUtil.AddInlineAttribute(yieldProc);
+            CivlUtil.AddInlineAttribute(wrapperNoninterferenceCheckerProc);
         }
 
-        private CivlTypeChecker civlTypeChecker;
-        private LinearTypeChecker linearTypeChecker;
-        private int layerNum;
-        private Dictionary<Absy, Absy> absyMap;
-        private Dictionary<Implementation, Implementation> implMap;
-        private HashSet<Procedure> yieldingProcs;
-
-        private Dictionary<string, Procedure> asyncAndParallelCallDesugarings;
-        private List<Declaration> yieldCheckerDecls;
-        private Procedure yieldProc;
-
-        private GlobalSnapshotInstrumentation globalSnapshotInstrumentation;
-        private RefinementInstrumentation refinementInstrumentation;
-        private NoninterferenceInstrumentation noninterferenceInstrumentation;
-
-        private Implementation YieldImpl()
+        private Implementation WrapperNoninterferenceCheckerImpl()
         {
             List<Variable> inputs = new List<Variable>();
             foreach (string domainName in linearTypeChecker.linearDomains.Keys)
@@ -95,26 +104,25 @@ namespace Microsoft.Boogie
                 inputs.Add(linearTypeChecker.LinearDomainInFormal(domainName));
             }
 
-            foreach (Variable g in civlTypeChecker.sharedVariables)
+            foreach (Variable g in civlTypeChecker.GlobalVariables)
             {
                 inputs.Add(OldGlobalFormal(g));
             }
 
             List<Block> blocks = new List<Block>();
             TransferCmd transferCmd = new ReturnCmd(Token.NoToken);
-            if (yieldCheckerDecls.Count > 0)
+            if (noninterferenceCheckerDecls.Count > 0)
             {
                 List<Block> blockTargets = new List<Block>();
                 List<String> labelTargets = new List<String>();
                 int labelCount = 0;
-                foreach (Procedure proc in yieldCheckerDecls.OfType<Procedure>())
+                foreach (Procedure proc in noninterferenceCheckerDecls.OfType<Procedure>())
                 {
                     List<Expr> exprSeq = new List<Expr>();
                     foreach (Variable v in inputs)
                     {
                         exprSeq.Add(Expr.Ident(v));
                     }
-
                     CallCmd callCmd = new CallCmd(Token.NoToken, proc.Name, exprSeq, new List<IdentifierExpr>());
                     callCmd.Proc = proc;
                     string label = $"L_{labelCount++}";
@@ -130,9 +138,9 @@ namespace Microsoft.Boogie
 
             blocks.Insert(0, new Block(Token.NoToken, "enter", new List<Cmd>(), transferCmd));
 
-            var yieldImpl = new Implementation(Token.NoToken, yieldProc.Name, new List<TypeVariable>(), inputs,
+            var yieldImpl = new Implementation(Token.NoToken, wrapperNoninterferenceCheckerProc.Name, new List<TypeVariable>(), inputs,
                 new List<Variable>(), new List<Variable>(), blocks);
-            yieldImpl.Proc = yieldProc;
+            yieldImpl.Proc = wrapperNoninterferenceCheckerProc;
             CivlUtil.AddInlineAttribute(yieldImpl);
             return yieldImpl;
         }
@@ -140,16 +148,15 @@ namespace Microsoft.Boogie
         private Formal OldGlobalFormal(Variable v)
         {
             return new Formal(Token.NoToken,
-                new TypedIdent(Token.NoToken, $"og_global_old_{v.Name}", v.TypedIdent.Type), true);
+                new TypedIdent(Token.NoToken, $"civl_global_old_{v.Name}", v.TypedIdent.Type), true);
         }
 
-        private void TransformImpl(Implementation impl)
+        private void TransformImpl(Implementation originalImpl, Implementation impl)
         {
             // initialize globalSnapshotInstrumentation
             globalSnapshotInstrumentation = new GlobalSnapshotInstrumentation(civlTypeChecker);
 
             // initialize refinementInstrumentation
-            Implementation originalImpl = implMap[impl];
             YieldingProc yieldingProc = civlTypeChecker.procToYieldingProc[originalImpl.Proc];
             if (yieldingProc.upperLayer == this.layerNum)
             {
@@ -174,6 +181,8 @@ namespace Microsoft.Boogie
                 refinementInstrumentation = new RefinementInstrumentation();
             }
 
+            var allYieldPredicates = CollectYields(impl);
+            
             // initialize noninterferenceInstrumentation
             if (CommandLineOptions.Clo.TrustNonInterference)
             {
@@ -181,12 +190,17 @@ namespace Microsoft.Boogie
             }
             else
             {
-                noninterferenceInstrumentation = new SomeNoninterferenceInstrumentation(civlTypeChecker,
+                noninterferenceCheckerDecls.AddRange(
+                    NoninterferenceChecker.CreateNoninterferenceCheckers(civlTypeChecker, linearTypeChecker, layerNum, absyMap, impl, allYieldPredicates));
+                noninterferenceInstrumentation = new SomeNoninterferenceInstrumentation(
+                    civlTypeChecker,
                     linearTypeChecker,
-                    layerNum, absyMap, globalSnapshotInstrumentation.OldGlobalMap, yieldProc);
+                    linearPermissionInstrumentation,
+                    globalSnapshotInstrumentation.OldGlobalMap, 
+                    wrapperNoninterferenceCheckerProc);
             }
 
-            DesugarConcurrency(impl);
+            DesugarConcurrency(impl, allYieldPredicates);
 
             impl.LocVars.AddRange(globalSnapshotInstrumentation.NewLocalVars);
             impl.LocVars.AddRange(refinementInstrumentation.NewLocalVars);
@@ -201,10 +215,13 @@ namespace Microsoft.Boogie
             initCmds.AddRange(noninterferenceInstrumentation.CreateInitCmds(impl));
             var gotoCmd = new GotoCmd(Token.NoToken, new List<String> { impl.Blocks[0].Label },
                 new List<Block> { impl.Blocks[0] });
-            return new Block(Token.NoToken, "og_init", initCmds, gotoCmd);
+            return new Block(Token.NoToken, "civl_init", initCmds, gotoCmd);
         }
 
-        private void ComputeYieldingLoops(Implementation impl, out HashSet<Block> yieldingLoopHeaders, out HashSet<Block> blocksInYieldingLoops)
+        private void ComputeYieldingLoops(
+            Implementation impl,
+            out HashSet<Block> yieldingLoopHeaders, 
+            out HashSet<Block> blocksInYieldingLoops)
         {
             Graph<Block> graph;
             impl.PruneUnreachableBlocks();
@@ -215,7 +232,6 @@ namespace Microsoft.Boogie
             {
                 throw new Exception("Irreducible flow graphs are unsupported.");
             }
-
             yieldingLoopHeaders = new HashSet<Block>();
             IEnumerable<Block> sortedHeaders = graph.SortHeadersByDominance();
             foreach (Block header in sortedHeaders)
@@ -229,7 +245,6 @@ namespace Microsoft.Boogie
                     yieldingLoopHeaders.Add(header);
                 }
             }
-
             blocksInYieldingLoops = GetBlocksInAllNaturalLoops(yieldingLoopHeaders, graph);
         }
 
@@ -273,21 +288,14 @@ namespace Microsoft.Boogie
             gotoCmd.labelTargets.Add(b);
         }
 
-        private void DesugarConcurrency(Implementation impl)
+        private void DesugarConcurrency(Implementation impl, Dictionary<YieldCmd, List<PredicateCmd>> allYieldPredicates)
         {
-            var allYieldPredicates = CollectYields(impl);
-            var allNonemptyYieldPredicates = allYieldPredicates.Values.Where(x => x.Count > 0);
-            if (allNonemptyYieldPredicates.Count() > 0)
-            {
-                yieldCheckerDecls.AddRange(noninterferenceInstrumentation.CreateYieldCheckerProcImpl(impl, allNonemptyYieldPredicates));
-            }
-
-            var yieldCheckerBlock = CreateYieldCheckerBlock();
+            var noninterferenceCheckerBlock = CreateNoninterferenceCheckerBlock();
             var refinementCheckerBlock = CreateRefinementCheckerBlock();
             var refinementCheckerForYieldingLoopsBlock = CreateRefinementCheckerBlockForYieldingLoops();
             var returnBlock = CreateReturnBlock();
             SplitBlocks(impl);
-
+            
             HashSet<Block> yieldingLoopHeaders;
             HashSet<Block> blocksInYieldingLoops;
             ComputeYieldingLoops(impl, out yieldingLoopHeaders, out blocksInYieldingLoops);
@@ -296,7 +304,7 @@ namespace Microsoft.Boogie
                 foreach (Block pred in header.Predecessors)
                 {
                     var gotoCmd = pred.TransferCmd as GotoCmd;
-                    AddEdge(gotoCmd, yieldCheckerBlock);
+                    AddEdge(gotoCmd, noninterferenceCheckerBlock);
                     if (blocksInYieldingLoops.Contains(pred))
                     {
                         AddEdge(gotoCmd, refinementCheckerForYieldingLoopsBlock);
@@ -318,7 +326,7 @@ namespace Microsoft.Boogie
                 header.Cmds = newCmds;
             }
 
-            // add jumps to yieldCheckerBlock and returnBlock
+            // add jumps to noninterferenceCheckerBlock and returnBlock
             foreach (var b in impl.Blocks)
             {
                 if (b.TransferCmd is GotoCmd gotoCmd)
@@ -345,7 +353,7 @@ namespace Microsoft.Boogie
                     }
                     if (addEdge)
                     {
-                        AddEdge(gotoCmd, yieldCheckerBlock);
+                        AddEdge(gotoCmd, noninterferenceCheckerBlock);
                         if (blocksInYieldingLoops.Contains(b))
                         {
                             AddEdge(gotoCmd, refinementCheckerForYieldingLoopsBlock);
@@ -361,7 +369,7 @@ namespace Microsoft.Boogie
                     b.TransferCmd = new GotoCmd(b.TransferCmd.tok, new List<string> { returnBlock.Label }, new List<Block> { returnBlock });
                 }
             }
-
+            
             // desugar YieldCmd, CallCmd, and ParCallCmd 
             foreach (Block b in impl.Blocks)
             {
@@ -388,29 +396,10 @@ namespace Microsoft.Boogie
                         {
                             newCmds.AddRange(refinementInstrumentation.CreateUpdatesToRefinementVars());
                         }
-                        if (callCmd.IsAsync)
+                        newCmds.Add(callCmd);
+                        if (civlTypeChecker.GlobalVariables.Count() > 0)
                         {
-                            if (!asyncAndParallelCallDesugarings.ContainsKey(callCmd.Proc.Name))
-                            {
-                                asyncAndParallelCallDesugarings[callCmd.Proc.Name] = new Procedure(Token.NoToken,
-                                    $"DummyAsyncTarget_{callCmd.Proc.Name}",
-                                    callCmd.Proc.TypeParameters, callCmd.Proc.InParams, callCmd.Proc.OutParams,
-                                    callCmd.Proc.Requires, new List<IdentifierExpr>(), new List<Ensures>());
-                            }
-
-                            var dummyAsyncTargetProc = asyncAndParallelCallDesugarings[callCmd.Proc.Name];
-                            CallCmd dummyCallCmd = new CallCmd(callCmd.tok, dummyAsyncTargetProc.Name, callCmd.Ins,
-                                callCmd.Outs, callCmd.Attributes);
-                            dummyCallCmd.Proc = dummyAsyncTargetProc;
-                            newCmds.Add(dummyCallCmd);
-                        }
-                        else
-                        {
-                            newCmds.Add(callCmd);
-                            if (civlTypeChecker.sharedVariables.Count > 0)
-                            {
-                                newCmds.AddRange(refinementInstrumentation.CreateAssumeCmds());
-                            }
+                            newCmds.AddRange(refinementInstrumentation.CreateAssumeCmds());
                         }
                         newCmds.AddRange(globalSnapshotInstrumentation.CreateUpdatesToOldGlobalVars());
                         newCmds.AddRange(refinementInstrumentation.CreateUpdatesToOldOutputVars());
@@ -426,7 +415,7 @@ namespace Microsoft.Boogie
                             newCmds.AddRange(refinementInstrumentation.CreateUpdatesToRefinementVars());
                         }
                         newCmds.AddRange(DesugarParCallCmd(parCallCmd));
-                        if (civlTypeChecker.sharedVariables.Count > 0)
+                        if (civlTypeChecker.GlobalVariables.Count() > 0)
                         {
                             newCmds.AddRange(refinementInstrumentation.CreateAssumeCmds());
                         }
@@ -439,7 +428,7 @@ namespace Microsoft.Boogie
                 }
             }
 
-            impl.Blocks.Add(yieldCheckerBlock);
+            impl.Blocks.Add(noninterferenceCheckerBlock);
             impl.Blocks.Add(refinementCheckerBlock);
             impl.Blocks.Add(refinementCheckerForYieldingLoopsBlock);
             impl.Blocks.Add(returnBlock);
@@ -525,12 +514,12 @@ namespace Microsoft.Boogie
             impl.Blocks.AddRange(newBlocks);
         }
 
-        private Block CreateYieldCheckerBlock()
+        private Block CreateNoninterferenceCheckerBlock()
         {
             var newCmds = new List<Cmd>();
             newCmds.AddRange(noninterferenceInstrumentation.CreateCallToYieldProc());
             newCmds.Add(new AssumeCmd(Token.NoToken, Expr.False));
-            return new Block(Token.NoToken, "YieldChecker", newCmds, new ReturnCmd(Token.NoToken));
+            return new Block(Token.NoToken, "NoninterferenceChecker", newCmds, new ReturnCmd(Token.NoToken));
         }
 
         private Block CreateRefinementCheckerBlock()
@@ -563,11 +552,12 @@ namespace Microsoft.Boogie
             List<PredicateCmd> cmds)
         {
             var newCmds = new List<Cmd>();
-            if (civlTypeChecker.sharedVariableIdentifiers.Count > 0)
+            if (civlTypeChecker.GlobalVariables.Count() > 0)
             {
-                newCmds.Add(new HavocCmd(Token.NoToken, civlTypeChecker.sharedVariableIdentifiers));
+                newCmds.Add(new HavocCmd(Token.NoToken, civlTypeChecker.GlobalVariables.Select(v => Expr.Ident(v)).ToList()));
                 newCmds.AddRange(refinementInstrumentation.CreateAssumeCmds());
             }
+            newCmds.AddRange(linearPermissionInstrumentation.DisjointnessAssumeCmds(yieldCmd, true));
             newCmds.AddRange(globalSnapshotInstrumentation.CreateUpdatesToOldGlobalVars());
             newCmds.AddRange(refinementInstrumentation.CreateUpdatesToOldOutputVars());
             newCmds.AddRange(noninterferenceInstrumentation.CreateUpdatesToPermissionCollector(yieldCmd));
@@ -584,7 +574,7 @@ namespace Microsoft.Boogie
             var newCmds = new List<Cmd>();
             List<Expr> ins = new List<Expr>();
             List<IdentifierExpr> outs = new List<IdentifierExpr>();
-            string procName = "og";
+            string procName = "ParallelCallPreconditionChecker";
             foreach (CallCmd callCmd in parCallCmd.CallCmds)
             {
                 procName = procName + "_" + callCmd.Proc.Name;
@@ -592,7 +582,7 @@ namespace Microsoft.Boogie
                 outs.AddRange(callCmd.Outs);
             }
 
-            if (!asyncAndParallelCallDesugarings.ContainsKey(procName))
+            if (!parallelCallPreconditionCheckers.ContainsKey(procName))
             {
                 List<Variable> inParams = new List<Variable>();
                 List<Variable> outParams = new List<Variable>();
@@ -628,22 +618,22 @@ namespace Microsoft.Boogie
                     }
                     count++;
                 }
-                asyncAndParallelCallDesugarings[procName] = new Procedure(Token.NoToken, procName,
+                parallelCallPreconditionCheckers[procName] = new Procedure(Token.NoToken, procName,
                     new List<TypeVariable>(), inParams, outParams, requiresSeq,
-                    civlTypeChecker.sharedVariableIdentifiers, ensuresSeq);
+                    civlTypeChecker.GlobalVariables.Select(v => Expr.Ident(v)).ToList(), ensuresSeq);
             }
 
-            Procedure proc = asyncAndParallelCallDesugarings[procName];
-            CallCmd dummyCallCmd = new CallCmd(parCallCmd.tok, proc.Name, ins, outs, parCallCmd.Attributes);
-            dummyCallCmd.Proc = proc;
-            newCmds.Add(dummyCallCmd);
+            Procedure proc = parallelCallPreconditionCheckers[procName];
+            CallCmd checkerCallCmd = new CallCmd(parCallCmd.tok, proc.Name, ins, outs, parCallCmd.Attributes);
+            checkerCallCmd.Proc = proc;
+            newCmds.Add(checkerCallCmd);
             return newCmds;
         }
 
         private Formal ParCallDesugarFormal(Variable v, int count, bool incoming)
         {
             return new Formal(Token.NoToken,
-                new TypedIdent(Token.NoToken, $"og_{count}_{v.Name}", v.TypedIdent.Type), incoming);
+                new TypedIdent(Token.NoToken, $"civl_{count}_{v.Name}", v.TypedIdent.Type), incoming);
         }
 
         private void SplitCmds(List<Cmd> cmds, out List<Cmd> firstCmds, out List<Cmd> secondCmds)

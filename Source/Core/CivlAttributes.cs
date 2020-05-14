@@ -11,14 +11,16 @@ namespace Microsoft.Boogie
         public const string LAYER = "layer";
 
         public const string YIELDS = "yields";
-        public const string YIELD_ASSERT = "yield_assert";
 
+        public const string INTRO = "intro";
+        
         public const string ATOMIC = "atomic";
         public const string LEFT = "left";
         public const string RIGHT = "right";
         public const string BOTH = "both";
 
         public static string REFINES = "refines";
+        public static string HIDE = "hide";
 
         public const string TERMINATES = "terminates";
 
@@ -27,6 +29,8 @@ namespace Microsoft.Boogie
         public const string LINEAR_OUT = "linear_out";
 
         public const string BACKWARD = "backward";
+        public const string COMMUTATIVITY = "commutativity";
+        public const string LEMMA = "lemma";
         public const string WITNESS = "witness";
 
         public const string PENDING_ASYNC = "pending_async";
@@ -39,7 +43,8 @@ namespace Microsoft.Boogie
         public const string CHOICE = "choice";
 
         private static string[] CIVL_ATTRIBUTES =
-            {LAYER, YIELDS, ATOMIC, LEFT, RIGHT, BOTH, REFINES, WITNESS,
+            {LAYER, YIELDS, INTRO, ATOMIC, LEFT, RIGHT, BOTH, REFINES, HIDE,
+             COMMUTATIVITY, LEMMA, WITNESS,
              PENDING_ASYNC, IS, IS_INVARIANT, IS_ABSTRACTION, ELIM, CHOICE };
 
         private static string[] LINEAR_ATTRIBUTES =
