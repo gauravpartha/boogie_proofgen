@@ -205,13 +205,13 @@ namespace ProofGeneration
 
             LocaleDecl progamLocale = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg);
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
-                new List<string>() { "Semantics", "Util" },
+                new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util" },
                 new List<OuterDecl>() { vcLocale, afterPassificationLocale });
 
             StoreTheory(theoryPassive);
 
             Theory theory = new Theory(afterPassificationImpl.Name,
-                new List<string>() { "Semantics", "Util" },
+                new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util" },
                 new List<OuterDecl>() { vcLocale, vcPassiveLocale, beforePassiveLocale, progamLocale });
 
             StoreTheory(theory);
