@@ -304,7 +304,7 @@ namespace ProofGeneration
                     {
                         Block curBlock = toVisit.Dequeue();
 
-                        if (curBlock.Cmds.Count != 0 || cfg.NumOfSuccessors(curBlock) == 0)
+                        if (curBlock.Cmds.Count != 0)
                         {
                             nonEmptySuccessors.Add(curBlock);
                         }
