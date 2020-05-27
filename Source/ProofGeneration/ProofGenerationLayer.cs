@@ -42,6 +42,9 @@ namespace ProofGeneration
         private static IDictionary<Block, IDictionary<Variable, Variable>> finalVarMapping = new Dictionary<Block, IDictionary<Variable, Variable>>();
         private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
 
+        //VC Automation Hints
+        private static readonly VCHintManager vcHintManager = new VCHintManager();
+
         public static void Program(Program p)
         {
             functions = p.Functions;
@@ -132,8 +135,13 @@ namespace ProofGeneration
             afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
 
-        public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
+        public static void NextHintForBlock(VCHint hint, Cmd cmd, Block block, VCExpr cmdBodyVC, VCExpr resultVC)
         {
+            vcHintManager.NextHintForBlock(hint, cmd, block, cmdBodyVC, resultVC);
+        }
+
+        public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
+        {           
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
                 vc,
@@ -161,13 +169,16 @@ namespace ProofGeneration
             var lemmaNamer = new IsaUniqueNamer();
 
             var passiveLemmaManager = new PassiveLemmaManager(vcinst, functions, inParams, localVars, outParams);
-            IDictionary<Block, LemmaDecl> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
+            IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
             IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
 
             Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
 
             List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
-            afterPassificationDecls.AddRange(finalProgramLemmas.Values);
+            foreach(var v in finalProgramLemmas.Values)
+            {
+                afterPassificationDecls.AddRange(v);
+            }
             afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
 
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
@@ -205,7 +216,7 @@ namespace ProofGeneration
 
             LocaleDecl progamLocale = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg);
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
-                new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util" },
+                new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML" },
                 new List<OuterDecl>() { vcLocale, afterPassificationLocale });
 
             StoreTheory(theoryPassive);
@@ -277,13 +288,22 @@ namespace ProofGeneration
             return result;
         }
 
-        private static IDictionary<Block, LemmaDecl> GenerateVCLemmas(CFGRepr cfg, PassiveLemmaManager passiveLemmaManager, IsaUniqueNamer lemmaNamer)
+        private static IDictionary<Block, IList<OuterDecl>> GenerateVCLemmas(CFGRepr cfg, PassiveLemmaManager passiveLemmaManager, IsaUniqueNamer lemmaNamer)
         {
-            var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
+            var blockToLemmaDecls = new Dictionary<Block, IList<OuterDecl>>();
 
             foreach (Block b in cfg.GetBlocksBackwards())
             {
-                blockToLemmaDecls.Add(b, passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b))));
+                //TODO move elsewhere
+                var result = new List<OuterDecl>();
+                if(vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints))
+                {
+                    //FIXME potential val name clash
+                    var code = MLUtil.DefineVal(b.Label + "_hints", MLUtil.MLList(hints));
+                    result.Add(new MLDecl(code));
+                }
+                result.Add(passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b))));
+                blockToLemmaDecls.Add(b, result);
             }
 
             return blockToLemmaDecls;

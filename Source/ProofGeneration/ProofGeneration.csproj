@@ -93,6 +93,9 @@
     <Compile Include="VCProofGen\VCExprDeclCollector.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
     <Compile Include="VCProofGen\VCExprToIsaTranslator.cs" />
+    <Compile Include="VCProofGen\VCHint.cs" />
+    <Compile Include="VCProofGen\VCHintBlock.cs" />
+    <Compile Include="VCProofGen\VCHintManager.cs" />
     <Compile Include="VCProofGen\VCInstantiation.cs" />
     <Compile Include="VCProofGen\VCToIsaInterface.cs" />
     <Compile Include="VCProofGen\VCBlockToIsaTranslator.cs" />

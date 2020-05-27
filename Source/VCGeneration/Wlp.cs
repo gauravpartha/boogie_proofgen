@@ -155,6 +155,30 @@ namespace VC {
 
           if (ctxt.ControlFlowVariableExpr == null) {
             Contract.Assert(ctxt.Label2absy != null);
+            #region proofgeneration
+            ProofGeneration.VCProofGen.VCHint hint;
+            if (N.Equals(VCExpressionGenerator.True))
+            {
+                hint = ProofGeneration.VCProofGen.VCHintManager.AssertNoConjHint;
+            } else if (subsumption == CommandLineOptions.SubsumptionOption.Always
+               || (subsumption == CommandLineOptions.SubsumptionOption.NotForQuantifiers && !(C is VCExprQuantifier)))
+            {
+                hint = ProofGeneration.VCProofGen.VCHintManager.AssertSubsumptionHint;
+            } else
+            {
+                hint = ProofGeneration.VCProofGen.VCHintManager.AssertConjHint;
+            }
+
+            ProofGeneration.ProofGenerationLayer.NextHintForBlock(
+                hint,
+                cmd,
+                b,
+                C,
+                gen.AndSimp(C, N)
+            );
+
+            #endregion
+
             return gen.AndSimp(C, N);
           } else {
             VCExpr controlFlowFunctionAppl = gen.ControlFlowFunctionApplication(ctxt.ControlFlowVariableExpr, gen.Integer(BigNum.FromInt(b.UniqueId)));
@@ -193,6 +217,17 @@ namespace VC {
           var v = gen.Variable("soft$$" + aid, Microsoft.Boogie.Type.Bool);
           expr = gen.Function(new VCExprSoftOp(Math.Max(softWeight, 1)), v, gen.ImpliesSimp(v, expr));
         }
+
+        #region proofgeneration
+        ProofGeneration.ProofGenerationLayer.NextHintForBlock(
+            new ProofGeneration.VCProofGen.AssumeConjHint(0, 0, -1),
+            cmd,
+            b,
+            expr,
+            gen.ImpliesSimp(expr, N)
+            );
+        #endregion 
+
         return MaybeWrapWithOptimization(ctxt, gen, ac.Attributes, gen.ImpliesSimp(expr, N));
       } else {
         Console.WriteLine(cmd.ToString());
