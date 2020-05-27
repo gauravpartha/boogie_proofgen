@@ -85,6 +85,7 @@
     <Compile Include="Util\BasicUtil.cs" />
     <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
     <Compile Include="Util\IsaUniqueNamer.cs" />
+    <Compile Include="Util\MLUtil.cs" />
     <Compile Include="VCProofGen\IActiveDeclGenerator.cs" />
     <Compile Include="VCProofGen\PassiveActiveDecl.cs" />
     <Compile Include="VCProofGen\StandardActiveDecl.cs" />

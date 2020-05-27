@@ -19,6 +19,8 @@ namespace ProofGeneration.Isa
         public abstract R VisitLemmasDecl(LemmasDecl d);
 
         public abstract R VisitLocaleDecl(LocaleDecl d);
+
+        public abstract R VisitMLDecl(MLDecl d);
     }
 
     public abstract class TermVisitor<R>

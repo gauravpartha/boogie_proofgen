@@ -127,6 +127,17 @@ namespace ProofGeneration.IsaPrettyPrint
             return 0;
         }
 
+        public override int VisitMLDecl(MLDecl d)
+        {
+            _sb.Append("ML\\<open>");
+            _sb.AppendLine();
+            _sb.Append(d.code);
+            _sb.AppendLine();
+            _sb.Append("\\<close>");
+
+            return 0;
+        }
+
         public int PrintContextElem(ContextElem c)
         {
             if (c.fixedVariables.Count > 0)

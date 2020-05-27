@@ -151,4 +151,20 @@ namespace ProofGeneration.Isa
             return visitor.VisitLemmasDecl(this);
         }
     }
+
+    public class MLDecl : OuterDecl
+    {
+        public readonly string code;
+
+        public MLDecl(string code) : base("ML")
+        {
+            this.code = code;
+        }
+
+        public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
+        {
+            return visitor.VisitMLDecl(this);
+        }
+    }
+
 }
