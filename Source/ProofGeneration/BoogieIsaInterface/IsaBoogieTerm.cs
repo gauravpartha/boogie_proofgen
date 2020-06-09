@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics.Contracts;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -28,6 +26,13 @@ namespace ProofGeneration
         {
             Term stringConst = new StringConst(v);
             return new TermApp(IsaCommonTerms.TermIdentFromName("Var"), new List<Term>() { stringConst });
+        }
+
+        public static Term BVar(int i)
+        {
+            Contract.Requires(i >= 0);
+            Term natConst = new NatConst(i);
+            return new TermApp(IsaCommonTerms.TermIdentFromName("BVar"), new List<Term>() { natConst });
         }
 
         public static Term ValFromLiteral(LiteralExpr node)
@@ -104,6 +109,9 @@ namespace ProofGeneration
                 case BinaryOperator.Opcode.Eq:
                     bopIsa = "Eq";
                     break;
+                case BinaryOperator.Opcode.Neq:
+                    bopIsa = "Neq";
+                    break;                
                 case BinaryOperator.Opcode.Add:
                     bopIsa = "Add";
                     break;
@@ -151,12 +159,33 @@ namespace ProofGeneration
                 case UnaryOperator.Opcode.Not:
                     uopIsa = "Not";
                     break;
+                case UnaryOperator.Opcode.Neg:
+                    uopIsa = "UMinus";
+                    break;
                 default:
                     throw new NotImplementedException();
             }
 
             var list = new List<Term>() { IsaCommonTerms.TermIdentFromName(uopIsa), arg };
             return new TermApp(IsaCommonTerms.TermIdentFromName("UnOp"), list);
+        }
+
+        /*
+         * if isForall is false, then it must be an existential quantifier
+         * */
+        public static Term Quantifier(bool isForall, Term boundVarType, Term body)
+        {
+            return isForall ? Forall(boundVarType, body) : Exists(boundVarType, body);
+        }
+
+        public static Term Forall(Term boundVarType, Term body)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Forall"), new List<Term> { boundVarType, body });
+        }
+
+        public static Term Exists(Term boundVarType, Term body)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Exists"), new List<Term> { boundVarType, body });
         }
 
         public static Term FunCall(string fname, IList<Term> args)

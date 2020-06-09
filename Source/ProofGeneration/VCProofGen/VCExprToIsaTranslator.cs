@@ -155,7 +155,24 @@ namespace ProofGeneration.VCProofGen
 
         public Term Visit(VCExprQuantifier node, bool arg)
         {
-            throw new NotImplementedException();
+            Term body = Translate(node.Body);
+
+            List<Identifier> boundVars = node.BoundVars.Select(v => (Identifier) new SimpleIdentifier(uniqueNamer.GetName(v, v.Name))).ToList();
+
+            return new TermQuantifier(ConvertQuantifierKind(node.Quan), boundVars, body);
+        }
+
+        private TermQuantifier.QuantifierKind ConvertQuantifierKind(Quantifier quantifier)
+        {
+            switch (quantifier)
+            {
+                case Quantifier.ALL:
+                    return TermQuantifier.QuantifierKind.ALL;
+                case Quantifier.EX:
+                    return TermQuantifier.QuantifierKind.EX;
+                default:
+                    throw new ProofGenUnexpectedStateException(GetType(), "unexpected vc quantifier");
+            }
         }
 
         public Term Visit(VCExprLet node, bool arg)

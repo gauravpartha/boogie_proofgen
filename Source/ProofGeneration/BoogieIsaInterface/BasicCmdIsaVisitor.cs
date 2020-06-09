@@ -14,6 +14,16 @@ namespace ProofGeneration
         //It's possible that the AST has two different variables which have the same name. Therefore we use an IsaUniqueNamer to 
         //avoid name clashes between different variables.
         private readonly IsaUniqueNamer uniqueNamer;
+        private readonly TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
+
+        /* Tracks the variables introduced for the currently active quantifiers
+         * The first node is the outermost quantifier.
+         * The last node is the innermost quantifier.
+         * Required for de-bruijn handling of bound variables.
+         * 
+         * FIXME: maybe make more efficient
+         * */
+        private LinkedList<Variable> quantifierVariables = new LinkedList<Variable>();
    
         public BasicCmdIsaVisitor(IsaUniqueNamer uniqueNamer)
         {
@@ -126,8 +136,27 @@ namespace ProofGeneration
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            ReturnResult(IsaBoogieTerm.Var(GetStringFromIdentifierExpr(node)));
-            //TODO: also look at decl?
+            // bound variables are represented using de-bruijn encoding
+            int i = 0;
+            bool isBoundVar = false;
+            for(var curNode = quantifierVariables.Last;  curNode != null; curNode = curNode.Previous)
+            {
+                if(curNode.Value.Equals(node.Decl))
+                {
+                    isBoundVar = true;
+                    break;
+                }
+                i++;
+            }
+
+            if(isBoundVar)
+            {
+                ReturnResult(IsaBoogieTerm.BVar(i));
+            } else
+            {
+                ReturnResult(IsaBoogieTerm.Var(GetStringFromIdentifierExpr(node)));
+            }
+
             return node;
         }
 
@@ -135,6 +164,58 @@ namespace ProofGeneration
         {
             ReturnResult(IsaBoogieTerm.ExprFromVal(IsaBoogieTerm.ValFromLiteral(node)));
             return node;
+        }
+
+        public override QuantifierExpr VisitQuantifierExpr(QuantifierExpr node)
+        {
+            if(node.Dummies.Count == 0 || node.TypeParameters.Count > 0)
+            {
+                throw new ProofGenUnexpectedStateException(GetType(), "can only handle variable quantification");
+            }
+
+            bool isForall = IsForall(node);
+
+            //Quantifers with multiple bound variables are desugared into multiple quantifiers expressions with single variables
+            List<Term> boundVarTypes = new List<Term>();
+
+            foreach(Variable boundVar in node.Dummies)
+            {
+                quantifierVariables.AddLast(boundVar);
+            }
+
+            int numBefore = quantifierVariables.Count;
+
+            Term result = Translate(node.Body);
+
+            if(numBefore != quantifierVariables.Count)
+            {
+                throw new ProofGenUnexpectedStateException(GetType(), "quantifier levels not the same before and after");
+            }
+
+            for(int i = node.Dummies.Count-1; i >= 0; i--)
+            {
+                quantifierVariables.RemoveLast();
+                Variable boundVar = node.Dummies[i];
+                Term boundVarType = typeIsaVisitor.Translate(boundVar.TypedIdent.Type);
+                result = IsaBoogieTerm.Quantifier(isForall, boundVarType, result);
+            }
+
+            ReturnResult(result);
+            return node;
+        }
+
+        private bool IsForall(QuantifierExpr quantifierExpr)
+        {
+            if(quantifierExpr is ForallExpr)
+            {
+                return true;
+            } else if(quantifierExpr is ExistsExpr)
+            {
+                return false;
+            } else
+            {
+                throw new ProofGenUnexpectedStateException(GetType(), "Unexpected quantifier");
+            }
         }
 
         //not implemented cmds
@@ -186,10 +267,6 @@ namespace ProofGeneration
         {
             throw new NotImplementedException();
         }
-        public override Expr VisitExistsExpr(ExistsExpr node)
-        {
-            throw new NotImplementedException();
-        }
         public override Expr VisitBvExtractExpr(BvExtractExpr node)
         {
             throw new NotImplementedException();
@@ -199,10 +276,6 @@ namespace ProofGeneration
             throw new NotImplementedException();
         }
         public override IList<Expr> VisitExprSeq(IList<Expr> exprSeq)
-        {
-            throw new NotImplementedException();
-        }
-        public override Expr VisitForallExpr(ForallExpr node)
         {
             throw new NotImplementedException();
         }
@@ -219,10 +292,6 @@ namespace ProofGeneration
             throw new NotImplementedException();
         }
         public override BinderExpr VisitBinderExpr(BinderExpr node)
-        {
-            throw new NotImplementedException();
-        }
-        public override QuantifierExpr VisitQuantifierExpr(QuantifierExpr node)
         {
             throw new NotImplementedException();
         }
