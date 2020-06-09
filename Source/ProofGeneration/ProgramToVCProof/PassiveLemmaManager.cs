@@ -42,7 +42,7 @@ namespace ProofGeneration.ProgramToVCProof
             funToInterpMapping = LemmaHelper.FunToTerm(functions, new IsaUniqueNamer());
         }
 
-        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
+        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
         {
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
@@ -52,7 +52,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst, LemmaHelper.FinalStateIsMagic(block));
 
-            Proof proof = BlockCorrectProof(block);
+            Proof proof = BlockCorrectProof(block, vcHintsName);
 
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
         }
@@ -141,16 +141,29 @@ namespace ProofGeneration.ProgramToVCProof
             return LemmaHelper.VariableAssumptions(programVariables, normalInitState, declToVCMapping, uniqueNamer);
         }
 
-        private Proof BlockCorrectProof(Block b)
+        private Proof BlockCorrectProof(Block b, string vcHintsName)
         {
-            List<string> methods = new List<string>
+            List<string> methods;
+            if (vcHintsName == null)
             {
-                "using assms " + globalAssmsName,
-                "apply cases",
-                "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
-                "apply (handle_cmd_list_full?)",
-                "by (auto?)"
-            };
+                methods = new List<string>
+                {
+                    "using assms " + globalAssmsName,
+                    "apply cases",
+                    "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
+                    "apply (handle_cmd_list_full?)",
+                    "by (auto?)"
+                };
+            } else
+            {
+                methods = new List<string>
+                {
+                    "using assms ",
+                    "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
+                    "apply (tactic \\<open> b_vc_hint_tac_2 @{context} @{thms "+ globalAssmsName + "} " + vcHintsName + " \\<close>)",
+                    "by (auto?)"
+                };                    
+            }
 
             return new Proof(methods);
         }

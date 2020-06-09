@@ -10,7 +10,8 @@ namespace ProofGeneration.ProgramToVCProof
 {
     interface IBlockLemmaManager
     {
-        LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> sucPassive, string lemmaName);
+        //If vcHintsName is null, then no hints are provided. All other parameters must be non-null.
+        LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> sucPassive, string lemmaName, string vcHintsName);
 
         LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> sucPassive, string lemmaName);
 

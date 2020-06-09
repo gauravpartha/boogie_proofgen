@@ -72,8 +72,11 @@ namespace ProofGeneration.ProgramToVCProof
             funToInterpMapping = LemmaHelper.FunToTerm(functions, new IsaUniqueNamer());
         }
 
-        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> passiveSuc, string lemmaName)
+        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> passiveSuc, string lemmaName, string vcHintsName)           
         {
+            if (vcHintsName != null)
+                throw new ProofGenUnexpectedStateException(GetType(), "did not expect any hints");
+
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
 

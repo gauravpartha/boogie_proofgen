@@ -154,6 +154,7 @@ namespace ProofGeneration
                 afterUnreachablePruningCfg,
                 out VCInstantiation vcinst);
 
+            /*
             LocaleDecl vcPassiveLocale = VCToIsaInterface.ConvertVC(
                 "vc_passive",
                 vc,
@@ -165,6 +166,7 @@ namespace ProofGeneration
                 localVars,
                 afterUnreachablePruningCfg,
                 out VCInstantiation vcPassiveInst);
+                */
 
             var lemmaNamer = new IsaUniqueNamer();
 
@@ -174,6 +176,7 @@ namespace ProofGeneration
 
             Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
 
+            
             List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
             foreach(var v in finalProgramLemmas.Values)
             {
@@ -182,11 +185,12 @@ namespace ProofGeneration
             afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
 
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
-
+            
 
             #region WIP
 
             // Generate before passification block lemmas to try out things
+            /*
             var beforePassiveNamer = new IsaUniqueNamer();
 
             IDictionary<Block, IDictionary<Variable, Expr>> constantEntry =
@@ -212,6 +216,7 @@ namespace ProofGeneration
             beforePassiveDecls.AddRange(beforePassiveLemmas.Values);
 
             LocaleDecl beforePassiveLocale = GenerateLocale("beforePassive", prePassiveLemmaManager, beforePassiveDecls);
+            */
             #endregion
 
             LocaleDecl progamLocale = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg);
@@ -221,11 +226,13 @@ namespace ProofGeneration
 
             StoreTheory(theoryPassive);
 
+            /*
             Theory theory = new Theory(afterPassificationImpl.Name,
                 new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util" },
                 new List<OuterDecl>() { vcLocale, vcPassiveLocale, beforePassiveLocale, progamLocale });
 
             StoreTheory(theory);
+            */
         }
 
         private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(
@@ -247,7 +254,8 @@ namespace ProofGeneration
                     LemmaDecl lemma = prePassiveLemmaManager.GenerateBlockLemma(
                         b,
                         finalCfg.GetSuccessorBlocks(origBlock),
-                        lemmaNamer.GetName(b, GetLemmaName(b)));
+                        lemmaNamer.GetName(b, GetLemmaName(b)),
+                        null);
                     blockToLemmaDecls.Add(b, lemma);
                 } else if (beforePeepholeReachable.Contains(origBlock))
                 {
@@ -296,13 +304,15 @@ namespace ProofGeneration
             {
                 //TODO move elsewhere
                 var result = new List<OuterDecl>();
-                if(vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints))
+                string vcHintsName = null;
+                if (vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints))
                 {
                     //FIXME potential val name clash
+                    vcHintsName = b.Label + "_hints";
                     var code = MLUtil.DefineVal(b.Label + "_hints", MLUtil.MLList(hints));
                     result.Add(new MLDecl(code));
                 }
-                result.Add(passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b))));
+                result.Add(passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b)), vcHintsName));
                 blockToLemmaDecls.Add(b, result);
             }
 
