@@ -106,8 +106,12 @@ namespace VC {
         }
 
         VCExpr C = ctxt.Ctxt.BoogieExprTranslator.Translate(ac.Expr);
+        #region proofgeneration
+        VCExpr postVC = N;
+        VCExpr exprVC = C;
+        #endregion
 
-        VCExpr VU = null;
+                VCExpr VU = null;
         if (!isFullyVerified)
         {
           if (ac.VerifiedUnder != null)
@@ -136,8 +140,11 @@ namespace VC {
             N = gen.ImpliesSimp(C, N, false);
           }
 
-          if (isFullyVerified)
+          ProofGeneration.VCProofGen.VCHint hint;
+
+         if (isFullyVerified)
           {
+            throw new NotImplementedException("proof generation does not support this option (caching of verification results)");
             return N;
           }
           else if (VU != null)
@@ -156,31 +163,21 @@ namespace VC {
           if (ctxt.ControlFlowVariableExpr == null) {
             Contract.Assert(ctxt.Label2absy != null);
             #region proofgeneration
-            ProofGeneration.VCProofGen.VCHint hint;
-            if (N.Equals(VCExpressionGenerator.True))
-            {
-                hint = ProofGeneration.VCProofGen.VCHintManager.AssertNoConjHint;
-            } else if (subsumption == CommandLineOptions.SubsumptionOption.Always
-               || (subsumption == CommandLineOptions.SubsumptionOption.NotForQuantifiers && !(C is VCExprQuantifier)))
-            {
-                hint = ProofGeneration.VCProofGen.VCHintManager.AssertSubsumptionHint;
-            } else
-            {
-                hint = ProofGeneration.VCProofGen.VCHintManager.AssertConjHint;
-            }
 
             ProofGeneration.ProofGenerationLayer.NextHintForBlock(
-                hint,
                 cmd,
                 b,
-                C,
-                gen.AndSimp(C, N)
+                exprVC,
+                postVC,
+                gen.AndSimp(C, N),
+                subsumption
             );
 
             #endregion
 
             return gen.AndSimp(C, N);
           } else {
+            throw new NotImplementedException("proof generation does not support this option (error labels in wlp)");
             VCExpr controlFlowFunctionAppl = gen.ControlFlowFunctionApplication(ctxt.ControlFlowVariableExpr, gen.Integer(BigNum.FromInt(b.UniqueId)));
             Contract.Assert(controlFlowFunctionAppl != null);
             VCExpr assertFailure = gen.Eq(controlFlowFunctionAppl, gen.Integer(BigNum.FromInt(-ac.UniqueId)));
@@ -220,11 +217,12 @@ namespace VC {
 
         #region proofgeneration
         ProofGeneration.ProofGenerationLayer.NextHintForBlock(
-            new ProofGeneration.VCProofGen.AssumeConjHint(0, 0, -1),
             cmd,
             b,
             expr,
-            gen.ImpliesSimp(expr, N)
+            N,
+            gen.ImpliesSimp(expr, N),
+            CommandLineOptions.SubsumptionOption.Never
             );
         #endregion 
 

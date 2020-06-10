@@ -135,9 +135,20 @@ namespace ProofGeneration
             afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
 
-        public static void NextHintForBlock(VCHint hint, Cmd cmd, Block block, VCExpr cmdBodyVC, VCExpr resultVC)
+        /// <summary> Records hint for a cmd in the final passified Boogie program</summary>
+        /// <param name="exprVC">the computed VC for the expression in the command</param>
+        /// <param name="postVC">the computed postcondition of the command</param>
+        /// <param name="resultVC">Wlp(cmd, postVC)</param>
+        /// <param name="subsumptionOption">The subsumption option for this cmd.</param>
+        public static void NextHintForBlock(
+            Cmd cmd, 
+            Block block, 
+            VCExpr exprVC, 
+            VCExpr postVC, 
+            VCExpr resultVC, 
+            CommandLineOptions.SubsumptionOption subsumptionOption)
         {
-            vcHintManager.NextHintForBlock(hint, cmd, block, cmdBodyVC, resultVC);
+            vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
         public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)

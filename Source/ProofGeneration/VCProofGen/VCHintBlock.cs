@@ -1,20 +1,29 @@
 ﻿using Microsoft.Boogie;
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using System.Linq;
 
 namespace ProofGeneration.VCProofGen
 {
     class VCHintBlock
     {
         private readonly Cmd[] cmds;
-        public VCHint[] Hints { get; private set; }
+        private readonly VCHint[] _hints;
 
-        //when this conjunct will become active, then if ImplAtTopLevel is true,
-        //then the nestLevel assumes that the original implication with which the
-        //the nestLevel was originally computed is still 
-        private ISet<VCHint> HintAwareOfUpdate = new HashSet<VCHint>();
-             
+        public IEnumerable<VCHint> Hints()
+        {
+            List<VCHint> result = new List<VCHint>();
+            //ignore hints after a hint that solves the complete goal
+            foreach (VCHint hint in _hints)
+            {
+                result.Add(hint);
+
+                if (hint.IsFinal())
+                {
+                    break;
+                }
+            }
+
+            return result;
+        }             
 
         private int nextCmd;
 
@@ -22,7 +31,7 @@ namespace ProofGeneration.VCProofGen
         {
             cmds = block.cmds.ToArray();
             nextCmd = cmds.Length - 1;
-            Hints = new VCHint[cmds.Length];
+            _hints = new VCHint[cmds.Length];
         }
 
         public void AddHint(Cmd cmd, VCHint hint)
@@ -32,7 +41,7 @@ namespace ProofGeneration.VCProofGen
                 throw new ProofGenUnexpectedStateException(this.GetType(), "current hint database does not match cmd");
             }
 
-            Hints[nextCmd] = hint;
+            _hints[nextCmd] = hint;
 
             nextCmd--;
         }
