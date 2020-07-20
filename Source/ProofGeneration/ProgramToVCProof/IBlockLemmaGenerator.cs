@@ -1,4 +1,5 @@
 ﻿using Microsoft.Boogie;
+using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> sucPassive, string lemmaName);
 
-        LemmaDecl MethodVerifiesLemma(Block block, int blockId, Term methodCfg, string lemmaName);
+        LemmaDecl MethodVerifiesLemma(CFGRepr cfg, Term methodCfg, string lemmaName);
 
         ContextElem Context();
 

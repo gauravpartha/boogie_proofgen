@@ -1,5 +1,6 @@
 ﻿using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.IsaPrettyPrint;
 using ProofGeneration.Util;
@@ -7,6 +8,7 @@ using ProofGeneration.VCProofGen;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace ProofGeneration.ProgramToVCProof
 {
@@ -17,7 +19,7 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IEnumerable<Variable> localVars;
         private readonly IsaProgramRepr isaProgramRepr;
         private readonly VCInstantiation vcinst;
-        private readonly Block entryBlock;
+        private readonly CFGRepr cfg;
 
         private readonly PureValueIsaTransformer pureValueIsaTransfomer = new PureValueIsaTransformer();
         private readonly PureTyIsaTransformer pureTyIsaTransfomer = new PureTyIsaTransformer();
@@ -33,9 +35,6 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly IDictionary<NamedDeclaration, LemmaDecl> membershipLemmasDict = new Dictionary<NamedDeclaration, LemmaDecl>();
 
-        private readonly string memPrefix = "mem";
-        private int memId = 0;
-
         private readonly TermIdent functionInterp = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
@@ -43,9 +42,9 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly string vcAssmName = "VC";
         private readonly string finterpAssmName = "FInterp";
-        private readonly string LocalVarsAssmName = "Params";
-        private readonly string ParamsAssmName = "Params";
-        private readonly string RedAssmNAme = "Red";
+        private readonly string paramsAssmName = "Params";
+        private readonly string localVarsAssmName = "LocalVars";
+        private readonly string RedAssmName = "Red";
 
         public EndToEndVCProof(
             IEnumerable<Function> functions, 
@@ -53,14 +52,14 @@ namespace ProofGeneration.ProgramToVCProof
             IEnumerable<Variable> localVars,
             IsaProgramRepr isaProgramRepr,
             VCInstantiation vcinst,
-            Block entryBlock)
+            CFGRepr cfg)
         {
             this.functions = functions;
             this.parameters = parameters;
             this.localVars = localVars;
             this.isaProgramRepr = isaProgramRepr;
             this.vcinst = vcinst;
-            this.entryBlock = entryBlock;
+            this.cfg = cfg;
         }
 
         public IEnumerable<OuterDecl> GenerateProof()
@@ -88,7 +87,6 @@ namespace ProofGeneration.ProgramToVCProof
             AddMembershipLemmas(localVars,
                 isaProgramRepr.localVarsDeclDef,
                 d => IsaBoogieTerm.VarDecl((Variable)d, false));
-
         }
 
         private void AddMembershipLemmas(
@@ -105,8 +103,7 @@ namespace ProofGeneration.ProgramToVCProof
 
                 Term statement = new TermBinary(lhs, rhs, TermBinary.BinaryOpCode.EQ);
                 Proof proof = new Proof(new List<string> { "by " + ProofUtil.Simp(declsDef + "_def") });
-                membershipLemmasDict.Add(d, new LemmaDecl(memPrefix + memId, statement, proof));
-                memId++;
+                membershipLemmasDict.Add(d, new LemmaDecl(MembershipName(d), statement, proof));
             }
         }
 
@@ -183,14 +180,14 @@ namespace ProofGeneration.ProgramToVCProof
                 "qed"
             };
 
-            return new LemmaDecl("vc_" + f.Name + "_corres", ContextElem.CreateWithAssumptions(assm), conclusion, new Proof(proofMethods));
+            return new LemmaDecl(FunCorresName(f), ContextElem.CreateWithAssumptions(assm), conclusion, new Proof(proofMethods));
         }
 
-        public LemmaDecl FinalLemma()
+        private LemmaDecl FinalLemma()
         {
             var uniqueNamer = new IsaUniqueNamer();
             var declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>)functions).Union(ProgramVariables), uniqueNamer);
-            var vcAssm = vcinst.GetVCBlockInstantiation(entryBlock, declToVCMapping);
+            var vcAssm = vcinst.GetVCBlockInstantiation(cfg.entry, declToVCMapping);
 
             List<Identifier> declIds = declToVCMapping.Values.Select(t => t.id).ToList();
             List<TypeIsa> declTypes = functions.Select(f => pureTyIsaTransfomer.Translate(f)).ToList();
@@ -204,16 +201,143 @@ namespace ProofGeneration.ProgramToVCProof
                 IsaCommonTerms.AppendList(isaProgramRepr.paramsDeclDef, isaProgramRepr.localVarsDeclDef),
                 new TermTuple(new List<Term> { isaProgramRepr.funcsDeclDef, functionInterp }),
                 isaProgramRepr.cfgDeclDef,
-                IsaBoogieTerm.CFGConfigNode(new NatConst(0), IsaBoogieTerm.Normal(normalInitState)),
+                IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNode, finalState)
                 );
 
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
-            var contextElem = ContextElem.CreateWithAssumptions(new List<Term> { vcAssm, finterpAssm, paramsAssm, localVarsAssm, multiRed });
-            return new LemmaDecl("endToEnd", contextElem, conclusion, new Proof(new List<string> { "oops" }));
+            var contextElem = ContextElem.CreateWithAssumptions(
+                new List<Term> { vcAssm, finterpAssm, paramsAssm, localVarsAssm, multiRed },
+                new List<string> { vcAssmName, finterpAssmName, paramsAssmName, localVarsAssmName, RedAssmName });
+            return new LemmaDecl("endToEnd", contextElem, conclusion, FinalProof());
         }
 
+        private Proof FinalProof()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("proof -");
+
+            //functions
+            foreach(Function f in functions)
+            {
+                Term fStringConst = new StringConst(f.Name);
+                sb.Append("let " + FunAbbrev(f) + " = ");
+                sb.AppendInner("opaque_comp the " + functionInterp + " " + fStringConst);
+                sb.AppendLine();
+                sb.Append("from " + finterpAssmName + " have " + InterpMemName(f) + ":");
+                sb.AppendInner(
+                new TermBinary(new TermApp(functionInterp, fStringConst), 
+                    IsaCommonTerms.SomeOption(IsaCommonTerms.TermIdentFromName(FunAbbrev(f))),
+                    TermBinary.BinaryOpCode.EQ).ToString());
+                sb.AppendLine();
+                sb.AppendLine("apply " + ProofUtil.SimpOnly("opaque_comp_def"));
+                sb.AppendLine("using " + "fun_interp_wf_def " + MembershipName(f) + " option.sel by metis");
+
+                sb.Append("from " + finterpAssmName + " have " + WfName(f) + ":");
+                sb.AppendInner(IsaBoogieTerm.FunInterpSingleWf(f, IsaCommonTerms.TermIdentFromName(FunAbbrev(f))).ToString());
+                sb.AppendLine();
+                sb.AppendLine("apply " + ProofUtil.SimpOnly("opaque_comp_def"));
+                sb.AppendLine("using " + "fun_interp_wf_def " + MembershipName(f) + " option.sel by metis");
+                sb.AppendLine();
+            }
+
+            //variables
+            AppendStateCorres(sb, paramsAssmName, parameters);
+            AppendStateCorres(sb, localVarsAssmName, localVars);
+
+            //conclusion
+            sb.Append("show ");
+            sb.AppendInner(new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ).ToString());
+            sb.AppendLine();
+     
+            sb.AppendLine("apply (rule passification.method_verifies[OF _ " + RedAssmName + "])");
+            sb.AppendLine("apply " + ProofUtil.SimpOnly("passification_def"));
+
+            foreach(Function f in functions)
+            {
+                //could be more precise with second conjI instead of using the optional tactical
+                sb.AppendLine("apply (rule conjI, " + ProofUtil.Simp(InterpMemName(f)) + ", (rule conjI)?, " + 
+                    "rule " + FunCorresName(f)+"[OF "+ WfName(f) +"])");
+            }
+
+            int numProgramVars = ProgramVariables.Count();
+            int idx = 0;
+            foreach(Variable v in ProgramVariables)
+            {
+                string conjIOpt = "";
+                if(idx != numProgramVars-1)
+                {
+                    conjIOpt = "rule conjI, ";
+                }
+                idx++;
+
+                sb.AppendLine("apply (" + conjIOpt + " rule " + StateCorresName(v)+ ")");
+            }
+
+            sb.AppendLine("by (rule " + vcAssmName + ")");
+            sb.AppendLine("qed");
+
+            return new Proof(new List<string> { sb.ToString() });
+        }
+
+        private void AppendStateCorres(StringBuilder sb, string assm, IEnumerable<Variable> vars)
+        {
+            foreach(var v in vars)
+            {
+                Term vStringConst = new StringConst(v.Name);
+                sb.Append("from " + assm + " have " + StateCorresName(v) + ":");
+                Term lhs = new TermApp(normalInitState, vStringConst);
+                Term rhs = IsaCommonTerms.SomeOption(
+                    pureValueIsaTransfomer.ConstructValue(
+                        pureValueIsaTransfomer.DestructValue(
+                            IsaCommonTerms.TheOption(lhs),
+                            v.TypedIdent.Type)
+                            , v.TypedIdent.Type)
+                        );
+                sb.AppendInner(new TermBinary(lhs, rhs, TermBinary.BinaryOpCode.EQ).ToString());
+                sb.AppendLine();
+                sb.AppendLine("apply " + ProofUtil.SimpOnly("state_typ_wf_def"));
+                sb.AppendLine("apply (erule allE, erule allE, erule impE, rule " + MembershipName(v) +")");
+                sb.AppendLine("by (fastforce dest: tint_intv)");
+            }
+        }
+
+        private string MembershipName(NamedDeclaration d)
+        {
+            if(d is Function)
+            {
+                return "mfun_" + d.Name;
+            } else
+            {
+                return "m_" + d.Name;
+            }
+        }
+
+        private string FunAbbrev(Function f)
+        {
+            return "?" + f.Name;
+        }
+
+        private string InterpMemName(Function f)
+        {
+            return "im_" + f.Name;
+        }
+
+        private string WfName(Function f)
+        {
+            return "i_" + f.Name;
+        }
+
+        private string FunCorresName(Function f)
+        {
+            return "vc_" + f.Name + "_corres";
+        }
+
+        private string StateCorresName(Variable v)
+        {
+            return "sc_" + v.Name;
+        }
 
     }
 }

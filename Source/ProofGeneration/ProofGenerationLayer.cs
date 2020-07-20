@@ -188,8 +188,7 @@ namespace ProofGeneration
 
             IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, axioms, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg, out IList<OuterDecl> programDecls);
             afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
-                afterPassificationCfg.entry,
-                afterPassificationCfg.GetUniqueIntLabel(afterPassificationCfg.entry),
+                afterUnreachablePruningCfg,
                 programRepr.cfgDeclDef,
                 "method_verifies"));
 
@@ -199,7 +198,7 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            var endToEnd = new EndToEndVCProof(functions, inParams, localVars, programRepr, vcinst, afterUnreachablePruningCfg.entry);
+            var endToEnd = new EndToEndVCProof(functions, inParams, localVars, programRepr, vcinst, afterUnreachablePruningCfg);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",

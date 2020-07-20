@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
@@ -210,11 +211,9 @@ namespace ProofGeneration.ProgramToVCProof
             return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);
         }
 
-        public LemmaDecl MethodVerifiesLemma(Block block, int blockId, Term methodCfg, string lemmaName)
+        public LemmaDecl MethodVerifiesLemma(CFGRepr cfg, Term methodCfg, string lemmaName)
         {
-            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-
-            Term initConfig = IsaBoogieTerm.CFGConfigNode(new IntConst(blockId), IsaBoogieTerm.Normal(normalInitState));
+            Term initConfig = IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState));
             Term finalNodeOrDone = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(new object(), "m'"));
 
             Term finalConfig = IsaBoogieTerm.CFGConfig(finalNodeOrDone, finalState);
@@ -222,7 +221,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term redCfgMulti = IsaBoogieTerm.RedCFGMulti(varContext, functionContext, methodCfg, initConfig, finalConfig);
 
             List<Term> assumptions = new List<Term>() { redCfgMulti };
-            assumptions.Add(vcinst.GetVCBlockInstantiation(block, declToVCMapping));
+            assumptions.Add(vcinst.GetVCBlockInstantiation(cfg.entry, declToVCMapping));
 
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
