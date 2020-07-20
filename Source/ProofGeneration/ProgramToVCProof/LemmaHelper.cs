@@ -52,20 +52,20 @@ namespace ProofGeneration.ProgramToVCProof
 
         public static Term VariableAssumption(Variable v, Term state, TermIdent vcVar, IsaUniqueNamer uniqueNamer)
         {
-            Term left = new TermApp(state, new StringConst(uniqueNamer.GetName(v, v.Name)));
+            Term left = new TermApp(state, new StringConst(v.Name));
             Term right = IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
             return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
         }
 
         public static Term VariableAssumptionExplicit(Variable v, Term state, Term rhs, IsaUniqueNamer uniqueNamer)
         {
-            Term left = new TermApp(state, new StringConst(uniqueNamer.GetName(v, v.Name)));
+            Term left = new TermApp(state, new StringConst(v.Name));
             return new TermBinary(left, rhs, TermBinary.BinaryOpCode.EQ);
         }
 
         public static Term VariableTypeAssumption(Variable v, Term varContext, IsaUniqueNamer uniqueNamer)
         {
-            Term left = new TermApp(varContext, new StringConst(uniqueNamer.GetName(v, v.Name)));
+            Term left = new TermApp(varContext, new StringConst(v.Name));
             Term right = IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(v.TypedIdent.Type));
             return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
         }

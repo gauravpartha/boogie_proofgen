@@ -131,7 +131,9 @@ namespace ProofGeneration
         //potential side effect
         public string GetStringFromIdentifierExpr(IdentifierExpr node)
         {
-            return uniqueNamer.GetName(node.Decl, node.Name);
+            return node.Name;
+            //TODO: check whether need unique name or not (under assumption that there are no variable name clashes, i.e., no shadowing)
+            //return uniqueNamer.GetName(node.Decl, node.Name);
         }
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
