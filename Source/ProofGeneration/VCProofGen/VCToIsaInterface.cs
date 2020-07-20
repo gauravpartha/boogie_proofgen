@@ -151,7 +151,7 @@ namespace ProofGeneration.VCProofGen
 
             foreach (Function f in functions)
             {
-                TypeIsa funType = pureTyIsaTransformer.TranslateDeclType(f);
+                TypeIsa funType = pureTyIsaTransformer.Translate(f);
                 result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(f.Name), funType));
             }
 

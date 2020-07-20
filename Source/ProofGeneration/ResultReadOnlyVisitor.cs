@@ -18,6 +18,10 @@ namespace ProofGeneration
 
         public T Translate(Absy node)
         {
+            if(!StateIsFresh())
+            {
+                throw new ProofGenUnexpectedStateException(GetType());
+            }
             Contract.Assert(TranslatePrecondition(node));
             Visit(node);
             return Results.Pop();

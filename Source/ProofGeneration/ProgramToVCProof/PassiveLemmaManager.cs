@@ -99,7 +99,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             foreach (KeyValuePair<NamedDeclaration, TermIdent> kv in declToVCMapping)
             {
-                TypeIsa typeIsa = pureTyIsaTransformer.TranslateDeclType(kv.Key);
+                TypeIsa typeIsa = pureTyIsaTransformer.Translate(kv.Key);
                 result.Add(Tuple.Create(kv.Value, typeIsa));
             }
 

@@ -10,32 +10,39 @@ namespace ProofGeneration.BoogieIsaInterface
     {
         protected override bool TranslatePrecondition(Absy node)
         {
-            return node is NamedDeclaration || node is Microsoft.Boogie.Type;
+            return node is GlobalVariable ||
+                node is LocalVariable ||
+                node is Formal ||
+                node is Function || 
+                node is Microsoft.Boogie.Type;
         }
 
-        public TypeIsa TranslateDeclType(NamedDeclaration nd)
+        public override Variable VisitVariable(Variable node)
         {
-            if (nd is Variable v)
-                return TranslateBoogieVarType(v);
-            else if (nd is Function f)
-                return TranslateBoogieFunctionType(f);
-            else
-                throw new NotImplementedException();
+            Visit(node.TypedIdent.Type);
+            return node;
         }
 
-        private TypeIsa TranslateBoogieVarType(Variable v)
+        public override Formal VisitFormal(Formal node)
         {
-            return Translate(v.TypedIdent.Type);
+            return (Formal) VisitVariable(node);
         }
 
-        private TypeIsa TranslateBoogieFunctionType(Function fun)
+        public override LocalVariable VisitLocalVariable(LocalVariable node)
         {
-            IList<TypeIsa> types = fun.InParams.Select(v => Translate(v.TypedIdent.Type)).ToList();
+            return (LocalVariable) VisitVariable(node); 
+        }
 
-            TypeIsa retType = Translate(fun.OutParams[0].TypedIdent.Type);
+        public override Function VisitFunction(Function node)
+        {
+            IList<TypeIsa> types = node.InParams.Select(v => Translate(v.TypedIdent.Type)).ToList();
+
+            TypeIsa retType = Translate(node.OutParams[0].TypedIdent.Type);
             types.Add(retType);
 
-            return types.Reverse().Aggregate((res, arg) => new ArrowType(arg, res));
+            ReturnResult(types.Reverse().Aggregate((res, arg) => new ArrowType(arg, res)));
+
+            return node;
         }
 
         public override Microsoft.Boogie.Type VisitType(Microsoft.Boogie.Type type)
