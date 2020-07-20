@@ -11,17 +11,17 @@ namespace ProofGeneration
     public static class IsaBoogieTerm
     {
 
-        public readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
-        public readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
-        public readonly static TermIdent redExprId = IsaCommonTerms.TermIdentFromName("red_expr");
-        public readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
-        public readonly static TermIdent magicStateId = IsaCommonTerms.TermIdentFromName("Magic");
-        public readonly static TermIdent failureStateId = IsaCommonTerms.TermIdentFromName("Failure");
-        public readonly static TermIdent convertValToBoolId = IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
-        public readonly static TermIdent convertValToIntId = IsaCommonTerms.TermIdentFromName("convert_val_to_int");
-        public readonly static TermIdent funInterpWfId = IsaCommonTerms.TermIdentFromName("fun_interp_wf");
-        public readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
-        public readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
+        private readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
+        private readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
+        private readonly static TermIdent redExprId = IsaCommonTerms.TermIdentFromName("red_expr");
+        private readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
+        private readonly static TermIdent magicStateId = IsaCommonTerms.TermIdentFromName("Magic");
+        private readonly static TermIdent failureStateId = IsaCommonTerms.TermIdentFromName("Failure");
+        private readonly static TermIdent convertValToBoolId = IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
+        private readonly static TermIdent convertValToIntId = IsaCommonTerms.TermIdentFromName("convert_val_to_int");
+        private readonly static TermIdent funInterpWfId = IsaCommonTerms.TermIdentFromName("fun_interp_wf");
+        private readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
+        private readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
  
         private static TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
 
