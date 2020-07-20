@@ -54,11 +54,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BoogieIsaInterface\ApplicableIsaVisitor.cs" />
+    <Compile Include="BoogieIsaInterface\AxiomIsaTransformer.cs" />
     <Compile Include="BoogieIsaInterface\BasicCmdIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieTerm.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
     <Compile Include="BoogieIsaInterface\IsaProgramGenerator.cs" />
+    <Compile Include="BoogieIsaInterface\IsaProgramRepr.cs" />
     <Compile Include="BoogieIsaInterface\MultiCmdIsaVisitor.cs" />
+    <Compile Include="BoogieIsaInterface\PureValueIsaTransformer.cs" />
     <Compile Include="BoogieIsaInterface\TypeIsaVisitor.cs" />
     <Compile Include="CFGRepr\CFGRepr.cs" />
     <Compile Include="CFGRepr\CFGReprTransformer.cs" />
@@ -74,6 +77,7 @@
     <Compile Include="Isa\OuterAst.cs" />
     <Compile Include="Isa\ProofAst.cs" />
     <Compile Include="ProgramToVCProof\ConstantPropInformation.cs" />
+    <Compile Include="ProgramToVCProof\EndToEndVCProof.cs" />
     <Compile Include="ProgramToVCProof\IBlockLemmaGenerator.cs" />
     <Compile Include="ProgramToVCProof\LemmaHelper.cs" />
     <Compile Include="ProgramToVCProof\PassiveLemmaManager.cs" />
@@ -86,6 +90,7 @@
     <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
     <Compile Include="Util\IsaUniqueNamer.cs" />
     <Compile Include="Util\MLUtil.cs" />
+    <Compile Include="Util\ProofUtil.cs" />
     <Compile Include="VCProofGen\IActiveDeclGenerator.cs" />
     <Compile Include="VCProofGen\PassiveActiveDecl.cs" />
     <Compile Include="VCProofGen\StandardActiveDecl.cs" />

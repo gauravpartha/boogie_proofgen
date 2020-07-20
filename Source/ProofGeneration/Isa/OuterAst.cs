@@ -88,6 +88,11 @@ namespace ProofGeneration.Isa
             return new ContextElem(fixedVariables, new List<Term>(), new List<string>());
         }
 
+        public static ContextElem CreateWithAssumptions(Term assumption)
+        {
+            return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), new List<Term> { assumption }, new List<string>());
+        }
+
         public static ContextElem CreateWithAssumptions(IList<Term> assumptions)
         {
             return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), assumptions, new List<string>());

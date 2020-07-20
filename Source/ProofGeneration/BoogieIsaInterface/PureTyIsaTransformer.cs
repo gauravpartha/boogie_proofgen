@@ -1,18 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 
-namespace ProofGeneration.VCProofGen
+namespace ProofGeneration.BoogieIsaInterface
 {
     class PureTyIsaTransformer : ResultReadOnlyVisitor<TypeIsa>
     {
         protected override bool TranslatePrecondition(Absy node)
         {
-            return node is Microsoft.Boogie.Type;
+            return node is NamedDeclaration || node is Microsoft.Boogie.Type;
         }
 
         public TypeIsa TranslateDeclType(NamedDeclaration nd)

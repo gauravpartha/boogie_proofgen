@@ -7,6 +7,7 @@ using System.Diagnostics.Contracts;
 using System;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
+using ProofGeneration.BoogieIsaInterface;
 
 namespace ProofGeneration.VCProofGen
 {

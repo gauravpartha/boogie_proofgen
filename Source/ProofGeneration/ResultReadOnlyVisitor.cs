@@ -18,7 +18,7 @@ namespace ProofGeneration
 
         public T Translate(Absy node)
         {
-            Contract.Requires(TranslatePrecondition(node));
+            Contract.Assert(TranslatePrecondition(node));
             Visit(node);
             return Results.Pop();
         }

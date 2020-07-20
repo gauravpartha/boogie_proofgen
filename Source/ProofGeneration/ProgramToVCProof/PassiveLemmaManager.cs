@@ -209,5 +209,27 @@ namespace ProofGeneration.ProgramToVCProof
 
             return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);
         }
+
+        public LemmaDecl MethodVerifiesLemma(Block block, int blockId, Term methodCfg, string lemmaName)
+        {
+            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
+
+            Term initConfig = IsaBoogieTerm.CFGConfigNode(new IntConst(blockId), IsaBoogieTerm.Normal(normalInitState));
+            Term finalNodeOrDone = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(new object(), "m'"));
+
+            Term finalConfig = IsaBoogieTerm.CFGConfig(finalNodeOrDone, finalState);
+
+            Term redCfgMulti = IsaBoogieTerm.RedCFGMulti(varContext, functionContext, methodCfg, initConfig, finalConfig);
+
+            List<Term> assumptions = new List<Term>() { redCfgMulti };
+            assumptions.Add(vcinst.GetVCBlockInstantiation(block, declToVCMapping));
+
+            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+
+            //TODO add full proof
+            Proof proof = new Proof(new List<string> { "sorry" });
+
+            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
+        }
     }   
 }

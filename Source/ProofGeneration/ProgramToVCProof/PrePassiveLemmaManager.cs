@@ -474,6 +474,9 @@ namespace ProofGeneration.ProgramToVCProof
             return result;
         }
 
-
+        public LemmaDecl MethodVerifiesLemma(Block block, int blockId, Term methodCfg, string lemmaName)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

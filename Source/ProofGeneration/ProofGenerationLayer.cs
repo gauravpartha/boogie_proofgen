@@ -10,6 +10,7 @@ using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using ProofGeneration.Util;
+using ProofGeneration.BoogieIsaInterface;
 
 namespace ProofGeneration
 {
@@ -34,6 +35,7 @@ namespace ProofGeneration
         private static CFGRepr noEmptyBlocksCfg;
         private static CFGRepr afterUnreachablePruningCfg;
 
+        private static IEnumerable<Axiom> axioms;
         private static IEnumerable<Function> functions;
         private static IEnumerable<Variable> inParams;
         private static IEnumerable<Variable> localVars;
@@ -47,6 +49,7 @@ namespace ProofGeneration
 
         public static void Program(Program p)
         {
+            axioms = p.Axioms;
             functions = p.Functions;
         }
 
@@ -165,27 +168,14 @@ namespace ProofGeneration
                 afterUnreachablePruningCfg,
                 out VCInstantiation vcinst);
 
-            /*
-            LocaleDecl vcPassiveLocale = VCToIsaInterface.ConvertVC(
-                "vc_passive",
-                vc,
-                new PassiveActiveDecl(),
-                gen,
-                translator,
-                functions,
-                inParams,
-                localVars,
-                afterUnreachablePruningCfg,
-                out VCInstantiation vcPassiveInst);
-                */
-
             var lemmaNamer = new IsaUniqueNamer();
 
             var passiveLemmaManager = new PassiveLemmaManager(vcinst, functions, inParams, localVars, outParams);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
-            IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
+            // ignore peephole for now
+            //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
 
-            Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
+            //Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
 
             
             List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
@@ -193,93 +183,30 @@ namespace ProofGeneration
             {
                 afterPassificationDecls.AddRange(v);
             }
-            afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
+            //afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
+          
+
+            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, axioms, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg, out IList<OuterDecl> programDecls);
+            afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
+                afterPassificationCfg.entry,
+                afterPassificationCfg.GetUniqueIntLabel(afterPassificationCfg.entry),
+                programRepr.cfgDeclDef,
+                "method_verifies"));
 
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
-            
 
-            #region WIP
+            var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
+            passiveOuterDecls.AddRange(programDecls);
+            passiveOuterDecls.Add(afterPassificationLocale);
 
-            // Generate before passification block lemmas to try out things
-            /*
-            var beforePassiveNamer = new IsaUniqueNamer();
+            var endToEnd = new EndToEndVCProof(functions, inParams, localVars, programRepr, vcinst, afterUnreachablePruningCfg.entry);
+            passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
-            IDictionary<Block, IDictionary<Variable, Expr>> constantEntry =
-                ConstantPropInformation.ConstantVariableInformation(beforePassificationCfg, out IDictionary<Block, IDictionary <Variable, Expr>> constantExit);           
-
-            var prePassiveLemmaManager = new PrePassiveLemmaManager(
-                vcPassiveInst,
-                beforePassificationCfg,
-                beforePassiveOrigBlock,
-                passiveToOrigVar,
-                constantEntry,
-                constantExit,
-                functions,
-                beforePassiveLocalVars,
-                beforePassiveInParams,
-                beforePassiveOutParams
-                );
-
-            IDictionary<Block, LemmaDecl> beforePassiveLemmas =
-                GenerateBeforePassiveLemmas(beforePassificationCfg, afterUnreachablePruningCfg, afterPassificationCfg, prePassiveLemmaManager, beforePassiveNamer);
-
-            List<OuterDecl> beforePassiveDecls = new List<OuterDecl>();
-            beforePassiveDecls.AddRange(beforePassiveLemmas.Values);
-
-            LocaleDecl beforePassiveLocale = GenerateLocale("beforePassive", prePassiveLemmaManager, beforePassiveDecls);
-            */
-            #endregion
-
-            LocaleDecl progamLocale = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg);
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
                 new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML" },
-                new List<OuterDecl>() { vcLocale, afterPassificationLocale });
+                passiveOuterDecls);
 
             StoreTheory(theoryPassive);
-
-            /*
-            Theory theory = new Theory(afterPassificationImpl.Name,
-                new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util" },
-                new List<OuterDecl>() { vcLocale, vcPassiveLocale, beforePassiveLocale, progamLocale });
-
-            StoreTheory(theory);
-            */
-        }
-
-        private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(
-            CFGRepr beforePassiveCfg,
-            CFGRepr finalCfg,
-            CFGRepr beforePeephole,         
-            PrePassiveLemmaManager prePassiveLemmaManager, 
-            IsaUniqueNamer lemmaNamer)
-        {
-            var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
-
-            ISet<Block> beforePeepholeReachable = ComputeReachableEmptyBlocks(beforePeephole);
-
-            foreach (Block b in beforePassiveCfg.GetBlocksBackwards())
-            {
-                Block origBlock = beforePassiveOrigBlock[b];
-                if (finalCfg.ContainsBlock(origBlock))
-                {
-                    LemmaDecl lemma = prePassiveLemmaManager.GenerateBlockLemma(
-                        b,
-                        finalCfg.GetSuccessorBlocks(origBlock),
-                        lemmaNamer.GetName(b, GetLemmaName(b)),
-                        null);
-                    blockToLemmaDecls.Add(b, lemma);
-                } else if (beforePeepholeReachable.Contains(origBlock))
-                {
-                    var nonEmptySuccessors = GetNonEmptySuccessors(origBlock, beforePeephole);
-                    LemmaDecl lemma = prePassiveLemmaManager.GenerateEmptyBlockLemma(
-                        b, 
-                        nonEmptySuccessors, 
-                        lemmaNamer.GetName(b, GetLemmaName(b)));
-                    blockToLemmaDecls.Add(b, lemma);
-                }                
-            }
-
-            return blockToLemmaDecls;
         }
 
         private static ISet<Block> ComputeReachableEmptyBlocks(CFGRepr beforePeephole)
@@ -362,29 +289,6 @@ namespace ProofGeneration
             return nonEmptySuccessors;
         }
 
-        private static IDictionary<Block, LemmaDecl> GetAdjustedPassiveLemmas(
-            CFGRepr beforePassification, 
-            IDictionary<Block, Block> beforePassiveToOrig, 
-            CFGRepr beforePeephole,
-            IBlockLemmaManager lemmaManager,
-            IsaUniqueNamer lemmaNamer)
-        {
-            var blocksToLemmas = new Dictionary<Block, LemmaDecl>();
-
-            foreach (Block block in beforePassification.GetBlocksBackwards())
-            {
-                Block origBlock = beforePassiveToOrig[block];
-
-                if(origBlock.Cmds.Count == 0)
-                {
-                    var nonEmptySuccessors = GetNonEmptySuccessors(origBlock, beforePeephole);
-                    blocksToLemmas.Add(block, lemmaManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));
-                }
-            }
-
-            return blocksToLemmas;
-        }
-
         //assume that block identities in beforePruning and afterPruning are the same (only edges may be different)
         private static IDictionary<Block, LemmaDecl> GetAdjustedLemmas(CFGRepr beforePeepholeCfg, 
             CFGRepr afterPeepholeCfg, 
@@ -433,6 +337,68 @@ namespace ProofGeneration
             sw.WriteLine(theoryString);
             sw.Close();
         }
+
+        /* old code
+        private static IDictionary<Block, LemmaDecl> GenerateBeforePassiveLemmas(
+            CFGRepr beforePassiveCfg,
+            CFGRepr finalCfg,
+            CFGRepr beforePeephole,
+            PrePassiveLemmaManager prePassiveLemmaManager,
+            IsaUniqueNamer lemmaNamer)
+        {
+            var blockToLemmaDecls = new Dictionary<Block, LemmaDecl>();
+
+            ISet<Block> beforePeepholeReachable = ComputeReachableEmptyBlocks(beforePeephole);
+
+            foreach (Block b in beforePassiveCfg.GetBlocksBackwards())
+            {
+                Block origBlock = beforePassiveOrigBlock[b];
+                if (finalCfg.ContainsBlock(origBlock))
+                {
+                    LemmaDecl lemma = prePassiveLemmaManager.GenerateBlockLemma(
+                        b,
+                        finalCfg.GetSuccessorBlocks(origBlock),
+                        lemmaNamer.GetName(b, GetLemmaName(b)),
+                        null);
+                    blockToLemmaDecls.Add(b, lemma);
+                }
+                else if (beforePeepholeReachable.Contains(origBlock))
+                {
+                    var nonEmptySuccessors = GetNonEmptySuccessors(origBlock, beforePeephole);
+                    LemmaDecl lemma = prePassiveLemmaManager.GenerateEmptyBlockLemma(
+                        b,
+                        nonEmptySuccessors,
+                        lemmaNamer.GetName(b, GetLemmaName(b)));
+                    blockToLemmaDecls.Add(b, lemma);
+                }
+            }
+
+            return blockToLemmaDecls;
+        }
+
+        private static IDictionary<Block, LemmaDecl> GetAdjustedPassiveLemmas(
+            CFGRepr beforePassification,
+            IDictionary<Block, Block> beforePassiveToOrig,
+            CFGRepr beforePeephole,
+            IBlockLemmaManager lemmaManager,
+            IsaUniqueNamer lemmaNamer)
+        {
+            var blocksToLemmas = new Dictionary<Block, LemmaDecl>();
+
+            foreach (Block block in beforePassification.GetBlocksBackwards())
+            {
+                Block origBlock = beforePassiveToOrig[block];
+
+                if (origBlock.Cmds.Count == 0)
+                {
+                    var nonEmptySuccessors = GetNonEmptySuccessors(origBlock, beforePeephole);
+                    blocksToLemmas.Add(block, lemmaManager.GenerateEmptyBlockLemma(block, nonEmptySuccessors, lemmaNamer.GetName(block, GetLemmaName(block))));
+                }
+            }
+
+            return blocksToLemmas;
+        }
+        */
 
     }
 

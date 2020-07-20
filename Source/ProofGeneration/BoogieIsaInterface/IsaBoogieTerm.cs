@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -10,10 +11,19 @@ namespace ProofGeneration
     public static class IsaBoogieTerm
     {
 
+        public readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
         public readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
+        public readonly static TermIdent redExprId = IsaCommonTerms.TermIdentFromName("red_expr");
         public readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
         public readonly static TermIdent magicStateId = IsaCommonTerms.TermIdentFromName("Magic");
         public readonly static TermIdent failureStateId = IsaCommonTerms.TermIdentFromName("Failure");
+        public readonly static TermIdent convertValToBoolId = IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
+        public readonly static TermIdent convertValToIntId = IsaCommonTerms.TermIdentFromName("convert_val_to_int");
+        public readonly static TermIdent funInterpWfId = IsaCommonTerms.TermIdentFromName("fun_interp_wf");
+        public readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
+        public readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
+ 
+        private static TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
@@ -224,11 +234,12 @@ namespace ProofGeneration
             return new TermTuple(elements);                            
         }
 
-        public static Term Program(Term fdecls, List<Term> mdecls)
+        public static Term Program(Term fdecls, Term constantDecls, Term globalDecls, Term axioms, List<Term> mdecls)
         {
             Term mdeclsTerm = new TermList(mdecls);
 
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Program"), new List<Term>() { fdecls, mdeclsTerm });
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Program"), 
+                new List<Term>() { fdecls, constantDecls, globalDecls, axioms, mdeclsTerm });
         }
 
         public static Term Normal(Term n_s)
@@ -259,6 +270,101 @@ namespace ProofGeneration
                     finalState
                 }
                 );
+        }
+
+        public static Term RedCFGMulti(Term varContext, Term funContext, Term cfg, Term initCFGConfig, Term finalCFGConfig)
+        {
+            return
+                new TermApp(redCfgMultiId,
+                new List<Term>()
+                {
+                    varContext,
+                    funContext,
+                    cfg,
+                    initCFGConfig,
+                    finalCFGConfig
+                }
+                );
+        }
+
+        public static Term CFGConfigNode(Term node, Term state)
+        {
+            return CFGConfig(IsaCommonTerms.Inl(node), state);
+        }
+
+        public static Term CFGConfigDone(Term state)
+        {
+            return CFGConfig(IsaCommonTerms.Inr(IsaCommonTerms.Unit()), state);
+        }
+
+        public static Term CFGConfig(Term nodeOrDone, Term state)
+        {
+            return new TermTuple(new List<Term> { nodeOrDone, state });
+        }
+
+        public static Term RedExpr(Term funContext, Term expr, Term state, Term resultValue)
+        {
+            return
+                new TermApp(redExprId,
+                new List<Term>()
+                {
+                    funContext,
+                    expr,
+                    state,
+                    resultValue
+                });
+        }
+
+        public static Term FunDecl(Function f, bool includeName=true)
+        {
+            Term fname = new StringConst(f.Name);
+            var argTypes = new TermList(f.InParams.Select(v => typeIsaVisitor.Translate(v.TypedIdent.Type)).ToList());
+            var retType = typeIsaVisitor.Translate(f.OutParams.First().TypedIdent.Type);
+            if(includeName)
+            {
+                return new TermTuple(new List<Term> { fname, argTypes, retType });
+            } else
+            {
+                return new TermTuple(new List<Term> { argTypes, retType });
+            }
+        }
+
+        public static Term VarDecl(Variable v, bool includeName=true)
+        {
+            Term vName = new StringConst(v.Name);
+            Term vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
+            if(includeName)
+            {
+                return new TermTuple(new List<Term> { vName, vType });
+            } else
+            {
+                return new TermTuple(new List<Term> { vType });
+            }
+        }
+
+        public static Term ConvertValToBool(Term val)
+        {
+            return new TermApp(convertValToBoolId, val);
+        }
+
+        public static Term ConvertValToInt(Term val)
+        {
+            return new TermApp(convertValToIntId, val);
+        }
+
+        public static Term FunInterpWf(Term fdecls, Term finterp)
+        {
+            return new TermApp(funInterpWfId, new List<Term> { fdecls, finterp });
+        }
+
+        public static Term FunInterpSingleWf(Term fdecl, Term fun)
+        {
+            return new TermApp(funInterpSingleWfId, new List<Term> { fdecl, fun });
+        }
+
+        public static Term StateWf(Term vdecls, Term state)
+        {
+            return new TermApp(stateWfId, new List<Term> { state, vdecls });
         }
 
     }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
+using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
