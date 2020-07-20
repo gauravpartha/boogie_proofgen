@@ -159,7 +159,24 @@ namespace ProofGeneration.Isa
 
         public enum QuantifierKind
         {
-            ALL, EX
+            ALL,
+            EX,
+            META_ALL //\<And>
+        }
+
+        public static TermQuantifier ForAll(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
+        {
+            return new TermQuantifier(QuantifierKind.ALL, boundVars, boundVarsTypes, term);
+        }
+
+        public static TermQuantifier Exists(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
+        {
+            return new TermQuantifier(QuantifierKind.EX, boundVars, boundVarsTypes, term);
+        }
+
+        public static TermQuantifier MetaAll(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
+        {
+            return new TermQuantifier(QuantifierKind.META_ALL, boundVars, boundVarsTypes, term);
         }
 
         public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)

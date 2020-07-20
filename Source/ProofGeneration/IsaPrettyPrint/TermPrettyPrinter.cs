@@ -115,6 +115,8 @@ namespace ProofGeneration.IsaPrettyPrint
                     return "\\<forall>";
                 case TermQuantifier.QuantifierKind.EX:
                     return "\\<exists>";
+                case TermQuantifier.QuantifierKind.META_ALL:
+                    return "\\<And>";
                 default:
                     throw new NotImplementedException();
             }
