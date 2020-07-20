@@ -197,16 +197,12 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public void AppendInner(string s)
         {
-            _sb.Append("\"");
-            _sb.Append(s);
-            _sb.Append("\"");
+            IsaPrettyPrinterHelper.AppendInner(_sb, s);
         }
 
         public void AppendInner(Action action)
         {
-            _sb.Append("\"");
-            action.Invoke();
-            _sb.Append("\"");
+            IsaPrettyPrinterHelper.AppendInner(_sb, action);
         }
 
         public void PrintProof(Proof p)

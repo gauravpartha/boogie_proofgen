@@ -357,6 +357,11 @@ namespace ProofGeneration
             return new TermApp(funInterpWfId, new List<Term> { fdecls, finterp });
         }
 
+        public static Term FunInterpSingleWf(Function f, Term fTerm)
+        {
+            return FunInterpSingleWf(FunDecl(f, false), fTerm);
+        }
+
         public static Term FunInterpSingleWf(Term fdecl, Term fun)
         {
             return new TermApp(funInterpSingleWfId, new List<Term> { fdecl, fun });

@@ -97,6 +97,12 @@ namespace ProofGeneration.Isa
         {
             return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), assumptions, new List<string>());
         }
+
+        public static ContextElem CreateWithAssumptions(IList<Term> assumptions, IList<string> assmLabels)
+        {
+            return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), assumptions, assmLabels);
+        }
+
     }
 
     public class LocaleDecl : OuterDecl

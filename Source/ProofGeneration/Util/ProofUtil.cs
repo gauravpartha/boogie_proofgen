@@ -9,19 +9,26 @@ namespace ProofGeneration.Util
 {
     public static class ProofUtil
     {
-        public static string Simp(string thm)
+        public static string Simp(params string [] theorems)
         {
-            return Simp(new List<string> { thm });
-        }
-
-        public static string Simp(List<string> theorems)
-        {
-            if(theorems.Count == 0)
+            if(theorems.Length == 0)
             {
                 return "simp";
             } else
             {
                 return "(simp add:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
+            }
+        }
+
+        public static string SimpOnly(params string[] theorems)
+        {
+            if (theorems.Length == 0)
+            {
+                return "simp";
+            }
+            else
+            {
+                return "(simp only:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
             }
         }
     }

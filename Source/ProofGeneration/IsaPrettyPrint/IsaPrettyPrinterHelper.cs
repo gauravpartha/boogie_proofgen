@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace ProofGeneration.IsaPrettyPrint
 {
-    class IsaPrettyPrinterHelper
+    public static class IsaPrettyPrinterHelper
     {
 
         public static readonly string TIMES = "\\<times>";
@@ -74,6 +75,20 @@ namespace ProofGeneration.IsaPrettyPrint
         public static string Inner(string innerTerm)
         {
             return "\"" + innerTerm + "\"";
+        }
+
+        public static void AppendInner(this StringBuilder sb, string s)
+        {
+            sb.Append("\"");
+            sb.Append(s);
+            sb.Append("\"");
+        }
+
+        public static void AppendInner(this StringBuilder sb, Action action)
+        {
+            sb.Append("\"");
+            action.Invoke();
+            sb.Append("\"");
         }
     }
 }
