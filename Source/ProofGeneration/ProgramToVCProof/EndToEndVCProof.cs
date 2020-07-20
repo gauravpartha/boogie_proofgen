@@ -21,15 +21,15 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly VCInstantiation vcinst;
         private readonly CFGRepr cfg;
 
-        private readonly PureValueIsaTransformer pureValueIsaTransfomer = new PureValueIsaTransformer();
-        private readonly PureTyIsaTransformer pureTyIsaTransfomer = new PureTyIsaTransformer();
+        private readonly PureValueIsaTransformer pureValueIsaTransformer = new PureValueIsaTransformer();
+        private readonly PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
 
         private IEnumerable<Variable> ProgramVariables
         {
             get
             {
-                return localVars.Union(parameters);
+                return parameters.Union(localVars);
             }
         }
 
@@ -123,10 +123,10 @@ namespace ProofGeneration.ProgramToVCProof
             IList<Term> paramsTerm = f.InParams.Select(v => (Term) IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name))).ToList();
             args.AddRange(paramsTerm);
 
-            IEnumerable<Term> paramsVal = paramsTerm.Select((p, idx) => pureValueIsaTransfomer.ConstructValue(p, f.InParams[idx].TypedIdent.Type));
+            IEnumerable<Term> paramsVal = paramsTerm.Select((p, idx) => pureValueIsaTransformer.ConstructValue(p, f.InParams[idx].TypedIdent.Type));
 
             Term outputVal = IsaCommonTerms.TheOption(new TermApp(funTerm, new TermList(paramsVal.ToList())));
-            Term pureOutputVal = pureValueIsaTransfomer.DestructValue(outputVal, f.OutParams[0].TypedIdent.Type);
+            Term pureOutputVal = pureValueIsaTransformer.DestructValue(outputVal, f.OutParams[0].TypedIdent.Type);
 
             string name = VCFunName(f);
 
@@ -154,17 +154,17 @@ namespace ProofGeneration.ProgramToVCProof
             var paramsTerm = paramsId.Select(id => (Term) new TermIdent(id));
             args.AddRange(paramsTerm);
 
-            IEnumerable<Term> paramsVal = paramsTerm.Select((p, idx) => pureValueIsaTransfomer.ConstructValue(p, f.InParams[idx].TypedIdent.Type));
+            IEnumerable<Term> paramsVal = paramsTerm.Select((p, idx) => pureValueIsaTransformer.ConstructValue(p, f.InParams[idx].TypedIdent.Type));
 
             Term vc_f = IsaCommonTerms.TermIdentFromName(VCFunName(f));
 
             Term assm = IsaBoogieTerm.FunInterpSingleWf(IsaBoogieTerm.FunDecl(f, false), funTerm);
 
             Term lhs = new TermApp(funTerm, new TermList(paramsVal.ToList()));
-            Term rhs = IsaCommonTerms.SomeOption(pureValueIsaTransfomer.ConstructValue(new TermApp(vc_f, args), f.OutParams[0].TypedIdent.Type));
+            Term rhs = IsaCommonTerms.SomeOption(pureValueIsaTransformer.ConstructValue(new TermApp(vc_f, args), f.OutParams[0].TypedIdent.Type));
             Term innerStatement = new TermBinary(lhs, rhs, TermBinary.BinaryOpCode.EQ);
 
-            var paramTypesIsa = f.InParams.Select(p => pureTyIsaTransfomer.Translate(p.TypedIdent.Type)).ToList();
+            var paramTypesIsa = f.InParams.Select(p => pureTyIsaTransformer.Translate(p.TypedIdent.Type)).ToList();
             Term conclusion = TermQuantifier.ForAll(paramsId, paramTypesIsa, innerStatement);
 
             //proof
@@ -190,8 +190,8 @@ namespace ProofGeneration.ProgramToVCProof
             var vcAssm = vcinst.GetVCBlockInstantiation(cfg.entry, declToVCMapping);
 
             List<Identifier> declIds = declToVCMapping.Values.Select(t => t.id).ToList();
-            List<TypeIsa> declTypes = functions.Select(f => pureTyIsaTransfomer.Translate(f)).ToList();
-            declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransfomer.Translate(v)));
+            List<TypeIsa> declTypes = functions.Select(f => pureTyIsaTransformer.Translate(f)).ToList();
+            declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));
             vcAssm = TermQuantifier.MetaAll(declIds, declTypes, vcAssm);
 
             Term finterpAssm = IsaBoogieTerm.FunInterpWf(isaProgramRepr.funcsDeclDef, functionInterp);
@@ -256,8 +256,8 @@ namespace ProofGeneration.ProgramToVCProof
 
             foreach(Function f in functions)
             {
-                //could be more precise with second conjI instead of using the optional tactical
-                sb.AppendLine("apply (rule conjI, " + ProofUtil.Simp(InterpMemName(f)) + ", (rule conjI)?, " + 
+                //TODO: Can be more precise with conjI tactic instead of using +, ?; 
+                sb.AppendLine("apply ((rule conjI)+, " + ProofUtil.Simp(InterpMemName(f)) + ", (rule conjI)?, " + 
                     "rule " + FunCorresName(f)+"[OF "+ WfName(f) +"])");
             }
 
@@ -268,7 +268,7 @@ namespace ProofGeneration.ProgramToVCProof
                 string conjIOpt = "";
                 if(idx != numProgramVars-1)
                 {
-                    conjIOpt = "rule conjI, ";
+                    conjIOpt = "(rule conjI)+, ";
                 }
                 idx++;
 
@@ -289,8 +289,8 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.Append("from " + assm + " have " + StateCorresName(v) + ":");
                 Term lhs = new TermApp(normalInitState, vStringConst);
                 Term rhs = IsaCommonTerms.SomeOption(
-                    pureValueIsaTransfomer.ConstructValue(
-                        pureValueIsaTransfomer.DestructValue(
+                    pureValueIsaTransformer.ConstructValue(
+                        pureValueIsaTransformer.DestructValue(
                             IsaCommonTerms.TheOption(lhs),
                             v.TypedIdent.Type)
                             , v.TypedIdent.Type)
@@ -299,7 +299,7 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine();
                 sb.AppendLine("apply " + ProofUtil.SimpOnly("state_typ_wf_def"));
                 sb.AppendLine("apply (erule allE, erule allE, erule impE, rule " + MembershipName(v) +")");
-                sb.AppendLine("by (fastforce dest: tint_intv)");
+                sb.AppendLine("by (fastforce dest: tint_intv tbool_boolv)");
             }
         }
 

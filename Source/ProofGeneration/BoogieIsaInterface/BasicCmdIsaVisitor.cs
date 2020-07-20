@@ -13,6 +13,7 @@ namespace ProofGeneration
 
         //It's possible that the AST has two different variables which have the same name. Therefore we use an IsaUniqueNamer to 
         //avoid name clashes between different variables.
+        //UPDATE (20.07.2020): do not support shadowing, so for now we don't rename
         private readonly IsaUniqueNamer uniqueNamer;
         private readonly TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
 
