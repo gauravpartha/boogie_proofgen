@@ -70,5 +70,10 @@ namespace ProofGeneration.IsaPrettyPrint
                 return list.Aggregate((s1, s2) => s1 + " " + s2);
             }
         }
+
+        public static string Inner(string innerTerm)
+        {
+            return "\"" + innerTerm + "\"";
+        }
     }
 }

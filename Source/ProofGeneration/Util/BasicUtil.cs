@@ -54,5 +54,15 @@ namespace ProofGeneration.Util
             }
         }
 
+        public static IDictionary<T1,T2> ApplyFunDict<T1,T2>(IEnumerable<T1> items, Func<T1,T2> f)
+        {
+            var dict = new Dictionary<T1, T2>();
+            foreach(var item in items)
+            {
+                dict.Add(item, f(item));
+            }
+            return dict;
+        }
+
     }
 }
