@@ -1394,11 +1394,18 @@ namespace VC {
 
                 #region proofgen
                 //var eraser = new Bpl.TypeErasure.TypeEraserPremisses((Bpl.TypeErasure.TypeAxiomBuilderPremisses)AxBuilder, checker.VCExprGen);
+                if(!(ctx is DeclFreeProverContext))
+                { 
+                    throw new NotImplementedException("Proof Generation only supports DeclFreeProverContext as context.");
+                }
+
+                var declFreeProverContext = ctx as DeclFreeProverContext;
 
                 //TODO: VCExpr exprWithoutTypes = eraser == null ? expr : eraser.Erase(expr, polarity);
                 ProofGeneration.ProofGenerationLayer.Program(parent.program);
                 ProofGeneration.ProofGenerationLayer.AfterUnreachablePruning(impl);
-                ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator);
+                //TODO: the typing axioms are ignored for now (since we don't support uninterpreted/polymorphic types)
+                ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(vc, declFreeProverContext.Axioms, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator);
                 //ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator, parent.program, impl);                
                 #endregion
         

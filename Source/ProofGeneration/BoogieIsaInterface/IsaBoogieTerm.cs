@@ -22,6 +22,7 @@ namespace ProofGeneration
         private readonly static TermIdent funInterpWfId = IsaCommonTerms.TermIdentFromName("fun_interp_wf");
         private readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
         private readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
+        private readonly static TermIdent axiomsSatId = IsaCommonTerms.TermIdentFromName("axioms_sat");
  
         private static TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
 
@@ -370,6 +371,11 @@ namespace ProofGeneration
         public static Term StateWf(Term vdecls, Term state)
         {
             return new TermApp(stateWfId, new List<Term> { state, vdecls });
+        }
+
+        public static Term AxiomSat(Term funContext, Term axioms, Term normalState)
+        {
+            return new TermApp(axiomsSatId, new List<Term> { funContext, normalState, axioms });
         }
 
     }

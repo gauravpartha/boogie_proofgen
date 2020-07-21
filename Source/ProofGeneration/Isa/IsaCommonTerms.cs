@@ -13,6 +13,8 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent InlId = TermIdentFromName("Inl");
         private static readonly TermIdent InrId = TermIdentFromName("Inr");
         private static readonly TermIdent AppendId = TermIdentFromName("append");
+        private static readonly TermIdent SetOfListId = TermIdentFromName("set");
+        private static readonly TermIdent MemberId = TermIdentFromName("Set.member");
 
         public static Term SomeOption(Term arg)
         {
@@ -57,6 +59,16 @@ namespace ProofGeneration.Isa
         public static Term AppendList(Term list1, Term list2)
         {
             return new TermApp(AppendId, new List<Term> { list1, list2 });
+        }
+
+        public static Term SetOfList(Term list)
+        {
+            return new TermApp(SetOfListId, list);
+        }
+
+        public static Term Elem(Term element, Term set)
+        {
+            return new TermApp(MemberId, new List<Term> { element, set });
         }
 
         public static TermIdent TermIdentFromName(string name)

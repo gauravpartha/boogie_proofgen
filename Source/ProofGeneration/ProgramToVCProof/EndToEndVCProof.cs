@@ -1,4 +1,5 @@
 ﻿using Microsoft.Boogie;
+using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
@@ -7,6 +8,7 @@ using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 
@@ -15,15 +17,19 @@ namespace ProofGeneration.ProgramToVCProof
     class EndToEndVCProof
     {
         private readonly IEnumerable<Function> functions;
+        private readonly IEnumerable<Axiom> axioms;
         private readonly IEnumerable<Variable> parameters;
         private readonly IEnumerable<Variable> localVars;
         private readonly IsaProgramRepr isaProgramRepr;
         private readonly VCInstantiation vcinst;
+        private readonly VCExpr vcAxioms;
         private readonly CFGRepr cfg;
 
+        private readonly BasicCmdIsaVisitor basicCmdIsaVisitor = new BasicCmdIsaVisitor();
         private readonly PureValueIsaTransformer pureValueIsaTransformer = new PureValueIsaTransformer();
         private readonly PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
+        private IDictionary<Axiom, int> axiomIdDict = null;
 
         private IEnumerable<Variable> ProgramVariables
         {
@@ -33,7 +39,7 @@ namespace ProofGeneration.ProgramToVCProof
             }
         }
 
-        private readonly IDictionary<NamedDeclaration, LemmaDecl> membershipLemmasDict = new Dictionary<NamedDeclaration, LemmaDecl>();
+        private readonly IList<LemmaDecl> membershipLemmas = new List<LemmaDecl>();
 
         private readonly TermIdent functionInterp = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
@@ -42,23 +48,28 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly string vcAssmName = "VC";
         private readonly string finterpAssmName = "FInterp";
+        private readonly string axiomAssmName = "Axioms";
         private readonly string paramsAssmName = "Params";
         private readonly string localVarsAssmName = "LocalVars";
         private readonly string RedAssmName = "Red";
 
         public EndToEndVCProof(
-            IEnumerable<Function> functions, 
-            IEnumerable<Variable> parameters, 
+            IEnumerable<Function> functions,
+            IEnumerable<Axiom> axioms,
+            IEnumerable<Variable> parameters,
             IEnumerable<Variable> localVars,
             IsaProgramRepr isaProgramRepr,
             VCInstantiation vcinst,
+            VCExpr vcAxioms,
             CFGRepr cfg)
         {
             this.functions = functions;
+            this.axioms = axioms;
             this.parameters = parameters;
             this.localVars = localVars;
             this.isaProgramRepr = isaProgramRepr;
             this.vcinst = vcinst;
+            this.vcAxioms = vcAxioms;
             this.cfg = cfg;
         }
 
@@ -67,7 +78,7 @@ namespace ProofGeneration.ProgramToVCProof
             List<OuterDecl> result = new List<OuterDecl>();
             AddMembershipLemmas();
 
-            result.AddRange(membershipLemmasDict.Values);
+            result.AddRange(membershipLemmas);
             result.AddRange(VCFunDefinitions().Values);
             result.AddRange(FunCorresLemmas().Values);
             result.Add(FinalLemma());
@@ -87,6 +98,7 @@ namespace ProofGeneration.ProgramToVCProof
             AddMembershipLemmas(localVars,
                 isaProgramRepr.localVarsDeclDef,
                 d => IsaBoogieTerm.VarDecl((Variable)d, false));
+            AddAxiomMembershipLemmas();
         }
 
         private void AddMembershipLemmas(
@@ -103,7 +115,27 @@ namespace ProofGeneration.ProgramToVCProof
 
                 Term statement = new TermBinary(lhs, rhs, TermBinary.BinaryOpCode.EQ);
                 Proof proof = new Proof(new List<string> { "by " + ProofUtil.Simp(declsDef + "_def") });
-                membershipLemmasDict.Add(d, new LemmaDecl(MembershipName(d), statement, proof));
+                membershipLemmas.Add(new LemmaDecl(MembershipName(d), statement, proof));
+            }
+        }
+
+        private void AddAxiomMembershipLemmas()
+        {
+            axiomIdDict = new Dictionary<Axiom, int>();
+
+            Term funContext = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
+            Term axiomSet = IsaCommonTerms.SetOfList(isaProgramRepr.axiomsDeclDef);
+            Term axiomSat = IsaBoogieTerm.AxiomSat(funContext, isaProgramRepr.axiomsDeclDef, normalInitState);
+            int id = 0;
+            foreach (var axiom in axioms)
+            {
+                Term axiomTerm = basicCmdIsaVisitor.Translate(axiom.Expr);
+                Term elemAssm = IsaCommonTerms.Elem(axiomTerm, axiomSet);
+
+                Proof proof = new Proof(new List<string> { "by (simp add: " + isaProgramRepr.axiomsDeclDef + "_def)" });
+                axiomIdDict.Add(axiom, id);
+                membershipLemmas.Add(new LemmaDecl(MembershipName(axiom, id), elemAssm, proof));
+                id++;
             }
         }
 
@@ -194,7 +226,10 @@ namespace ProofGeneration.ProgramToVCProof
             declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));
             vcAssm = TermQuantifier.MetaAll(declIds, declTypes, vcAssm);
 
+            Term funContext = new TermTuple(new List<Term> { isaProgramRepr.funcsDeclDef, functionInterp });
+
             Term finterpAssm = IsaBoogieTerm.FunInterpWf(isaProgramRepr.funcsDeclDef, functionInterp);
+            Term axiomAssm = IsaBoogieTerm.AxiomSat(funContext, isaProgramRepr.axiomsDeclDef, normalInitState);
             Term paramsAssm = IsaBoogieTerm.StateWf(isaProgramRepr.paramsDeclDef, normalInitState);
             Term localVarsAssm = IsaBoogieTerm.StateWf(isaProgramRepr.localVarsDeclDef, normalInitState);
             Term multiRed = IsaBoogieTerm.RedCFGMulti(
@@ -208,8 +243,8 @@ namespace ProofGeneration.ProgramToVCProof
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
             var contextElem = ContextElem.CreateWithAssumptions(
-                new List<Term> { vcAssm, finterpAssm, paramsAssm, localVarsAssm, multiRed },
-                new List<string> { vcAssmName, finterpAssmName, paramsAssmName, localVarsAssmName, RedAssmName });
+                new List<Term> { vcAssm, finterpAssm, axiomAssm, paramsAssm, localVarsAssm, multiRed },
+                new List<string> { vcAssmName, finterpAssmName, axiomAssmName, paramsAssmName, localVarsAssmName, RedAssmName });
             return new LemmaDecl("endToEnd", contextElem, conclusion, FinalProof());
         }
 
@@ -245,6 +280,19 @@ namespace ProofGeneration.ProgramToVCProof
             //variables
             AppendStateCorres(sb, paramsAssmName, parameters);
             AppendStateCorres(sb, localVarsAssmName, localVars);
+
+            //axioms
+            Term funContext = new TermTuple(new List<Term> { isaProgramRepr.funcsDeclDef, functionInterp });
+
+            foreach(Axiom ax in axioms)
+            {
+                Term axiomTerm = basicCmdIsaVisitor.Translate(ax.Expr);
+                Term exprEvaluatesToTrue = IsaBoogieTerm.RedExpr(funContext, axiomTerm, normalInitState, IsaBoogieTerm.BoolVal(true));
+                sb.Append("have "+ EvaluationName(ax) + ":" + " ");
+                sb.AppendInner(exprEvaluatesToTrue.ToString()); sb.AppendLine();
+                sb.AppendLine("by (rule axioms_sat_mem[OF " + MembershipName(ax) + " " + axiomAssmName +"])");
+            }
+            sb.AppendLine();
 
             //conclusion
             sb.Append("show ");
@@ -312,6 +360,23 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 return "m_" + d.Name;
             }
+        }
+
+        private string MembershipName(Axiom a)
+        {
+            Contract.Requires(axiomIdDict != null);
+            return "ma_" + axiomIdDict[a];
+        }
+
+        private string EvaluationName(Axiom a)
+        {
+            Contract.Requires(axiomIdDict != null);
+            return "ea_" + axiomIdDict[a];
+        }
+
+        private string MembershipName(Axiom a, int id)
+        {
+            return "ma_" + id;
         }
 
         private string FunAbbrev(Function f)

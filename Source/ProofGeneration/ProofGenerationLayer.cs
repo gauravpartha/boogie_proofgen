@@ -154,8 +154,8 @@ namespace ProofGeneration
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
-        public static void VCGenerateAllProofs(VCExpr vc, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
-        {           
+        public static void VCGenerateAllProofs(VCExpr vc, VCExpr vcAxioms, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
+        {
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
                 vc,
@@ -198,7 +198,7 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            var endToEnd = new EndToEndVCProof(functions, inParams, localVars, programRepr, vcinst, afterUnreachablePruningCfg);
+            var endToEnd = new EndToEndVCProof(functions, axioms, inParams, localVars, programRepr, vcinst, vcAxioms, afterUnreachablePruningCfg);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
