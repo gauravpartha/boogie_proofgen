@@ -149,6 +149,8 @@ namespace ProofGeneration.IsaPrettyPrint
         {
             switch (bop)
             {
+                case TermBinary.BinaryOpCode.META_IMP:
+                    return "\\<Longrightarrow>";
                 case TermBinary.BinaryOpCode.ADD:
                     return "+";
                 case TermBinary.BinaryOpCode.SUB:

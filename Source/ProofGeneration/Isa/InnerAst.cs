@@ -210,6 +210,7 @@ namespace ProofGeneration.Isa
 
         public enum BinaryOpCode
         {
+            META_IMP, //\<Longrightarrow>
             EQ, NEQ,
             LT, LE, GT, GE,
             AND, OR, IMPLIES,
