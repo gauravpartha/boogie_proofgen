@@ -31,5 +31,10 @@ namespace ProofGeneration.Util
         {
             return baseTheorem + "[OF " + IsaPrettyPrinterHelper.SpaceAggregate(inputTheorems) + "]";
         }
+
+        public static string TryRepeatConjI()
+        {
+            return "tryRepeatConjI";
+        }
     }
 }

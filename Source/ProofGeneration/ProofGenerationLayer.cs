@@ -215,10 +215,28 @@ namespace ProofGeneration
         private static IEnumerable<VCExpr> DeconstructAxioms(VCExpr vcAxioms)
         {
             int numAxioms = axioms.Count();
-            if(numAxioms > 1 &&
-                vcAxioms is VCExprNAry vcNAry && vcNAry.Op == VCExpressionGenerator.AndOp && axioms.Count() == vcNAry.Count())
+
+            /* Simplifying assumption: vcAxioms of the form (((Ax1 /\ Ax2) /\ Ax3) /\ Ax4) /\ ...
+             * This is not true in general due to simplifications made by Boogie such as True /\ True -> True
+             * Also, I don't know yet how type axioms are handled. */
+            var result = new List<VCExpr>();
+
+            if (numAxioms > 1)
             {
-                return vcNAry;
+                VCExpr vcAxiomsTemp = vcAxioms;
+                while (vcAxiomsTemp is VCExprNAry vcNAry && vcNAry.Op == VCExpressionGenerator.AndOp && vcNAry.Length == 2)
+                {
+                    result.Add(vcNAry[1]);
+                    vcAxiomsTemp = vcNAry[0];
+                }
+                result.Add(vcAxiomsTemp);
+                if (result.Count != numAxioms)
+                {
+                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                        "Not supported: vcAxioms not in -sync with Boogie axioms(could be due to optimizations / type axioms)");
+                }
+                result.Reverse();
+                return result;
             } else if(numAxioms == 1 || (numAxioms == 0 && vcAxioms.Equals(VCExpressionGenerator.True)))
             {
                 return new List<VCExpr> { vcAxioms };

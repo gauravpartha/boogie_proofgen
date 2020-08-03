@@ -91,6 +91,7 @@ namespace ProofGeneration.VCProofGen
 
                 DefDecl def = new DefDecl("vcax_"+axId, new Tuple<IList<Term>, Term>(args, rhs));
                 axiomToDef.Add(ax, def);
+                axId++;
             }
             BasicUtil.ZipDo(axioms, vcAxioms, axiomsAction);
             vcinstAxiom = new VCInstantiation<Axiom>(axiomToDef, activeDeclsPerAxiomSorted, localeName);

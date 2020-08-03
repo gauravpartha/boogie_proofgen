@@ -23,7 +23,6 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IsaProgramRepr isaProgramRepr;
         private readonly VCInstantiation<Block> vcinst;
         private readonly VCInstantiation<Axiom> vcinstAxiom;
-        private readonly VCExpr vcAxioms;
         private readonly CFGRepr cfg;
 
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor = new BasicCmdIsaVisitor();
@@ -223,7 +222,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term vcAssmWithoutAxioms = vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping);
 
             Term vcAssm =
-                axioms.Aggregate(vcAssmWithoutAxioms, (vcCur, ax) =>
+                axioms.Reverse().Aggregate(vcAssmWithoutAxioms, (vcCur, ax) =>
                     new TermBinary(vcinstAxiom.GetVCObjInstantiation(ax, declToVCMapping), vcCur, TermBinary.BinaryOpCode.META_IMP)
                 );
 
@@ -308,6 +307,11 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine("val " + FunCorresName(f, true) + " = " + "@{thm " + ProofUtil.OF(FunCorresName(f), WfName(f)) + "}");
                 sb.AppendLine("val " + InterpMemName(f, true) + " = " + "@{thm " + InterpMemName(f) + "}");
             }
+            string storedFunctionThms = "storedFunctionThms";
+            string interpLemmasList = "[" + IsaPrettyPrinterHelper.CommaAggregate(functions.Select(f => FunCorresName(f, true))) + ", " +
+    IsaPrettyPrinterHelper.CommaAggregate(functions.Select(f => InterpMemName(f, true))) + "]";
+
+            sb.AppendLine("val " + storedFunctionThms + " = " + interpLemmasList);
             sb.AppendLine("\\<close>");
 
             //conclusion
@@ -322,7 +326,7 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 //TODO: Can be more precise with conjI tactic instead of using +, ?;
                 //TODO: Use stored ML theorems to avoid re-instantiation
-                sb.AppendLine("apply ((rule conjI)+, " + ProofUtil.Simp(InterpMemName(f)) + ", (rule conjI)?, " + 
+                sb.AppendLine("apply (" + ProofUtil.TryRepeatConjI() + ", " + ProofUtil.Simp(InterpMemName(f)) + ", " + ProofUtil.TryRepeatConjI() +", " + 
                     "rule " + FunCorresName(f)+"[OF "+ WfName(f) +"])");
             }
 
@@ -342,14 +346,11 @@ namespace ProofGeneration.ProgramToVCProof
 
             sb.AppendLine("apply (rule " + vcAssmName + ")");
 
-            string interpLemmasList = "[" + IsaPrettyPrinterHelper.CommaAggregate(functions.Select(f => FunCorresName(f, true))) + ", " +
-                IsaPrettyPrinterHelper.CommaAggregate(functions.Select(f => InterpMemName(f, true))) + "]";
-
             foreach(Axiom ax in axioms)
             {
                 sb.AppendLine("apply " + ProofUtil.SimpOnly(vcinstAxiom.GetVCObjNameRef(ax) + "_def"));
                 sb.AppendLine("apply (rule expr_to_vc[OF " + EvaluationName(ax) + "])");               
-                sb.AppendLine("apply(tactic \\<open> b_vc_expr_rel_tac @{context} " + interpLemmasList + " [] 1 \\<close>)");
+                sb.AppendLine("apply(tactic \\<open> b_vc_expr_rel_tac @{context} " + storedFunctionThms + " [] 1 \\<close>)");
             }
             sb.AppendLine("done");
             sb.AppendLine("qed");
