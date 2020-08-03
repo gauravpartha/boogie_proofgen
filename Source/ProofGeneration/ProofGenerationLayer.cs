@@ -156,18 +156,22 @@ namespace ProofGeneration
 
         public static void VCGenerateAllProofs(VCExpr vc, VCExpr vcAxioms, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
         {
+            IEnumerable<VCExpr> vcAxiomsDeconstructed = DeconstructAxioms(vcAxioms);
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
                 vc,
+                vcAxiomsDeconstructed,
                 new StandardActiveDecl(),
                 gen,
                 translator,
                 functions,
+                axioms,
                 inParams,
                 localVars,
                 afterUnreachablePruningCfg,
-                out VCInstantiation vcinst);
-
+                out VCInstantiation<Block> vcinst,
+                out VCInstantiation<Axiom> vcinstAxiom);
+            
             var lemmaNamer = new IsaUniqueNamer();
 
             var passiveLemmaManager = new PassiveLemmaManager(vcinst, functions, inParams, localVars, outParams);
@@ -198,7 +202,7 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            var endToEnd = new EndToEndVCProof(functions, axioms, inParams, localVars, programRepr, vcinst, vcAxioms, afterUnreachablePruningCfg);
+            var endToEnd = new EndToEndVCProof(functions, axioms, inParams, localVars, programRepr, vcinst, vcinstAxiom, afterUnreachablePruningCfg);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
@@ -206,6 +210,23 @@ namespace ProofGeneration
                 passiveOuterDecls);
 
             StoreTheory(theoryPassive);
+        }
+
+        private static IEnumerable<VCExpr> DeconstructAxioms(VCExpr vcAxioms)
+        {
+            int numAxioms = axioms.Count();
+            if(numAxioms > 1 &&
+                vcAxioms is VCExprNAry vcNAry && vcNAry.Op == VCExpressionGenerator.AndOp && axioms.Count() == vcNAry.Count())
+            {
+                return vcNAry;
+            } else if(numAxioms == 1 || (numAxioms == 0 && vcAxioms.Equals(VCExpressionGenerator.True)))
+            {
+                return new List<VCExpr> { vcAxioms };
+            } else 
+            {
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenUnexpectedStateException),
+                    "Not supported: vcAxioms not in-sync with Boogie axioms (could be due to optimizations/type axioms)");
+            }
         }
 
         private static ISet<Block> ComputeReachableEmptyBlocks(CFGRepr beforePeephole)

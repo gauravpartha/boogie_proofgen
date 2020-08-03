@@ -17,14 +17,17 @@ namespace ProofGeneration.VCProofGen
         public static LocaleDecl ConvertVC(
             string localeName,
             VCExpr vc,
+            IEnumerable<VCExpr> vcAxioms,
             IActiveDeclGenerator activeDeclGenerator,
             VCExpressionGenerator gen,
             Boogie2VCExprTranslator translator,
             IEnumerable<Function> functions,
+            IEnumerable<Axiom> axioms,
             IEnumerable<Variable> inParams,
             IEnumerable<Variable> localVars,
             CFGRepr cfg,
-            out VCInstantiation vcinst)
+            out VCInstantiation<Block> vcinst,
+            out VCInstantiation<Axiom> vcinstAxiom)
         {
             VCExprLet vcLet = vc as VCExprLet;
             Contract.Assert(vcLet != null);
@@ -53,37 +56,60 @@ namespace ProofGeneration.VCProofGen
                 vcOuterDecls.Add(blockToVCExpr[block]);
             }
 
-            //reason for using two references: cannot use out paramaters in lambda expressions
-            vcinst = new VCInstantiation(blockToVCExpr, activeDeclsPerBlockSorted, localeName);
+            //reason for using two references: cannot use out parameters in lambda expressions
+            vcinst = new VCInstantiation<Block>(blockToVCExpr, activeDeclsPerBlockSorted, localeName);
             var vcinstInternal = vcinst;
 
+            /*
             LemmaDecl vcCorrectLemma = new LemmaDecl("vc_correct",
-                new TermApp(vcinstInternal.GetVCBlockRef(cfg.entry, false), 
+                new TermApp(vcinstInternal.GetVCObjRef(cfg.entry, false), 
                            activeVarsPerBlock[cfg.entry].Select(v => (Term) IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name))).ToList()),
                 new Proof(
                   new List<string>() {
                       "apply (simp only: " +
-                      cfg.GetBlocksForwards().Select(b => vcinstInternal.GetVCBlockNameRef(b, false) + "_def").Concat(" ")
+                      cfg.GetBlocksForwards().Select(b => vcinstInternal.GetVCObjNameRef(b, false) + "_def").Concat(" ")
                       + ")",
                       "oops"
                   }
                 ));
 
             vcOuterDecls.Add(vcCorrectLemma);
+            */
+
+            //axioms
+            IDictionary<Axiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(axioms, vcAxioms, vcToBoogieVar);
+            IDictionary<Axiom, IList<NamedDeclaration>> activeDeclsPerAxiomSorted =
+                 SortActiveDecls(activeDeclsPerAxiom, functions, translator, out IDictionary<Axiom, IList<VCExprVar>> activeVarsPerAxiom);
+            var axiomVCDefs = new List<DefDecl>();
+            var axiomToDef = new Dictionary<Axiom, DefDecl>();
+            var vcExprIsaTranslator = new VCExprToIsaTranslator(uniqueNamer);
+            int axId = 0;
+            void axiomsAction(Axiom ax, VCExpr vcAx)
+            {
+                IList<Term> args = activeVarsPerAxiom[ax].Select(v => vcExprIsaTranslator.Translate(v)).ToList();
+                Term rhs = vcExprIsaTranslator.Translate(vcAx);
+
+                DefDecl def = new DefDecl("vcax_"+axId, new Tuple<IList<Term>, Term>(args, rhs));
+                axiomToDef.Add(ax, def);
+            }
+            BasicUtil.ZipDo(axioms, vcAxioms, axiomsAction);
+            vcinstAxiom = new VCInstantiation<Axiom>(axiomToDef, activeDeclsPerAxiomSorted, localeName);
+
+            vcOuterDecls.AddRange(axiomToDef.Values);
 
             return new LocaleDecl(localeName, ContextElem.CreateWithFixedVars(GetVarsInVC(functions, uniqueNamer)), vcOuterDecls);
         }
 
-        private static Dictionary<Block, IList<NamedDeclaration>>  SortActiveDecls(
-            IDictionary<Block, ISet<NamedDeclaration>> activeDeclsPerBlock,
+        private static Dictionary<T, IList<NamedDeclaration>>  SortActiveDecls<T>(
+            IDictionary<T, ISet<NamedDeclaration>> activeDeclsPerBlock,
             IEnumerable<Function> functions,
             Boogie2VCExprTranslator translator,
-            out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock)
+            out IDictionary<T, IList<VCExprVar>> activeVarsPerBlock)
         {
-            activeVarsPerBlock = new Dictionary<Block, IList<VCExprVar>>();
-            var activeDeclsPerBlockSorted = new Dictionary<Block, IList<NamedDeclaration>>();
+            activeVarsPerBlock = new Dictionary<T, IList<VCExprVar>>();
+            var activeDeclsPerBlockSorted = new Dictionary<T, IList<NamedDeclaration>>();
 
-            foreach (KeyValuePair<Block, ISet<NamedDeclaration>> kv in activeDeclsPerBlock)
+            foreach (KeyValuePair<T, ISet<NamedDeclaration>> kv in activeDeclsPerBlock)
             {
                 var activeVars = kv.Value.Where(decl => decl is Variable);
 
@@ -155,6 +181,24 @@ namespace ProofGeneration.VCProofGen
                 result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(f.Name), funType));
             }
 
+            return result;
+        }
+
+        private static IDictionary<Axiom, ISet<NamedDeclaration>> VCInstAxioms(
+            IEnumerable<Axiom> axioms, 
+            IEnumerable<VCExpr> vcAxioms, 
+            IDictionary<VCExprVar, Variable> vcToBoogieVar)
+        {
+            var result = new Dictionary<Axiom, ISet<NamedDeclaration>>();
+
+            VCExprDeclCollector collector = new VCExprDeclCollector();
+            void action(Axiom ax, VCExpr vc)
+            {
+                ISet<NamedDeclaration> decls = collector.CollectNamedDeclarations(vc, vcToBoogieVar);
+                result.Add(ax, decls);
+            }
+
+            BasicUtil.ZipDo(axioms, vcAxioms, action);
             return result;
         }
     }

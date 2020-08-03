@@ -12,7 +12,7 @@ namespace ProofGeneration.ProgramToVCProof
 {
     class PassiveLemmaManager : IBlockLemmaManager
     {
-        private readonly VCInstantiation vcinst;
+        private readonly VCInstantiation<Block> vcinst;
         private readonly IEnumerable<Function> functions;
         private readonly IEnumerable<Variable> programVariables;
 
@@ -31,7 +31,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly string globalAssmsName = "global_assms";
 
-        public PassiveLemmaManager(VCInstantiation vcinst, IEnumerable<Function> functions, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars, IEnumerable<Variable> outParams)
+        public PassiveLemmaManager(VCInstantiation<Block> vcinst, IEnumerable<Function> functions, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars, IEnumerable<Variable> outParams)
         {
             this.vcinst = vcinst;
             this.functions = functions;
@@ -49,7 +49,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };
-            assumptions.Add(vcinst.GetVCBlockInstantiation(block, declToVCMapping));
+            assumptions.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
 
             Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst, LemmaHelper.FinalStateIsMagic(block));
 
@@ -151,7 +151,7 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     "using assms " + globalAssmsName,
                     "apply cases",
-                    "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
+                    "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (handle_cmd_list_full?)",
                     "by (auto?)"
                 };
@@ -160,7 +160,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms ",
-                    "apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)",
+                    "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (tactic \\<open> b_vc_hint_tac_2 @{context} @{thms "+ globalAssmsName + "} " + vcHintsName + " \\<close>)",
                     "by (auto?)"
                 };                    
@@ -174,7 +174,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term normalInitState,
             Term finalState,
             IDictionary<NamedDeclaration, TermIdent> declToVCMapping,
-            VCInstantiation vcinst,
+            VCInstantiation<Block> vcinst,
             bool useMagicFinalState = false)
         {
             if (useMagicFinalState)
@@ -221,7 +221,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term redCfgMulti = IsaBoogieTerm.RedCFGMulti(varContext, functionContext, methodCfg, initConfig, finalConfig);
 
             List<Term> assumptions = new List<Term>() { redCfgMulti };
-            assumptions.Add(vcinst.GetVCBlockInstantiation(cfg.entry, declToVCMapping));
+            assumptions.Add(vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping));
 
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 

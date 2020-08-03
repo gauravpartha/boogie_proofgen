@@ -22,11 +22,11 @@ namespace ProofGeneration.ProgramToVCProof
                 });
         }
 
-        public static Term ConjunctionOfSuccessorBlocks(IEnumerable<Block> successorBlocks, IDictionary<NamedDeclaration, TermIdent> declToVCMapping, VCInstantiation vcinst)
+        public static Term ConjunctionOfSuccessorBlocks(IEnumerable<Block> successorBlocks, IDictionary<NamedDeclaration, TermIdent> declToVCMapping, VCInstantiation<Block> vcinst)
         {
             return
             successorBlocks.
-                Select(b_suc => vcinst.GetVCBlockInstantiation(b_suc, declToVCMapping)).
+                Select(b_suc => vcinst.GetVCObjInstantiation(b_suc, declToVCMapping)).
                 Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.AND));
         }
 

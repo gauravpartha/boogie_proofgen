@@ -38,6 +38,10 @@ namespace ProofGeneration.VCProofGen
             };
         }
 
+        public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer) : 
+            this(uniqueNamer, new Dictionary<Block, DefDecl>(), new Dictionary<Block, IList<VCExprVar>>())
+        { }
+
         public Term Translate(VCExpr node)
         {
             Contract.Requires(node != null);

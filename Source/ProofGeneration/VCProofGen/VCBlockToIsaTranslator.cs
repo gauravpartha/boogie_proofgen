@@ -41,12 +41,12 @@ namespace ProofGeneration.VCProofGen
 
             IDictionary<Block, DefDecl> blockToDefVC = new Dictionary<Block, DefDecl>();
 
-            foreach(Block block in cfg.GetBlocksBackwards())
+            var vcExprIsaVisitor = new VCExprToIsaTranslator(uniqueNamer, blockToDefVC, blockToActiveVars);
+
+            foreach (Block block in cfg.GetBlocksBackwards())
             {
                 // might be more efficient to hand over this:
                 // IEnumerable<Tuple<Block, DefDecl>> successorDefs = cfg.outgoingBlocks[block].Select(b => new Tuple<Block, DefDecl>(b, blockToDefVC[b]));
-
-                var vcExprIsaVisitor = new VCExprToIsaTranslator(uniqueNamer, blockToDefVC, blockToActiveVars);
 
                 Term term = vcExprIsaVisitor.Translate(blockToVC[block]);
 

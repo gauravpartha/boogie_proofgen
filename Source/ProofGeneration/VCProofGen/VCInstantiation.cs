@@ -9,48 +9,48 @@ using System.Diagnostics.Contracts;
 namespace ProofGeneration.VCProofGen
 {
     //instantiates vc block definitions correctly
-    public class VCInstantiation
+    public class VCInstantiation<T>
     {
         private readonly string localeName;        
 
-        private readonly IDictionary<Block, DefDecl> blockToDef;
+        private readonly IDictionary<T, DefDecl> objToDef;
 
-        //blocks are only parameterized by those declarations which appear in them, i.e. this should a subset of holeSpec
-        private readonly IDictionary<Block, IList<NamedDeclaration>> blockToDecls;
+        //objects are only parameterized by those declarations which appear in them
+        private readonly IDictionary<T, IList<NamedDeclaration>> objToDecls;
 
         public VCInstantiation(
-            IDictionary<Block, DefDecl> blockToDef, 
-            IDictionary<Block, IList<NamedDeclaration>> blockToDecls) : this(blockToDef, blockToDecls, "")
+            IDictionary<T, DefDecl> objToDef, 
+            IDictionary<T, IList<NamedDeclaration>> objToDecls) : this(objToDef, objToDecls, "")
         {
         }
 
         public VCInstantiation(
-            IDictionary<Block, DefDecl> blockToDef, 
-            IDictionary<Block, IList<NamedDeclaration>> blockToDecls, 
+            IDictionary<T, DefDecl> objToDef, 
+            IDictionary<T, IList<NamedDeclaration>> objToDecls, 
             string localeName)
         {
-            Contract.Requires(blockToDef != null);
-            Contract.Requires(blockToDecls != null);
+            Contract.Requires(objToDef != null);
+            Contract.Requires(objToDecls != null);
             Contract.Requires(localeName != null);
             
-            this.blockToDef = blockToDef;
-            this.blockToDecls = blockToDecls;
+            this.objToDef = objToDef;
+            this.objToDecls = objToDecls;
             this.localeName = localeName;
         }
 
-        public Term GetVCBlockInstantiation(Block block, IDictionary<NamedDeclaration, TermIdent> declToVC)
+        public Term GetVCObjInstantiation(T obj, IDictionary<NamedDeclaration, TermIdent> declToVC)
         {
-            return GetVCBlockInstantiation(block, decl => declToVC[decl]);
+            return GetVCObjInstantiation(obj, decl => declToVC[decl]);
         }
 
-        public Term GetVCBlockInstantiation(Block block, Func<NamedDeclaration, TermIdent> declToVC)
+        public Term GetVCObjInstantiation(T obj, Func<NamedDeclaration, TermIdent> declToVC)
         {    
-            if(!blockToDef.ContainsKey(block))
+            if(!objToDef.ContainsKey(obj))
             {
                 throw new ProofGenUnexpectedStateException(this.GetType(), "block unknown by vc");
             }
 
-            IList<NamedDeclaration> activeDecls = blockToDecls[block];
+            IList<NamedDeclaration> activeDecls = objToDecls[obj];
 
             IList<Term> args = new List<Term>();
             foreach(NamedDeclaration decl in activeDecls)
@@ -58,35 +58,35 @@ namespace ProofGeneration.VCProofGen
                 args.Add(declToVC(decl));
             }
 
-            return new TermApp(GetVCBlockRef(block), args);
+            return new TermApp(GetVCObjRef(obj), args);
         }
 
-        public IList<NamedDeclaration> GetVCBlockParameters(Block block)
+        public IList<NamedDeclaration> GetVCObjParameters(T obj)
         {
-            if (!blockToDecls.ContainsKey(block))
+            if (!objToDecls.ContainsKey(obj))
             {
                 throw new ProofGenUnexpectedStateException(this.GetType(), "block unknown by vc");
             }
 
-            return blockToDecls[block];
+            return objToDecls[obj];
         }
 
-        public Term GetVCBlockRef(Block block, bool qualified = true)
+        public Term GetVCObjRef(T block, bool qualified = true)
         {
             Contract.Requires(block != null);
-            Contract.Requires(blockToDef.ContainsKey(block));
+            Contract.Requires(objToDef.ContainsKey(block));
 
-            return IsaCommonTerms.TermIdentFromName(GetVCBlockNameRef(block, qualified));
+            return IsaCommonTerms.TermIdentFromName(GetVCObjNameRef(block, qualified));
         }
 
-        public string GetVCBlockNameRef(Block block, bool qualified = true)
+        public string GetVCObjNameRef(T block, bool qualified = true)
         {
             Contract.Requires(block != null);
-            Contract.Requires(blockToDef.ContainsKey(block));
+            Contract.Requires(objToDef.ContainsKey(block));
 
             string prefix = (qualified && localeName.Count() > 0) ? localeName + "." : "";
 
-            return prefix + blockToDef[block].name;
+            return prefix + objToDef[block].name;
         }
 
     }

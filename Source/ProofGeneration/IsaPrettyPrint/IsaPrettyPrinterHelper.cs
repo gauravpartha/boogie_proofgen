@@ -36,9 +36,9 @@ namespace ProofGeneration.IsaPrettyPrint
             return "(|" + s + "|)";
         }
 
-        public static string CommaAggregate(IList<string> list)
+        public static string CommaAggregate(IEnumerable<string> list)
         {
-            if (list.Count == 0)
+            if (!list.Any())
             {
                 return "";
             }
@@ -48,9 +48,9 @@ namespace ProofGeneration.IsaPrettyPrint
             }
         }
 
-        public static string CommaNewLineAggregate(IList<string> list)
+        public static string CommaNewLineAggregate(IEnumerable<string> list)
         {
-            if (list.Count == 0)
+            if (!list.Any())
             {
                 return "";
             }
@@ -60,9 +60,9 @@ namespace ProofGeneration.IsaPrettyPrint
             }
         }
 
-        public static string SpaceAggregate(IList<string> list)
+        public static string SpaceAggregate(IEnumerable<string> list)
         {
-            if (list.Count == 0)
+            if (!list.Any())
             {
                 return "";
             }

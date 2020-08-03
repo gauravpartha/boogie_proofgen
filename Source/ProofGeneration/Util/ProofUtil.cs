@@ -1,9 +1,4 @@
 ﻿using ProofGeneration.IsaPrettyPrint;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProofGeneration.Util
 {
@@ -30,6 +25,11 @@ namespace ProofGeneration.Util
             {
                 return "(simp only:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
             }
+        }
+
+        public static string OF(string baseTheorem, params string[] inputTheorems)
+        {
+            return baseTheorem + "[OF " + IsaPrettyPrinterHelper.SpaceAggregate(inputTheorems) + "]";
         }
     }
 }

@@ -12,7 +12,7 @@ namespace ProofGeneration.ProgramToVCProof
 {
     class PrePassiveLemmaManager : IBlockLemmaManager
     {
-        private readonly VCInstantiation vcinst;
+        private readonly VCInstantiation<Block> vcinst;
         private readonly CFGRepr cfg;
         private readonly IDictionary<Block, Block> origToPassiveBlock;
         private readonly IDictionary<Block, Block> passiveToOrigBlock;
@@ -45,7 +45,7 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly string varAssmsName = "var_assms";
 
         public PrePassiveLemmaManager(
-            VCInstantiation vcinst,
+            VCInstantiation<Block> vcinst,
             CFGRepr cfg,
             IDictionary<Block, Block> origToPassiveBlock,
             IDictionary<Variable, Variable> passiveToOrigVar,
@@ -90,7 +90,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             //add VC assumption
             assumptions.Add(
-                vcinst.GetVCBlockInstantiation(origBlock, passiveDecl =>
+                vcinst.GetVCObjInstantiation(origBlock, passiveDecl =>
                 {
                     if (passiveDecl is Function)
                     {
@@ -119,7 +119,7 @@ namespace ProofGeneration.ProgramToVCProof
             };
 
             if (unfoldVC)
-                methods.Add("apply (simp only: " + vcinst.GetVCBlockNameRef(b) + "_def)");
+                methods.Add("apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)");
 
             methods.Add("apply (handle_cmd_list_full v_assms: " + varAssmsName + ")?");
             methods.Add("by (auto?)");
@@ -272,7 +272,7 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 //successor vc
                 successorVCs.Add(
-                    vcinst.GetVCBlockInstantiation(bSuc, passiveDecl =>
+                    vcinst.GetVCObjInstantiation(bSuc, passiveDecl =>
                     {
                         if (passiveDecl is Function)
                             return declToVCMapping[passiveDecl];
@@ -438,7 +438,7 @@ namespace ProofGeneration.ProgramToVCProof
             var result = new List<Term>();
             includedVars = new HashSet<Variable>();
 
-            foreach (NamedDeclaration decl in vcinst.GetVCBlockParameters(blockPassive))
+            foreach (NamedDeclaration decl in vcinst.GetVCObjParameters(blockPassive))
             {
                 if (decl is Variable vPassive)
                 {

@@ -54,7 +54,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BoogieIsaInterface\ApplicableIsaVisitor.cs" />
-    <Compile Include="BoogieIsaInterface\AxiomIsaTransformer.cs" />
     <Compile Include="BoogieIsaInterface\BasicCmdIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieTerm.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
