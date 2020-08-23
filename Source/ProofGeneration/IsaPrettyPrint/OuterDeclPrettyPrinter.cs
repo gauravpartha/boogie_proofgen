@@ -130,7 +130,8 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override int VisitMLDecl(MLDecl d)
         {
-            _sb.Append("ML\\<open>");
+            _sb.Append(d.GetDeclId());
+            _sb.Append("\\<open>");
             _sb.AppendLine();
             _sb.Append(d.code);
             _sb.AppendLine();

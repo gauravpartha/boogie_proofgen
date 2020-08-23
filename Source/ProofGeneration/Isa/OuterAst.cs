@@ -166,16 +166,41 @@ namespace ProofGeneration.Isa
     public class MLDecl : OuterDecl
     {
         public readonly string code;
+        public readonly MLKind kind;
 
-        public MLDecl(string code) : base("ML")
+        public enum MLKind {
+            NORMAL, PROOF, VAL
+        }
+
+        public MLDecl(string code, MLKind kind) : base("ML")
         {
             this.code = code;
+            this.kind = kind;
+        }
+
+        public MLDecl(string code) : this(code, MLKind.NORMAL)
+        {
         }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitMLDecl(this);
         }
-    }
 
+        public string GetDeclId()
+        {
+            switch (kind)
+            {
+                case MLKind.NORMAL:
+                    return "ML";
+                case MLKind.PROOF:
+                    return "ML_prf";
+                case MLKind.VAL:
+                    return "ML_val";
+                default:
+                    throw new ProofGenUnexpectedStateException(typeof(MLDecl), "no type");
+            }
+        }
+
+    }
 }
