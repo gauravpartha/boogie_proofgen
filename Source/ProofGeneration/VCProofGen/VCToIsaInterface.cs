@@ -21,10 +21,7 @@ namespace ProofGeneration.VCProofGen
             IActiveDeclGenerator activeDeclGenerator,
             VCExpressionGenerator gen,
             Boogie2VCExprTranslator translator,
-            IEnumerable<Function> functions,
-            IEnumerable<Axiom> axioms,
-            IEnumerable<Variable> inParams,
-            IEnumerable<Variable> localVars,
+            BoogieMethodData methodData,
             CFGRepr cfg,
             out VCInstantiation<Block> vcinst,
             out VCInstantiation<Axiom> vcinstAxiom)
@@ -36,17 +33,18 @@ namespace ProofGeneration.VCProofGen
             IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
 
 
-            IDictionary<VCExprVar, Variable> vcToBoogieVar = VCExprToBoogieVar(translator, inParams.Union(localVars));
+            IDictionary<VCExprVar, Variable> vcToBoogieVar = VCExprToBoogieVar(translator, methodData.InParams.Union(methodData.Locals));
             IDictionary<Block, ISet<NamedDeclaration>> activeDeclsPerBlock = 
                 activeDeclGenerator.GetActiveDeclsPerBlock(blockToVC, vcToBoogieVar, cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars);
 
             IDictionary<Block, IList<NamedDeclaration>> activeDeclsPerBlockSorted =
-                SortActiveDecls(activeDeclsPerBlock, functions, translator, out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock);
+                SortActiveDecls(activeDeclsPerBlock, methodData.Functions, translator, out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock);
 
             IDictionary<Block, IList<VCExprVar>> blockToNewVCVars = ConvertVariableToVCExpr(blockToNewVars, translator);
 
             var blockToIsaTranslator = new VCBlockToIsaTranslator(uniqueNamer);
-            IDictionary<Block, DefDecl> blockToVCExpr = blockToIsaTranslator.IsaDefsFromVC(blockToVC, activeVarsPerBlock, cfg, inParams, localVars, blockToNewVCVars);
+            IDictionary<Block, DefDecl> blockToVCExpr = 
+                blockToIsaTranslator.IsaDefsFromVC(blockToVC, activeVarsPerBlock, cfg, methodData, blockToNewVCVars);
 
             //add vc definitions of blocks in correct order
             IList<OuterDecl> vcOuterDecls = new List<OuterDecl>();
@@ -77,9 +75,9 @@ namespace ProofGeneration.VCProofGen
             */
 
             //axioms
-            IDictionary<Axiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(axioms, vcAxioms, vcToBoogieVar);
+            IDictionary<Axiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(methodData.Axioms, vcAxioms, vcToBoogieVar);
             IDictionary<Axiom, IList<NamedDeclaration>> activeDeclsPerAxiomSorted =
-                 SortActiveDecls(activeDeclsPerAxiom, functions, translator, out IDictionary<Axiom, IList<VCExprVar>> activeVarsPerAxiom);
+                 SortActiveDecls(activeDeclsPerAxiom, methodData.Functions, translator, out IDictionary<Axiom, IList<VCExprVar>> activeVarsPerAxiom);
             var axiomVCDefs = new List<DefDecl>();
             var axiomToDef = new Dictionary<Axiom, DefDecl>();
             var vcExprIsaTranslator = new VCExprToIsaTranslator(uniqueNamer);
@@ -93,12 +91,12 @@ namespace ProofGeneration.VCProofGen
                 axiomToDef.Add(ax, def);
                 axId++;
             }
-            BasicUtil.ZipDo(axioms, vcAxioms, axiomsAction);
+            BasicUtil.ZipDo(methodData.Axioms, vcAxioms, axiomsAction);
             vcinstAxiom = new VCInstantiation<Axiom>(axiomToDef, activeDeclsPerAxiomSorted, localeName);
 
             vcOuterDecls.AddRange(axiomToDef.Values);
 
-            return new LocaleDecl(localeName, ContextElem.CreateWithFixedVars(GetVarsInVC(functions, uniqueNamer)), vcOuterDecls);
+            return new LocaleDecl(localeName, ContextElem.CreateWithFixedVars(GetVarsInVC(methodData.Functions, uniqueNamer)), vcOuterDecls);
         }
 
         private static Dictionary<T, IList<NamedDeclaration>>  SortActiveDecls<T>(

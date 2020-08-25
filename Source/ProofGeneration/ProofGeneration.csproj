@@ -55,6 +55,10 @@
   <ItemGroup>
     <Compile Include="BoogieIsaInterface\ApplicableIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\BasicCmdIsaVisitor.cs" />
+    <Compile Include="BoogieIsaInterface\BoogieGlobalData.cs" />
+    <Compile Include="BoogieIsaInterface\BoogieMethodData.cs" />
+    <Compile Include="BoogieIsaInterface\DeBruijnVarTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieTerm.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
     <Compile Include="BoogieIsaInterface\IsaProgramGenerator.cs" />

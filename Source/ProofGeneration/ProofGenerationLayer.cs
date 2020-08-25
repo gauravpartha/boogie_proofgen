@@ -20,26 +20,22 @@ namespace ProofGeneration
 
         private static IDictionary<Block, Block> beforeDagOrigBlock;
         private static CFGRepr beforeDagCfg;
-        private static IEnumerable<Variable> beforeDagInParams;
-        private static IEnumerable<Variable> beforeDagLocalVars;
-        private static IEnumerable<Variable> beforeDagOutParams;
+
+        private static BoogieMethodData beforeDagData;
 
 
         private static IDictionary<Block, Block> beforePassiveOrigBlock;
         private static CFGRepr beforePassificationCfg;
-        private static IEnumerable<Variable> beforePassiveInParams;
-        private static IEnumerable<Variable> beforePassiveLocalVars;
-        private static IEnumerable<Variable> beforePassiveOutParams;
+
+        private static BoogieMethodData beforePassiveData;
 
         private static CFGRepr afterPassificationCfg;
         private static CFGRepr noEmptyBlocksCfg;
         private static CFGRepr afterUnreachablePruningCfg;
 
-        private static IEnumerable<Axiom> axioms;
-        private static IEnumerable<Function> functions;
-        private static IEnumerable<Variable> inParams;
-        private static IEnumerable<Variable> localVars;
-        private static IEnumerable<Variable> outParams;
+        private static BoogieMethodData finalProgData;
+
+        private static BoogieGlobalData boogieGlobalData;
 
         private static IDictionary<Block, IDictionary<Variable, Variable>> finalVarMapping = new Dictionary<Block, IDictionary<Variable, Variable>>();
         private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
@@ -49,26 +45,28 @@ namespace ProofGeneration
 
         public static void Program(Program p)
         {
-            axioms = p.Axioms;
-            functions = p.Functions;
+            boogieGlobalData = new BoogieGlobalData(p.Functions, p.Axioms, p.GlobalVariables, p.Constants);
         }
 
         public static void BeforeCFGToDAG(Implementation impl)
         {
             beforeDagCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforeDagOrigBlock, false);
-
-            beforeDagInParams = new List<Variable>(impl.InParams);
-            beforeDagLocalVars = new List<Variable>(impl.LocVars);
-            beforeDagOutParams = new List<Variable>(impl.OutParams);
+            beforeDagData = MethodDataFromImpl(impl, boogieGlobalData);
         }
 
         public static void BeforePassification(Implementation impl)
         {
             beforePassificationCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforePassiveOrigBlock);
+            beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData);
+        }
 
-            beforePassiveInParams = new List<Variable>(impl.InParams);
-            beforePassiveLocalVars = new List<Variable>(impl.LocVars);
-            beforePassiveOutParams = new List<Variable>(impl.OutParams);
+        private static BoogieMethodData MethodDataFromImpl(Implementation impl, BoogieGlobalData globalData)
+        {
+            return new BoogieMethodData(
+                globalData,
+                new List<Variable>(impl.InParams),
+                new List<Variable>(impl.LocVars),
+                new List<Variable>(impl.LocVars));
         }
 
         /*
@@ -101,20 +99,18 @@ namespace ProofGeneration
 
         public static void AfterPassification(Implementation impl)
         {
-            inParams = impl.InParams;
-            localVars = impl.LocVars;
-            outParams = impl.OutParams;
+            finalProgData = MethodDataFromImpl(impl, boogieGlobalData);
             afterPassificationImpl = impl;
             afterPassificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
 
             var nameToVar = new Dictionary<string, Variable>();
 
-            foreach(Variable v in beforePassiveInParams.Union(beforePassiveLocalVars).Union(beforePassiveOutParams))
+            foreach(Variable v in beforePassiveData.InParams.Union(beforePassiveData.Locals).Union(beforePassiveData.OutParams))
             {
                 nameToVar.Add(v.Name, v);
             }
 
-            foreach(Variable vPassive in inParams.Union(localVars).Union(outParams))
+            foreach(Variable vPassive in finalProgData.InParams.Union(finalProgData.Locals).Union(finalProgData.OutParams))
             {
                 //heuristic to get mapping
                 string [] split = vPassive.Name.Split('@');
@@ -164,17 +160,14 @@ namespace ProofGeneration
                 new StandardActiveDecl(),
                 gen,
                 translator,
-                functions,
-                axioms,
-                inParams,
-                localVars,
+                finalProgData,
                 afterUnreachablePruningCfg,
                 out VCInstantiation<Block> vcinst,
                 out VCInstantiation<Axiom> vcinstAxiom);
             
             var lemmaNamer = new IsaUniqueNamer();
 
-            var passiveLemmaManager = new PassiveLemmaManager(vcinst, functions, inParams, localVars, outParams);
+            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
             // ignore peephole for now
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
@@ -190,7 +183,7 @@ namespace ProofGeneration
             //afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
           
 
-            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, functions, axioms, beforeDagInParams, beforeDagLocalVars, beforeDagOutParams, beforeDagCfg, out IList<OuterDecl> programDecls);
+            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, beforeDagData, beforeDagCfg, out IList<OuterDecl> programDecls);
             afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
                 afterUnreachablePruningCfg,
                 programRepr.cfgDeclDef,
@@ -202,7 +195,7 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            var endToEnd = new EndToEndVCProof(functions, axioms, inParams, localVars, programRepr, vcinst, vcinstAxiom, afterUnreachablePruningCfg);
+            var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcinst, vcinstAxiom, afterUnreachablePruningCfg);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
@@ -214,7 +207,7 @@ namespace ProofGeneration
 
         private static IEnumerable<VCExpr> DeconstructAxioms(VCExpr vcAxioms)
         {
-            int numAxioms = axioms.Count();
+            int numAxioms = boogieGlobalData.Axioms.Count();
 
             /* Simplifying assumption: vcAxioms of the form (((Ax1 /\ Ax2) /\ Ax3) /\ Ax4) /\ ...
              * This is not true in general due to simplifications made by Boogie such as True /\ True -> True

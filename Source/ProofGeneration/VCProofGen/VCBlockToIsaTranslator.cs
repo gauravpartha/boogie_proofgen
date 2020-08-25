@@ -31,13 +31,12 @@ namespace ProofGeneration.VCProofGen
         public IDictionary<Block, DefDecl> IsaDefsFromVC(IDictionary<Block, VCExpr> blockToVC, 
             IDictionary<Block, IList<VCExprVar>> blockToActiveVars,
             CFGRepr cfg, 
-            IEnumerable<Variable> inParams, 
-            IEnumerable<Variable> localVars, 
+            BoogieMethodData methodData, 
             IDictionary<Block, IList<VCExprVar>> blockToNewVars = null)
         {
             Contract.Ensures(Contract.Result<IDictionary<Block, DefDecl>>().Count == cfg.NumOfBlocks());
 
-            ISet<string> programVariables = new HashSet<string>(inParams.Select(v => v.Name).Concat(localVars.Select(v => v.Name)));
+            ISet<string> programVariables = new HashSet<string>(methodData.InParams.Select(v => v.Name).Concat(methodData.Locals.Select(v => v.Name)));
 
             IDictionary<Block, DefDecl> blockToDefVC = new Dictionary<Block, DefDecl>();
 

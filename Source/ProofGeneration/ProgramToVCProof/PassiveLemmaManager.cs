@@ -14,6 +14,8 @@ namespace ProofGeneration.ProgramToVCProof
     {
         private readonly VCInstantiation<Block> vcinst;
         private readonly IEnumerable<Function> functions;
+
+        private readonly BoogieMethodData methodData;
         private readonly IEnumerable<Variable> programVariables;
 
         private readonly TermIdent varContext = IsaCommonTerms.TermIdentFromName("\\<Lambda>");
@@ -31,11 +33,11 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly string globalAssmsName = "global_assms";
 
-        public PassiveLemmaManager(VCInstantiation<Block> vcinst, IEnumerable<Function> functions, IEnumerable<Variable> inParams, IEnumerable<Variable> localVars, IEnumerable<Variable> outParams)
+        public PassiveLemmaManager(VCInstantiation<Block> vcinst, BoogieMethodData methodData)
         {
             this.vcinst = vcinst;
-            this.functions = functions;
-            programVariables = inParams.Union(localVars).Union(outParams);
+            this.methodData = methodData;
+            programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
             initState = IsaBoogieTerm.Normal(normalInitState);
             cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer);
             declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>)functions).Union(programVariables), uniqueNamer);

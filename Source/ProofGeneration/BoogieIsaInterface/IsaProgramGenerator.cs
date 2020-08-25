@@ -19,11 +19,7 @@ namespace ProofGeneration
         public IsaProgramRepr GetIsaProgram(
             string localeName,
             string procName,
-            IEnumerable<Function> functions,
-            IEnumerable<Axiom> axioms,
-            IEnumerable<Variable> inParams,
-            IEnumerable<Variable> localVars,
-            IEnumerable<Variable> outParams,
+            BoogieMethodData methodData,
             CFGRepr cfg,
             out IList<OuterDecl> decls
             )
@@ -35,11 +31,11 @@ namespace ProofGeneration
 
             Term nodes = GetNodeSet(cfg);
 
-            DefDecl funcs = GetFunctionDeclarationsIsa(procName, functions);
-            DefDecl axiomsDecl = GetAxioms(procName, axioms);
+            DefDecl funcs = GetFunctionDeclarationsIsa(procName, methodData.Functions);
+            DefDecl axiomsDecl = GetAxioms(procName, methodData.Axioms);
 
-            OuterDecl parameters = GetVariableDeclarationsIsa("inParams", procName, inParams);
-            OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, localVars);
+            OuterDecl parameters = GetVariableDeclarationsIsa("inParams", procName, methodData.InParams);
+            OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, methodData.Locals);
 
             Term methodBodyCFG =
                 IsaBoogieTerm.MethodCFGBody(
