@@ -271,6 +271,15 @@ namespace ProofGeneration.Isa
     {
         public readonly int n;
 
+        //if set to true, then the pretty printer will use "Suc" constructors to represent n and otherwise just decimal representation
+        public readonly bool useConstructorRepr = false;
+
+        public NatConst(int n, bool useConstructorRepr)
+        {
+            this.n = n;
+            useConstructorRepr = false;
+        }
+
         public NatConst(int n)
         {
             this.n = n;
@@ -329,6 +338,21 @@ namespace ProofGeneration.Isa
     public abstract class TypeIsa
     {
         public abstract T Dispatch<T>(TypeIsaVisitor<T> visitor);
+    }
+
+    public class VarType : TypeIsa
+    {
+        public readonly string name;
+
+        public VarType(string name)
+        {
+            this.name = name;
+        }
+        
+        public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
+        {
+            return visitor.VisitVarType(this);
+        }
     }
 
     public class ArrowType : TypeIsa

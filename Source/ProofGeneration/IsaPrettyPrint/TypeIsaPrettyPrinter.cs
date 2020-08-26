@@ -7,6 +7,12 @@ namespace ProofGeneration.IsaPrettyPrint
 {
     public class TypeIsaPrettyPrinter : TypeIsaVisitor<string>
     {
+
+        public override string VisitVarType(VarType t)
+        {
+            return IsaPrettyPrinterHelper.Parenthesis("\'" + t.name);
+        }
+
         public override string VisitArrowType(ArrowType t)
         {
             string rArg = Visit(t.argType);
@@ -47,6 +53,5 @@ namespace ProofGeneration.IsaPrettyPrint
             string aggr = rArgs.Aggregate((s1, s2) => s1 + " " + IsaPrettyPrinterHelper.TIMES + " " + s2);
             return IsaPrettyPrinterHelper.Parenthesis(aggr);
         }
-
     }
 }

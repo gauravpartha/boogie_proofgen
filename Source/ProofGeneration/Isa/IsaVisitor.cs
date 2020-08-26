@@ -85,6 +85,8 @@ namespace ProofGeneration.Isa
             return result;
         }
 
+        public abstract R VisitVarType(VarType t);
+
         public abstract R VisitTupleType(TupleType t);
 
         public abstract R VisitArrowType(ArrowType t);

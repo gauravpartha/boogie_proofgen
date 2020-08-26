@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
@@ -23,8 +25,11 @@ namespace ProofGeneration
         private readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
         private readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
         private readonly static TermIdent axiomsSatId = IsaCommonTerms.TermIdentFromName("axioms_sat");
- 
-        private static TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
+
+        private readonly static TermIdent forallId = IsaCommonTerms.TermIdentFromName("Forall");
+        private readonly static TermIdent existsId = IsaCommonTerms.TermIdentFromName("Exists");
+        private readonly static TermIdent forallTypeId = IsaCommonTerms.TermIdentFromName("ForallT");
+        private readonly static TermIdent existsTypeId = IsaCommonTerms.TermIdentFromName("ExistsT");
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
@@ -37,6 +42,13 @@ namespace ProofGeneration
         {
             Term stringConst = new StringConst(v);
             return new TermApp(IsaCommonTerms.TermIdentFromName("Var"), new List<Term>() { stringConst });
+        }
+
+        public static Term Var(int i)
+        {
+            Contract.Requires(i >= 0);
+            Term natConst = new NatConst(i);
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Var"), new List<Term>() { natConst });
         }
 
         public static Term BVar(int i)
@@ -181,6 +193,8 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("UnOp"), list);
         }
 
+        //value quantification
+
         /*
          * if isForall is false, then it must be an existential quantifier
          * */
@@ -191,18 +205,36 @@ namespace ProofGeneration
 
         public static Term Forall(Term boundVarType, Term body)
         {
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Forall"), new List<Term> { boundVarType, body });
+            return new TermApp(forallId, new List<Term> { boundVarType, body });
         }
 
         public static Term Exists(Term boundVarType, Term body)
         {
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Exists"), new List<Term> { boundVarType, body });
+            return new TermApp(existsId, new List<Term> { boundVarType, body });
         }
 
-        public static Term FunCall(string fname, IList<Term> args)
+        //type quantification
+
+        public static Term TypeQuantifier(bool isForall, Term body)
         {
+            return isForall ? ForallType(body) : ExistsType(body);
+        }
+
+        public static Term ForallType(Term body)
+        {
+            return new TermApp(forallTypeId, new List<Term> { body });
+        }
+
+        public static Term ExistsType(Term body)
+        {
+            return new TermApp(existsTypeId, new List<Term> { body });
+        }
+
+        public static Term FunCall(string fname, IList<Term> typeArgs, IList<Term> args)
+        {
+            var wrapTypeArgs = new TermList(typeArgs);
             var wrapArgs = new TermList(args);
-            var fnameAndArgs = new List<Term>() { new StringConst(fname), wrapArgs };
+            var fnameAndArgs = new List<Term>() { new StringConst(fname), wrapTypeArgs, wrapArgs };
 
             return new TermApp(IsaCommonTerms.TermIdentFromName("FunExp"), fnameAndArgs);
         }
@@ -240,7 +272,7 @@ namespace ProofGeneration
             Term mdeclsTerm = new TermList(mdecls);
 
             return new TermApp(IsaCommonTerms.TermIdentFromName("Program"), 
-                new List<Term>() { fdecls, constantDecls, globalDecls, axioms, mdeclsTerm });
+                new List<Term>() { new TermList(new List<Term>()), fdecls, constantDecls, globalDecls, axioms, mdeclsTerm });
         }
 
         public static Term Normal(Term n_s)
@@ -258,14 +290,16 @@ namespace ProofGeneration
             return failureStateId;
         }
 
-        public static Term RedCmdList(Term varContext, Term funContext, Term cmdList, Term initState, Term finalState)
+        public static Term RedCmdList(BoogieContextIsa boogieContext, Term cmdList, Term initState, Term finalState)
         {
             return
                 new TermApp(redCmdListId,
                 new List<Term>()
                 {
-                    varContext,
-                    funContext,
+                    boogieContext.absValTyMap,
+                    boogieContext.varContext,
+                    boogieContext.funContext,
+                    boogieContext.rtypeEnv,
                     cmdList,
                     initState,
                     finalState
@@ -273,14 +307,16 @@ namespace ProofGeneration
                 );
         }
 
-        public static Term RedCFGMulti(Term varContext, Term funContext, Term cfg, Term initCFGConfig, Term finalCFGConfig)
+        public static Term RedCFGMulti(BoogieContextIsa boogieContext, Term cfg, Term initCFGConfig, Term finalCFGConfig)
         {
             return
                 new TermApp(redCfgMultiId,
                 new List<Term>()
                 {
-                    varContext,
-                    funContext,
+                    boogieContext.absValTyMap,
+                    boogieContext.varContext,
+                    boogieContext.funContext,
+                    boogieContext.rtypeEnv,
                     cfg,
                     initCFGConfig,
                     finalCFGConfig
@@ -303,21 +339,30 @@ namespace ProofGeneration
             return new TermTuple(new List<Term> { nodeOrDone, state });
         }
 
-        public static Term RedExpr(Term funContext, Term expr, Term state, Term resultValue)
+        public static Term RedExpr(BoogieContextIsa boogieContext, Term expr, Term state, Term resultValue)
         {
             return
                 new TermApp(redExprId,
                 new List<Term>()
                 {
-                    funContext,
+                    boogieContext.absValTyMap,
+                    boogieContext.funContext,
+                    boogieContext.rtypeEnv,
                     expr,
                     state,
                     resultValue
                 });
         }
 
-        public static Term FunDecl(Function f, bool includeName=true)
+        public static Term FunDecl(Function f, IVariableTranslationFactory varTranslationFactory, bool includeName=true)
         {
+            IVariableTranslation<TypeVariable> typeVarTranslation = varTranslationFactory.CreateEmptyTranslation().TypeVarTranslation;
+            foreach(TypeVariable tv in f.TypeParameters)
+            {
+                typeVarTranslation.AddBoundVariable(tv);
+            }
+            var typeIsaVisitor = new TypeIsaVisitor(typeVarTranslation);
+
             Term fname = new StringConst(f.Name);
             var argTypes = new TermList(f.InParams.Select(v => typeIsaVisitor.Translate(v.TypedIdent.Type)).ToList());
             var retType = typeIsaVisitor.Translate(f.OutParams.First().TypedIdent.Type);
@@ -330,7 +375,7 @@ namespace ProofGeneration
             }
         }
 
-        public static Term VarDecl(Variable v, bool includeName=true)
+        public static Term VarDecl(Variable v, TypeIsaVisitor typeIsaVisitor, bool includeName=true)
         {
             Term vName = new StringConst(v.Name);
             Term vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
@@ -358,9 +403,9 @@ namespace ProofGeneration
             return new TermApp(funInterpWfId, new List<Term> { fdecls, finterp });
         }
 
-        public static Term FunInterpSingleWf(Function f, Term fTerm)
+        public static Term FunInterpSingleWf(Function f, Term fTerm, IVariableTranslationFactory factory)
         {
-            return FunInterpSingleWf(FunDecl(f, false), fTerm);
+            return FunInterpSingleWf(FunDecl(f, factory), fTerm);
         }
 
         public static Term FunInterpSingleWf(Term fdecl, Term fun)

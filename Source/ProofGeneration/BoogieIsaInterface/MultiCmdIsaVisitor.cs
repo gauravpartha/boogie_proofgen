@@ -1,7 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
@@ -17,12 +17,13 @@ namespace ProofGeneration.BoogieIsaInterface
             this.basicCmdVisitor = basicCmdVisitor;
         }
 
-        public MultiCmdIsaVisitor(IsaUniqueNamer uniqueNamer) : this(new BasicCmdIsaVisitor(uniqueNamer))
+        public MultiCmdIsaVisitor(IsaUniqueNamer uniqueNamer, IVariableTranslationFactory varTranslationFactory) : 
+            this(new BasicCmdIsaVisitor(uniqueNamer, varTranslationFactory))
         {
 
         }
 
-        public MultiCmdIsaVisitor() : this(new BasicCmdIsaVisitor())
+        public MultiCmdIsaVisitor(IVariableTranslationFactory varTranslationFactory) : this(new BasicCmdIsaVisitor(varTranslationFactory))
         { 
             
         }

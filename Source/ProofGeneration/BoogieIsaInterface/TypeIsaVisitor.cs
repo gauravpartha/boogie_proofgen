@@ -2,15 +2,18 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
 
 namespace ProofGeneration
 {
-    class TypeIsaVisitor : ResultReadOnlyVisitor<Term>
+    public class TypeIsaVisitor : ResultReadOnlyVisitor<Term>
     {
+
+        private readonly IVariableTranslation<TypeVariable> typeVarTranslation;
+
         [ContractInvariantMethod]
         void ObjectInvariant()
         {
@@ -18,24 +21,39 @@ namespace ProofGeneration
             Contract.Invariant(Results.Count <= 1);
         }
 
+        public TypeIsaVisitor(IVariableTranslation<TypeVariable> typeVarTranslation)
+        {
+            this.typeVarTranslation = typeVarTranslation;
+        }
+
+
         protected override bool TranslatePrecondition(Absy node)
         {
             return node is Microsoft.Boogie.Type;
         }
 
-        public override Microsoft.Boogie.Type VisitType(Microsoft.Boogie.Type type)
+        public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
         {
-            throw new NotImplementedException();
+            ReturnResult(IsaBoogieType.TVar(typeVarTranslation.TranslateVariable(node)));
+            return node;
+        }
+
+        public override CtorType VisitCtorType(CtorType node)
+        {
+            List<Term> argTypes = node.Arguments.Select(t => Translate(t)).ToList();
+
+            ReturnResult(IsaBoogieType.TConType(node.Decl.Name, argTypes));
+            return node;
         }
 
         public override Microsoft.Boogie.Type VisitBasicType(BasicType node)
         {
             if(node.IsBool)
             {
-                ReturnResult(IsaBoogieType.BoolType());
+                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.BoolType()));
             } else if(node.IsInt)
             {
-                ReturnResult(IsaBoogieType.IntType());
+                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType()));
             } else
             {
                 throw new NotImplementedException();
@@ -44,5 +62,35 @@ namespace ProofGeneration
             return node;
         }
 
+        public override Microsoft.Boogie.Type VisitTypeProxy(TypeProxy node)
+        {
+            if(node.ProxyFor == null)
+            {
+                throw new NotImplementedException();
+            }
+            ReturnResult(Translate(node.ProxyFor));
+            return node;
+        }
+
+        //not implemented
+        public override Microsoft.Boogie.Type VisitType(Microsoft.Boogie.Type type)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override MapType VisitMapType(MapType node)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Microsoft.Boogie.Type VisitBvType(BvType node)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Microsoft.Boogie.Type VisitFloatType(FloatType node)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

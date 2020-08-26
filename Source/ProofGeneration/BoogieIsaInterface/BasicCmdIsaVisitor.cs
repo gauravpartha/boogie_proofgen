@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
@@ -15,23 +17,24 @@ namespace ProofGeneration
         //avoid name clashes between different variables.
         //UPDATE (20.07.2020): do not support shadowing, so for now we don't rename
         private readonly IsaUniqueNamer uniqueNamer;
-        private readonly TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
 
-        /* Tracks the variables introduced for the currently active quantifiers
-         * The first node is the outermost quantifier.
-         * The last node is the innermost quantifier.
-         * Required for de-bruijn handling of bound variables.
-         * 
-         * FIXME: maybe make more efficient
-         * */
-        private LinkedList<Variable> quantifierVariables = new LinkedList<Variable>();
-   
-        public BasicCmdIsaVisitor(IsaUniqueNamer uniqueNamer)
+        private readonly BoogieVariableTranslation boogieVarTranslation;
+        private readonly TypeIsaVisitor typeIsaVisitor;
+
+        private readonly IVariableTranslationFactory variableFactory;
+
+
+        public BasicCmdIsaVisitor(IsaUniqueNamer uniqueNamer, IVariableTranslationFactory variableFactory)
         {
+            this.variableFactory = variableFactory;
+            boogieVarTranslation = variableFactory.CreateTranslation();
+            //by sharing TypeVarTranslation, changes in the bound variables will be visible in the type visitor
+            this.typeIsaVisitor = new TypeIsaVisitor(boogieVarTranslation.TypeVarTranslation);
             this.uniqueNamer = uniqueNamer;
         }
 
-        public BasicCmdIsaVisitor() : this(new IsaUniqueNamer()) { }
+        public BasicCmdIsaVisitor(IVariableTranslationFactory variableFactory) : this(new IsaUniqueNamer(), variableFactory)
+        { }
    
         [ContractInvariantMethod]
         void ObjectInvariant()
@@ -122,7 +125,8 @@ namespace ProofGeneration
                 args.Add(Translate(expr));
             }
 
-            IAppliableVisitor<Term> applicableIsaVisitor = new ApplicableIsaVisitor(args);
+            IAppliableVisitor<Term> applicableIsaVisitor = 
+                new ApplicableIsaVisitor(node.TypeParameters, args, boogieVarTranslation.TypeVarTranslation);
             Term res = node.Fun.Dispatch(applicableIsaVisitor);
 
             ReturnResult(res);
@@ -139,27 +143,7 @@ namespace ProofGeneration
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            // bound variables are represented using de-bruijn encoding
-            int i = 0;
-            bool isBoundVar = false;
-            for(var curNode = quantifierVariables.Last;  curNode != null; curNode = curNode.Previous)
-            {
-                if(curNode.Value.Equals(node.Decl))
-                {
-                    isBoundVar = true;
-                    break;
-                }
-                i++;
-            }
-
-            if(isBoundVar)
-            {
-                ReturnResult(IsaBoogieTerm.BVar(i));
-            } else
-            {
-                ReturnResult(IsaBoogieTerm.Var(GetStringFromIdentifierExpr(node)));
-            }
-
+            ReturnResult(IsaBoogieTerm.Var(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl)));            
             return node;
         }
 
@@ -171,36 +155,47 @@ namespace ProofGeneration
 
         public override QuantifierExpr VisitQuantifierExpr(QuantifierExpr node)
         {
-            if(node.Dummies.Count == 0 || node.TypeParameters.Count > 0)
+            if(!(node is ForallExpr || node is ExistsExpr))
             {
-                throw new ProofGenUnexpectedStateException(GetType(), "can only handle variable quantification");
+                throw new ProofGenUnexpectedStateException(GetType(), "can only handle forall and exists quantifiers");
             }
 
             bool isForall = IsForall(node);
 
             //Quantifers with multiple bound variables are desugared into multiple quantifiers expressions with single variables
-            List<Term> boundVarTypes = new List<Term>();
-
             foreach(Variable boundVar in node.Dummies)
             {
-                quantifierVariables.AddLast(boundVar);
+                boogieVarTranslation.VarTranslation.AddBoundVariable(boundVar);
+            }
+            foreach(TypeVariable boundTyVar in node.TypeParameters)
+            {
+                boogieVarTranslation.TypeVarTranslation.AddBoundVariable(boundTyVar);
             }
 
-            int numBefore = quantifierVariables.Count;
+            int numValVarBefore = boogieVarTranslation.VarTranslation.NumBoundVariables();
+            int numTyVarBefore = boogieVarTranslation.TypeVarTranslation.NumBoundVariables();
 
             Term result = Translate(node.Body);
 
-            if(numBefore != quantifierVariables.Count)
+            if (numValVarBefore != boogieVarTranslation.VarTranslation.NumBoundVariables() || 
+                numTyVarBefore != boogieVarTranslation.TypeVarTranslation.NumBoundVariables())
             {
                 throw new ProofGenUnexpectedStateException(GetType(), "quantifier levels not the same before and after");
             }
 
             for(int i = node.Dummies.Count-1; i >= 0; i--)
             {
-                quantifierVariables.RemoveLast();
+                boogieVarTranslation.VarTranslation.DropLastBoundVariable();
                 Variable boundVar = node.Dummies[i];
                 Term boundVarType = typeIsaVisitor.Translate(boundVar.TypedIdent.Type);
                 result = IsaBoogieTerm.Quantifier(isForall, boundVarType, result);
+            }
+
+            for(int i = node.TypeParameters.Count-1; i >= 0; i--)
+            {
+                boogieVarTranslation.TypeVarTranslation.DropLastBoundVariable();
+                TypeVariable boundTyVar = node.TypeParameters[i];
+                result = IsaBoogieTerm.TypeQuantifier(isForall, result);
             }
 
             ReturnResult(result);

@@ -4,17 +4,26 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
 
 namespace ProofGeneration
 {
     class ApplicableIsaVisitor : IAppliableVisitor<Term>
     {
-        private IList<Term> _args;
+        private readonly TypeParamInstantiation _typeInst;
+        private readonly IList<Term> _args;
 
-        public ApplicableIsaVisitor(IList<Term> args)
+        private readonly TypeIsaVisitor typeIsaVisitor;
+
+        public ApplicableIsaVisitor(TypeParamInstantiation typeInst, 
+            IList<Term> args, 
+            IVariableTranslation<TypeVariable> typeVarTranslation)
         {
+            _typeInst = typeInst;
             _args = args;
+            typeIsaVisitor = new TypeIsaVisitor(typeVarTranslation);
         }
 
         public Term Visit(UnaryOperator unaryOperator)
@@ -44,7 +53,14 @@ namespace ProofGeneration
                 throw new ExprArgException();
             }
 
-            return IsaBoogieTerm.FunCall(functionCall.FunctionName, _args);
+            List<Term> typeInstIsa = new List<Term>();
+            foreach(var typeVar in _typeInst.FormalTypeParams)
+            {
+                Term t = typeIsaVisitor.Translate(_typeInst[typeVar]);
+                typeInstIsa.Add(t);
+            }
+
+            return IsaBoogieTerm.FunCall(functionCall.FunctionName, typeInstIsa, _args);
         }
 
         public Term Visit(MapSelect mapSelect)

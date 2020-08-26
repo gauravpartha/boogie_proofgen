@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -13,13 +14,12 @@ namespace ProofGeneration.ProgramToVCProof
     class PassiveLemmaManager : IBlockLemmaManager
     {
         private readonly VCInstantiation<Block> vcinst;
-        private readonly IEnumerable<Function> functions;
 
         private readonly BoogieMethodData methodData;
         private readonly IEnumerable<Variable> programVariables;
 
-        private readonly TermIdent varContext = IsaCommonTerms.TermIdentFromName("\\<Lambda>");
-        private readonly TermIdent functionContext = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
+        private readonly BoogieContextIsa boogieContext;
+
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
         private readonly Term initState;
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
@@ -31,24 +31,34 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
 
+        private readonly IVariableTranslationFactory variableFactory;
+
         private readonly string globalAssmsName = "global_assms";
 
-        public PassiveLemmaManager(VCInstantiation<Block> vcinst, BoogieMethodData methodData)
+        public PassiveLemmaManager(VCInstantiation<Block> vcinst, BoogieMethodData methodData, IVariableTranslationFactory variableFactory)
         {
             this.vcinst = vcinst;
             this.methodData = methodData;
             programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
             initState = IsaBoogieTerm.Normal(normalInitState);
-            cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer);
-            declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>)functions).Union(programVariables), uniqueNamer);
+            this.variableFactory = variableFactory;
+            cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer, variableFactory);
+            declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(programVariables), uniqueNamer);
             //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
-            funToInterpMapping = LemmaHelper.FunToTerm(functions, new IsaUniqueNamer());
+            funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
+
+            boogieContext = new BoogieContextIsa(
+              IsaCommonTerms.TermIdentFromName("A"),
+              IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
+              IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
+              IsaCommonTerms.TermIdentFromName("\\<Omega>")
+              );
         }
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
         {
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };
             assumptions.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
@@ -63,7 +73,7 @@ namespace ProofGeneration.ProgramToVCProof
         public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
         {
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };
             if (successors.Any())
@@ -87,16 +97,18 @@ namespace ProofGeneration.ProgramToVCProof
         {
             PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
+            VarType absValType = new VarType("a");
+
             var result = new List<Tuple<TermIdent, TypeIsa>>
             {
-                Tuple.Create(varContext, IsaBoogieType.VarContextType()),
-                Tuple.Create(functionContext, IsaBoogieType.FunContextType()),
-                Tuple.Create(normalInitState, IsaBoogieType.NormalStateType())
+                Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
+                Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunContextType(absValType)),
+                Tuple.Create(normalInitState, IsaBoogieType.NormalStateType(absValType))
             };
 
             foreach (KeyValuePair<Function, TermIdent> kv in funToInterpMapping)
             {
-                result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType()));
+                result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType(absValType)));
             }
 
             foreach (KeyValuePair<NamedDeclaration, TermIdent> kv in declToVCMapping)
@@ -123,7 +135,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<string> AssumptionLabels()
         {
-            return LemmaHelper.AssumptionLabels("G", 0, 2*functions.Count() + programVariables.Count());
+            return LemmaHelper.AssumptionLabels("G", 0, 2*(methodData.Functions).Count() + programVariables.Count());
         }
 
         private IList<Term> GlobalAssumptions()
@@ -136,12 +148,12 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Term> GlobalFunctionContextAssumptions()
         {
-            return LemmaHelper.FunctionAssumptions(functions, funToInterpMapping, declToVCMapping, functionContext);            
+            return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext.funContext);            
         }
 
         private IList<Term> GlobalStateAssumptions()
         {
-            return LemmaHelper.VariableAssumptions(programVariables, normalInitState, declToVCMapping, uniqueNamer);
+            return LemmaHelper.VariableAssumptions(programVariables, normalInitState, declToVCMapping, variableFactory.CreateTranslation().VarTranslation);
         }
 
         private Proof BlockCorrectProof(Block b, string vcHintsName)
@@ -220,7 +232,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             Term finalConfig = IsaBoogieTerm.CFGConfig(finalNodeOrDone, finalState);
 
-            Term redCfgMulti = IsaBoogieTerm.RedCFGMulti(varContext, functionContext, methodCfg, initConfig, finalConfig);
+            Term redCfgMulti = IsaBoogieTerm.RedCFGMulti(boogieContext, methodCfg, initConfig, finalConfig);
 
             List<Term> assumptions = new List<Term>() { redCfgMulti };
             assumptions.Add(vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping));

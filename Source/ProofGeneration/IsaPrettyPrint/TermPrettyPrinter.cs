@@ -17,22 +17,25 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitNatConst(NatConst t)
         {
-            //TODO make this configurable (i.e. not necessarily Suc form)
-
-            StringBuilder sb = new StringBuilder("");
-            for (int i = t.n; i > 0; i--)
+            if (t.useConstructorRepr)
             {
-                sb.Append("Suc(");
+                StringBuilder sb = new StringBuilder("");
+                for (int i = t.n; i > 0; i--)
+                {
+                    sb.Append("Suc(");
+                }
+
+                sb.Append(0);
+
+                for (int i = 1; i <= t.n; i++)
+                {
+                    sb.Append(")");
+                }
+                return IsaPrettyPrinterHelper.Parenthesis(sb.ToString());
             }
-
-            sb.Append(0);
-
-            for (int i = 1; i <= t.n; i++)
-            {
-                sb.Append(")");
+            else {
+                return (t.n).ToString();
             }
-
-            return IsaPrettyPrinterHelper.Parenthesis(sb.ToString());
         }
 
         public override string VisitIntConst(IntConst t)

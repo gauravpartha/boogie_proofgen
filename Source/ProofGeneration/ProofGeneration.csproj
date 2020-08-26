@@ -55,10 +55,17 @@
   <ItemGroup>
     <Compile Include="BoogieIsaInterface\ApplicableIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\BasicCmdIsaVisitor.cs" />
+    <Compile Include="BoogieIsaInterface\BoogieContextIsa.cs" />
     <Compile Include="BoogieIsaInterface\BoogieGlobalData.cs" />
     <Compile Include="BoogieIsaInterface\BoogieMethodData.cs" />
-    <Compile Include="BoogieIsaInterface\DeBruijnVarTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\BoogieFixedVarTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\BoogieVariableTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnTyVarTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnFixedVarTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnVarFactory.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\IVariableTranslation.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\IFixedVariableTranslation.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieTerm.cs" />
     <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
     <Compile Include="BoogieIsaInterface\IsaProgramGenerator.cs" />
@@ -66,6 +73,7 @@
     <Compile Include="BoogieIsaInterface\MultiCmdIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\PureValueIsaTransformer.cs" />
     <Compile Include="BoogieIsaInterface\TypeIsaVisitor.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\IVariableTranslationFactory.cs" />
     <Compile Include="CFGRepr\CFGRepr.cs" />
     <Compile Include="CFGRepr\CFGReprTransformer.cs" />
     <Compile Include="IsaPrettyPrint\IsaPrettyPrinterHelper.cs" />

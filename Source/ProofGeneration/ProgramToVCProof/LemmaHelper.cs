@@ -5,13 +5,14 @@ using ProofGeneration.VCProofGen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics.Contracts;
+using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 
 namespace ProofGeneration.ProgramToVCProof
 {
     static class LemmaHelper
     {
         private static PureToBoogieValConverter pureToBoogieValConverter = new PureToBoogieValConverter();
-        private static TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
 
         public static bool FinalStateIsMagic(Block block)
         {
@@ -39,20 +40,20 @@ namespace ProofGeneration.ProgramToVCProof
             IEnumerable<Variable> programVars,
             Term state,
             IDictionary<NamedDeclaration, TermIdent> declToVCMapping,
-            IsaUniqueNamer uniqueNamer)
+            IVariableTranslation<Variable> varTranslation)
         {
             var result = new List<Term>();
             foreach (Variable v in programVars)
             {
-                result.Add(VariableAssumption(v, state, declToVCMapping[v], uniqueNamer));
+                result.Add(VariableAssumption(v, state, declToVCMapping[v], varTranslation));
             }
 
             return result;
         }
 
-        public static Term VariableAssumption(Variable v, Term state, TermIdent vcVar, IsaUniqueNamer uniqueNamer)
+        public static Term VariableAssumption(Variable v, Term state, TermIdent vcVar, IVariableTranslation<Variable> varTranslation)
         {
-            Term left = new TermApp(state, new StringConst(v.Name));
+            Term left = new TermApp(state, new NatConst(varTranslation.TranslateVariable(v)));
             Term right = IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
             return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
         }
@@ -63,7 +64,7 @@ namespace ProofGeneration.ProgramToVCProof
             return new TermBinary(left, rhs, TermBinary.BinaryOpCode.EQ);
         }
 
-        public static Term VariableTypeAssumption(Variable v, Term varContext, IsaUniqueNamer uniqueNamer)
+        public static Term VariableTypeAssumption(Variable v, Term varContext, TypeIsaVisitor typeIsaVisitor)
         {
             Term left = new TermApp(varContext, new StringConst(v.Name));
             Term right = IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(v.TypedIdent.Type));

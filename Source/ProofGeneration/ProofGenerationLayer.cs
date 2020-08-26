@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using ProofGeneration.Util;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 
 namespace ProofGeneration
 {
@@ -34,6 +35,7 @@ namespace ProofGeneration
         private static CFGRepr afterUnreachablePruningCfg;
 
         private static BoogieMethodData finalProgData;
+        private static IVariableTranslationFactory varTranslationFactory;
 
         private static BoogieGlobalData boogieGlobalData;
 
@@ -64,6 +66,7 @@ namespace ProofGeneration
         {
             return new BoogieMethodData(
                 globalData,
+                new List<TypeVariable>(impl.TypeParameters),
                 new List<Variable>(impl.InParams),
                 new List<Variable>(impl.LocVars),
                 new List<Variable>(impl.LocVars));
@@ -150,9 +153,11 @@ namespace ProofGeneration
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
-        public static void VCGenerateAllProofs(VCExpr vc, VCExpr vcAxioms, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
+        public static void VCGenerateAllProofs(VCExpr vc, VCExpr vcAxioms, VCExpr typeAxioms, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
         {
-            IEnumerable<VCExpr> vcAxiomsDeconstructed = DeconstructAxioms(vcAxioms);
+            IEnumerable<VCExpr> vcAxiomsDeconstructed = DeconstructAxiomsNoChecks(vcAxioms);
+            vcAxiomsDeconstructed = vcAxiomsDeconstructed.Union(DeconstructAxiomsNoChecks(typeAxioms));
+
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
                 vc,
@@ -167,7 +172,11 @@ namespace ProofGeneration
             
             var lemmaNamer = new IsaUniqueNamer();
 
-            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData);
+            var fixedVarTranslation = new DeBruijnFixedVarTranslation(finalProgData);
+            var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
+            varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
+
+            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, varTranslationFactory);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
             // ignore peephole for now
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
@@ -183,7 +192,7 @@ namespace ProofGeneration
             //afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
           
 
-            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, beforeDagData, beforeDagCfg, out IList<OuterDecl> programDecls);
+            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, finalProgData, varTranslationFactory, beforeDagCfg, out IList<OuterDecl> programDecls);
             afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
                 afterUnreachablePruningCfg,
                 programRepr.cfgDeclDef,
@@ -192,17 +201,33 @@ namespace ProofGeneration
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
             var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
-            passiveOuterDecls.AddRange(programDecls);
+            //passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcinst, vcinstAxiom, afterUnreachablePruningCfg);
+            /*
+            var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcinst, vcinstAxiom, afterUnreachablePruningCfg, finalProgVarTranslation);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
+            */
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
                 new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML" },
                 passiveOuterDecls);
 
             StoreTheory(theoryPassive);
+        }
+
+        private static IEnumerable<VCExpr> DeconstructAxiomsNoChecks(VCExpr vcAxioms)
+        {
+            var result = new List<VCExpr>();
+            VCExpr vcAxiomsTemp = vcAxioms;
+            while (vcAxiomsTemp is VCExprNAry vcNAry && vcNAry.Op == VCExpressionGenerator.AndOp && vcNAry.Length == 2)
+            {
+                result.Add(vcNAry[1]);
+                vcAxiomsTemp = vcNAry[0];
+            }
+            result.Add(vcAxiomsTemp);
+            result.Reverse();
+            return result;
         }
 
         private static IEnumerable<VCExpr> DeconstructAxioms(VCExpr vcAxioms)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -21,12 +22,11 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IDictionary<Block, IDictionary<Variable, Expr>> constantEntry;
         private readonly IDictionary<Block, IDictionary<Variable, Expr>> constantExit;
 
-
-        private readonly IEnumerable<Function> functions;
+        private readonly BoogieMethodData methodData;
         private readonly IEnumerable<Variable> programVariables;
 
-        private readonly TermIdent varContext = IsaCommonTerms.TermIdentFromName("\\<Lambda>");
-        private readonly TermIdent functionContext = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
+        private readonly BoogieContextIsa boogieContext;
+
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
         private readonly Term initState;
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
@@ -36,6 +36,8 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IDictionary<Function, TermIdent> funToInterpMapping;
 
         private readonly MultiCmdIsaVisitor cmdIsaVisitor;
+
+        private readonly IVariableTranslationFactory varTranslationFactory;
 
         private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
         private readonly IsaUniqueNamer boogieVarUniqueNamer = new IsaUniqueNamer();
@@ -51,10 +53,8 @@ namespace ProofGeneration.ProgramToVCProof
             IDictionary<Variable, Variable> passiveToOrigVar,
             IDictionary<Block, IDictionary<Variable, Expr>> constantEntry,
             IDictionary<Block, IDictionary<Variable, Expr>> constantExit,
-            IEnumerable<Function> functions, 
-            IEnumerable<Variable> inParams,
-            IEnumerable<Variable> outParams,
-            IEnumerable<Variable> localVars)
+            BoogieMethodData methodData,
+            IVariableTranslationFactory varTranslationFactory)
         {
             this.vcinst = vcinst;
             this.cfg = cfg;
@@ -63,13 +63,21 @@ namespace ProofGeneration.ProgramToVCProof
             this.passiveToOrigVar = passiveToOrigVar;
             this.constantEntry = constantEntry;
             this.constantExit = constantExit;
-            this.functions = functions;
-            programVariables = inParams.Union(localVars).Union(outParams);
-            initState = IsaBoogieTerm.Normal(normalInitState);        
-            cmdIsaVisitor = new MultiCmdIsaVisitor(boogieVarUniqueNamer);
-            declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>)functions).Union(programVariables).Union(localVars), uniqueNamer);
+            this.methodData = methodData;
+            programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
+            initState = IsaBoogieTerm.Normal(normalInitState);
+            this.varTranslationFactory = varTranslationFactory;
+            cmdIsaVisitor = new MultiCmdIsaVisitor(boogieVarUniqueNamer, varTranslationFactory);
+            declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(programVariables), uniqueNamer);
             //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
-            funToInterpMapping = LemmaHelper.FunToTerm(functions, new IsaUniqueNamer());
+            funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
+
+            boogieContext = new BoogieContextIsa(
+                IsaCommonTerms.TermIdentFromName("A"),
+                IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
+                IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
+                IsaCommonTerms.TermIdentFromName("\\<Omega>")
+                );
         }
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> passiveSuc, string lemmaName, string vcHintsName)           
@@ -78,7 +86,7 @@ namespace ProofGeneration.ProgramToVCProof
                 throw new ProofGenUnexpectedStateException(GetType(), "did not expect any hints");
 
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };
 
@@ -114,7 +122,7 @@ namespace ProofGeneration.ProgramToVCProof
         {
             List<string> methods = new List<string>
             {
-                "using assms " + (functions.Any() ? funAssmsName : ""),
+                "using assms " + (methodData.Functions.Any() ? funAssmsName : ""),
                 "apply cases"
             };
 
@@ -144,7 +152,7 @@ namespace ProofGeneration.ProgramToVCProof
         public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> succPassive, string lemmaName)
         {
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(varContext, functionContext, cmds, initState, finalState);
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
             List<Term> assumptions = new List<Term>() { cmdsReduce };
 
             assumptions.AddRange(PrunedBlockEntryStateAssms(block, succPassive, normalInitState));
@@ -175,7 +183,7 @@ namespace ProofGeneration.ProgramToVCProof
                 result.Add(new LemmasDecl(varAssmsName, VarAssumptionLabels()));
             }
 
-            if (functions.Any())
+            if (methodData.Functions.Any())
             {
                 result.Add(new LemmasDecl(funAssmsName, FunAssumptionLabels()));
             }
@@ -192,7 +200,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Term> GlobalFunctionContextAssumptions()
         {
-            return LemmaHelper.FunctionAssumptions(functions, funToInterpMapping, declToVCMapping, functionContext);
+            return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext.funContext);
         }
 
         private IList<Term> GlobalVarContextAssumptions()
@@ -200,7 +208,8 @@ namespace ProofGeneration.ProgramToVCProof
             var assms = new List<Term>();
             foreach (Variable v in programVariables)
             {
-                assms.Add(LemmaHelper.VariableTypeAssumption(v, varContext, boogieVarUniqueNamer));
+                assms.Add(LemmaHelper.VariableTypeAssumption(v, boogieContext.varContext, 
+                    new TypeIsaVisitor(varTranslationFactory.CreateTranslation().TypeVarTranslation)));
             }
             return assms;
         }
@@ -219,22 +228,24 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<string> FunAssumptionLabels()
         {
-            return LemmaHelper.AssumptionLabels("F", programVariables.Count(), 2*functions.Count());
+            return LemmaHelper.AssumptionLabels("F", programVariables.Count(), 2*methodData.Functions.Count());
         }
 
         private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
         {
             PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
+            VarType absValType = new VarType("a");
+
             var result = new List<Tuple<TermIdent, TypeIsa>>()
             {
-                Tuple.Create(varContext, IsaBoogieType.VarContextType()),
-                Tuple.Create(functionContext, IsaBoogieType.FunContextType())
+                Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
+                Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunContextType(absValType))
             };
 
             foreach (KeyValuePair<Function, TermIdent> kv in funToInterpMapping)
             {
-                result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType()));
+                result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType(absValType)));
             }
 
             return result;
@@ -446,7 +457,8 @@ namespace ProofGeneration.ProgramToVCProof
 
                     if (includeVar(vOrig))
                     {
-                        result.Add(LemmaHelper.VariableAssumption(vOrig, normalState, declToVCMapping[vOrig], boogieVarUniqueNamer));
+                        result.Add(LemmaHelper.VariableAssumption(vOrig, normalState, declToVCMapping[vOrig], 
+                            varTranslationFactory.CreateTranslation().VarTranslation));
                         includedVars.Add(vOrig);
                     }
                 }
@@ -467,7 +479,8 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 if (includeVar(v))
                 {
-                    result.Add(LemmaHelper.VariableAssumption(v, normalState, declToVCMapping[v], boogieVarUniqueNamer));
+                    result.Add(LemmaHelper.VariableAssumption(v, normalState, declToVCMapping[v], 
+                        varTranslationFactory.CreateTranslation().VarTranslation));
                     includedVars.Add(v);
                 }
             }

@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Text;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -13,17 +12,20 @@ namespace ProofGeneration
 {
     class IsaProgramGenerator
     {
-        private readonly MultiCmdIsaVisitor cmdIsaVisitor = new MultiCmdIsaVisitor();
-        private readonly TypeIsaVisitor typeIsaVisitor = new TypeIsaVisitor();
+        private MultiCmdIsaVisitor cmdIsaVisitor;
+        private IVariableTranslationFactory varTranslationFactory;
 
         public IsaProgramRepr GetIsaProgram(
             string localeName,
             string procName,
             BoogieMethodData methodData,
+            IVariableTranslationFactory varTranslationFactory,
             CFGRepr cfg,
             out IList<OuterDecl> decls
             )
         {
+            this.varTranslationFactory = varTranslationFactory;
+            cmdIsaVisitor = new MultiCmdIsaVisitor(varTranslationFactory);
             Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
 
             OuterDecl outEdges = GetOutEdgesIsa(procName, cfg);
@@ -138,14 +140,13 @@ namespace ProofGeneration
 
         private DefDecl GetFunctionDeclarationsIsa(string methodName, IEnumerable<Function> functions)
         {
-            var typeIsaVisitor = new TypeIsaVisitor();
             //var equations = new List<Tuple<IList<Term>, Term>>();
             var fdecls = new List<Term>();
 
 
             foreach (var f in functions)
             {
-                fdecls.Add(IsaBoogieTerm.FunDecl(f));
+                fdecls.Add(IsaBoogieTerm.FunDecl(f, varTranslationFactory));
             }
 
             var  equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(fdecls));
@@ -155,7 +156,7 @@ namespace ProofGeneration
 
         private DefDecl GetVariableDeclarationsIsa(string varKind, string methodName, IEnumerable<Variable> variables)
         {
-            var typeIsaVisitor = new TypeIsaVisitor();
+            var typeIsaVisitor = new TypeIsaVisitor(varTranslationFactory.CreateTranslation().TypeVarTranslation);
 
             var vdecls = new List<Term>();
 

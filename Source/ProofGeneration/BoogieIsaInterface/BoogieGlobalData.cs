@@ -21,5 +21,10 @@ namespace ProofGeneration.BoogieIsaInterface
             this.GlobalVars = globalVars;
             this.Constants = constants;
         }
+
+        public static BoogieGlobalData CreateEmpty()
+        {
+            return new BoogieGlobalData(new List<Function>(), new List<Axiom>(), new List<Variable>(), new List<Variable>());
+        }
     }
 }

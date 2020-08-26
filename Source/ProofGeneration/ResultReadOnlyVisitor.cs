@@ -5,7 +5,7 @@ using System.Diagnostics.Contracts;
 namespace ProofGeneration
 {
     /** visitor where visited nodes uses results from children */
-    abstract class ResultReadOnlyVisitor<T> : ReadOnlyVisitor
+    public abstract class ResultReadOnlyVisitor<T> : ReadOnlyVisitor
     {
         protected Stack<T> Results { get; } = new Stack<T>();
 
