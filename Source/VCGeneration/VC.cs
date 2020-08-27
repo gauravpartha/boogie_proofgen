@@ -1393,7 +1393,22 @@ namespace VC {
         Contract.Assert(vc != null);
 
                 #region proofgen
-                //var eraser = new Bpl.TypeErasure.TypeEraserPremisses((Bpl.TypeErasure.TypeAxiomBuilderPremisses)AxBuilder, checker.VCExprGen);
+                var axiomBuilder = new Bpl.TypeErasure.TypeAxiomBuilderPremisses(checker.VCExprGen);
+                axiomBuilder.Setup();
+                Bpl.TypeErasure.TypeEraser eraser;
+                switch (CommandLineOptions.Clo.TypeEncodingMethod)
+                {
+                    case CommandLineOptions.TypeEncoding.Predicates:
+                        eraser = new Bpl.TypeErasure.TypeEraserPremisses(axiomBuilder, checker.VCExprGen);
+                        break;
+                    case CommandLineOptions.TypeEncoding.Monomorphic:
+                        eraser = null;
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }                
+
+
                 if(!(ctx is DeclFreeProverContext))
                 { 
                     throw new NotImplementedException("Proof Generation only supports DeclFreeProverContext as context.");
@@ -1401,20 +1416,39 @@ namespace VC {
 
                 var declFreeProverContext = ctx as DeclFreeProverContext;
 
-                //TODO: VCExpr exprWithoutTypes = eraser == null ? expr : eraser.Erase(expr, polarity);
-                ProofGeneration.ProofGenerationLayer.Program(parent.program);
-                ProofGeneration.ProofGenerationLayer.AfterUnreachablePruning(impl);
+                
+                VCExpr exprWithoutTypes = eraser == null ? vc : eraser.Erase(vc, 1);
+                      
+                VCExpr typeAxioms = axiomBuilder.GetNewAxioms();
+
+                LetBindingSorter letSorter = new LetBindingSorter(checker.VCExprGen);
+                Contract.Assert(letSorter != null);
+
+                VCExpr sortedExpr = letSorter.Mutate(exprWithoutTypes, true);
+
+
+                ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(
+                    sortedExpr, 
+                    declFreeProverContext.Axioms, 
+                    typeAxioms,
+                    checker.TheoremProver.VCExprGen, 
+                    checker.TheoremProver.Context.BoogieExprTranslator,
+                    eraser == null ? null : axiomBuilder);
+                
+                //ProofGeneration.ProofGenerationLayer.AfterUnreachablePruning(impl);
                 //TODO: the typing axioms are ignored for now (since we don't support uninterpreted/polymorphic types)
-                ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(vc, declFreeProverContext.Axioms, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator);
+
+
+                //ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(vc, declFreeProverContext.Axioms, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator);
                 //ProofGeneration.ProofGenerationLayer.ConvertVC(vc, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator, parent.program, impl);                
                 #endregion
-        
-        /*
-        VCExpr controlFlowFunctionAppl = exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
-        VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(impl.Blocks[0].UniqueId)));
-        vc = exprGen.Implies(eqExpr, vc);
-        */
-        reporter = new ErrorReporter(gotoCmdOrigins, label2absy, impl.Blocks, parent.incarnationOriginMap, callback, mvInfo, this.Checker.TheoremProver.Context, parent.program);
+
+                /*
+                VCExpr controlFlowFunctionAppl = exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
+                VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(impl.Blocks[0].UniqueId)));
+                vc = exprGen.Implies(eqExpr, vc);
+                */
+                reporter = new ErrorReporter(gotoCmdOrigins, label2absy, impl.Blocks, parent.incarnationOriginMap, callback, mvInfo, this.Checker.TheoremProver.Context, parent.program);
 
         if (CommandLineOptions.Clo.TraceVerify && no >= 0)
         {
@@ -1585,6 +1619,7 @@ namespace VC {
 #endif
 
       #region proofgen
+      ProofGeneration.ProofGenerationLayer.Program(program);
       ProofGeneration.ProofGenerationLayer.BeforeCFGToDAG(impl);
       #endregion
 

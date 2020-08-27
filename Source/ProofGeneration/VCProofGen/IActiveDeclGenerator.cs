@@ -18,7 +18,7 @@ namespace ProofGeneration.VCProofGen
         /// </summary>
         IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(
             IDictionary<Block, VCExpr> blockToVC,
-            IDictionary<VCExprVar, Variable> vcToBoogieVar,
+            IVCVarTranslator translator,
             CFGRepr cfg,
             out IDictionary<Block, ISet<Variable>> blockToNewVars);
 

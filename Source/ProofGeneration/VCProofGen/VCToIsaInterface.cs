@@ -1,4 +1,5 @@
 ﻿using Microsoft.Boogie;
+using Microsoft.Boogie.TypeErasure;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
@@ -21,6 +22,7 @@ namespace ProofGeneration.VCProofGen
             IActiveDeclGenerator activeDeclGenerator,
             VCExpressionGenerator gen,
             Boogie2VCExprTranslator translator,
+            TypeAxiomBuilderPremisses axiomBuilder,
             BoogieMethodData methodData,
             CFGRepr cfg,
             out VCInstantiation<Block> vcinst,
@@ -32,15 +34,15 @@ namespace ProofGeneration.VCProofGen
             var uniqueNamer = new IsaUniqueNamer();
             IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
 
+            IVCVarTranslator varTranslator = new VCVarTranslator(methodData.InParams.Union(methodData.Locals), translator, axiomBuilder);
 
-            IDictionary<VCExprVar, Variable> vcToBoogieVar = VCExprToBoogieVar(translator, methodData.InParams.Union(methodData.Locals));
             IDictionary<Block, ISet<NamedDeclaration>> activeDeclsPerBlock = 
-                activeDeclGenerator.GetActiveDeclsPerBlock(blockToVC, vcToBoogieVar, cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars);
+                activeDeclGenerator.GetActiveDeclsPerBlock(blockToVC, varTranslator, cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars);
 
             IDictionary<Block, IList<NamedDeclaration>> activeDeclsPerBlockSorted =
-                SortActiveDecls(activeDeclsPerBlock, methodData.Functions, translator, out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock);
+                SortActiveDecls(activeDeclsPerBlock, methodData.Functions, varTranslator, out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock);
 
-            IDictionary<Block, IList<VCExprVar>> blockToNewVCVars = ConvertVariableToVCExpr(blockToNewVars, translator);
+            IDictionary<Block, IList<VCExprVar>> blockToNewVCVars = ConvertVariableToVCExpr(blockToNewVars, varTranslator);
 
             var blockToIsaTranslator = new VCBlockToIsaTranslator(uniqueNamer);
             IDictionary<Block, DefDecl> blockToVCExpr = 
@@ -54,11 +56,13 @@ namespace ProofGeneration.VCProofGen
                 vcOuterDecls.Add(blockToVCExpr[block]);
             }
 
-            //reason for using two references: cannot use out parameters in lambda expressions
             vcinst = new VCInstantiation<Block>(blockToVCExpr, activeDeclsPerBlockSorted, localeName);
-            var vcinstInternal = vcinst;
 
             /*
+             *             
+            //reason for using second reference: cannot use out parameters in lambda expressions
+            var vcinstInternal = vcinst;
+
             LemmaDecl vcCorrectLemma = new LemmaDecl("vc_correct",
                 new TermApp(vcinstInternal.GetVCObjRef(cfg.entry, false), 
                            activeVarsPerBlock[cfg.entry].Select(v => (Term) IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name))).ToList()),
@@ -75,13 +79,14 @@ namespace ProofGeneration.VCProofGen
             */
 
             //axioms
-            IDictionary<Axiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(methodData.Axioms, vcAxioms, vcToBoogieVar);
+            IDictionary<Axiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(methodData.Axioms, vcAxioms, varTranslator);
             IDictionary<Axiom, IList<NamedDeclaration>> activeDeclsPerAxiomSorted =
-                 SortActiveDecls(activeDeclsPerAxiom, methodData.Functions, translator, out IDictionary<Axiom, IList<VCExprVar>> activeVarsPerAxiom);
+                 SortActiveDecls(activeDeclsPerAxiom, methodData.Functions, varTranslator, out IDictionary<Axiom, IList<VCExprVar>> activeVarsPerAxiom);
             var axiomVCDefs = new List<DefDecl>();
             var axiomToDef = new Dictionary<Axiom, DefDecl>();
             var vcExprIsaTranslator = new VCExprToIsaTranslator(uniqueNamer);
             int axId = 0;
+            //TODO: not all vc axioms have corresponding program axiom
             void axiomsAction(Axiom ax, VCExpr vcAx)
             {
                 IList<Term> args = activeVarsPerAxiom[ax].Select(v => vcExprIsaTranslator.Translate(v)).ToList();
@@ -102,7 +107,7 @@ namespace ProofGeneration.VCProofGen
         private static Dictionary<T, IList<NamedDeclaration>>  SortActiveDecls<T>(
             IDictionary<T, ISet<NamedDeclaration>> activeDeclsPerBlock,
             IEnumerable<Function> functions,
-            Boogie2VCExprTranslator translator,
+            IVCVarTranslator translator,
             out IDictionary<T, IList<VCExprVar>> activeVarsPerBlock)
         {
             activeVarsPerBlock = new Dictionary<T, IList<VCExprVar>>();
@@ -111,8 +116,16 @@ namespace ProofGeneration.VCProofGen
             foreach (KeyValuePair<T, ISet<NamedDeclaration>> kv in activeDeclsPerBlock)
             {
                 var activeVars = kv.Value.Where(decl => decl is Variable);
+                var activeVCVars = activeVars.Select(decl => {
+                    if (translator.TranslateBoogieVar((Variable)decl, out VCExprVar result))
+                    {
+                        return result;
+                    } else
+                    {
+                        Contract.Assert(false);
+                        return null;
+                    }}).ToList();
 
-                var activeVCVars = activeVars.Select(decl => { var vcVar = translator.TryLookupVariable((Variable)decl); Contract.Assert(vcVar != null); return vcVar; }).ToList();
                 activeVarsPerBlock.Add(kv.Key, activeVCVars);
 
                 var sortedDecls = new List<NamedDeclaration>();
@@ -130,7 +143,7 @@ namespace ProofGeneration.VCProofGen
             return activeDeclsPerBlockSorted;
         }
 
-        private static IDictionary<Block, IList<VCExprVar>> ConvertVariableToVCExpr(IDictionary<Block, ISet<Variable>> dict, Boogie2VCExprTranslator translator)
+        private static IDictionary<Block, IList<VCExprVar>> ConvertVariableToVCExpr(IDictionary<Block, ISet<Variable>> dict, IVCVarTranslator translator)
         {
             if (dict == null)
                 return null;
@@ -142,12 +155,11 @@ namespace ProofGeneration.VCProofGen
                 IList<VCExprVar> newVCExprs = new List<VCExprVar>();
                 foreach (Variable v in blockAndVars.Value)
                 {
-                    VCExprVar translatedVar = translator.TryLookupVariable(v);
-                    if (translatedVar == null)
+                    if (!translator.TranslateBoogieVar(v, out VCExprVar result))
                     {
                         throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface), "Could not map Boogie variable to VC variable");
                     }
-                    newVCExprs.Add(translatedVar);
+                    newVCExprs.Add(result);
                 }
                 blockToNewVCVar.Add(blockAndVars.Key, newVCExprs);
             }
@@ -155,19 +167,6 @@ namespace ProofGeneration.VCProofGen
             return blockToNewVCVar;
         }
    
-        private static IDictionary<VCExprVar, Variable> VCExprToBoogieVar(Boogie2VCExprTranslator translator, IEnumerable<Variable> decls)
-        {
-            var vcToBoogieVar = new Dictionary<VCExprVar, Variable>();
-            foreach (var decl in decls)
-            {
-                VCExprVar result = translator.TryLookupVariable(decl);
-                if (result != null)
-                    vcToBoogieVar.Add(result, decl);
-            }
-
-            return vcToBoogieVar;
-        }
-
         private static IList<Tuple<TermIdent, TypeIsa>> GetVarsInVC(IEnumerable<Function> functions, IsaUniqueNamer uniqueNamer)
         {
             var pureTyIsaTransformer = new PureTyIsaTransformer();
@@ -186,14 +185,14 @@ namespace ProofGeneration.VCProofGen
         private static IDictionary<Axiom, ISet<NamedDeclaration>> VCInstAxioms(
             IEnumerable<Axiom> axioms, 
             IEnumerable<VCExpr> vcAxioms, 
-            IDictionary<VCExprVar, Variable> vcToBoogieVar)
+            IVCVarTranslator translator)
         {
             var result = new Dictionary<Axiom, ISet<NamedDeclaration>>();
 
             VCExprDeclCollector collector = new VCExprDeclCollector();
             void action(Axiom ax, VCExpr vc)
             {
-                ISet<NamedDeclaration> decls = collector.CollectNamedDeclarations(vc, vcToBoogieVar);
+                ISet<NamedDeclaration> decls = collector.CollectNamedDeclarations(vc, translator);
                 result.Add(ax, decls);
             }
 

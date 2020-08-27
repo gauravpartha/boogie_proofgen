@@ -115,6 +115,8 @@
     <Compile Include="VCProofGen\VCInstantiation.cs" />
     <Compile Include="VCProofGen\VCToIsaInterface.cs" />
     <Compile Include="VCProofGen\VCBlockToIsaTranslator.cs" />
+    <Compile Include="VCProofGen\IVCVarTranslator.cs" />
+    <Compile Include="VCProofGen\VCVarTranslator.cs" />
     <Compile Include="version.cs" />
   </ItemGroup>
   <ItemGroup>

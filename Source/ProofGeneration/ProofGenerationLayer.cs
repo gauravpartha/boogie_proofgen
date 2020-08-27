@@ -12,6 +12,7 @@ using System.Linq;
 using ProofGeneration.Util;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
+using Microsoft.Boogie.TypeErasure;
 
 namespace ProofGeneration
 {
@@ -137,6 +138,8 @@ namespace ProofGeneration
             afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
 
+        public static Boogie2VCExprTranslator checkTranslator;
+
         /// <summary> Records hint for a cmd in the final passified Boogie program</summary>
         /// <param name="exprVC">the computed VC for the expression in the command</param>
         /// <param name="postVC">the computed postcondition of the command</param>
@@ -148,12 +151,19 @@ namespace ProofGeneration
             VCExpr exprVC, 
             VCExpr postVC, 
             VCExpr resultVC, 
-            CommandLineOptions.SubsumptionOption subsumptionOption)
+            CommandLineOptions.SubsumptionOption subsumptionOption
+            )
         {
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
-        public static void VCGenerateAllProofs(VCExpr vc, VCExpr vcAxioms, VCExpr typeAxioms, VCExpressionGenerator gen, Boogie2VCExprTranslator translator)
+        //axiom builder is null iff types are not erased (since no polymorphism in vc)
+        public static void VCGenerateAllProofs(VCExpr vc, 
+            VCExpr vcAxioms, 
+            VCExpr typeAxioms, 
+            VCExpressionGenerator gen, 
+            Boogie2VCExprTranslator translator,
+            TypeAxiomBuilderPremisses axiomBuilder)
         {
             IEnumerable<VCExpr> vcAxiomsDeconstructed = DeconstructAxiomsNoChecks(vcAxioms);
             vcAxiomsDeconstructed = vcAxiomsDeconstructed.Union(DeconstructAxiomsNoChecks(typeAxioms));
@@ -165,6 +175,7 @@ namespace ProofGeneration
                 new StandardActiveDecl(),
                 gen,
                 translator,
+                axiomBuilder,
                 finalProgData,
                 afterUnreachablePruningCfg,
                 out VCInstantiation<Block> vcinst,

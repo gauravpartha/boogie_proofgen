@@ -1,10 +1,6 @@
 ﻿using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -12,20 +8,20 @@ namespace ProofGeneration.VCProofGen
     {
         private ISet<NamedDeclaration> NamedDeclarations;        
 
-        private IDictionary<VCExprVar, Variable> VcToVar;
+        private IVCVarTranslator translator;
 
-        public ISet<NamedDeclaration> CollectNamedDeclarations(VCExpr node, IDictionary<VCExprVar, Variable> vcToVar)
+        public ISet<NamedDeclaration> CollectNamedDeclarations(VCExpr node, IVCVarTranslator translator)
         {
-            this.VcToVar = vcToVar;
-            this.NamedDeclarations = new HashSet<NamedDeclaration>();
+            this.translator = translator;
+            NamedDeclarations = new HashSet<NamedDeclaration>();
 
             node.Accept(this, true);
-            return this.NamedDeclarations;
+            return NamedDeclarations;
         }
 
         protected override bool StandardResult(VCExpr node, bool arg)
         {
-            if(node is VCExprVar varNode && VcToVar.TryGetValue(varNode, out Variable boogieVar))
+            if(node is VCExprVar varNode && translator.TranslateVCVar(varNode, out Variable boogieVar))
             {
                  NamedDeclarations.Add(boogieVar);
             } else if(node is VCExprNAry vcExprNAry && vcExprNAry.Op is VCExprBoogieFunctionOp boogieFunOp)

@@ -11,7 +11,7 @@ namespace ProofGeneration.VCProofGen
 {
     class PassiveActiveDecl : IActiveDeclGenerator
     {
-        public IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(IDictionary<Block, VCExpr> blockToVC, IDictionary<VCExprVar, Variable> vcToBoogieVar, CFGRepr cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars)
+        public IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(IDictionary<Block, VCExpr> blockToVC, IVCVarTranslator translator, CFGRepr cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars)
         {
             var blockToDefinedDecls = new Dictionary<Block, ISet<NamedDeclaration>>();
 
@@ -27,7 +27,7 @@ namespace ProofGeneration.VCProofGen
             //compute all named declarations in the VC for each block b which have been used before b is reached
             foreach (Block b in cfg.GetBlocksForwards())
             {
-                ISet<NamedDeclaration> bDecls = declCollector.CollectNamedDeclarations(blockToVC[b], vcToBoogieVar);
+                ISet<NamedDeclaration> bDecls = declCollector.CollectNamedDeclarations(blockToVC[b], translator);
                 blockToNamedDecls.Add(b, bDecls);
 
                 foreach (Block bSucc in cfg.GetSuccessorBlocks(b))
