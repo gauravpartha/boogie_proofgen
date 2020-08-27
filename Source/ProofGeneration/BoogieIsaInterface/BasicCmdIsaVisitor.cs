@@ -61,7 +61,7 @@ namespace ProofGeneration
 
         protected override bool TranslatePrecondition(Absy node)
         {
-            return node is Cmd || node is Expr;
+            return node is Cmd || node is Expr || node is AssignLhs;
         }
 
         public override Cmd VisitAssertCmd(AssertCmd node)
