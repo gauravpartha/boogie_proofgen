@@ -9,8 +9,18 @@ namespace ProofGeneration.BoogieIsaInterface
     class PureTyIsaTransformer : ResultReadOnlyVisitor<TypeIsa>
     {
         //u represents the Boogie values in the VC and t represents the Boogie types in the VC
-        private readonly VarType valueTy = new VarType("u");
+        private readonly TypeIsa valueTy;
         private readonly VarType typeTy = new VarType("t");
+
+
+        public PureTyIsaTransformer(TypeIsa valueTy)
+        {
+            this.valueTy = valueTy;
+        }
+
+        public PureTyIsaTransformer() : this(new VarType("u"))
+        { }
+        
 
         protected override bool TranslatePrecondition(Absy node)
         {
@@ -63,9 +73,17 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public override CtorType VisitCtorType(CtorType node)
         {
-            //we don't support VC optimizations that monomorphize the VC if there are no polymorphic types for now
-            //hence values of a type generated via a constructor are always represented by u
-            ReturnResult(valueTy);
+            //TODO: checking for T by name does not work in general, fix this by parametrizing the class by the actual object
+            if(node.Decl.Name.Equals("T") && !node.Arguments.Any())
+            {
+                ReturnResult(typeTy);
+            } else
+            {
+                //we don't support VC optimizations that monomorphize the VC if there are no polymorphic types for now
+                //hence values of a type generated via a constructor are always represented by u
+                ReturnResult(valueTy);
+            }
+
             return node;
         }
 

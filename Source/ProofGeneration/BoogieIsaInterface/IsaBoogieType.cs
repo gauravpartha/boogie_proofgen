@@ -38,12 +38,17 @@ namespace ProofGeneration
 
         public static Term TConType(string constructorName, List<Term> constructorArgs)
         {
-            return new TermApp(new StringConst(constructorName), new TermList(constructorArgs));
+            return new TermApp(new TermApp(tconId, new StringConst(constructorName)), new TermList(constructorArgs));
         }
 
         public static TypeIsa ValType(TypeIsa absValType)
         {
             return new DataType("val", new List<TypeIsa>() { absValType });
+        }
+
+        public static TypeIsa AbstractValueTyFunType(TypeIsa absValType)
+        {
+            return new DataType("absval_ty_fun", new List<TypeIsa>() { absValType });
         }
 
         public static TypeIsa NormalStateType(TypeIsa absValType)

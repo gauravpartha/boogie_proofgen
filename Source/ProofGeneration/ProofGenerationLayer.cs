@@ -138,8 +138,6 @@ namespace ProofGeneration
             afterUnreachablePruningCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
 
-        public static Boogie2VCExprTranslator checkTranslator;
-
         /// <summary> Records hint for a cmd in the final passified Boogie program</summary>
         /// <param name="exprVC">the computed VC for the expression in the command</param>
         /// <param name="postVC">the computed postcondition of the command</param>
@@ -179,7 +177,9 @@ namespace ProofGeneration
                 finalProgData,
                 afterUnreachablePruningCfg,
                 out VCInstantiation<Block> vcinst,
-                out VCInstantiation<Axiom> vcinstAxiom);
+                out VCInstantiation<Axiom> vcinstAxiom,
+                out IVCVarFunTranslator vcTranslator,
+                out IEnumerable<Function> vcFunctions);
             
             var lemmaNamer = new IsaUniqueNamer();
 
@@ -187,7 +187,7 @@ namespace ProofGeneration
             var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
-            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, varTranslationFactory);
+            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, vcFunctions, vcTranslator, varTranslationFactory);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
             // ignore peephole for now
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);

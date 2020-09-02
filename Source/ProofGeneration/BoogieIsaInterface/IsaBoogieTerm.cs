@@ -13,18 +13,25 @@ namespace ProofGeneration
     public static class IsaBoogieTerm
     {
 
+        private readonly static TermIdent intVId = IsaCommonTerms.TermIdentFromName("IntV");
+        private readonly static TermIdent boolVId = IsaCommonTerms.TermIdentFromName("BoolV");
+        private readonly static TermIdent intLitId = IsaCommonTerms.TermIdentFromName("LInt");
+        private readonly static TermIdent boolLitId = IsaCommonTerms.TermIdentFromName("LBool");
+
         private readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
         private readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
         private readonly static TermIdent redExprId = IsaCommonTerms.TermIdentFromName("red_expr");
         private readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
         private readonly static TermIdent magicStateId = IsaCommonTerms.TermIdentFromName("Magic");
         private readonly static TermIdent failureStateId = IsaCommonTerms.TermIdentFromName("Failure");
-        private readonly static TermIdent convertValToBoolId = IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
-        private readonly static TermIdent convertValToIntId = IsaCommonTerms.TermIdentFromName("convert_val_to_int");
+        public static TermIdent ConvertValToBoolId { get; }= IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
+        public static TermIdent ConvertValToIntId { get;  }= IsaCommonTerms.TermIdentFromName("convert_val_to_int");
         private readonly static TermIdent funInterpWfId = IsaCommonTerms.TermIdentFromName("fun_interp_wf");
         private readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
         private readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
         private readonly static TermIdent axiomsSatId = IsaCommonTerms.TermIdentFromName("axioms_sat");
+
+        private readonly static TermIdent typeOfValId = IsaCommonTerms.TermIdentFromName("type_of_val");
 
         private readonly static TermIdent forallId = IsaCommonTerms.TermIdentFromName("Forall");
         private readonly static TermIdent existsId = IsaCommonTerms.TermIdentFromName("Exists");
@@ -33,9 +40,9 @@ namespace ProofGeneration
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
-        public static Term ExprFromVal(Term val)
+        public static Term ExprFromLiteral(Term lit)
         {
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Val"), new List<Term>() { val });
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Lit"), new List<Term>() { lit });
         }
 
         public static Term Var(string v)
@@ -58,19 +65,29 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("BVar"), new List<Term>() { natConst });
         }
 
-        public static Term ValFromLiteral(LiteralExpr node)
+        public static Term Literal(LiteralExpr node)
         {
             if (node.Type.IsBool)
             {
-               return BoolVal(node.asBool);
+               return BoolLiteral(node.asBool);
             }
             else if (node.Type.IsInt)
             {
-                return IntVal(node.asBigNum);
+                return IntLiteral(node.asBigNum);
             } else
             {
                 throw new NotImplementedException();
             }
+        }
+
+        public static Term IntLiteral(Microsoft.Basetypes.BigNum num)
+        {
+            return new TermApp(intLitId, new IntConst(num));
+        }
+
+        public static Term IntValConstr()
+        {
+            return intVId;
         }
 
         public static Term IntVal(Microsoft.Basetypes.BigNum num)
@@ -81,7 +98,17 @@ namespace ProofGeneration
 
         public static Term IntVal(Term i)
         {
-            return new TermApp(IsaCommonTerms.TermIdentFromName("IntV"), new List<Term>() { i });
+            return new TermApp(intVId, new List<Term>() { i });
+        }
+
+        public static Term BoolLiteral(bool b)
+        {
+            return new TermApp(boolLitId, new BoolConst(b));
+        }
+        
+        public static Term BoolValConstr()
+        {
+            return boolVId;
         }
 
         public static Term BoolVal(bool b)
@@ -92,7 +119,7 @@ namespace ProofGeneration
 
         public static Term BoolVal(Term b)
         {
-            return new TermApp(IsaCommonTerms.TermIdentFromName("BoolV"), new List<Term>() { b });
+            return new TermApp(boolVId, new List<Term>() { b });
         }
 
         public static Term Assert(Term arg)
@@ -390,12 +417,17 @@ namespace ProofGeneration
 
         public static Term ConvertValToBool(Term val)
         {
-            return new TermApp(convertValToBoolId, val);
+            return new TermApp(ConvertValToBoolId, val);
         }
 
         public static Term ConvertValToInt(Term val)
         {
-            return new TermApp(convertValToIntId, val);
+            return new TermApp(ConvertValToIntId, val);
+        }
+
+        public static Term TypeToVal(Term absValTyMap, Term value)
+        {
+            return new TermApp(new TermApp(typeOfValId, absValTyMap), value);
         }
 
         public static Term FunInterpWf(Term fdecls, Term finterp)

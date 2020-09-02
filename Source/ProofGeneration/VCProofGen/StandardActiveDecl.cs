@@ -11,7 +11,7 @@ namespace ProofGeneration.VCProofGen
 {
     class StandardActiveDecl : IActiveDeclGenerator
     {
-        public IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(IDictionary<Block, VCExpr> blockToVC, IVCVarTranslator translator, CFGRepr cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars)
+        public IDictionary<Block, ISet<NamedDeclaration>> GetActiveDeclsPerBlock(IDictionary<Block, VCExpr> blockToVC, IVCVarFunTranslator translator, CFGRepr cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars)
         {
             var blockToDecls = new Dictionary<Block, ISet<NamedDeclaration>>();
 

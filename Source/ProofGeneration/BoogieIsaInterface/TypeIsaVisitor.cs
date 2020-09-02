@@ -34,7 +34,7 @@ namespace ProofGeneration
 
         public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
         {
-            ReturnResult(IsaBoogieType.TVar(typeVarTranslation.TranslateVariable(node)));
+            ReturnResult(typeVarTranslation.TranslateVariable(node));
             return node;
         }
 

@@ -26,7 +26,9 @@ namespace ProofGeneration.VCProofGen
             BoogieMethodData methodData,
             CFGRepr cfg,
             out VCInstantiation<Block> vcinst,
-            out VCInstantiation<Axiom> vcinstAxiom)
+            out VCInstantiation<Axiom> vcinstAxiom,
+            out IVCVarFunTranslator vcTranslator,
+            out IEnumerable<Function> vcTypeFunctions)
         {
             VCExprLet vcLet = vc as VCExprLet;
             Contract.Assert(vcLet != null);
@@ -34,13 +36,25 @@ namespace ProofGeneration.VCProofGen
             var uniqueNamer = new IsaUniqueNamer();
             IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
 
-            IVCVarTranslator varTranslator = new VCVarTranslator(methodData.InParams.Union(methodData.Locals), translator, axiomBuilder);
+            IDictionary<Function, Function> funToVCfun = new VCFunDeclCollector().CollectFunDeclarations(vc, methodData.Functions);
+            IVCVarFunTranslator varTranslator = new VCVarFunTranslator(methodData.InParams.Union(methodData.Locals), funToVCfun, translator, axiomBuilder);
 
             IDictionary<Block, ISet<NamedDeclaration>> activeDeclsPerBlock = 
                 activeDeclGenerator.GetActiveDeclsPerBlock(blockToVC, varTranslator, cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars);
 
+            #region temporary: extend vc instantiation to support vc functions
+            IList<Function> otherFunctions = new List<Function>();
+
+            foreach(NamedDeclaration decl in activeDeclsPerBlock[cfg.entry])
+            {
+                if (decl is Function fun && !varTranslator.TranslateBoogieFunction(fun, out Function origFun)) {
+                    otherFunctions.Add(fun);
+                }
+            }
+            #endregion
+
             IDictionary<Block, IList<NamedDeclaration>> activeDeclsPerBlockSorted =
-                SortActiveDecls(activeDeclsPerBlock, methodData.Functions, varTranslator, out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock);
+                SortActiveDecls(activeDeclsPerBlock, methodData.Functions.Union(otherFunctions), varTranslator, out IDictionary<Block, IList<VCExprVar>> activeVarsPerBlock);
 
             IDictionary<Block, IList<VCExprVar>> blockToNewVCVars = ConvertVariableToVCExpr(blockToNewVars, varTranslator);
 
@@ -97,17 +111,33 @@ namespace ProofGeneration.VCProofGen
                 axId++;
             }
             BasicUtil.ZipDo(methodData.Axioms, vcAxioms, axiomsAction);
+
             vcinstAxiom = new VCInstantiation<Axiom>(axiomToDef, activeDeclsPerAxiomSorted, localeName);
 
             vcOuterDecls.AddRange(axiomToDef.Values);
 
-            return new LocaleDecl(localeName, ContextElem.CreateWithFixedVars(GetVarsInVC(methodData.Functions, uniqueNamer)), vcOuterDecls);
+            var vcFunctions = methodData.Functions.Select(f =>
+            {
+                if (varTranslator.TranslateBoogieFunction(f, out Function result))
+                {
+                    return result;
+                }
+                else
+                {
+                    throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface), "can't find function");
+                }
+            }).Union(otherFunctions);
+
+            vcTranslator = varTranslator;
+            vcTypeFunctions = otherFunctions;
+
+            return new LocaleDecl(localeName, ContextElem.CreateWithFixedVars(GetVarsInVC(vcFunctions, uniqueNamer)), vcOuterDecls);
         }
 
         private static Dictionary<T, IList<NamedDeclaration>>  SortActiveDecls<T>(
             IDictionary<T, ISet<NamedDeclaration>> activeDeclsPerBlock,
             IEnumerable<Function> functions,
-            IVCVarTranslator translator,
+            IVCVarFunTranslator translator,
             out IDictionary<T, IList<VCExprVar>> activeVarsPerBlock)
         {
             activeVarsPerBlock = new Dictionary<T, IList<VCExprVar>>();
@@ -137,13 +167,17 @@ namespace ProofGeneration.VCProofGen
                     }
                 }
                 sortedDecls.AddRange(activeVars);
+                if(sortedDecls.Count() != kv.Value.Count)
+                {
+                    throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface), "did not capture all active declarations");
+                }
                 activeDeclsPerBlockSorted.Add(kv.Key, sortedDecls);
             }
 
             return activeDeclsPerBlockSorted;
         }
 
-        private static IDictionary<Block, IList<VCExprVar>> ConvertVariableToVCExpr(IDictionary<Block, ISet<Variable>> dict, IVCVarTranslator translator)
+        private static IDictionary<Block, IList<VCExprVar>> ConvertVariableToVCExpr(IDictionary<Block, ISet<Variable>> dict, IVCVarFunTranslator translator)
         {
             if (dict == null)
                 return null;
@@ -185,7 +219,7 @@ namespace ProofGeneration.VCProofGen
         private static IDictionary<Axiom, ISet<NamedDeclaration>> VCInstAxioms(
             IEnumerable<Axiom> axioms, 
             IEnumerable<VCExpr> vcAxioms, 
-            IVCVarTranslator translator)
+            IVCVarFunTranslator translator)
         {
             var result = new Dictionary<Axiom, ISet<NamedDeclaration>>();
 

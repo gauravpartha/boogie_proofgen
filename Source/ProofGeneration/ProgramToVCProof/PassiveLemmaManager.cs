@@ -24,7 +24,7 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly Term initState;
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
 
-        private readonly IDictionary<NamedDeclaration, TermIdent> declToVCMapping;
+        private readonly IDictionary<NamedDeclaration, Term> declToVCMapping;
         private readonly IDictionary<Function, TermIdent> funToInterpMapping;
 
         private readonly MultiCmdIsaVisitor cmdIsaVisitor;
@@ -35,24 +35,35 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly string globalAssmsName = "global_assms";
 
-        public PassiveLemmaManager(VCInstantiation<Block> vcinst, BoogieMethodData methodData, IVariableTranslationFactory variableFactory)
+        private readonly IVCVarFunTranslator vcTranslator;
+
+        public PassiveLemmaManager(VCInstantiation<Block> vcinst, 
+            BoogieMethodData methodData, 
+            IEnumerable<Function> vcFunctions, 
+            IVCVarFunTranslator vcTranslator,
+            IVariableTranslationFactory variableFactory)
         {
             this.vcinst = vcinst;
             this.methodData = methodData;
             programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
             initState = IsaBoogieTerm.Normal(normalInitState);
+            this.vcTranslator = vcTranslator;
             this.variableFactory = variableFactory;
             cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer, variableFactory);
-            declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(programVariables), uniqueNamer);
-            //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
-            funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
-
             boogieContext = new BoogieContextIsa(
               IsaCommonTerms.TermIdentFromName("A"),
               IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
               IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
               IsaCommonTerms.TermIdentFromName("\\<Omega>")
               );
+            var typeDeclTranslation = new ConcreteTypeDeclTranslation(boogieContext); 
+            declToVCMapping = LemmaHelper.DeclToTerm(
+                ((IEnumerable<NamedDeclaration>) methodData.Functions).Union(programVariables), 
+                vcFunctions,
+                typeDeclTranslation,
+                uniqueNamer);
+            //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
+            funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
         }
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
@@ -95,12 +106,15 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
         {
-            PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
             VarType absValType = new VarType("a");
 
+            //instantiate SMT value type with Boogie value type
+            PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer(IsaBoogieType.ValType(absValType));
+            
             var result = new List<Tuple<TermIdent, TypeIsa>>
             {
+                Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),
                 Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
                 Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunContextType(absValType)),
                 Tuple.Create(normalInitState, IsaBoogieType.NormalStateType(absValType))
@@ -111,10 +125,21 @@ namespace ProofGeneration.ProgramToVCProof
                 result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType(absValType)));
             }
 
-            foreach (KeyValuePair<NamedDeclaration, TermIdent> kv in declToVCMapping)
+            foreach (Function boogieFun in methodData.Functions)
             {
-                TypeIsa typeIsa = pureTyIsaTransformer.Translate(kv.Key);
-                result.Add(Tuple.Create(kv.Value, typeIsa));
+                //get untyped version, maybe should precompute this somewhere and re-use or get the data from the VC
+                TypeUtil.SplitTypeParams(boogieFun.TypeParameters, boogieFun.InParams.Select(v => v.TypedIdent.Type),
+                    out List<TypeVariable> explicitTypeVars, out _);
+
+                TypeIsa typeIsa = pureTyIsaTransformer.Translate(new Function(null, boogieFun.Name,
+                    explicitTypeVars, boogieFun.InParams, boogieFun.OutParams[0]));
+                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(boogieFun, boogieFun.Name)), typeIsa));
+            }
+
+            foreach (Variable v in programVariables)
+            {
+                TypeIsa typeIsa = pureTyIsaTransformer.Translate(v);
+                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name)), typeIsa));
             }
 
             return result;
@@ -148,7 +173,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Term> GlobalFunctionContextAssumptions()
         {
-            return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext.funContext);            
+            return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext);            
         }
 
         private IList<Term> GlobalStateAssumptions()
@@ -187,7 +212,7 @@ namespace ProofGeneration.ProgramToVCProof
             IEnumerable<Block> b_successors,
             Term normalInitState,
             Term finalState,
-            IDictionary<NamedDeclaration, TermIdent> declToVCMapping,
+            IDictionary<NamedDeclaration, Term> declToVCMapping,
             VCInstantiation<Block> vcinst,
             bool useMagicFinalState = false)
         {
@@ -205,7 +230,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term ifNormalConclusionRhs1 = new TermBinary(normalFinalState, normalInitState, TermBinary.BinaryOpCode.EQ);
 
             Term ifNormalConclusionRhs =
-                b_successors.Count() == 0 ?
+                !b_successors.Any() ?
                 ifNormalConclusionRhs1 :
                 new TermBinary(
                     ifNormalConclusionRhs1,

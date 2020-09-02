@@ -223,6 +223,20 @@ namespace ProofGeneration.Isa
             this.argRight = argRight;
             this.op = op;
         }
+        public static TermBinary Eq(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.EQ);
+        }
+        
+        public static TermBinary And(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.AND);
+        }
+        
+        public static TermBinary Implies(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.IMPLIES);
+        }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {

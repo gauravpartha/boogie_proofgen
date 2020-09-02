@@ -224,7 +224,9 @@ namespace ProofGeneration.ProgramToVCProof
         private LemmaDecl FinalLemma()
         {
             var uniqueNamer = new IsaUniqueNamer();
-            var declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(ProgramVariables), uniqueNamer);
+            throw new NotImplementedException();
+            //adjust declToVCMapping to include vc type declarations
+            var declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(ProgramVariables), null, null, uniqueNamer);
             Term vcAssmWithoutAxioms = vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping);
 
             Term vcAssm =
@@ -232,7 +234,7 @@ namespace ProofGeneration.ProgramToVCProof
                     new TermBinary(vcinstAxiom.GetVCObjInstantiation(ax, declToVCMapping), vcCur, TermBinary.BinaryOpCode.META_IMP)
                 );
 
-            List<Identifier> declIds = declToVCMapping.Values.Select(t => t.id).ToList();
+            List<Identifier> declIds = declToVCMapping.Values.Select(t => ((TermIdent) t).id).ToList();
             List<TypeIsa> declTypes = methodData.Functions.Select(f => pureTyIsaTransformer.Translate(f)).ToList();
             declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));
             vcAssm = TermQuantifier.MetaAll(declIds, declTypes, vcAssm);

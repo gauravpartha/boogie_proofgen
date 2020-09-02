@@ -8,9 +8,9 @@ namespace ProofGeneration.VCProofGen
     {
         private ISet<NamedDeclaration> NamedDeclarations;        
 
-        private IVCVarTranslator translator;
+        private IVCVarFunTranslator translator;
 
-        public ISet<NamedDeclaration> CollectNamedDeclarations(VCExpr node, IVCVarTranslator translator)
+        public ISet<NamedDeclaration> CollectNamedDeclarations(VCExpr node, IVCVarFunTranslator translator)
         {
             this.translator = translator;
             NamedDeclarations = new HashSet<NamedDeclaration>();
@@ -26,7 +26,14 @@ namespace ProofGeneration.VCProofGen
                  NamedDeclarations.Add(boogieVar);
             } else if(node is VCExprNAry vcExprNAry && vcExprNAry.Op is VCExprBoogieFunctionOp boogieFunOp)
             {
-                NamedDeclarations.Add(boogieFunOp.Func);
+                if(translator.TranslateVCFunction(boogieFunOp.Func, out Function boogieFun))
+                {
+                    NamedDeclarations.Add(boogieFun);
+                } else
+                {
+                    //function does not appear in the Boogie program and is some VC specific function
+                    NamedDeclarations.Add(boogieFunOp.Func);
+                }
             }
 
             return true;

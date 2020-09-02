@@ -58,6 +58,7 @@
     <Compile Include="BoogieIsaInterface\BoogieContextIsa.cs" />
     <Compile Include="BoogieIsaInterface\BoogieGlobalData.cs" />
     <Compile Include="BoogieIsaInterface\BoogieMethodData.cs" />
+    <Compile Include="BoogieIsaInterface\IsaBoogieVCTerm.cs" />
     <Compile Include="BoogieIsaInterface\VariableTranslation\BoogieFixedVarTranslation.cs" />
     <Compile Include="BoogieIsaInterface\VariableTranslation\BoogieVariableTranslation.cs" />
     <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnTranslation.cs" />
@@ -95,6 +96,7 @@
     <Compile Include="ProgramToVCProof\PassiveLemmaManager.cs" />
     <Compile Include="ProgramToVCProof\PrePassiveLemmaManager.cs" />
     <Compile Include="ProgramToVCProof\PureToBoogieValConverter.cs" />
+    <Compile Include="ProgramToVCProof\TypeUtil.cs" />
     <Compile Include="ProofGenerationExceptions.cs" />
     <Compile Include="ProofGenerationLayer.cs" />
     <Compile Include="ResultReadOnlyVisitor.cs" />
@@ -103,10 +105,12 @@
     <Compile Include="Util\IsaUniqueNamer.cs" />
     <Compile Include="Util\MLUtil.cs" />
     <Compile Include="Util\ProofUtil.cs" />
+    <Compile Include="VCProofGen\ConcreteTypeDeclTranslation.cs" />
     <Compile Include="VCProofGen\IActiveDeclGenerator.cs" />
     <Compile Include="VCProofGen\PassiveActiveDecl.cs" />
     <Compile Include="VCProofGen\StandardActiveDecl.cs" />
     <Compile Include="VCProofGen\VCBlockExtractor.cs" />
+    <Compile Include="VCProofGen\VCFunDeclCollector.cs" />
     <Compile Include="VCProofGen\VCExprDeclCollector.cs" />
     <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
     <Compile Include="VCProofGen\VCExprToIsaTranslator.cs" />
@@ -116,8 +120,9 @@
     <Compile Include="VCProofGen\VCInstantiation.cs" />
     <Compile Include="VCProofGen\VCToIsaInterface.cs" />
     <Compile Include="VCProofGen\VCBlockToIsaTranslator.cs" />
-    <Compile Include="VCProofGen\IVCVarTranslator.cs" />
-    <Compile Include="VCProofGen\VCVarTranslator.cs" />
+    <Compile Include="VCProofGen\IVCVarFunTranslator.cs" />
+    <Compile Include="VCProofGen\VCTypeDeclTranslation.cs" />
+    <Compile Include="VCProofGen\VCVarFunTranslator.cs" />
     <Compile Include="version.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -132,6 +137,10 @@
     <ProjectReference Include="..\Graph\Graph.csproj">
       <Project>{69A2B0B8-BCAC-4101-AE7A-556FCC58C06E}</Project>
       <Name>Graph</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ParserHelper\ParserHelper.csproj">
+      <Project>{fcd3ac7f-9dfd-46c8-ab1e-09f0b0f16dc5}</Project>
+      <Name>ParserHelper</Name>
     </ProjectReference>
     <ProjectReference Include="..\VCExpr\VCExpr.csproj">
       <Project>{56ffdbca-7d14-43b8-a6ca-22a20e417ee1}</Project>

@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 using System.Diagnostics.Contracts;
 
 namespace ProofGeneration.VCProofGen
 {
-    //instantiates vc block definitions correctly
+    //instantiates vc definitions correctly
     public class VCInstantiation<T>
     {
         private readonly string localeName;        
@@ -38,12 +37,12 @@ namespace ProofGeneration.VCProofGen
             this.localeName = localeName;
         }
 
-        public Term GetVCObjInstantiation(T obj, IDictionary<NamedDeclaration, TermIdent> declToVC)
+        public Term GetVCObjInstantiation(T obj, IDictionary<NamedDeclaration, Term> declToVC)
         {
             return GetVCObjInstantiation(obj, decl => declToVC[decl]);
         }
 
-        public Term GetVCObjInstantiation(T obj, Func<NamedDeclaration, TermIdent> declToVC)
+        public Term GetVCObjInstantiation(T obj, Func<NamedDeclaration, Term> declToVC)
         {    
             if(!objToDef.ContainsKey(obj))
             {
