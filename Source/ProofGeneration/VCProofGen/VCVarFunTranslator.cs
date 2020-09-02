@@ -1,17 +1,27 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.TypeErasure;
 using Microsoft.Boogie.VCExprAST;
 
 namespace ProofGeneration.VCProofGen
 {
-    class VCVarTranslator : IVCVarTranslator
+    class VCVarFunTranslator : IVCVarFunTranslator
     {
         private readonly IDictionary<VCExprVar, Variable> vcToBoogie;
         private readonly IDictionary<Variable, VCExprVar> boogieToVc;
 
-        public VCVarTranslator(IEnumerable<Variable> vars, Boogie2VCExprTranslator translator, TypeAxiomBuilderPremisses axiomBuilder)
+        private readonly IDictionary<Function, Function> origToErasedFun;
+        private readonly IDictionary<Function, Function> erasedToOrigFun;
+
+        public VCVarFunTranslator(IEnumerable<Variable> vars, 
+            IDictionary<Function, Function> origToErasedFun,
+            Boogie2VCExprTranslator translator, 
+            TypeAxiomBuilderPremisses axiomBuilder)
         {
+            this.origToErasedFun = origToErasedFun;
+            this.erasedToOrigFun = origToErasedFun.ToDictionary((i) => i.Value, (i) => i.Key);
+
             boogieToVc = new Dictionary<Variable, VCExprVar>();
             vcToBoogie = new Dictionary<VCExprVar, Variable>();
             foreach (var v in vars)
@@ -51,6 +61,34 @@ namespace ProofGeneration.VCProofGen
                 result = resultInternal;
                 return true;
             } else
+            {
+                result = null;
+                return false;
+            }
+        }
+
+        public bool TranslateBoogieFunction(Function v, out Function result)
+        {
+            if (origToErasedFun.TryGetValue(v, out Function internalResult))
+            {
+                result = internalResult;
+                return true;
+            }
+            else
+            {
+                result = null;
+                return false;
+            }
+        }
+
+        public bool TranslateVCFunction(Function vcFun, out Function result)
+        {
+            if (erasedToOrigFun.TryGetValue(vcFun, out Function internalResult))
+            {
+                result = internalResult;
+                return true;
+            }
+            else
             {
                 result = null;
                 return false;
