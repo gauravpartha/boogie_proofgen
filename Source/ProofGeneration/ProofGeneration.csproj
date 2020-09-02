@@ -74,6 +74,7 @@
     <Compile Include="BoogieIsaInterface\PureValueIsaTransformer.cs" />
     <Compile Include="BoogieIsaInterface\TypeIsaVisitor.cs" />
     <Compile Include="BoogieIsaInterface\VariableTranslation\IVariableTranslationFactory.cs" />
+    <Compile Include="BoogieIsaInterface\VariableTranslation\SimpleVarSubstitution.cs" />
     <Compile Include="CFGRepr\CFGRepr.cs" />
     <Compile Include="CFGRepr\CFGReprTransformer.cs" />
     <Compile Include="IsaPrettyPrint\IsaPrettyPrinterHelper.cs" />

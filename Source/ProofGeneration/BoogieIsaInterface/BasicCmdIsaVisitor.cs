@@ -143,13 +143,13 @@ namespace ProofGeneration
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            ReturnResult(IsaBoogieTerm.Var(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl)));            
+            ReturnResult(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl));            
             return node;
         }
 
         public override Expr VisitLiteralExpr(LiteralExpr node)
         {
-            ReturnResult(IsaBoogieTerm.ExprFromVal(IsaBoogieTerm.ValFromLiteral(node)));
+            ReturnResult(IsaBoogieTerm.ExprFromLiteral(IsaBoogieTerm.Literal(node)));
             return node;
         }
 

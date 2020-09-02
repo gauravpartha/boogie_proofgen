@@ -51,11 +51,19 @@ namespace ProofGeneration.ProgramToVCProof
             return result;
         }
 
-        public static Term VariableAssumption(Variable v, Term state, TermIdent vcVar, IVariableTranslation<Variable> varTranslation)
+        public static Term VariableAssumption(Variable v, Term state, Term vcVar, IVariableTranslation<Variable> varTranslation)
         {
-            Term left = new TermApp(state, new NatConst(varTranslation.TranslateVariable(v)));
-            Term right = IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
-            return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
+            if (varTranslation.TryTranslateVariableId(v, out Term varId))
+            {
+                Term left = new TermApp(state, varId);
+                Term right =
+                    IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
+                return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
+            }
+            else
+            {
+                throw new ProofGenUnexpectedStateException(typeof(LemmaHelper), "Can't retrieve variable id");
+            }
         }
 
         public static Term VariableAssumptionExplicit(Variable v, Term state, Term rhs, IsaUniqueNamer uniqueNamer)

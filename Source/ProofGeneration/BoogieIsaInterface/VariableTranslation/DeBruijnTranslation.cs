@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
@@ -6,12 +8,15 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
     {
         private readonly IFixedVariableTranslation<T> variableTranslation;
 
-        private LinkedList<T> boundVariables = new LinkedList<T>();
+        private readonly LinkedList<T> boundVariables = new LinkedList<T>();
+
+        private readonly Func<int, Term> variableConstructor;
 
 
-        public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation)
+        public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation, Func<int, Term> variableConstructor)
         {
             this.variableTranslation = variableTranslation;
+            this.variableConstructor = variableConstructor;
         }
 
         public void AddBoundVariable(T boundVar)
@@ -28,8 +33,8 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         {
             return boundVariables.Count;
         }
-
-        public int TranslateVariable(T variable)
+        
+        private int TranslateVariableIdx(T variable)
         {
             int i = 0;
             bool isBoundVar = false;
@@ -54,5 +59,15 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             }
         }
 
+        public Term TranslateVariable(T variable)
+        {
+            return variableConstructor(TranslateVariableIdx(variable));
+        }
+
+        public bool TryTranslateVariableId(T variable, out Term id)
+        {
+            id = new IntConst(TranslateVariableIdx(variable));
+            return true;
+        }
     }
 }
