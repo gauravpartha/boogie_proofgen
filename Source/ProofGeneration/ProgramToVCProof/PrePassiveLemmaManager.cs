@@ -11,6 +11,7 @@ using ProofGeneration.VCProofGen;
 
 namespace ProofGeneration.ProgramToVCProof
 {
+    /*
     class PrePassiveLemmaManager : IBlockLemmaManager
     {
         private readonly VCInstantiation<Block> vcinst;
@@ -492,4 +493,5 @@ namespace ProofGeneration.ProgramToVCProof
             throw new NotImplementedException();
         }
     }
+    */
 }
