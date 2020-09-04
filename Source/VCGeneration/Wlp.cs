@@ -140,8 +140,6 @@ namespace VC {
             N = gen.ImpliesSimp(C, N, false);
           }
 
-          ProofGeneration.VCProofGen.VCHint hint;
-
          if (isFullyVerified)
           {
             throw new NotImplementedException("proof generation does not support this option (caching of verification results)");
