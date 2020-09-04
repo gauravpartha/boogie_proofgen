@@ -174,7 +174,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitNeqOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            return HandleBinaryOp(TermBinary.BinaryOpCode.NEQ, arg);
         }
 
         public Term VisitNotOp(VCExprNAry node, List<Term> arg)

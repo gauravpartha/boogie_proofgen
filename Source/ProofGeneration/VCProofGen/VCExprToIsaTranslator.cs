@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using ProofGeneration.BoogieIsaInterface;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -22,6 +23,8 @@ namespace ProofGeneration.VCProofGen
         private readonly IDictionary<Block, IList<VCExprVar>> blockToActiveVars;
 
         private readonly IsaUniqueNamer uniqueNamer;
+
+        private readonly PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
         public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC, IDictionary<Block, IList<VCExprVar>> blockToActiveVars)
         {
@@ -181,7 +184,17 @@ namespace ProofGeneration.VCProofGen
 
         public Term Visit(VCExprLet node, bool arg)
         {
-            throw new NotImplementedException();
+            /* translate multi-binder let expression into multiple single-binder let expressions
+             * reverse first, since we want to fold right
+             */
+            return node.Reverse().Aggregate(Translate(node.Body), (prevBody, elem) =>
+            {
+                return IsaCommonTerms.Let(new SimpleIdentifier(uniqueNamer.GetName(elem.V, elem.V.Name)),
+                    pureTyIsaTransformer.Translate(elem.V.Type),
+                    Translate(elem.E),
+                    prevBody
+                );
+            });
         }
 
         private bool TryGetDefFromBlock(string blockName, out Block block, out DefDecl blockDef)
