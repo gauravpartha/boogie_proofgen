@@ -161,7 +161,8 @@ namespace ProofGeneration.Isa
         {
             ALL,
             EX,
-            META_ALL //\<And>
+            META_ALL, //\<And>
+            LAMBDA
         }
 
         public static TermQuantifier ForAll(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
@@ -177,6 +178,10 @@ namespace ProofGeneration.Isa
         public static TermQuantifier MetaAll(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
         {
             return new TermQuantifier(QuantifierKind.META_ALL, boundVars, boundVarsTypes, term);
+        }
+        public static TermQuantifier Lambda(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
+        {
+            return new TermQuantifier(QuantifierKind.LAMBDA, boundVars, boundVarsTypes, term);
         }
 
         public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)

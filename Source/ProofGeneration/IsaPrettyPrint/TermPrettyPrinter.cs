@@ -120,6 +120,8 @@ namespace ProofGeneration.IsaPrettyPrint
                     return "\\<exists>";
                 case TermQuantifier.QuantifierKind.META_ALL:
                     return "\\<And>";
+                case TermQuantifier.QuantifierKind.LAMBDA:
+                    return "\\<lambda>";
                 default:
                     throw new NotImplementedException();
             }
