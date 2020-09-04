@@ -18,6 +18,13 @@ namespace ProofGeneration.VCProofGen
             node.Accept(this, true);
             return NamedDeclarations;
         }
+        
+        public override bool Visit(VCExprQuantifier node, bool arg) {
+            bool res = StandardResult(node, arg);
+            //ignore triggers, only traverse body
+            node.Body.Accept(this, arg);
+            return res;
+        } 
 
         protected override bool StandardResult(VCExpr node, bool arg)
         {
