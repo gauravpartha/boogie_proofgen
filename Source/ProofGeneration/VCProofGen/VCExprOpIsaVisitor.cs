@@ -6,7 +6,7 @@ using System.Diagnostics.Contracts;
 
 namespace ProofGeneration.VCProofGen
 {
-    class VCExprOpIsaVisitor : IVCExprOpVisitor<Term, List<Term>>
+    public class VCExprOpIsaVisitor : IVCExprOpVisitor<Term, List<Term>>
     {
 
         public Term HandleBinaryOp(TermBinary.BinaryOpCode bop, List<Term> arg)

@@ -106,11 +106,8 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
         {
-
-            VarType absValType = new VarType("a");
-
-            //instantiate SMT value type with Boogie value type
-            PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer(IsaBoogieType.ValType(absValType));
+            var absValType = new VarType("a");
+            PureTyIsaTransformer pureTyIsaTransformer = LemmaHelper.ConretePureTyIsaTransformer(absValType);
             
             var result = new List<Tuple<TermIdent, TypeIsa>>
             {
@@ -152,10 +149,13 @@ namespace ProofGeneration.ProgramToVCProof
 
         public IList<OuterDecl> Prelude()
         {
+            /* TODO
             IList<string> assmLabels = AssumptionLabels();
             var globalAssmsLemmas = new LemmasDecl(globalAssmsName, assmLabels);
 
             return new List<OuterDecl>() { globalAssmsLemmas };
+            */
+            return new List<OuterDecl>() { };
         }
 
         private IList<string> AssumptionLabels()

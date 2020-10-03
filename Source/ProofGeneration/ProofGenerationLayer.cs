@@ -44,7 +44,8 @@ namespace ProofGeneration
         private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
 
         //VC Automation Hints
-        private static readonly VCHintManager vcHintManager = new VCHintManager();
+        private static VCHintManager vcHintManager;
+        private static TypePremiseEraserFactory typePremiseEraserFactory;
 
         public static void Program(Program p)
         {
@@ -155,6 +156,12 @@ namespace ProofGeneration
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
+        public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)
+        {
+            typePremiseEraserFactory = factory;
+            vcHintManager = new VCHintManager(factory, new VCExprToIsaTranslator(new IsaUniqueNamer()));
+        }
+
         //axiom builder is null iff types are not erased (since no polymorphism in vc)
         public static void VCGenerateAllProofs(VCExpr vc, 
             VCExpr vcAxioms, 
@@ -163,13 +170,21 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
-            IEnumerable<VCExpr> vcAxiomsDeconstructed = DeconstructAxiomsNoChecks(vcAxioms);
-            vcAxiomsDeconstructed = vcAxiomsDeconstructed.Union(DeconstructAxiomsNoChecks(typeAxioms));
+            List<VCExpr> vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
+            int nAxioms = boogieGlobalData.Axioms.Count();
+            if (vcBoogieAxioms.Count() != nAxioms + 3)
+            {
+                //+3, since we currently ignore the three type ordering axioms
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                    "vc axioms not in-sync with Boogie axioms");
+            }
 
+            IEnumerable<VCExpr> vcAllAxioms =  vcBoogieAxioms.GetRange(3,nAxioms).Union(DeconstructAxiomsNoChecks(typeAxioms));
+            
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
                 vc,
-                vcAxiomsDeconstructed,
+                vcAllAxioms,
                 new StandardActiveDecl(),
                 gen,
                 translator,
@@ -177,7 +192,7 @@ namespace ProofGeneration
                 finalProgData,
                 afterUnreachablePruningCfg,
                 out VCInstantiation<Block> vcinst,
-                out VCInstantiation<Axiom> vcinstAxiom,
+                out VCInstantiation<VCAxiom> vcinstAxiom,
                 out IVCVarFunTranslator vcTranslator,
                 out IEnumerable<Function> vcFunctions);
             
@@ -212,13 +227,11 @@ namespace ProofGeneration
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
             var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
-            //passiveOuterDecls.AddRange(programDecls);
+            passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            /*
-            var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcinst, vcinstAxiom, afterUnreachablePruningCfg, finalProgVarTranslation);
+            var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcFunctions, vcinst, vcinstAxiom, afterUnreachablePruningCfg, varTranslationFactory);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
-            */
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
                 new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML" },
@@ -310,12 +323,13 @@ namespace ProofGeneration
                 //TODO move elsewhere
                 var result = new List<OuterDecl>();
                 string vcHintsName = null;
-                if (vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints))
+                if (vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls))
                 {
                     //FIXME potential val name clash
                     vcHintsName = b.Label + "_hints";
                     var code = MLUtil.DefineVal(b.Label + "_hints", MLUtil.MLList(hints));
                     result.Add(new MLDecl(code));
+                    result.AddRange(requiredDecls);
                 }
                 result.Add(passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b)), vcHintsName));
                 blockToLemmaDecls.Add(b, result);

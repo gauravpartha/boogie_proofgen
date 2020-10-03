@@ -46,7 +46,7 @@ namespace ProofGeneration
 
             DefDecl methodBodyDecl = GetMethodBodyCFGDecl(procName, methodBodyCFG);
 
-            Term method = IsaBoogieTerm.Method(procName, IsaCommonTerms.TermIdentFromName(parameters.name), IsaCommonTerms.TermIdentFromName(localVariables.name), IsaCommonTerms.TermIdentFromName(methodBodyDecl.name));
+            Term method = IsaBoogieTerm.Method(procName, methodData.TypeParams.Count(), IsaCommonTerms.TermIdentFromName(parameters.name), IsaCommonTerms.TermIdentFromName(localVariables.name), IsaCommonTerms.TermIdentFromName(methodBodyDecl.name));
 
             //TODO: global variables
             Term program = IsaBoogieTerm.Program(IsaCommonTerms.TermIdentFromName(funcs.name),
@@ -165,7 +165,7 @@ namespace ProofGeneration
                 Term vName = new StringConst(v.Name);
                 Term vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
 
-                vdecls.Add(new TermTuple(new List<Term> { vName, vType }));               
+                vdecls.Add( vType ); 
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(vdecls));

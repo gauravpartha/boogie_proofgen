@@ -11,9 +11,14 @@ namespace ProofGeneration.VCProofGen
 
         private IDictionary<Function, Function> funToVCfun;
 
+        public IDictionary<Function, Function> CollectFunDeclarations(VCExpr vcExpr, IEnumerable<Function> functions)
+        {
+            return CollectFunDeclarations(new List<VCExpr>() {vcExpr}, functions);
+        }
+
         //returns map that maps each function f in the input functions for which there is a corresponding function in the VC with the same name
         // (to which f is mapped to in the dictionary)
-        public IDictionary<Function, Function> CollectFunDeclarations(VCExpr node, IEnumerable<Function> functions)
+        public IDictionary<Function, Function> CollectFunDeclarations(IEnumerable<VCExpr> vcExprs, IEnumerable<Function> functions)
         {
             nameToFunction = new Dictionary<string, Function>();
             foreach(var f in functions)
@@ -21,8 +26,12 @@ namespace ProofGeneration.VCProofGen
                 nameToFunction.Add(f.Name, f);
             }
             funToVCfun = new Dictionary<Function, Function>();
+            
+            foreach(VCExpr vcExpr in vcExprs)
+            {
+                vcExpr.Accept(this, true);
+            }
 
-            node.Accept(this, true);
             return funToVCfun;
         }
 

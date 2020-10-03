@@ -19,8 +19,10 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly BoogieMethodData methodData;
 
         private readonly IsaProgramRepr isaProgramRepr;
+
+        private readonly IEnumerable<Function> vcFunctions;
         private readonly VCInstantiation<Block> vcinst;
-        private readonly VCInstantiation<Axiom> vcinstAxiom;
+        private readonly VCInstantiation<VCAxiom> vcinstAxiom;
         private readonly CFGRepr cfg;
 
         private readonly IVariableTranslationFactory varTranslationFactory;
@@ -57,12 +59,14 @@ namespace ProofGeneration.ProgramToVCProof
         public EndToEndVCProof(
             BoogieMethodData methodData,
             IsaProgramRepr isaProgramRepr,
+            IEnumerable<Function> vcFunctions, 
             VCInstantiation<Block> vcinst,
-            VCInstantiation<Axiom> vcinstAxiom,
+            VCInstantiation<VCAxiom> vcinstAxiom,
             CFGRepr cfg,
             IVariableTranslationFactory varTranslationFactory)
         {
             this.methodData = methodData;
+            this.vcFunctions = vcFunctions;
             this.isaProgramRepr = isaProgramRepr;
             this.vcinst = vcinst;
             this.vcinstAxiom = vcinstAxiom;
@@ -96,28 +100,52 @@ namespace ProofGeneration.ProgramToVCProof
             //functions
             AddMembershipLemmas(methodData.Functions,
                 isaProgramRepr.funcsDeclDef,
-                d => IsaBoogieTerm.FunDecl((Function)d, varTranslationFactory, false));
+                d => new StringConst(d.Name),
+                d => IsaBoogieTerm.FunDecl((Function)d, varTranslationFactory, false),
+                false
+                );
             //variables
+            var varTranslation = varTranslationFactory.CreateTranslation().VarTranslation;
+            Func<NamedDeclaration, Term> idOfVar =
+                d =>
+                {
+                    if (varTranslation.TryTranslateVariableId((Variable) d, out Term varId))
+                    {
+                        return varId;
+                    }
+                    else
+                    {
+                        throw new ProofGenUnexpectedStateException(typeof(EndToEndVCProof),
+                            "Could not retrieve variable id");
+                    }
+                };
+                
             AddMembershipLemmas(methodData.InParams,
                 isaProgramRepr.paramsDeclDef,
-                d => IsaBoogieTerm.VarDecl((Variable)d, typeIsaVisitor, false));
+                idOfVar,
+                d => IsaBoogieTerm.VarDecl((Variable)d, typeIsaVisitor, false),
+                true);
             AddMembershipLemmas(methodData.Locals,
                 isaProgramRepr.localVarsDeclDef,
-                d => IsaBoogieTerm.VarDecl((Variable)d, typeIsaVisitor, false));
+                idOfVar,
+                d => IsaBoogieTerm.VarDecl((Variable)d, typeIsaVisitor, false),
+                true);
             AddAxiomMembershipLemmas();
         }
 
         private void AddMembershipLemmas(
             IEnumerable<NamedDeclaration> decls,
             Term declsDef,
-            Func<NamedDeclaration, Term> declOf)
+            Func<NamedDeclaration, Term> nameOf,
+            Func<NamedDeclaration, Term> declOf,
+            bool isVariable)
         {
             foreach (var d in decls)
             {
                 Term lhs = new TermApp(
-                    IsaCommonTerms.TermIdentFromName("map_of"),
-                    new List<Term> { declsDef, new StringConst(d.Name) });
-                Term rhs = IsaCommonTerms.SomeOption(declOf(d));
+                    isVariable ? IsaCommonTerms.TermIdentFromName("nth") : IsaCommonTerms.TermIdentFromName("map_of"),
+                    new List<Term> { declsDef, nameOf(d) });
+                Term rhs = isVariable ? declOf(d) : IsaCommonTerms.SomeOption(declOf(d));
 
                 Term statement = new TermBinary(lhs, rhs, TermBinary.BinaryOpCode.EQ);
                 Proof proof = new Proof(new List<string> { "by " + ProofUtil.Simp(declsDef + "_def") });
@@ -131,7 +159,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             Term funContext = IsaCommonTerms.TermIdentFromName("\\<Gamma>");
             Term axiomSet = IsaCommonTerms.SetOfList(isaProgramRepr.axiomsDeclDef);
-            Term axiomSat = IsaBoogieTerm.AxiomSat(funContext, isaProgramRepr.axiomsDeclDef, normalInitState);
+            Term axiomSat = IsaBoogieTerm.AxiomSat(boogieContext.absValTyMap, funContext, isaProgramRepr.axiomsDeclDef, normalInitState);
             int id = 0;
             foreach (var axiom in methodData.Axioms)
             {
@@ -196,7 +224,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             Term vc_f = IsaCommonTerms.TermIdentFromName(VCFunName(f));
 
-            Term assm = IsaBoogieTerm.FunInterpSingleWf(IsaBoogieTerm.FunDecl(f, varTranslationFactory, false), funTerm);
+            Term assm = IsaBoogieTerm.FunInterpSingleWf(boogieContext.absValTyMap, IsaBoogieTerm.FunDecl(f, varTranslationFactory, false), funTerm);
 
             Term lhs = new TermApp(funTerm, new TermList(paramsVal.ToList()));
             Term rhs = IsaCommonTerms.SomeOption(pureValueIsaTransformer.ConstructValue(new TermApp(vc_f, args), f.OutParams[0].TypedIdent.Type));
@@ -224,27 +252,29 @@ namespace ProofGeneration.ProgramToVCProof
         private LemmaDecl FinalLemma()
         {
             var uniqueNamer = new IsaUniqueNamer();
-            throw new NotImplementedException();
             //adjust declToVCMapping to include vc type declarations
-            var declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(ProgramVariables), null, null, uniqueNamer);
+            var typeDeclTranslation = new GenericTypeDeclTranslation(uniqueNamer); 
+            var declToVCMapping = 
+                LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(ProgramVariables), vcFunctions, typeDeclTranslation, uniqueNamer);
             Term vcAssmWithoutAxioms = vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping);
 
-            Term vcAssm =
-                methodData.Axioms.Reverse().Aggregate(vcAssmWithoutAxioms, (vcCur, ax) =>
-                    new TermBinary(vcinstAxiom.GetVCObjInstantiation(ax, declToVCMapping), vcCur, TermBinary.BinaryOpCode.META_IMP)
-                );
+            Term vcAssm = vcinstAxiom.Keys.Reverse().Aggregate(vcAssmWithoutAxioms, (current, vcAx) => 
+                new TermBinary(vcinstAxiom.GetVCObjInstantiation(vcAx, declToVCMapping), current, TermBinary.BinaryOpCode.META_IMP));
 
             List<Identifier> declIds = declToVCMapping.Values.Select(t => ((TermIdent) t).id).ToList();
-            List<TypeIsa> declTypes = methodData.Functions.Select(f => pureTyIsaTransformer.Translate(f)).ToList();
-            declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));
+            var absValType = new VarType("a");
+            PureTyIsaTransformer concretePureTyIsaTransformer = LemmaHelper.ConretePureTyIsaTransformer(absValType);
+            List<TypeIsa> declTypes = declToVCMapping.Keys.Select(nd => concretePureTyIsaTransformer.Translate(nd)).ToList(); 
+            /*List<TypeIsa> declTypes = methodData.Functions.Select(f => pureTyIsaTransformer.Translate(f)).ToList();
+            declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));*/
             vcAssm = TermQuantifier.MetaAll(declIds, declTypes, vcAssm);
 
             Term funContext = new TermTuple(new List<Term> { isaProgramRepr.funcsDeclDef, boogieContext.funContext });
 
-            Term finterpAssm = IsaBoogieTerm.FunInterpWf(isaProgramRepr.funcsDeclDef, boogieContext.funContext);
-            Term axiomAssm = IsaBoogieTerm.AxiomSat(funContext, isaProgramRepr.axiomsDeclDef, normalInitState);
-            Term paramsAssm = IsaBoogieTerm.StateWf(isaProgramRepr.paramsDeclDef, normalInitState);
-            Term localVarsAssm = IsaBoogieTerm.StateWf(isaProgramRepr.localVarsDeclDef, normalInitState);
+            Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, isaProgramRepr.funcsDeclDef, boogieContext.funContext);
+            Term axiomAssm = IsaBoogieTerm.AxiomSat(boogieContext.absValTyMap, funContext, isaProgramRepr.axiomsDeclDef, normalInitState);
+            Term paramsAssm = IsaBoogieTerm.StateWf(boogieContext.absValTyMap, boogieContext.rtypeEnv, isaProgramRepr.paramsDeclDef, normalInitState);
+            Term localVarsAssm = IsaBoogieTerm.StateWf(boogieContext.absValTyMap, boogieContext.rtypeEnv, isaProgramRepr.localVarsDeclDef, normalInitState);
             Term multiRed = IsaBoogieTerm.RedCFGMulti(
                 new BoogieContextIsa(
                     boogieContext.absValTyMap,                  
@@ -261,7 +291,7 @@ namespace ProofGeneration.ProgramToVCProof
             var contextElem = ContextElem.CreateWithAssumptions(
                 new List<Term> { vcAssm, finterpAssm, axiomAssm, paramsAssm, localVarsAssm, multiRed },
                 new List<string> { vcAssmName, finterpAssmName, axiomAssmName, paramsAssmName, localVarsAssmName, RedAssmName });
-            return new LemmaDecl("endToEnd", contextElem, conclusion, FinalProof());
+            return new LemmaDecl("endToEnd", contextElem, conclusion, new Proof(new List<string>()));
         }
 
         private Proof FinalProof()
@@ -286,7 +316,7 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine("using " + "fun_interp_wf_def " + MembershipName(f) + " option.sel by metis");
 
                 sb.Append("from " + finterpAssmName + " have " + WfName(f) + ":");
-                sb.AppendInner(IsaBoogieTerm.FunInterpSingleWf(f, IsaCommonTerms.TermIdentFromName(FunAbbrev(f)), varTranslationFactory).ToString());
+                sb.AppendInner(IsaBoogieTerm.FunInterpSingleWf(f, boogieContext.absValTyMap, IsaCommonTerms.TermIdentFromName(FunAbbrev(f)), varTranslationFactory).ToString());
                 sb.AppendLine();
                 sb.AppendLine("apply " + ProofUtil.SimpOnly("opaque_comp_def"));
                 sb.AppendLine("using " + "fun_interp_wf_def " + MembershipName(f) + " option.sel by metis");
@@ -357,12 +387,14 @@ namespace ProofGeneration.ProgramToVCProof
 
             sb.AppendLine("apply (rule " + vcAssmName + ")");
 
+            /* TODO
             foreach(Axiom ax in methodData.Axioms)
             {
                 sb.AppendLine("apply " + ProofUtil.SimpOnly(vcinstAxiom.GetVCObjNameRef(ax) + "_def"));
                 sb.AppendLine("apply (rule expr_to_vc[OF " + EvaluationName(ax) + "])");               
                 sb.AppendLine("apply(tactic \\<open> b_vc_expr_rel_tac @{context} " + storedFunctionThms + " [] 1 \\<close>)");
             }
+            */
             sb.AppendLine("done");
             sb.AppendLine("qed");
 

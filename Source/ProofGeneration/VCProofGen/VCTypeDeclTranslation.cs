@@ -6,44 +6,47 @@ namespace ProofGeneration.VCProofGen
 {
     abstract class VCTypeDeclTranslation
     {
-        public Term TranslateTypeDecl(Function func)
+        public bool TryTranslateTypeDecl(Function func, out Term result)
         {
             string name = func.Name;
 
             if(name.Equals("type"))
             {
-                return Type(func);
+                result = Type(func);
             } else if(name.Equals("Ctor"))
             {
-                return Ctor(func);
+                result = Ctor(func);
             } else if(name.Equals("intType"))
             {
-                return IntType(func);
+                result = IntType(func);
             } else if(name.Equals("boolType"))
             {
-                return BoolType(func);
+                result = BoolType(func);
             } else if(name.Equals("U_2_int"))
             {
-                return U2Int(func);
+                result = U2Int(func);
             } else if(name.Equals("U_2_bool"))
             {
-                return U2Bool(func);
+                result = U2Bool(func);
             } else if(name.Equals("int_2_U"))
             {
-                return Int2U(func);
+                result = Int2U(func);
             } else if(name.Equals("bool_2_U"))
             {
-                return Bool2U(func);
+                result = Bool2U(func);
             } else if(IsTypeConstr(name, out string constrName))
             {
-                return TypeConstructor(constrName, func);
+                result = TypeConstructor(constrName, func);
             } else if(IsTypeConstrInverse(name, out string invConstrName, out int index))
             {
-                return TypeConstructorInverse(invConstrName, index, func);
+                result = TypeConstructorInverse(invConstrName, index, func);
             } else
             {
-                throw new ArgumentException();
+                result = null;
+                return false;
             }
+
+            return true;
         }
 
         public abstract Term Type(Function func);

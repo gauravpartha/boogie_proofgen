@@ -952,12 +952,15 @@ namespace Microsoft.Boogie.TypeErasure
       }
     }
 
-    public TypeEraserPremisses(TypeAxiomBuilderPremisses axBuilder, VCExpressionGenerator gen)
+    private readonly bool _extractTypeArgs;
+
+    public TypeEraserPremisses(TypeAxiomBuilderPremisses axBuilder, VCExpressionGenerator gen, bool extractTypeArgs=true)
       : base(axBuilder, gen) {
       Contract.Requires(gen != null);
       Contract.Requires(axBuilder != null);
 
       this.AxBuilderPremisses = axBuilder;
+      _extractTypeArgs = extractTypeArgs;
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1088,16 +1091,26 @@ namespace Microsoft.Boogie.TypeErasure
       Contract.Requires(cce.NonNullElements(newBoundVars));
       Contract.Ensures(Contract.Result<VCExpr>() != null);
       List<VCExprLetBinding/*!*/>/*!*/ typeVarBindings =
-        AxBuilderPremisses.GenTypeParamBindings(node.TypeParameters, occurringVars, bindings, true);
+        _extractTypeArgs ? AxBuilderPremisses.GenTypeParamBindings(node.TypeParameters, occurringVars, bindings, true) : new List<VCExprLetBinding>();
+
+      if (!_extractTypeArgs)
+      {
+        node.TypeParameters.ForEach(tvar => 
+                  bindings.TypeVariableBindings.Add(tvar, Gen.Variable(tvar.Name, AxBuilderPremisses.T)));
+      }
+
       Contract.Assert(typeVarBindings != null);
-      // Check whether some of the type parameters could not be
+      // If extracting type variables is switched off, all type variables are quantified over, otherwise
+      // check whether some of the type parameters could not be
       // determined from the bound variable types. In this case, we
       // quantify explicitly over these variables
+      
       if (typeVarBindings.Count < node.TypeParameters.Count) {
-        foreach (TypeVariable/*!*/ var in node.TypeParameters) {
+      // type variables are quantified over first to make proof generation easier (hence Reverse + Insert at beginning)
+        foreach (TypeVariable/*!*/ var in ((IEnumerable<TypeVariable>) node.TypeParameters).Reverse()) {
           Contract.Assert(var != null);
-          if (typeVarBindings.All(b => !b.V.Equals(bindings.TypeVariableBindings[var])))
-            newBoundVars.Add((VCExprVar)bindings.TypeVariableBindings[var]);
+          if (!_extractTypeArgs || typeVarBindings.All(b => !b.V.Equals(bindings.TypeVariableBindings[var])))
+            newBoundVars.Insert(0, (VCExprVar)bindings.TypeVariableBindings[var]);
         }
       }
 

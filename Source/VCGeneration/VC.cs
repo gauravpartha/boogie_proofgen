@@ -1389,54 +1389,64 @@ namespace VC {
         var exprGen = ctx.ExprGen;
         VCExpr controlFlowVariableExpr = exprGen.Integer(BigNum.ZERO);
         
+        #region proofgen
+        TypePremiseEraserFactory typePremiseEraserFactory;
+        switch (CommandLineOptions.Clo.TypeEncodingMethod)
+        {
+            case CommandLineOptions.TypeEncoding.Predicates:
+                typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet); 
+                break;
+            case CommandLineOptions.TypeEncoding.Monomorphic:
+                typePremiseEraserFactory = null;
+                break;
+            default:
+                throw new NotImplementedException();
+        } 
+        ProofGeneration.ProofGenerationLayer.SetTypeEraserFactory(typePremiseEraserFactory);
+        #endregion
+        
         VCExpr vc = parent.GenerateVCAux(impl, null, label2absy, checker.TheoremProver.Context);
+
+        if(!(ctx is DeclFreeProverContext))
+        { 
+          throw new NotImplementedException("Proof Generation only supports DeclFreeProverContext as context.");
+        }
+
+        
+        
         Contract.Assert(vc != null);
 
                 #region proofgen
-                var axiomBuilder = new Bpl.TypeErasure.TypeAxiomBuilderPremisses(checker.VCExprGen);
-                axiomBuilder.Setup();
-                Bpl.TypeErasure.TypeEraser eraser;
-                switch (CommandLineOptions.Clo.TypeEncodingMethod)
-                {
-                    case CommandLineOptions.TypeEncoding.Predicates:
-                        eraser = new Bpl.TypeErasure.TypeEraserPremisses(axiomBuilder, checker.VCExprGen);
-                        break;
-                    case CommandLineOptions.TypeEncoding.Monomorphic:
-                        eraser = null;
-                        break;
-                    default:
-                        throw new NotImplementedException();
-                }                
-
-
                 if(!(ctx is DeclFreeProverContext))
                 { 
                     throw new NotImplementedException("Proof Generation only supports DeclFreeProverContext as context.");
                 }
 
                 var declFreeProverContext = ctx as DeclFreeProverContext;
+                var premiseEraserProvider = typePremiseEraserFactory?.NewEraser();
 
-                
-                VCExpr exprWithoutTypes = eraser == null ? vc : eraser.Erase(vc, 1);
-                      
-                VCExpr typeAxioms = axiomBuilder.GetNewAxioms();
+                VCExpr eraseVC (VCExpr vc) 
+                {
+                  return premiseEraserProvider == null ? vc : premiseEraserProvider.EraseVC(vc);
+                }
 
-                LetBindingSorter letSorter = new LetBindingSorter(checker.VCExprGen);
-                Contract.Assert(letSorter != null);
+                VCExpr erasedVC = eraseVC(vc);
+                VCExpr erasedAxioms = eraseVC(declFreeProverContext.Axioms);
 
-                VCExpr sortedExpr = letSorter.Mutate(exprWithoutTypes, true);
-
+                VCExpr typeAxioms = null;
+                if (premiseEraserProvider != null) {
+                  typeAxioms = premiseEraserProvider.AxiomBuilder.GetNewAxioms();
+                }
 
                 ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(
-                    sortedExpr, 
-                    declFreeProverContext.Axioms, 
+                    erasedVC, 
+                    erasedAxioms, 
                     typeAxioms,
                     checker.TheoremProver.VCExprGen, 
                     checker.TheoremProver.Context.BoogieExprTranslator,
-                    eraser == null ? null : axiomBuilder);
+                    premiseEraserProvider?.AxiomBuilder);
                 
                 //ProofGeneration.ProofGenerationLayer.AfterUnreachablePruning(impl);
-                //TODO: the typing axioms are ignored for now (since we don't support uninterpreted/polymorphic types)
 
 
                 //ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(vc, declFreeProverContext.Axioms, checker.TheoremProver.VCExprGen, checker.TheoremProver.Context.BoogieExprTranslator);

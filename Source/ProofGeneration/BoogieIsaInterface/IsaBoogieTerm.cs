@@ -38,6 +38,8 @@ namespace ProofGeneration
         private readonly static TermIdent forallTypeId = IsaCommonTerms.TermIdentFromName("ForallT");
         private readonly static TermIdent existsTypeId = IsaCommonTerms.TermIdentFromName("ExistsT");
 
+        private readonly static TermIdent closedTypeId = IsaCommonTerms.TermIdentFromName("closed");
+
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
         public static Term ExprFromLiteral(Term lit)
@@ -280,12 +282,13 @@ namespace ProofGeneration
             return new TermRecord(mapping);
         }
 
-        public static Term Method(string methodName, Term parameters, Term localVars, Term methodCFGBody)
+        public static Term Method(string methodName, int numTypeParams, Term parameters, Term localVars, Term methodCFGBody)
         {
             var elements =
                 new List<Term>()
                 {
                     new StringConst(methodName),
+                    new NatConst(numTypeParams),
                     parameters,
                     localVars,
                     methodCFGBody
@@ -384,21 +387,27 @@ namespace ProofGeneration
         public static Term FunDecl(Function f, IVariableTranslationFactory varTranslationFactory, bool includeName=true)
         {
             IVariableTranslation<TypeVariable> typeVarTranslation = varTranslationFactory.CreateEmptyTranslation().TypeVarTranslation;
-            foreach(TypeVariable tv in f.TypeParameters)
+            
+            /*
+             * types variables are numbered as they appear in the list as opposed to type variables appearing later having a smaller number
+             * that's the reason the loop iterates in reverse order
+             */
+            foreach(TypeVariable tv in ((IEnumerable<TypeVariable>) f.TypeParameters).Reverse())
             {
                 typeVarTranslation.AddBoundVariable(tv);
             }
             var typeIsaVisitor = new TypeIsaVisitor(typeVarTranslation);
 
             Term fname = new StringConst(f.Name);
+            Term numTypeParams = new NatConst(f.TypeParameters.Count);
             var argTypes = new TermList(f.InParams.Select(v => typeIsaVisitor.Translate(v.TypedIdent.Type)).ToList());
             var retType = typeIsaVisitor.Translate(f.OutParams.First().TypedIdent.Type);
             if(includeName)
             {
-                return new TermTuple(new List<Term> { fname, argTypes, retType });
+                return new TermTuple(new List<Term> { fname, numTypeParams, argTypes, retType });
             } else
             {
-                return new TermTuple(new List<Term> { argTypes, retType });
+                return new TermTuple(new List<Term> { numTypeParams, argTypes, retType });
             }
         }
 
@@ -411,7 +420,7 @@ namespace ProofGeneration
                 return new TermTuple(new List<Term> { vName, vType });
             } else
             {
-                return new TermTuple(new List<Term> { vType });
+                return vType;
             }
         }
 
@@ -430,30 +439,34 @@ namespace ProofGeneration
             return new TermApp(new TermApp(typeOfValId, absValTyMap), value);
         }
 
-        public static Term FunInterpWf(Term fdecls, Term finterp)
+        public static Term FunInterpWf(Term absValTyMap, Term fdecls, Term finterp)
         {
-            return new TermApp(funInterpWfId, new List<Term> { fdecls, finterp });
+            return new TermApp(funInterpWfId, new List<Term> { absValTyMap, fdecls, finterp });
         }
 
-        public static Term FunInterpSingleWf(Function f, Term fTerm, IVariableTranslationFactory factory)
+        public static Term FunInterpSingleWf(Function f, Term absValTyMap, Term fTerm, IVariableTranslationFactory factory)
         {
-            return FunInterpSingleWf(FunDecl(f, factory), fTerm);
+            return FunInterpSingleWf(absValTyMap, FunDecl(f, factory), fTerm);
         }
 
-        public static Term FunInterpSingleWf(Term fdecl, Term fun)
+        public static Term FunInterpSingleWf(Term absValTyMap, Term fdecl, Term fun)
         {
-            return new TermApp(funInterpSingleWfId, new List<Term> { fdecl, fun });
+            return new TermApp(funInterpSingleWfId, new List<Term> { absValTyMap, fdecl, fun });
         }
 
-        public static Term StateWf(Term vdecls, Term state)
+        public static Term StateWf(Term absValTyMap, Term typeEnv, Term vdecls, Term state)
         {
-            return new TermApp(stateWfId, new List<Term> { state, vdecls });
+            return new TermApp(stateWfId, new List<Term> { absValTyMap, typeEnv, state, vdecls });
         }
 
-        public static Term AxiomSat(Term funContext, Term axioms, Term normalState)
+        public static Term AxiomSat(Term absValTyMap, Term funContext, Term axioms, Term normalState)
         {
-            return new TermApp(axiomsSatId, new List<Term> { funContext, normalState, axioms });
+            return new TermApp(axiomsSatId, new List<Term> { absValTyMap, funContext, normalState, axioms });
         }
 
+        public static Term ClosedType(Term ty)
+        {
+            return new TermApp(closedTypeId, ty);
+        }
     }
 }

@@ -18,7 +18,8 @@ namespace ProofGeneration.VCProofGen
         
         public override Term Ctor(Function func)
         {
-            throw new NotImplementedException();
+            //TODO just returning something here
+            return IsaCommonTerms.TermIdentFromName("Ctor");
         }
 
         public override Term Bool2U(Function func)
@@ -43,27 +44,27 @@ namespace ProofGeneration.VCProofGen
 
         public override Term BoolType(Function func)
         {
-            return IsaBoogieType.PrimType(IsaBoogieType.BoolType());
+            return IsaBoogieVC.PrimTypeClosed(IsaBoogieType.BoolType());
         }
 
         public override Term IntType(Function func)
         {
-            return IsaBoogieType.PrimType(IsaBoogieType.IntType());
+            return IsaBoogieVC.PrimTypeClosed(IsaBoogieType.IntType());
         }
 
         public override Term Type(Function func)
         {
-            return IsaBoogieVCTerm.VCType(_boogieContextIsa.absValTyMap);
+            return IsaBoogieVC.VCType(_boogieContextIsa.absValTyMap);
         }
 
         public override Term TypeConstructor(string constrName, Function func)
         {
-            return IsaBoogieVCTerm.VCTypeConstructor(constrName, func.InParams.Count);
+            return IsaBoogieVC.VCTypeConstructor(constrName, func.InParams.Count);
         }
 
         public override Term TypeConstructorInverse(string constrName, int index, Function func)
         {
-            return IsaBoogieVCTerm.VCInv(index);
+            return IsaBoogieVC.VCInv(index);
         }
     }
 }

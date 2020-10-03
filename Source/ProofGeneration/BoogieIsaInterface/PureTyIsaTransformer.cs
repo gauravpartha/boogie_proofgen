@@ -8,17 +8,18 @@ namespace ProofGeneration.BoogieIsaInterface
 {
     class PureTyIsaTransformer : ResultReadOnlyVisitor<TypeIsa>
     {
-        //u represents the Boogie values in the VC and t represents the Boogie types in the VC
+        //valueTy represents the Boogie values in the VC and typeTy represents the Boogie types in the VC
         private readonly TypeIsa valueTy;
-        private readonly VarType typeTy = new VarType("t");
+        private readonly TypeIsa typeTy;
 
 
-        public PureTyIsaTransformer(TypeIsa valueTy)
+        public PureTyIsaTransformer(TypeIsa valueTy, TypeIsa typeTy)
         {
             this.valueTy = valueTy;
+            this.typeTy = typeTy;
         }
 
-        public PureTyIsaTransformer() : this(new VarType("u"))
+        public PureTyIsaTransformer() : this(new VarType("u"), new VarType("t"))
         { }
         
 
@@ -99,7 +100,8 @@ namespace ProofGeneration.BoogieIsaInterface
             }
             else
             {
-                throw new NotImplementedException();
+               //TODO: just returning some type so that can test, but need to adjust this
+               ReturnResult(new PrimitiveType(Isa.SimpleType.Int));
             }
 
             return node;

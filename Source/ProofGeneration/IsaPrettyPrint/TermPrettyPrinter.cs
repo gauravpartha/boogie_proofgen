@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using H = ProofGeneration.IsaPrettyPrint.IsaPrettyPrinterHelper;
 
 namespace ProofGeneration.IsaPrettyPrint
 {
@@ -31,7 +32,7 @@ namespace ProofGeneration.IsaPrettyPrint
                 {
                     sb.Append(")");
                 }
-                return IsaPrettyPrinterHelper.Parenthesis(sb.ToString());
+                return H.Parenthesis(sb.ToString());
             }
             else {
                 return (t.n).ToString();
@@ -53,7 +54,7 @@ namespace ProofGeneration.IsaPrettyPrint
             string rFun = Visit(t.fun);
             IList<string> rArgs = VisitList(t.arg);
 
-            return IsaPrettyPrinterHelper.Parenthesis(rFun + " " + IsaPrettyPrinterHelper.SpaceAggregate(rArgs));
+            return H.Parenthesis(rFun + " " + H.SpaceAggregate(rArgs));
         }
 
         public override string VisitTermWithExplicitType(TermWithExplicitType t)
@@ -61,7 +62,7 @@ namespace ProofGeneration.IsaPrettyPrint
             string rTerm = Visit(t.term);
             string rType = typePrettyPrinter.Visit(t.type);
 
-            return IsaPrettyPrinterHelper.Parenthesis(rTerm + "::" + rType);
+            return H.Parenthesis(rTerm + "::" + rType);
         }
 
         public override string VisitTermIdent(TermIdent t)
@@ -72,25 +73,25 @@ namespace ProofGeneration.IsaPrettyPrint
         public override string VisitTermList(TermList t)
         {
             var rArgs = VisitList(t.list);
-            return IsaPrettyPrinterHelper.Brackets(IsaPrettyPrinterHelper.CommaNewLineAggregate(rArgs));
+            return H.Brackets(H.CommaNewLineAggregate(rArgs));
         }
 
         public override string VisitTermRecord(TermRecord t)
         {
             var res = t.mapping.Select(tuple => tuple.Item1 + " = " + Visit(tuple.Item2));
-            return "(|" + (IsaPrettyPrinterHelper.CommaAggregate(res.ToList())) + "|)";
+            return "(|" + (H.CommaAggregate(res.ToList())) + "|)";
         }
 
         public override string VisitTermSet(TermSet t)
         {
             var rArgs = t.elements.Select(tElem => Visit(tElem)).ToList();
-            return IsaPrettyPrinterHelper.CurlyBrackets(IsaPrettyPrinterHelper.CommaAggregate(rArgs));
+            return H.CurlyBrackets(H.CommaAggregate(rArgs));
         }
 
         public override string VisitTermTuple(TermTuple t)
         {
             var res = VisitList(t.terms);
-            return IsaPrettyPrinterHelper.Parenthesis(IsaPrettyPrinterHelper.CommaAggregate(res));
+            return H.Parenthesis(H.CommaAggregate(res));
         }
 
         public override string VisitTermQuantifier(TermQuantifier t)
@@ -100,7 +101,20 @@ namespace ProofGeneration.IsaPrettyPrint
             sb.Append("(");
             sb.Append(qIsa);
             sb.Append(" ");
-            sb.Append(IsaPrettyPrinterHelper.SpaceAggregate(t.boundVars.Select(id => GetStringFromIdentifier(id)).ToList()));
+
+            IEnumerable<string> boundVarsTranslated;
+            if (t.boundVarsTypes != null)
+            {
+                boundVarsTranslated = t.boundVars.Zip(t.boundVarsTypes, (id, ty) =>
+                    H.Parenthesis(GetStringFromIdentifier(id) + "::" + typePrettyPrinter.Visit(ty))
+                );
+            }
+            else
+            {
+                boundVarsTranslated = t.boundVars.Select(GetStringFromIdentifier);
+            }
+
+            sb.Append(H.SpaceAggregate(boundVarsTranslated));
             sb.Append(".");
 
             sb.Append(" ");
@@ -134,7 +148,7 @@ namespace ProofGeneration.IsaPrettyPrint
             string leftString = t.argLeft.Dispatch(this);
             string rightString = t.argRight.Dispatch(this);
 
-            return IsaPrettyPrinterHelper.Parenthesis(leftString + " " + isaSymbol + " " + rightString);
+            return H.Parenthesis(leftString + " " + isaSymbol + " " + rightString);
         }
 
         public string GetStringFromIdentifier(Identifier id)
@@ -191,7 +205,7 @@ namespace ProofGeneration.IsaPrettyPrint
 
             string argString = t.arg.Dispatch(this);
 
-            return IsaPrettyPrinterHelper.Parenthesis(isaSymbol + " " + argString);
+            return H.Parenthesis(isaSymbol + " " + argString);
         }
 
         public string GetStringFromUnary(TermUnary.UnaryOpCode uop)

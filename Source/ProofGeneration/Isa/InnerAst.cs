@@ -19,6 +19,11 @@ namespace ProofGeneration.Isa
         {
             this.name = name;
         }
+
+        public override string ToString()
+        {
+            return this.name;
+        }
     }
 
     class Wildcard : Identifier { }
@@ -186,8 +191,10 @@ namespace ProofGeneration.Isa
 
         public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
         {
-            Contract.Requires(boundVars != null); Contract.Requires(term != null);
-            Contract.Requires(boundVarsTypes == null || boundVars.Count == boundVarsTypes.Count);
+            if (boundVars == null || (boundVarsTypes != null && boundVars.Count != boundVarsTypes.Count))
+            {
+                throw new ArgumentException();
+            }
             this.quantifier = quantifier;
             this.boundVars = boundVars;
             this.boundVarsTypes = boundVarsTypes;
@@ -241,6 +248,11 @@ namespace ProofGeneration.Isa
         public static TermBinary Implies(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.IMPLIES);
+        }
+        
+        public static TermBinary MetaImplies(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.META_IMP);
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)

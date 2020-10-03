@@ -26,7 +26,7 @@ namespace ProofGeneration.VCProofGen
             BoogieMethodData methodData,
             CFGRepr cfg,
             out VCInstantiation<Block> vcinst,
-            out VCInstantiation<Axiom> vcinstAxiom,
+            out VCInstantiation<VCAxiom> vcinstAxiom,
             out IVCVarFunTranslator vcTranslator,
             out IEnumerable<Function> vcTypeFunctions)
         {
@@ -36,7 +36,9 @@ namespace ProofGeneration.VCProofGen
             var uniqueNamer = new IsaUniqueNamer();
             IDictionary<Block, VCExpr> blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
 
-            IDictionary<Function, Function> funToVCfun = new VCFunDeclCollector().CollectFunDeclarations(vc, methodData.Functions);
+            var declCollector = new VCFunDeclCollector();
+            IDictionary<Function, Function> funToVCfun =
+                (declCollector.CollectFunDeclarations(new List<VCExpr>() {vc}.Concat(vcAxioms), methodData.Functions));
             IVCVarFunTranslator varTranslator = new VCVarFunTranslator(methodData.InParams.Union(methodData.Locals), funToVCfun, translator, axiomBuilder);
 
             IDictionary<Block, ISet<NamedDeclaration>> activeDeclsPerBlock = 
@@ -44,11 +46,29 @@ namespace ProofGeneration.VCProofGen
 
             #region temporary: extend vc instantiation to support vc functions
             IList<Function> otherFunctions = new List<Function>();
+            ISet<Function> otherFunctionsSet = new HashSet<Function>();
 
             foreach(NamedDeclaration decl in activeDeclsPerBlock[cfg.entry])
             {
-                if (decl is Function fun && !varTranslator.TranslateBoogieFunction(fun, out Function origFun)) {
+                if (decl is Function fun && !varTranslator.TranslateBoogieFunction(fun, out _)) {
                     otherFunctions.Add(fun);
+                    otherFunctionsSet.Add(fun);
+                }
+            }
+            
+            //also record functions that are used elswhere (type axiom related functions)
+            VCExprDeclCollector collector = new VCExprDeclCollector();
+            var vcExprs = vcAxioms.ToList();
+            foreach(VCExpr ax in vcExprs)
+            {
+                var decls = collector.CollectNamedDeclarations(ax, varTranslator);
+                foreach (var d in decls)
+                {
+                    if (d is Function fun && !varTranslator.TranslateBoogieFunction(fun, out _) &&
+                        !otherFunctions.Contains(d) )
+                    {
+                        otherFunctions.Add(fun);
+                    }
                 }
             }
             #endregion
@@ -93,26 +113,30 @@ namespace ProofGeneration.VCProofGen
             */
 
             //axioms
-            IDictionary<Axiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(methodData.Axioms, vcAxioms, varTranslator);
-            IDictionary<Axiom, IList<NamedDeclaration>> activeDeclsPerAxiomSorted =
-                 SortActiveDecls(activeDeclsPerAxiom, methodData.Functions, varTranslator, out IDictionary<Axiom, IList<VCExprVar>> activeVarsPerAxiom);
+            IDictionary<VCAxiom, ISet<NamedDeclaration>> activeDeclsPerAxiom = VCInstAxioms(methodData.Axioms, vcExprs, varTranslator);
+            IDictionary<VCAxiom, IList<NamedDeclaration>> activeDeclsPerAxiomSorted =
+                 SortActiveDecls(activeDeclsPerAxiom, methodData.Functions.Union(otherFunctions), varTranslator, out IDictionary<VCAxiom, IList<VCExprVar>> activeVarsPerAxiom);
             var axiomVCDefs = new List<DefDecl>();
-            var axiomToDef = new Dictionary<Axiom, DefDecl>();
+            var axiomToDef = new Dictionary<VCAxiom, DefDecl>();
             var vcExprIsaTranslator = new VCExprToIsaTranslator(uniqueNamer);
-            int axId = 0;
-            //TODO: not all vc axioms have corresponding program axiom
-            void axiomsAction(Axiom ax, VCExpr vcAx)
+
+            if (activeDeclsPerAxiomSorted.Count != vcExprs.Count())
             {
-                IList<Term> args = activeVarsPerAxiom[ax].Select(v => vcExprIsaTranslator.Translate(v)).ToList();
-                Term rhs = vcExprIsaTranslator.Translate(vcAx);
+                throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface), "count not in-sync");
+            }
+            
+            int axId = 0;
+            foreach(VCAxiom vcax in activeDeclsPerAxiomSorted.Keys)
+            {
+                IList<Term> args = activeVarsPerAxiom[vcax].Select(v => vcExprIsaTranslator.Translate(v)).ToList();
+                Term rhs = vcExprIsaTranslator.Translate(vcax.Expr);
 
                 DefDecl def = new DefDecl("vcax_"+axId, new Tuple<IList<Term>, Term>(args, rhs));
-                axiomToDef.Add(ax, def);
+                axiomToDef.Add(vcax, def);
                 axId++;
             }
-            BasicUtil.ZipDo(methodData.Axioms, vcAxioms, axiomsAction);
 
-            vcinstAxiom = new VCInstantiation<Axiom>(axiomToDef, activeDeclsPerAxiomSorted, localeName);
+            vcinstAxiom = new VCInstantiation<VCAxiom>(axiomToDef, activeDeclsPerAxiomSorted, localeName);
 
             vcOuterDecls.AddRange(axiomToDef.Values);
 
@@ -216,21 +240,34 @@ namespace ProofGeneration.VCProofGen
             return result;
         }
 
-        private static IDictionary<Axiom, ISet<NamedDeclaration>> VCInstAxioms(
+        //length of vcAxioms is at least length n of axioms (direct correspondence between the first n elements of the
+        //two lists)
+        private static IDictionary<VCAxiom, ISet<NamedDeclaration>> VCInstAxioms(
             IEnumerable<Axiom> axioms, 
             IEnumerable<VCExpr> vcAxioms, 
             IVCVarFunTranslator translator)
         {
-            var result = new Dictionary<Axiom, ISet<NamedDeclaration>>();
+            var result = new Dictionary<VCAxiom, ISet<NamedDeclaration>>();
 
             VCExprDeclCollector collector = new VCExprDeclCollector();
-            void action(Axiom ax, VCExpr vc)
+            using (var e1 = axioms.GetEnumerator())
+            using (var e2 = vcAxioms.GetEnumerator())
             {
-                ISet<NamedDeclaration> decls = collector.CollectNamedDeclarations(vc, translator);
-                result.Add(ax, decls);
-            }
+                while (e1.MoveNext() && e2.MoveNext())
+                {
+                    VCBoogieAxiom boogieAxiom = new VCBoogieAxiom(e2.Current, e1.Current);
+                    var activeDecls = collector.CollectNamedDeclarations(e2.Current, translator);
+                    result.Add(boogieAxiom, activeDecls); 
+                }
 
-            BasicUtil.ZipDo(axioms, vcAxioms, action);
+                while (e2.MoveNext())
+                {
+                    VCOtherAxiom otherAxiom = new VCOtherAxiom(e2.Current);
+                    var activeDecls = collector.CollectNamedDeclarations(e2.Current, translator);
+                    result.Add(otherAxiom, activeDecls); 
+                }
+            }
+            
             return result;
         }
     }

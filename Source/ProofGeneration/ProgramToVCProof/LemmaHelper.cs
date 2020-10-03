@@ -4,6 +4,7 @@ using ProofGeneration.Isa;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 using System.Collections.Generic;
+using System.ComponentModel.Design.Serialization;
 using System.Linq;
 using System.Diagnostics.Contracts;
 using ProofGeneration.BoogieIsaInterface;
@@ -109,8 +110,7 @@ namespace ProofGeneration.ProgramToVCProof
 
 
                 List<Identifier> boundTypeVars = GetNames("targ", f.TypeParameters.Count);
-                
-                
+
                 IDictionary<TypeVariable, Term> substitution = new Dictionary<TypeVariable, Term>();
                 int i = 0;
                 foreach(var tv in f.TypeParameters)
@@ -126,9 +126,13 @@ namespace ProofGeneration.ProgramToVCProof
                         f.InParams.Where(v => !TypeUtil.IsPrimitive(v.TypedIdent.Type))
                             .Select((v, idx) => TermBinary.Eq(
                                 IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, new TermIdent(boundParamVars[idx])),
-                                IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(v.TypedIdent.Type)))) ;
+                                typeIsaVisitor.Translate(v.TypedIdent.Type))) ;
 
                 List<Term> boogieFunTyArgs = boundTypeVars.Select(id => (Term) new TermIdent(id)).ToList();
+                IEnumerable<Term> vcFunTyArgs =
+                    f.TypeParameters.Where(tv => explicitTypeVars.Contains(tv))
+                        .Select((tv, idx) => IsaBoogieVC.TyToClosed(boogieFunTyArgs[idx])
+                    );
                 List<Term> boogieFunValArgs =
                     f.InParams.Select(
                         (v, idx) => converter.ConvertToBoogieVal(v.TypedIdent.Type, new TermIdent(boundParamVars[idx]))
@@ -143,24 +147,26 @@ namespace ProofGeneration.ProgramToVCProof
                 Term right = IsaCommonTerms.SomeOption(
                     converter.ConvertToBoogieVal(f.OutParams.First().TypedIdent.Type,
                         new TermApp(declToVCMapping[f],
-                            boundParamVars.Select(bv => (Term) new TermIdent(bv)).ToList()
-                        )
+                             vcFunTyArgs.Union(
+                                boundParamVars.Select(bv => (Term) new TermIdent(bv)).ToList()
+                            ).ToList())
                     )
-                    );
+                );
 
                 Term equation = TermBinary.Eq(left, right);
 
                 if (typeArgConstraints.Any())
                 {
-                    var aggregatedAssms = typeArgConstraints.Aggregate((t1, t2) => TermBinary.And(t1,t2));
+                    var closednessAssms = boogieFunTyArgs.Select(t1 => IsaBoogieTerm.ClosedType(t1))
+                        .Aggregate((t1, t2) => TermBinary.And(t2, t1));
+                    var aggregatedAssms = typeArgConstraints.Aggregate((t1, t2) => TermBinary.And(t2,t1));
                     assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), 
-                        TermBinary.Implies(aggregatedAssms, equation)));
+                        TermBinary.Implies(closednessAssms, TermBinary.Implies(aggregatedAssms, equation))));
                 }
                 else
                 { 
                     assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), equation));
                 }
-
                 #endregion
             }
 
@@ -182,7 +188,15 @@ namespace ProofGeneration.ProgramToVCProof
 
             foreach(Function f in vcTypeDecls)
             {
-                dict.Add(f, typeDeclTranslation.TranslateTypeDecl(f));
+                if (typeDeclTranslation.TryTranslateTypeDecl(f, out Term result))
+                {
+                    dict.Add(f, result);
+                }
+                else
+                {
+                    throw new ProofGenUnexpectedStateException(typeof(LemmaHelper), "Could not find vc function instantiation");
+                }
+
             }
 
             return dict;
@@ -217,6 +231,14 @@ namespace ProofGeneration.ProgramToVCProof
                 result.Add(new SimpleIdentifier(baseName + i));
             }
             return result;
+        }
+
+        //returns PureTyIsaTransformer that instantiates U and T with the concrete instantiations
+        public static PureTyIsaTransformer ConretePureTyIsaTransformer(TypeIsa abstractValueType)
+        {
+            //instantiate type in VC representing Boogie values with Boogie value type
+            //instantiate type in VC representing Boogie types with Boogie closed type
+            return new PureTyIsaTransformer(IsaBoogieType.ValType(abstractValueType), IsaBoogieVC.BoogieClosedType());
         }
 
     }

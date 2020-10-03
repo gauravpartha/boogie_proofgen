@@ -11,7 +11,7 @@ using ProofGeneration.BoogieIsaInterface;
 namespace ProofGeneration.VCProofGen
 {
     // argument is not used
-    class VCExprToIsaTranslator : IVCExprVisitor<Term, bool>
+    public class VCExprToIsaTranslator : IVCExprVisitor<Term, bool>
     {
 
         private readonly IDictionary<Block, DefDecl> successorToVC;

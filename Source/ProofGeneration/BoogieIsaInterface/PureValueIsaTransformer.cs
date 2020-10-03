@@ -63,5 +63,16 @@ namespace ProofGeneration.BoogieIsaInterface
 
             return node;
         }
+        public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
+        {
+            ReturnResult(arg);
+            return node;
+        }
+
+        public override CtorType VisitCtorType(CtorType node)
+        {
+            ReturnResult(arg);
+            return node;
+        }
     }
 }

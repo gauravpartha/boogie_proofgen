@@ -88,5 +88,9 @@ namespace ProofGeneration.VCProofGen
             return prefix + objToDef[block].name;
         }
 
+        public IEnumerable<T> Keys
+        {
+            get { return objToDef.Keys; }
+        }
     }
 }

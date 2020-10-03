@@ -1,5 +1,6 @@
 ﻿using Microsoft.Boogie;
 using System.Collections.Generic;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -7,6 +8,8 @@ namespace ProofGeneration.VCProofGen
     {
         private readonly Cmd[] cmds;
         private readonly VCHint[] _hints;
+        //declarations required for proof
+        public IList<OuterDecl> OuterDecls { get; }
 
         public IEnumerable<VCHint> Hints()
         {
@@ -32,6 +35,7 @@ namespace ProofGeneration.VCProofGen
             cmds = block.cmds.ToArray();
             nextCmd = cmds.Length - 1;
             _hints = new VCHint[cmds.Length];
+            OuterDecls = new List<OuterDecl>();
         }
 
         public void AddHint(Cmd cmd, VCHint hint)
@@ -44,6 +48,11 @@ namespace ProofGeneration.VCProofGen
             _hints[nextCmd] = hint;
 
             nextCmd--;
+        }
+
+        public void AddRequiredDecl(OuterDecl decl)
+        {
+            OuterDecls.Add(decl);
         }
 
         private int NumOfCommands(VCHint hint)
