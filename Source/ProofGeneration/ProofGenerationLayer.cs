@@ -224,11 +224,11 @@ namespace ProofGeneration
                 programRepr.cfgDeclDef,
                 "method_verifies"));
 
-            LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
+            //LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
             var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
             passiveOuterDecls.AddRange(programDecls);
-            passiveOuterDecls.Add(afterPassificationLocale);
+            // passiveOuterDecls.Add(afterPassificationLocale);
 
             var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcFunctions, vcinst, vcinstAxiom, afterUnreachablePruningCfg, varTranslationFactory);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
@@ -342,31 +342,31 @@ namespace ProofGeneration
         private static IEnumerable<Block> GetNonEmptySuccessors(Block block, CFGRepr cfg)
         {            
             //block is unreachable after peephole
-                var nonEmptySuccessors = new List<Block>();
+            var nonEmptySuccessors = new List<Block>();
 
-                if (cfg.NumOfSuccessors(block) > 0)
+            if (cfg.NumOfSuccessors(block) > 0)
+            {
+                //find first reachable blocks that are not empty
+                Queue<Block> toVisit = new Queue<Block>();
+                toVisit.Enqueue(block);
+                while (toVisit.Count > 0)
                 {
-                    //find first reachable blocks that are not empty
-                    Queue<Block> toVisit = new Queue<Block>();
-                    toVisit.Enqueue(block);
-                    while (toVisit.Count > 0)
-                    {
-                        Block curBlock = toVisit.Dequeue();
+                    Block curBlock = toVisit.Dequeue();
 
-                        if (curBlock.Cmds.Count != 0)
+                    if (curBlock.Cmds.Count != 0)
+                    {
+                        nonEmptySuccessors.Add(curBlock);
+                    }
+                    else
+                    {
+                        foreach (Block succ in cfg.GetSuccessorBlocks(curBlock))
                         {
-                            nonEmptySuccessors.Add(curBlock);
-                        }
-                        else
-                        {
-                            foreach (Block succ in cfg.GetSuccessorBlocks(curBlock))
-                            {
-                                toVisit.Enqueue(succ);
-                            }
+                            toVisit.Enqueue(succ);
                         }
                     }
                 }
-                        
+            }
+                    
             return nonEmptySuccessors;
         }
 

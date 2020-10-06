@@ -82,7 +82,7 @@ namespace ProofGeneration
             foreach (Axiom ax in axioms)
             {
                 IList<Term> axTerms = cmdIsaVisitor.Translate(ax.Expr);
-                if(axTerms.Count != 1) { throw new ProofGenUnexpectedStateException(GetType(), "axiom not translated into single term"); };
+                if(axTerms.Count != 1) { throw new ProofGenUnexpectedStateException(GetType(), "axiom not translated into single term"); }
                 axiomsExpr.Add(axTerms.First());
             }
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(axiomsExpr));

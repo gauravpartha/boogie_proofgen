@@ -126,7 +126,7 @@ namespace ProofGeneration.ProgramToVCProof
                         f.InParams.Where(v => !TypeUtil.IsPrimitive(v.TypedIdent.Type))
                             .Select((v, idx) => TermBinary.Eq(
                                 IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, new TermIdent(boundParamVars[idx])),
-                                typeIsaVisitor.Translate(v.TypedIdent.Type))) ;
+                                typeIsaVisitor.Translate(v.TypedIdent.Type)));
 
                 List<Term> boogieFunTyArgs = boundTypeVars.Select(id => (Term) new TermIdent(id)).ToList();
                 IEnumerable<Term> vcFunTyArgs =

@@ -42,7 +42,7 @@ namespace ProofGeneration.CFGRepresentation
                 newToOldBlocks = null;
             }                
 
-            AlternateCFGRepr(blocksToConvert, out Block entryBlock, out IDictionary < Block, IList < Block >> outgoingBlocks);
+            AlternateCFGRepr(blocksToConvert, out Block entryBlock, out IDictionary<Block, IList<Block >> outgoingBlocks);
             IDictionary<Block, int> labeling;
             if (isAcyclic)
             {

@@ -1,6 +1,4 @@
-﻿
-
-using Microsoft.Boogie;
+﻿using Microsoft.Boogie;
 using System;
 using System.Collections;
 using System.Diagnostics.Contracts;

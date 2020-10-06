@@ -1819,11 +1819,6 @@ namespace Microsoft.Boogie.VCExprAST
       Contract.Requires(v != null);
       this.V = v;
       this.E = e;
-      if (!v.Type.Equals(e.Type))
-      {
-        int x = 4;
-      }
-      
       Contract.Assert(v.Type.Equals(e.Type));
     }
   }

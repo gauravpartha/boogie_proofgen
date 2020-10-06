@@ -412,8 +412,8 @@ namespace ProofGeneration.ProgramToVCProof
                     pureValueIsaTransformer.ConstructValue(
                         pureValueIsaTransformer.DestructValue(
                             IsaCommonTerms.TheOption(lhs),
-                            v.TypedIdent.Type)
-                            , v.TypedIdent.Type)
+                            v.TypedIdent.Type), 
+                        v.TypedIdent.Type)
                         );
                 sb.AppendInner(new TermBinary(lhs, rhs, TermBinary.BinaryOpCode.EQ).ToString());
                 sb.AppendLine();
