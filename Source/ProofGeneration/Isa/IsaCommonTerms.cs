@@ -25,6 +25,14 @@ namespace ProofGeneration.Isa
                 );
         }
         
+        public static Term Let(Identifier boundVar, Term termSubst, Term body)
+        {
+            return new TermApp(
+                new TermApp(new TermIdent(new SimpleIdentifier("Let")), termSubst),
+                TermQuantifier.Lambda(new List<Identifier>(){boundVar}, null, body) 
+                );
+        }
+        
         public static Term SomeOption(Term arg)
         {
             return new TermApp(SomeId, new List<Term>() { arg });

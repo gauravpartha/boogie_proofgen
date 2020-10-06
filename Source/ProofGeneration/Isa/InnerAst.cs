@@ -157,7 +157,7 @@ namespace ProofGeneration.Isa
     {
         public readonly IList<Identifier> boundVars;
         //if non-null,
-        public readonly IList<TypeIsa> boundVarsTypes;
+        public readonly IList<TypeIsa> boundVarTypes;
         public readonly Term term;
 
         public readonly QuantifierKind quantifier;
@@ -189,15 +189,16 @@ namespace ProofGeneration.Isa
             return new TermQuantifier(QuantifierKind.LAMBDA, boundVars, boundVarsTypes, term);
         }
 
-        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
+        //if boundVarTypes is null, then this represents not providing explicit types
+        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarTypes, Term term)
         {
-            if (boundVars == null || (boundVarsTypes != null && boundVars.Count != boundVarsTypes.Count))
+            if (boundVars == null || (boundVarTypes != null && boundVars.Count != boundVarTypes.Count))
             {
                 throw new ArgumentException();
             }
             this.quantifier = quantifier;
             this.boundVars = boundVars;
-            this.boundVarsTypes = boundVarsTypes;
+            this.boundVarTypes = boundVarTypes;
             this.term = term;
         }
 

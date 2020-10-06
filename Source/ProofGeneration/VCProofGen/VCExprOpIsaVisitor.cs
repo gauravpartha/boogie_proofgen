@@ -3,11 +3,42 @@ using ProofGeneration.Isa;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Runtime.InteropServices;
+using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
     public class VCExprOpIsaVisitor : IVCExprOpVisitor<Term, List<Term>>
     {
+        private ConcreteTypeDeclTranslation _concreteTypeTranslation;
+
+        private IsaUniqueNamer _uniqueNamer;
+        
+        private bool _tryInstantiatingTypes = false; 
+        public VCExprOpIsaVisitor(IsaUniqueNamer functionNamer)
+        {
+            _uniqueNamer = functionNamer;
+            var boogieContext = new BoogieContextIsa(
+                IsaCommonTerms.TermIdentFromName("A"),
+                IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
+                IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
+                IsaCommonTerms.TermIdentFromName("\\<Omega>"));
+            _concreteTypeTranslation = new ConcreteTypeDeclTranslation(boogieContext);
+        }
+
+        public VCExprOpIsaVisitor() : this(new IsaUniqueNamer()) { }
+
+        public void setFunctionNamer(IsaUniqueNamer functionNamer)
+        {
+            _uniqueNamer = functionNamer;
+        }
+
+        public void SetTryInstantiatingTypes(bool flag)
+        {
+            _tryInstantiatingTypes = flag;
+        }
 
         public Term HandleBinaryOp(TermBinary.BinaryOpCode bop, List<Term> arg)
         {
@@ -33,8 +64,17 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitBoogieFunctionOp(VCExprNAry node, List<Term> arg)
         {
-            if(node.Op is VCExprBoogieFunctionOp funOp) {
-                return new TermApp(IsaCommonTerms.TermIdentFromName(funOp.Func.Name), arg);
+            if(node.Op is VCExprBoogieFunctionOp funOp)
+            {
+                string name = funOp.Func.Name;
+                if (_tryInstantiatingTypes && _concreteTypeTranslation.TryTranslateTypeDecl(funOp.Func, out Term funTermResult))
+                {
+                    return new TermApp(funTermResult, arg);
+                }
+                else
+                {
+                    return new TermApp(IsaCommonTerms.TermIdentFromName(_uniqueNamer.GetName(funOp.Func.Name, funOp.Func.Name)), arg);
+                }
             }
 
             //should never reach this code

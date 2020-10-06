@@ -103,9 +103,9 @@ namespace ProofGeneration.IsaPrettyPrint
             sb.Append(" ");
 
             IEnumerable<string> boundVarsTranslated;
-            if (t.boundVarsTypes != null)
+            if (t.boundVarTypes != null)
             {
-                boundVarsTranslated = t.boundVars.Zip(t.boundVarsTypes, (id, ty) =>
+                boundVarsTranslated = t.boundVars.Zip(t.boundVarTypes, (id, ty) =>
                     H.Parenthesis(GetStringFromIdentifier(id) + "::" + typePrettyPrinter.Visit(ty))
                 );
             }

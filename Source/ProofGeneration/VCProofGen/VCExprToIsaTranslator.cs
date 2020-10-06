@@ -13,7 +13,6 @@ namespace ProofGeneration.VCProofGen
     // argument is not used
     public class VCExprToIsaTranslator : IVCExprVisitor<Term, bool>
     {
-
         private readonly IDictionary<Block, DefDecl> successorToVC;
 
         protected readonly ISet<VCExprOp> criticalOps;
@@ -25,6 +24,8 @@ namespace ProofGeneration.VCProofGen
         private readonly IsaUniqueNamer uniqueNamer;
 
         private readonly PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
+
+        private bool _tryInstantiatingFunctions = false;
 
         public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC, IDictionary<Block, IList<VCExprVar>> blockToActiveVars)
         {
@@ -44,6 +45,16 @@ namespace ProofGeneration.VCProofGen
         public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer) : 
             this(uniqueNamer, new Dictionary<Block, DefDecl>(), new Dictionary<Block, IList<VCExprVar>>())
         { }
+        public void SetTryInstantiatingFunctions(bool flag)
+        {
+            _tryInstantiatingFunctions = flag;
+            vcExprOpIsaVisitor.SetTryInstantiatingTypes(flag);
+        }
+
+        public void SetFunctionNamer(IsaUniqueNamer functionNamer)
+        {
+            vcExprOpIsaVisitor.setFunctionNamer(functionNamer);
+        }
 
         public Term Translate(VCExpr node)
         {
@@ -189,8 +200,11 @@ namespace ProofGeneration.VCProofGen
              */
             return node.Reverse().Aggregate(Translate(node.Body), (prevBody, elem) =>
             {
+                /* don't provide explicit type annotations for simplicity, since in certain cases would have to translate
+                 the actual type to something else (such as when it is the type variable 't, but we would want closed_ty)
+                 */
                 return IsaCommonTerms.Let(new SimpleIdentifier(uniqueNamer.GetName(elem.V, elem.V.Name)),
-                    pureTyIsaTransformer.Translate(elem.V.Type),
+                     //pureTyIsaTransformer.Translate(elem.V.Type), 
                     Translate(elem.E),
                     prevBody
                 );

@@ -42,6 +42,10 @@ namespace ProofGeneration.VCProofGen
         {
             return EraseVC(_vcTranslator.Translate(e));
         }
+        /// <summary>
+        /// Erases the types in <paramref name="vc"/>.
+        /// Note that this has a side-effect on the original vc object.
+        /// </summary>
         public VCExpr EraseVC(VCExpr vc)
         {
               VCExpr exprWithoutTypes = Eraser.Erase(vc, 1);

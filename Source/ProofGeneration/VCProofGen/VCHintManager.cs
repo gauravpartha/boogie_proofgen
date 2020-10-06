@@ -25,6 +25,7 @@ namespace ProofGeneration.VCProofGen
         {
             _typeEraserFactory = typeEraserFactory;
             _vcToIsaTranslator = vcToIsaTranslator;
+            _vcToIsaTranslator.SetTryInstantiatingFunctions(true);
         }
 
         //hints must be provided in a backwards manner (from last to first command)
@@ -71,10 +72,14 @@ namespace ProofGeneration.VCProofGen
         /// </summary>
         private LemmaDecl LemmaForVc(Expr expr, VCExpr translatedVcExpr, bool isAssumeCmd)
         {
-            //to be safe create new eraser (erasers have state that change when certain methods are applied)
-            VCExpr vcExtracted = _typeEraserFactory.NewEraser(true).EraseVC(translatedVcExpr);
+            // To be safe create new erasers (erasers have state that change when certain methods are applied)
+            /* Note that vcExtracted is supposed to be the same as directly erasing translatedVcExpr. The reason we
+             translate the Boogie expression again to a VC expression before erasing it, is that erasure of a VCExpr
+             has side effects on that VCExpr. 
+             */
+            VCExpr vcExtracted = _typeEraserFactory.NewEraser(true).TranslateAndErase(expr);
             VCExpr vcNotExtracted = _typeEraserFactory.NewEraser(false).TranslateAndErase(expr);
-
+            
             Term lhs, rhs;
             if (isAssumeCmd)
             {
@@ -92,6 +97,7 @@ namespace ProofGeneration.VCProofGen
             }
 
             var lemmaName = "expr_equiv_" + _lemmaId;
+            _lemmaId++;
 
             return new LemmaDecl(lemmaName, TermBinary.MetaImplies(lhs, rhs), new Proof(new List<string> {"oops"}));
         }
@@ -126,7 +132,6 @@ namespace ProofGeneration.VCProofGen
             if (_typeQuantChecker.HasTypeQuantification(assumeCmd.Expr))
             {
                 decl = LemmaForVc(assumeCmd.Expr, exprVC, true);
-                decl = null;
             }
             else
             {

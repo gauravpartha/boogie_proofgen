@@ -159,7 +159,19 @@ namespace ProofGeneration
         public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)
         {
             typePremiseEraserFactory = factory;
-            vcHintManager = new VCHintManager(factory, new VCExprToIsaTranslator(new IsaUniqueNamer()));
+            IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
+            /* Hack: try to make sure unique namer uses names for Boogie functions that are different from the default name
+             * otherwise it clashes with the functions potentially fixed in the context of a locale
+             */
+            foreach(var fun in boogieGlobalData.Functions)
+            {
+                uniqueNamer.GetName(fun.Name, "o_"+fun.Name);
+            }
+
+            var translator = new VCExprToIsaTranslator(uniqueNamer);
+            translator.SetFunctionNamer(uniqueNamer);
+            
+            vcHintManager = new VCHintManager(factory, translator);
         }
 
         //axiom builder is null iff types are not erased (since no polymorphism in vc)
@@ -224,11 +236,11 @@ namespace ProofGeneration
                 programRepr.cfgDeclDef,
                 "method_verifies"));
 
-            //LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
+            LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
             var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
             passiveOuterDecls.AddRange(programDecls);
-            // passiveOuterDecls.Add(afterPassificationLocale);
+            passiveOuterDecls.Add(afterPassificationLocale);
 
             var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcFunctions, vcinst, vcinstAxiom, afterUnreachablePruningCfg, varTranslationFactory);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
