@@ -1,4 +1,4 @@
-﻿using Microsoft.Basetypes;
+﻿using Microsoft.BaseTypes;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;

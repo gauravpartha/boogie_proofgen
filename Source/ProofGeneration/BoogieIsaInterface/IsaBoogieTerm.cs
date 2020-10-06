@@ -82,7 +82,7 @@ namespace ProofGeneration
             }
         }
 
-        public static Term IntLiteral(Microsoft.Basetypes.BigNum num)
+        public static Term IntLiteral(Microsoft.BaseTypes.BigNum num)
         {
             return new TermApp(intLitId, new IntConst(num));
         }
@@ -92,7 +92,7 @@ namespace ProofGeneration
             return intVId;
         }
 
-        public static Term IntVal(Microsoft.Basetypes.BigNum num)
+        public static Term IntVal(Microsoft.BaseTypes.BigNum num)
         {
             Term intConst = new IntConst(num);
             return IntVal(intConst);

@@ -548,7 +548,7 @@ namespace Microsoft.Boogie.TypeErasure
       Ctor = HelperFuns.BoogieFunction("Ctor", t, Type.Int);
     }
 
-    public virtual void Setup()
+    public virtual void Setup() {
       /*PROOF GEN: only support integers and booleans */
       GetBasicTypeRepr(Type.Int);
       //GetBasicTypeRepr(Type.Real);

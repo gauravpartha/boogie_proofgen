@@ -26,7 +26,7 @@ namespace ProofGeneration
         {
             this.varTranslationFactory = varTranslationFactory;
             cmdIsaVisitor = new MultiCmdIsaVisitor(varTranslationFactory);
-            Term entry = new IntConst(Microsoft.Basetypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
+            Term entry = new IntConst(Microsoft.BaseTypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
 
             OuterDecl outEdges = GetOutEdgesIsa(procName, cfg);
             OuterDecl nodesToBlocks = GetNodeToBlocksIsa(procName, cfg);
