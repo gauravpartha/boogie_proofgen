@@ -63,11 +63,9 @@ procedure {:yields} {:layer 4} {:refines "atomic_main"} main({:linear "tid"} id:
     var mid: int;
     var cid: int;
 
-    yield;
     call server3(id, tids);
     call client3(id);
     call master3(id);
-    yield;
 }
 
 procedure {:intro} {:layer 3} StatusSnapshot() returns (snapshot: [int]int)
@@ -85,12 +83,12 @@ procedure {:yields} {:layer 3} {:refines "atomic_server"} server3({:linear "tid"
     var {:layer 3} snapshot: [int]int;
     var {:linear "tid"} tids': [int]bool;
     var {:linear "tid"} tid: int;
-    yield;
+
     i := 0;
     call snapshot := StatusSnapshot();
     tids' := tids;
     while (i < n)
-    invariant {:terminates} {:layer 2,3} true;
+    invariant {:terminates} {:layer 3} true;
     invariant {:layer 3} 0 <= i && i <= n;
     invariant {:layer 3} (forall j: int :: i <= j && j < n <==> tids'[j]);
     invariant {:layer 3} status == (lambda j: int :: if (0 <= j && j < i) then CREATED else snapshot[j]);
@@ -99,7 +97,6 @@ procedure {:yields} {:layer 3} {:refines "atomic_server"} server3({:linear "tid"
         async call {:sync} server2(tid);
         i := i + 1;
     }
-    yield;
 }
 
 procedure {:left} {:layer 3} atomic_server2({:linear "tid"} i: int)
@@ -112,9 +109,7 @@ procedure {:yields} {:layer 2} {:refines "atomic_server2"} server2({:linear "tid
 
 procedure {:yields} {:layer 3} {:refines "atomic_client"} client3({:linear "tid"} id: int)
 {
-    yield;
     call client2();
-    yield;
 }
 
 procedure {:atomic} {:layer 3} atomic_client2()
@@ -127,9 +122,7 @@ procedure {:yields} {:layer 2} {:refines "atomic_client2"} client2();
 
 procedure {:yields} {:layer 3} {:refines "atomic_master"} master3({:linear "tid"} id: int)
 {
-    yield;
     call master2();
-    yield;
 }
 
 procedure {:atomic} {:layer 3} atomic_master2()

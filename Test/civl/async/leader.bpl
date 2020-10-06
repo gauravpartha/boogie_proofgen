@@ -61,17 +61,15 @@ modifies col_dom, col_val, dec_dom, dec_val;
 
 procedure {:yields}{:layer 1}{:refines "main_atomic"} main ({:linear_in "Perm"} perms:[Perm]bool)
 requires {:layer 1} perms == all_perms();
-requires {:layer 1} dec_dom == (lambda i:int :: false);
-requires {:layer 1} col_dom == (lambda i:int :: (lambda j:int :: false));
+ensures {:layer 1} all_decided(init_val, dec_dom, dec_val);
 {
   var s:int;
   var {:linear "Perm"} perms':[Perm]bool;
   var {:linear "Perm"} perms'':[Perm]bool;
-  yield; assert {:layer 1} perms == all_perms();
   s := 1;
   perms' := perms;
   while (s <= N)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} perms' == s_perms_geq(s);
   invariant {:layer 1} inv_val(s, init_val, col_dom, col_val);
   invariant {:layer 1} s > N ==> all_decided(init_val, dec_dom, dec_val);
@@ -80,7 +78,6 @@ requires {:layer 1} col_dom == (lambda i:int :: (lambda j:int :: false));
     async call {:sync} P(s, perms'');
     s := s + 1;
   }
-  yield; assert {:layer 1} all_decided(init_val, dec_dom, dec_val);
 }
 
 procedure {:yields}{:layer 1}{:left} P (s:int, {:linear_in "Perm"} perms:[Perm]bool)
@@ -94,12 +91,12 @@ modifies col_dom, col_val, dec_dom, dec_val;
   var v:int;
   var {:linear "Perm"} p:Perm;
   var {:linear "Perm"} perms':[Perm]bool;
-  call dummy();
+  
   perms' := perms;
   r := 1;
   call v := read_init_val(s);
   while (r <= N)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} perms' == s_r_perms_geq(s,r);
   invariant {:layer 1} inv_val'(s, r, init_val, col_dom, col_val);
   invariant {:layer 1} s == N ==> all_decided'(r, init_val, dec_dom, dec_val);
@@ -108,7 +105,6 @@ modifies col_dom, col_val, dec_dom, dec_val;
     async call {:sync} Q(r, s, v, p);
     r := r + 1;
   }
-  call dummy();
 }
 
 procedure {:left}{:layer 1} Q_atomic (r:int, s:int, v:int, {:linear_in "Perm"} p:Perm)
@@ -148,8 +144,6 @@ procedure {:yields}{:layer 1}{:both} split_perms_receiver (s:Pid, r:Pid, {:linea
 requires {:layer 1} perms_in ==  s_r_perms_geq(s,r);
 ensures {:layer 1} perms_out_1 == s_r_perms_geq(s,r+1);
 ensures {:layer 1} is_perm(s,r,perms_out_2);
-
-procedure {:yields}{:layer 0} dummy ();
 
 // ###########################################################################
 // Collectors for linear domains

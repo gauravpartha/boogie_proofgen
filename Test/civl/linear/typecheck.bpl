@@ -74,7 +74,7 @@ procedure {:yields} {:layer 1} D()
     call c, x := E(a, x);
 
     yield;
-    par a := F(a) | x := F(a);
+    par c := F(a) | x := F(a);
     yield;
 }
 
@@ -128,4 +128,25 @@ procedure {:yields} {:layer 1} P2({:linear_in ""} x:int) returns({:linear ""} x'
   yield;
   par x' := I(x') | J();
   yield;
+}
+
+procedure {:yields} {:layer 1}
+P({:linear "lin"} x: int, {:linear_in "lin"} y: int)
+{
+  par Q(x) | linear_yield_x(y) | linear_yield_x(y);
+  par Q(x) | linear_yield_x(x) | linear_yield_x(y);
+}
+
+procedure {:yields} {:layer 1}
+Q({:linear "lin"} a: int);
+
+var {:layer 0,1} x:int;
+
+procedure {:yield_invariant} {:layer 1} linear_yield_x({:linear "lin"} n: int);
+requires x >= n;
+
+function {:builtin "MapConst"} MapConstBool(bool) : [int]bool;
+function {:inline} {:linear "lin"} TidCollector(x: int) : [int]bool
+{
+  MapConstBool(false)[x := true]
 }

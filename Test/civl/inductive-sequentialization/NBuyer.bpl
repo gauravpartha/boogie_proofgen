@@ -457,7 +457,7 @@ requires {:layer 1} Init(pids, ReqCH, QuoteCH, RemCH, DecCH, contribution);
   var {:pending_async}{:layer 1} PAs:[PA]int;
   var {:linear "pid"} pid:int;
   var {:linear "pid"} pids':[int]bool;
-  yield; assert {:layer 1} Init(pids, ReqCH, QuoteCH, RemCH, DecCH, contribution);
+
   pids' := pids;
   call pid, pids' := linear_transfer(0, pids');
   async call sellerInit(pid);
@@ -467,7 +467,7 @@ requires {:layer 1} Init(pids, ReqCH, QuoteCH, RemCH, DecCH, contribution);
   async call lastBuyer(pid);
   i := 2;
   while (i < n)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 2 <= i && i <= n;
   invariant {:layer 1} (forall ii:int :: middleBuyerID(ii) && ii >= i ==> pids'[ii]);
   invariant {:layer 1} PAs == MapAddPA4(SellerInitPA(0), FirstBuyerInitPA(1), LastBuyerPA(n), (lambda pa:PA :: if is#MiddleBuyerPA(pa) && middleBuyerID(pid#MiddleBuyerPA(pa)) && pid#MiddleBuyerPA(pa) < i then 1 else 0));
@@ -476,7 +476,6 @@ requires {:layer 1} Init(pids, ReqCH, QuoteCH, RemCH, DecCH, contribution);
     async call middleBuyer(pid);
     i := i + 1;
   }
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "SellerInit"}
@@ -485,20 +484,19 @@ requires {:layer 1} sellerID(pid);
 {
   var i:int;
   var {:layer 1} old_QuoteCH:[int][int]int;
-  yield;
+
   call old_QuoteCH := Snapshot_QuoteCH();
   call receive_req();
-  async call sellerFinish(pid);
   i := 1;
   while (i <= n)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} QuoteCH == (lambda ii:int :: (lambda q:int :: if buyerID(ii) && ii < i && q == price then old_QuoteCH[ii][q] + 1 else old_QuoteCH[ii][q]));
   {
     call send_quote(i, price);
     i := i + 1;
   }
-  yield;
+  async call sellerFinish(pid);
 }
 
 procedure {:yields}{:layer 1}{:refines "SellerFinish"}
@@ -506,23 +504,20 @@ sellerFinish ({:linear_in "pid"} pid:int)
 requires {:layer 1} sellerID(pid);
 {
   var d:bool;
-  yield;
+
   call d := receive_dec();
   if (d)
   {
     call assert_sum();
   }
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "FirstBuyerInit"}
 firstBuyerInit ({:linear_in "pid"} pid:int)
 requires {:layer 1} firstBuyerID(pid);
 {
-  yield;
   call send_req();
   async call firstBuyer(pid);
-  yield;
 }
 
 
@@ -532,12 +527,11 @@ requires {:layer 1} firstBuyerID(pid);
 {
   var q:int;
   var amount:int;
-  yield;
+
   call q := receive_quote(pid);
   if (*) { amount := min(wallet, q); } else { amount := 0; }
   call set_contribution(pid, amount);
   call send_rem(nextBuyer(pid), q - amount);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "MiddleBuyer"}
@@ -547,13 +541,12 @@ requires {:layer 1} middleBuyerID(pid);
   var q:int;
   var r:int;
   var amount:int;
-  yield;
+
   call q := receive_quote(pid);
   call r := receive_rem(pid);
   if (*) { amount := min(wallet, r); } else { amount := 0; }
   call set_contribution(pid, amount);
   call send_rem(nextBuyer(pid), r - amount);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "LastBuyer"}
@@ -563,13 +556,12 @@ requires {:layer 1} lastBuyerID(pid);
   var q:int;
   var r:int;
   var amount:int;
-  yield;
+
   call q := receive_quote(pid);
   call r := receive_rem(pid);
   if (*) { amount := min(wallet, r); } else { amount := 0; }
   call set_contribution(pid, amount);
   call send_dec(amount == r);
-  yield;
 }
 
 procedure {:intro}{:layer 1} Snapshot_QuoteCH() returns (snapshot:[int][int]int)

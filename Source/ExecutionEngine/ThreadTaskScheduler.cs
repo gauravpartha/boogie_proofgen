@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
+﻿using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,14 +19,14 @@ namespace Microsoft.Boogie
       stackSize = StackReserveSize;
     }
 
-    protected override IEnumerable<Task> GetScheduledTasks() 
+    protected override IEnumerable<Task> GetScheduledTasks()
     {
-      // There is never a queue of scheduled, but not running, tasks.  
+      // There is never a queue of scheduled, but not running, tasks.
       // So return an empty list.
       return new List<Task>();
     }
 
-    protected override void QueueTask(Task task) 
+    protected override void QueueTask(Task task)
     {
       // Each queued task runs on a newly-created thread with the required 
       // stack size.  The default .NET task scheduler is built on the .NET 
@@ -39,19 +35,18 @@ namespace Microsoft.Boogie
       //
       // Boogie creates tasks which in turn create tasks and wait on them.
       // So throttling tasks via a queue risks deadlock.
-
       Thread th = new Thread(TaskMain, stackSize);
       th.Start(task);
     }
 
-    protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) 
+    protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
     {
       return false;
     }
 
-    private void TaskMain(object data) 
+    private void TaskMain(object data)
     {
-      Task t = (Task)data;
+      Task t = (Task) data;
       TryExecuteTask(t);
     }
   }

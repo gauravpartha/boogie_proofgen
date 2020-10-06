@@ -336,13 +336,13 @@ requires {:layer 1} Init(pids, ReqCH, VoteCH, DecCH, decisions);
   var {:pending_async}{:layer 1} PAs:[PA]int;
   var {:linear "pid"} pid:int;
   var {:linear "pid"} pids':[int]bool;
-  yield; assert {:layer 1} Init(pids, ReqCH, VoteCH, DecCH, decisions);
+
   pids' := pids;
   call pid, pids' := linear_transfer(0, pids');
   async call coordinator1(pid);
   i := 1;
   while (i <= n)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} (forall ii:int :: pid(ii) && ii >= i ==> pids'[ii]);
   invariant {:layer 1} PAs == MapAddPA(SingletonPA(Coordinator1(0)), (lambda pa:PA :: if is#Participant1(pa) && pid(pid#Participant1(pa)) && pid#Participant1(pa) < i then 1 else 0));
@@ -351,7 +351,6 @@ requires {:layer 1} Init(pids, ReqCH, VoteCH, DecCH, decisions);
     async call participant1(pid);
     i := i + 1;
   }
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "PARTICIPANT1"}
@@ -359,7 +358,7 @@ participant1 ({:linear_in "pid"} pid:int)
 requires {:layer 1} pid(pid);
 {
   var v:vote;
-  yield;
+
   if (*)
   {
     call receive_req(pid);
@@ -368,7 +367,6 @@ requires {:layer 1} pid(pid);
     call send_vote(v);
   }
   async call participant2(pid);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "PARTICIPANT2"}
@@ -376,10 +374,9 @@ participant2 ({:linear_in "pid"} pid:int)
 requires {:layer 1} pid(pid);
 {
   var d:decision;
-  yield;
+
   call d := receive_dec(pid);
   call set_decision(pid, d);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "COORDINATOR1"}
@@ -389,8 +386,7 @@ requires {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
 {
   var i:int;
   var {:layer 1} old_ReqCH:[int]int;
-  yield;
-  assert {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
+
   call old_ReqCH := Snapshot_ReqCH();
   i := 1;
   while (i <= n)
@@ -402,7 +398,6 @@ requires {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
     i := i + 1;
   }
   async call coordinator2(pid);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "COORDINATOR2"}
@@ -415,8 +410,7 @@ requires {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
   var i:int;
   var {:layer 1} old_VoteCH:[vote]int;
   var {:layer 1} old_DecCH:[int][decision]int;
-  yield;
-  assert {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
+
   call old_VoteCH := Snapshot_VoteCH();
   call old_DecCH := Snapshot_DecCH();
   i := 0;
@@ -445,7 +439,6 @@ requires {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
     call send_dec(i, d);
     i := i + 1;
   }
-  yield;
 }
 
 procedure {:intro}{:layer 1} Snapshot_ReqCH() returns (snapshot:[int]int)

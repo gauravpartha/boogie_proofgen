@@ -259,11 +259,11 @@ requires {:layer 1} Init(pids, channel, terminated, id, leader);
   var {:linear "pid"} pid:int;
   var {:linear "pid"} pids':[int]bool;
   var i:int;
-  yield; assert {:layer 1} Init(pids, channel, terminated, id, leader);
+
   pids' := pids;
   i := 1;
   while (i <= n)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} (forall ii:int :: pid(ii) && ii >= i ==> pids'[ii]);
   invariant {:layer 1} PAs == (lambda pa:PA :: if is#PInit_PA(pa) && pid(pid#PInit_PA(pa)) && pid#PInit_PA(pa) < i then 1 else 0);
@@ -272,7 +272,6 @@ requires {:layer 1} Init(pids, channel, terminated, id, leader);
     async call pinit(pid);
     i := i + 1;
   }
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "PInit"}
@@ -280,11 +279,10 @@ pinit ({:linear_in "pid"} pid:int)
 requires {:layer 1} pid(pid);
 {
   var m:int;
-  yield;
+
   call m := get_id(pid);
   call send(next(pid), m);
   async call p(pid);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "P"}
@@ -293,7 +291,7 @@ requires {:layer 1} pid(pid);
 {
   var m:int;
   var i:int;
-  yield;
+
   call i := get_id(pid);
   call m := receive(pid);
   if (m == i)
@@ -309,7 +307,6 @@ requires {:layer 1} pid(pid);
     }
     async call p(pid);
   }
-  yield;
 }
 
 procedure {:intro}{:layer 1} set_terminated(pid:int)

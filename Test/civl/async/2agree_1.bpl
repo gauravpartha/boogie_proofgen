@@ -38,10 +38,8 @@ procedure {:yields} {:layer 2} {:refines "atomic_agree"} main ({:linear_in "lin"
 requires {:layer 2} perm(p);
 {
   var val_a_local : int;
-  yield; assert {:layer 2} perm(p);
   call val_a_local := get_val_a_perm(p);
-  async call propose_by_a(val_a_local, p);
-  yield;
+  async call {:sync} propose_by_a(val_a_local, p);
 }
 
 // ###########################################################################
@@ -54,20 +52,18 @@ ensures {:layer 2} Consistent(val_a, val_b, done_a, done_b);
 modifies val_a, done_a, val_b, done_b;
 {
   var val_b_local : int;
-  
+
   if (*)
   {
     call set_val_b_perm(val, p);
     call set_done_b_perm(p);
-    async call ack_by_b(p);
+    async call {:sync} ack_by_b(p);
   }
   else
   {
     call set_val_b_perm(val_b_local, p);
-    async call propose_by_b(val_b_local, p);
+    async call {:sync} propose_by_b(val_b_local, p);
   }
-
-  call dummy_1();
 }
 
 procedure {:yields} {:layer 2} {:left} ack_by_a({:linear_in "lin"} p : int)
@@ -89,20 +85,18 @@ ensures {:layer 2} Consistent(val_a, val_b, done_a, done_b);
 modifies val_a, done_a, val_b, done_b;
 {
   var val_a_local : int;
-  
+
   if (*)
   {
     call set_val_a_perm(val, p);
     call set_done_a_perm(p);
-    async call ack_by_a(p);
+    async call {:sync} ack_by_a(p);
   }
   else
   {
     call set_val_a_perm(val_a_local, p);
-    async call propose_by_a(val_a_local, p);
+    async call {:sync} propose_by_a(val_a_local, p);
   }
-
-  call dummy_1();
 }
 
 procedure {:yields} {:layer 2} {:left} ack_by_b({:linear_in "lin"} p : int)
@@ -113,11 +107,6 @@ modifies done_a;
 {
   call set_done_a_perm(p);
 }
-
-// ###########################################################################
-// Dummy procedure to satisfy yield checker for mover procedures
-
-procedure {:yields} {:layer 1} dummy_1 ();
 
 // ###########################################################################
 // Abstracted atomic actions with permissions
@@ -142,15 +131,15 @@ modifies done_b;
 { assert perm(p); done_b := true; }
 
 procedure {:yields} {:layer 1} {:refines "atomic_get_val_a_perm"} get_val_a_perm ({:linear "lin"} p : int) returns (ret : int)
-{ yield; call ret := get_val_a(); yield; }
+{ call ret := get_val_a(); }
 procedure {:yields} {:layer 1} {:refines "atomic_set_val_a_perm"} set_val_a_perm (val : int, {:linear "lin"} p : int)
-{ yield; call set_val_a(val); yield; }
+{ call set_val_a(val); }
 procedure {:yields} {:layer 1} {:refines "atomic_set_val_b_perm"} set_val_b_perm (val : int, {:linear "lin"} p : int)
-{ yield; call set_val_b(val); yield; }
+{ call set_val_b(val); }
 procedure {:yields} {:layer 1} {:refines "atomic_set_done_a_perm"} set_done_a_perm ({:linear "lin"} p : int)
-{ yield; call set_done_a(); yield; }
+{ call set_done_a(); }
 procedure {:yields} {:layer 1} {:refines "atomic_set_done_b_perm"} set_done_b_perm ({:linear "lin"} p : int)
-{ yield; call set_done_b(); yield; }
+{ call set_done_b(); }
 
 // ###########################################################################
 // Primitive atomic actions

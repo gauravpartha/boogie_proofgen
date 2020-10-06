@@ -15,17 +15,17 @@ function {:builtin "MapConst"} MapConstBool(bool): [int]bool;
 function {:inline} {:linear "perm"} ABCollector(ab: AB) : [int]bool
 { MapConstBool(false)[x#AB(ab) := true][-x#AB(ab) := true] }
 function {:inline} {:linear "perm"} ABSetCollector(abs: [AB]bool) : [int]bool
-{ (lambda i:int :: (exists ab:AB :: abs[ab] && (i == x#AB(ab) || i == -x#AB(ab)))) }
+{ (lambda i:int :: abs[AB(i)] || abs[AB(-i)]) }
 
 function {:inline} {:linear "perm"} ACollector(a: A) : [int]bool
 { MapConstBool(false)[x#A(a) := true] }
 function {:inline} {:linear "perm"} ASetCollector(as: [A]bool) : [int]bool
-{ (lambda i:int :: (exists a:A :: as[a] && (i == x#A(a)))) }
+{ (lambda i:int :: as[A(i)]) }
 
 function {:inline} {:linear "perm"} BCollector(b: B) : [int]bool
 { MapConstBool(false)[-x#B(b) := true] }
 function {:inline} {:linear "perm"} BSetCollector(bs: [B]bool) : [int]bool
-{ (lambda i:int :: (exists b:B :: bs[b] && (i == -x#B(b)))) }
+{ (lambda i:int :: bs[B(-i)]) }
 
 function {:inline} bToA (b:B) : A { A(x#B(b)) }
 
@@ -35,11 +35,12 @@ var {:layer 0,1}{:linear "perm"} As:[A]bool;
 var {:layer 0,1}{:linear "perm"} Bs:[B]bool;
 
 // Invariant
-function {:inline} Inv (x:int, As:[A]bool, Bs: [B]bool) : bool
-{
-     x >= cardAs(As) - cardBs(Bs)
-  && (forall b:B :: Bs[b] ==> As[bToA(b)])
-}
+procedure {:yield_invariant}{:layer 1} Inv ();
+requires x >= cardAs(As) - cardBs(Bs);
+requires (forall b:B :: Bs[b] ==> As[bToA(b)]);
+
+procedure {:yield_invariant}{:layer 1} Inv_incdec (b:B);
+requires As[bToA(b)];
 
 // Definitions and facts about cardinality
 function {:inline} cardAs (As:[A]bool) : int;
@@ -67,51 +68,57 @@ requires As[bToA(_b)];
 ensures cardAs(As) > cardBs(Bs);
 
 // Acutal program
-procedure {:yields}{:layer 1} main ()
-requires {:layer 1} Inv(x, As, Bs);
+procedure {:yields}{:layer 1}
+{:yield_requires "Inv"}
+main ({:linear_in "perm"} all_abs: [AB]bool)
+requires {:layer 1} all_abs == (lambda v:AB :: 1 <= x#AB(v));
 {
   var i:int;
+  var {:linear "perm"} abs: [AB]bool;
   var {:linear "perm"} ab:AB;
-  yield; assert {:layer 1} Inv(x, As, Bs);
+  abs := all_abs;
+  i := 1;
   while (*)
-  invariant {:layer 1} Inv(x, As, Bs);
+  invariant {:yields}{:layer 1}{:yield_loop "Inv"} true;
+  invariant {:layer 1} 1 <= i;
+  invariant {:layer 1} abs == (lambda v:AB :: i <= x#AB(v));
   {
-    call ab := alloc_ab();
+    call ab, abs := transfer_ab(i, abs);
     async call incdec(ab);
-    yield; assert {:layer 1} Inv(x, As, Bs);
+    i := i + 1;
   }
-  yield;
 }
 
-procedure {:yields}{:layer 1} alloc_ab () returns ({:linear "perm"} ab:AB);
-ensures {:layer 1} As == old(As);
-ensures {:layer 1} Bs == old(Bs);
-ensures {:layer 1} x == old(x);
+procedure {:both}{:layer 1} TRANSFER_AB (x:int, {:linear_in "perm"} abs:[AB]bool) returns ({:linear "perm"} ab:AB, {:linear "perm"} abs':[AB]bool)
+{
+  assert !abs[AB(-x)];
+  assert abs[AB(x)];
+  abs' := abs[AB(x) := false];
+  ab := AB(x);
+}
 
-procedure {:yields}{:layer 1} split_ab ({:linear_in "perm"} ab:AB) returns ({:linear "perm"} a:A, {:linear "perm"} b:B);
-ensures {:layer 1} x#A(a) == x#AB(ab);
-ensures {:layer 1} x#B(b) == x#AB(ab);
-ensures {:layer 1} As == old(As);
-ensures {:layer 1} Bs == old(Bs);
-ensures {:layer 1} x == old(x);
+procedure {:both}{:layer 1} SPLIT_AB ({:linear_in "perm"} ab:AB) returns ({:linear "perm"} a:A, {:linear "perm"} b:B)
+{
+  assert x#AB(ab) != 0;
+  a := A(x#AB(ab));
+  b := B(x#AB(ab));
+}
 
-procedure {:yields}{:layer 1} incdec({:linear_in "perm"} ab:AB)
-requires {:layer 1} Inv(x, As, Bs);
-ensures  {:layer 1} Inv(x, As, Bs);
+procedure {:yields}{:layer 1}
+{:yield_preserves "Inv"}
+incdec({:linear_in "perm"} ab:AB)
+requires {:layer 1} x#AB(ab) != 0;
 {
   var {:linear "perm"} a:A;
   var {:linear "perm"} b:B;
-  yield; assert {:layer 1} Inv(x, As, Bs);
   call a,b := split_ab(ab);
   call {:layer 1} Lemma_card_geq(As, Bs);
   call {:layer 1} Lemma_add_to_A(a, As);
   call geq0_inc(a, b);
-  yield;
-  assert {:layer 1} Inv(x, As, Bs) && As[bToA(b)];
+  par Inv() | Inv_incdec(b);
   call {:layer 1} Lemma_card_greater(b, As, Bs);
   call {:layer 1} Lemma_add_to_B(b, Bs);
   call geq0_dec(b);
-  yield; assert {:layer 1}{:expand} Inv(x, As, Bs);
 }
 
 procedure {:atomic}{:layer 1} GEQ0_INC ({:linear_in "perm"} a:A, {:linear "perm"} b:B)
@@ -134,3 +141,6 @@ modifies x, Bs;
 
 procedure {:yields}{:layer 0}{:refines "GEQ0_INC"} geq0_inc ({:linear_in "perm"} a:A, {:linear "perm"} b:B);
 procedure {:yields}{:layer 0}{:refines "GEQ0_DEC"} geq0_dec ({:linear_in "perm"} b:B);
+
+procedure {:yields}{:layer 0}{:refines "TRANSFER_AB"} transfer_ab (x:int, {:linear_in "perm"} abs:[AB]bool) returns ({:linear "perm"} ab:AB, {:linear "perm"} abs':[AB]bool);
+procedure {:yields}{:layer 0}{:refines "SPLIT_AB"} split_ab ({:linear_in "perm"} ab:AB) returns ({:linear "perm"} a:A, {:linear "perm"} b:B);

@@ -70,21 +70,11 @@ function InvChannels (joinChannel: [Round][JoinResponse]int, permJoinChannel: Jo
       contents#VoteResponseChannel(permVoteChannel)[VotePerm(r, from#VoteResponse(vr))] == vr)
 }
 
-procedure {:yields} {:layer 0} YieldInv_0();
+procedure {:yield_invariant} {:layer 1} YieldInv();
+requires Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, permVoteChannel);
 
-procedure {:yields} {:layer 1} YieldInv()
-requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, permVoteChannel);
-ensures  {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, permVoteChannel);
-{
-  yield; assert {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, permVoteChannel);
-}
-
-procedure {:yields} {:layer 1} YieldInvChannels()
+procedure {:yield_invariant} {:layer 1} YieldInvChannels();
 requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVoteChannel);
-ensures  {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVoteChannel);
-{
-  yield; assert {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVoteChannel);
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -97,11 +87,10 @@ requires {:layer 1} InitLow(acceptorState, joinChannel, voteChannel, permJoinCha
   var {:layer 1}{:linear "perm"} rs': [Round]bool;
   var {:layer 1}{:pending_async} PAs:[PA]int;
 
-  par YieldInv() | YieldInvChannels();
   r := 0;
   rs' := rs;
   while (*)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 0 <= r;
   invariant {:layer 1} (forall r': Round :: r < r' ==> rs'[r']);
   invariant {:layer 1} PAs == (lambda pa: PA :: if (is#StartRound_PA(pa) && round#StartRound_PA(pa) == round_lin#StartRound_PA(pa) && Round(round#StartRound_PA(pa)) && round#StartRound_PA(pa) <= r) then 1 else 0);
@@ -111,7 +100,6 @@ requires {:layer 1} InitLow(acceptorState, joinChannel, voteChannel, permJoinCha
     async call StartRound(r, r_lin);
   }
   call AddPendingAsyncs(PAs);
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "A_StartRound"} StartRound(r: Round, {:layer 1}{:linear_in "perm"} r_lin: Round)
@@ -125,11 +113,10 @@ requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permV
   var {:layer 1}{:linear "perm"} ps': [Permission]bool;
   var {:layer 1}{:pending_async} PAs:[PA]int;
 
-  par YieldInv() | YieldInvChannels();
   call ps, ps' := SplitPermissions(r_lin);
   n := 1;
   while (n <= numNodes)
-  invariant {:layer 0,1}{:terminates} true;
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 1 <= n && n <= numNodes+1;
   invariant {:layer 1} (forall n': Node :: n <= n' && n' <= numNodes ==> ps[JoinPerm(r, n')]);
   invariant {:layer 1} PAs == (lambda pa: PA :: if is#Join_PA(pa) && round#Join_PA(pa) == r && 1 <= node#Join_PA(pa) && node#Join_PA(pa) < n && p#Join_PA(pa) == JoinPerm(round#Join_PA(pa), node#Join_PA(pa)) then 1 else 0);
@@ -141,7 +128,6 @@ requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permV
   async call Propose(r, ps');
   call AddPendingAsyncs(PAs);
   call RemovePendingAsyncs(SingletonPA(StartRound_PA(r, r_lin)));
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:right} ProposeHelper(r: Round) returns (maxRound: Round, maxValue: Value, {:layer 1} ns: NodeSet)
@@ -161,7 +147,6 @@ ensures {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVo
   var {:layer 1}{:linear "perm"} receivedPermissions: [Permission]bool;
   var {:layer 1}{:linear "perm"} receivedPermission: Permission;
 
-  call YieldInv_0();
   call {:layer 1} ns := InitializeQuorum();
   call receivedPermissions := InitializePermissions();
   count := 0;
@@ -191,7 +176,6 @@ ensures {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVo
       break;
     }
   }
-  call YieldInv_0();
 }
 
 procedure {:yields}{:layer 1}{:refines "A_Propose"} Propose(r: Round, {:layer 1}{:linear_in "perm"} ps: [Permission]bool)
@@ -207,16 +191,15 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
   var {:layer 1}{:linear "perm"} p: Permission;
   var {:layer 1}{:linear "perm"} cp: Permission;
   var {:layer 1}{:pending_async} PAs:[PA]int;
-    
-  par YieldInv() | YieldInvChannels();
+
   call maxRound, maxValue, ns := ProposeHelper(r);
   call ps', cp := SplitConcludePermission(r, ps);
   n := 1;
   while (n <= numNodes)
+  invariant {:layer 1}{:terminates} true;
   invariant {:layer 1} 1 <= n && n <= numNodes+1;
   invariant {:layer 1} (forall n': Node :: n <= n' && n' <= numNodes ==> ps'[VotePerm(r, n')]);
   invariant {:layer 1} PAs == (lambda pa: PA :: if is#Vote_PA(pa) && round#Vote_PA(pa) == r && 1 <= node#Vote_PA(pa) && node#Vote_PA(pa) < n && value#Vote_PA(pa) == maxValue && p#Vote_PA(pa) == VotePerm(round#Vote_PA(pa), node#Vote_PA(pa)) then 1 else 0);
-  invariant {:layer 0,1}{:terminates} true;
   {
     call ps', p := ExtractVotePermission(ps', r, n);
     async call Vote(r, n, maxValue, p);
@@ -226,7 +209,6 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
   call ProposeIntro(r, maxValue);
   call AddPendingAsyncs(PAs);
   call RemovePendingAsyncs(SingletonPA(Propose_PA(r, ps)));
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "A_Conclude"} Conclude(r: Round, v: Value, {:layer 1}{:linear_in "perm"} p: Permission)
@@ -240,7 +222,6 @@ requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permV
   var {:linear "perm"} {:layer 1} receivedPermissions: [Permission]bool;
   var {:linear "perm"} {:layer 1} receivedPermission: Permission;
 
-  par YieldInv() | YieldInvChannels();
   call {:layer 1} q := InitializeQuorum();
   call receivedPermissions := InitializePermissions();
   count := 0;
@@ -263,7 +244,6 @@ requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permV
     }
   }
   call RemovePendingAsyncs(SingletonPA(Conclude_PA(r, v, p)));
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "A_Join"} Join(r: Round, n: Node, {:layer 1}{:linear_in "perm"} p: Permission)
@@ -274,7 +254,6 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
   var lastVoteRound: Round;
   var lastVoteValue: Value;
 
-  call YieldInv();
   call doJoin, lastVoteRound, lastVoteValue := JoinUpdate(r, n);
   if (doJoin) {
     call SendJoinResponse(r, n, lastVoteRound, lastVoteValue);
@@ -282,7 +261,6 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
     call JoinIntro(r, n);
   }
   call RemovePendingAsyncs(SingletonPA(Join_PA(r, n, p)));
-  yield;
 }
 
 procedure {:yields}{:layer 1}{:refines "A_Vote"} Vote(r: Round, n: Node, v: Value, {:layer 1}{:linear_in "perm"} p: Permission)
@@ -290,7 +268,7 @@ requires {:layer 1} Round(r) && Node(n) && p == VotePerm(r, n);
 requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, permVoteChannel);
 {
   var doVote:bool;
-  call YieldInv();
+
   call doVote := VoteRoundUpdate(r, n, v);
   if (doVote) {
     call SendVoteResponse(r, n);
@@ -299,7 +277,6 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
     call VoteIntro(r, n);
   }
   call RemovePendingAsyncs(SingletonPA(Vote_PA(r, n, v, p)));
-  yield;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

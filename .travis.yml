@@ -9,7 +9,7 @@ git:
 env:
   global:
     - SOLUTION=Source/Boogie-NetCore.sln
-    - Z3URL=https://github.com/Z3Prover/z3/releases/download/z3-4.8.7/z3-4.8.7-x64-ubuntu-16.04.zip
+    - Z3URL=https://github.com/Z3Prover/z3/releases/download/z3-4.8.8/z3-4.8.8-x64-ubuntu-16.04.zip
     # Workaround for GitVersionTask bug in combination with .NET Core SDK 3.1.200
     # (see, e.g., https://github.com/dotnet/sdk/issues/10878 and https://github.com/GitTools/GitVersion/issues/2063)
     - MSBUILDSINGLELOADCONTEXT=1
@@ -21,12 +21,21 @@ install:
   - wget ${Z3URL}
   - unzip z3*.zip
   - export PATH="$(find $PWD/z3* -name bin -type d):$PATH"
-  # Install needed python tools
+  # Install python tools
   - sudo pip install lit OutputCheck pyyaml psutil
+  # Restore dotnet tools
+  - dotnet tool restore
 script:
+  # Check that generated scanner and parser are consistent with attributed grammar
+  - dotnet tool run coco Source/Core/BoogiePL.atg -namespace Microsoft.Boogie -frames Source/Core/
+  - diff --strip-trailing-cr Source/Core/Parser.cs Source/Core/Parser.cs.old
+  - diff --strip-trailing-cr Source/Core/Scanner.cs Source/Core/Scanner.cs.old
+  # Build Boogie
   - dotnet build -c ${CONFIGURATION} ${SOLUTION}
+  # Run unit tests
   - dotnet test --no-build -c ${CONFIGURATION} ${SOLUTION}
-  - lit -v --timeout=120 -D dotnet -D configuration=${CONFIGURATION} Test
+  # Run lit test suite
+  - lit -v --timeout=120 -D configuration=${CONFIGURATION} Test
   # Do not deploy if GitVersionTask could not be used to extract the correct version number
   - test ! -e Source/BoogieDriver/bin/${CONFIGURATION}/Boogie.1.0.0.nupkg
 deploy:

@@ -28,31 +28,16 @@ function {:inline} Inv2 (tickets: [int]bool, ticket: int, lock: X): (bool)
 }
 
 // ###########################################################################
-// Yield assertions
+// Yield invariants
 
-procedure {:yields} {:layer 2} YieldSpec ({:linear "tid"} tid: X)
-requires {:layer 2} tid != nil && cs == tid;
-ensures  {:layer 2} tid != nil && cs == tid;
-{
-  yield;
-  assert {:layer 2} tid != nil && cs == tid;
-}
+procedure {:yield_invariant} {:layer 2} YieldSpec ({:linear "tid"} tid: X);
+requires tid != nil && cs == tid;
 
-procedure {:yields} {:layer 1} Yield1 ()
-requires {:layer 1} Inv1(T, t);
-ensures  {:layer 1} Inv1(T, t);
-{
-  yield;
-  assert {:layer 1} Inv1(T, t);
-}
+procedure {:yield_invariant} {:layer 1} Yield1 ();
+requires Inv1(T, t);
 
-procedure {:yields} {:layer 2} Yield2 ()
-requires {:layer 2} Inv2(T, s, cs);
-ensures  {:layer 2} Inv2(T, s, cs);
-{
-  yield;
-  assert {:layer 2} Inv2(T, s, cs);
-}
+procedure {:yield_invariant} {:layer 2} Yield2 ();
+requires Inv2(T, s, cs);
 
 // ###########################################################################
 // Main program
@@ -63,61 +48,49 @@ requires {:layer 2} xls' == MapConstBool(true);
   var {:linear "tid"} tid: X;
   var {:linear "tid"} xls: [X]bool;
 
-  yield;
-
   call InitAbstract(xls');
   xls := xls';
 
-  par Yield1() | Yield2();
-
   while (*)
-  invariant {:layer 1} Inv1(T, t);
-  invariant {:layer 2} Inv2(T, s, cs);
+  invariant {:yields} {:layer 1,2} {:yield_loop "Yield1"} {:yield_loop "Yield2"} true;
   {
     par xls, tid := Allocate(xls) | Yield1() | Yield2();
     async call Customer(tid);
-    par Yield1() | Yield2();
   }
-  par Yield1() | Yield2();
 }
 
 procedure {:yields} {:layer 2} Allocate ({:linear_in "tid"} xls':[X]bool) returns ({:linear "tid"} xls: [X]bool, {:linear "tid"} xl: X)
 ensures {:layer 1,2} xl != nil;
 {
-  yield;
   call xls, xl := AllocateLow(xls');
-  yield;
 }
 
-procedure {:yields} {:layer 2} Customer ({:linear_in "tid"} tid: X)
-requires {:layer 1} Inv1(T, t);
-requires {:layer 2} Inv2(T, s, cs) && tid != nil;
+procedure {:yields} {:layer 2}
+{:yield_requires "Yield1"}
+{:yield_requires "Yield2"}
+Customer ({:linear_in "tid"} tid: X)
+requires {:layer 2} tid != nil;
 {
-  par Yield1() | Yield2();
   while (*)
-  invariant {:layer 1} Inv1(T, t);
-  invariant {:layer 2} Inv2(T, s, cs);
+  invariant {:yields} {:layer 1,2} {:yield_loop "Yield1"} {:yield_loop "Yield2"} true;
   {
     call Enter(tid);
     par Yield1() | Yield2() | YieldSpec(tid);
     call Leave(tid);
-    par Yield1() | Yield2();
   }
-  par Yield1() | Yield2();
 }
 
-procedure {:yields} {:layer 2} Enter ({:linear "tid"} tid: X)
-requires {:layer 1} Inv1(T, t);
-ensures  {:layer 1} Inv1(T, t);
-requires {:layer 2} Inv2(T, s, cs) && tid != nil;
-ensures  {:layer 2} Inv2(T, s, cs) && cs == tid;
+procedure {:yields} {:layer 2}
+{:yield_preserves "Yield1"}
+{:yield_preserves "Yield2"}
+{:yield_ensures   "YieldSpec", tid}
+Enter ({:linear "tid"} tid: X)
+requires {:layer 2} tid != nil;
 {
   var m: int;
 
-  par Yield1() | Yield2();
   call m := GetTicketAbstract(tid);
   call WaitAndEnter(tid, m);
-  par Yield1() | Yield2() | YieldSpec(tid);
 }
 
 // ###########################################################################
@@ -132,9 +105,7 @@ modifies cs, s, T;
 procedure {:yields} {:layer 1} {:refines "AtomicInitAbstract"} InitAbstract ({:linear "tid"} xls:[X]bool)
 ensures  {:layer 1} Inv1(T, t);
 {
-  yield;
   call Init(xls);
-  par Yield1();
 }
 
 procedure {:right} {:layer 2} AtomicGetTicketAbstract ({:linear "tid"} tid: X) returns (m: int)

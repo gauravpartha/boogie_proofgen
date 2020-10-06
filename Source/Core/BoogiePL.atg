@@ -9,7 +9,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Microsoft.Boogie;
-using Microsoft.Basetypes;
+using Microsoft.BaseTypes;
 using Bpl = Microsoft.Boogie;
 
 
@@ -31,26 +31,26 @@ readonly StructuredCmd/*!*/ dummyStructuredCmd;
 ///Returns the number of parsing errors encountered.  If 0, "program" returns as
 ///the parsed program.
 ///</summary>
-public static int Parse (string/*!*/ filename, /*maybe null*/ List<string/*!*/> defines, out /*maybe null*/ Program program, bool useBaseName=false) /* throws System.IO.IOException */ {
+public static int Parse (string/*!*/ filename, List<string/*!*/> defines, out /*maybe null*/ Program program, bool useBaseName=false) /* throws System.IO.IOException */ {
   Contract.Requires(filename != null);
   Contract.Requires(cce.NonNullElements(defines,true));
 
-  if (defines == null) {
-    defines = new List<string/*!*/>();
-  }
-
   if (filename == "stdin.bpl") {
-    var s = ParserHelper.Fill(Console.In, defines);
-    return Parse(s, filename, out program, useBaseName);
-  } else {
-    FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read);
-    var s = ParserHelper.Fill(stream, defines);
-    var ret = Parse(s, filename, out program, useBaseName);
-    stream.Close();
-    return ret;
+    return Parse(Console.In, filename, defines, out program, useBaseName);
+  } else
+  {
+    using (FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
+    {
+      return Parse(new StreamReader(stream), filename, defines, out program, useBaseName);
+    }
   }
 }
 
+public static int Parse(TextReader stream, string/*!*/ filename, List<string> defines, out /*maybe null*/ Program program, bool useBaseName=false) /* throws System.IO.IOException */
+{
+  var preprocessedSource = ParserHelper.Fill(stream, defines);
+  return Parse(preprocessedSource, filename, out program, useBaseName);
+}
 
 public static int Parse (string s, string/*!*/ filename, out /*maybe null*/ Program program, bool useBaseName=false) /* throws System.IO.IOException */ {
   Contract.Requires(s != null);
@@ -130,7 +130,7 @@ CHARACTERS
   cr        = '\r'.
   lf        = '\n'.
   tab       = '\t'.
-  
+
   space = ' '.
   quote = '"'.
 
@@ -151,7 +151,7 @@ TOKENS
 
   decimal = digit {digit} 'e' [ '-' ] digit {digit} .
   dec_float = digit {digit} '.' digit {digit} [ 'e' [ '-' ] digit {digit} ] .
-	float = [ '-' ] '0' 'x' hexdigit {hexdigit} '.' hexdigit {hexdigit} 'e' [ '-' ] digit {digit} 'f' digit {digit} 'e' digit {digit} 
+	float = [ '-' ] '0' 'x' hexdigit {hexdigit} '.' hexdigit {hexdigit} 'e' [ '-' ] digit {digit} 'f' digit {digit} 'e' digit {digit}
 										| '0' 'N' 'a' 'N' digit {digit} 'e' digit {digit}
 										| '0' 'n' 'a' 'n' digit {digit} 'e' digit {digit}
 										| '0' '+' 'o' 'o' digit {digit} 'e' digit {digit}
@@ -520,7 +520,13 @@ Function<.out List<Declaration>/*!*/ ds.>
     if (definition != null) {
       // generate either an axiom or a function body
       if (QKeyValue.FindBoolAttribute(kv, "inline")) {
+        if (QKeyValue.FindBoolAttribute(kv, "define"))
+          SemErr("function cannot have both :inline and :define attributes");
         func.Body = definition;
+      } else if (QKeyValue.FindBoolAttribute(kv, "define")) {
+        if (func.TypeParameters.Count > 0)
+          SemErr("function with :define attribute has to be monomorphic");
+        func.DefinitionBody = func.CreateFunctionDefinition(definition);
       } else {
         ds.Add(func.CreateDefinitionAxiom(definition, kv));
       }
@@ -614,7 +620,7 @@ Procedure<out Procedure/*!*/ proc, out /*maybe null*/ Implementation impl>
   | { Spec<pre, mods, post> }
     ImplBody<out locals, out stmtList>
     (.
-      impl = new Implementation(x, x.val, typeParams,
+      impl = new Implementation(x, x.val, typeParams.ConvertAll(tp => new TypeVariable(tp.tok, tp.Name)),
                                 Formal.StripWhereClauses(ins), Formal.StripWhereClauses(outs), locals, stmtList, kv == null ? null : (QKeyValue)kv.Clone(), this.errors);
     .)
   )
@@ -699,15 +705,14 @@ StmtList<out StmtList/*!*/ stmtList>
 
   {
   ( LabelOrCmd<out c, out label>
-    (. if (c != null) {
+    (. Contract.Assert(c == null || label == null);
+       if (c != null) {
          // LabelOrCmd read a Cmd
-         Contract.Assert(label == null);
          if (startToken == null) { startToken = c.tok;  cs = new List<Cmd>(); }
          Contract.Assert(cs != null);
          cs.Add(c);
-       } else {
+       } else if (label != null) {
          // LabelOrCmd read a label
-         Contract.Assert(label != null);
          if (startToken != null) {
            Contract.Assert(cs != null);
            // dump the built-up state into a BigBlock
@@ -848,7 +853,7 @@ BreakCmd<out BreakCmd/*!*/ bcmd>
 /*------------------------------------------------------------------------*/
 
 LabelOrCmd<out Cmd c, out IToken label>
-/* ensures (c == null) != (label != null) */
+/* ensures (c == null) || (label == null) */
 = (. IToken/*!*/ x; Expr/*!*/ e;
      List<IToken>/*!*/ xs;
      List<IdentifierExpr> ids;
@@ -935,11 +940,10 @@ MapAssignIndex<.out IToken/*!*/ x, out List<Expr/*!*/>/*!*/ indexes.>
 
 /*------------------------------------------------------------------------*/
 CallCmd<out Cmd c>
-= (. Contract.Ensures(Contract.ValueAtReturn(out c) != null); 
-     IToken x; 
+= (. Contract.Ensures(Contract.ValueAtReturn(out c) != null);
+     IToken x;
      bool isAsync = false;
      bool isFree = false;
-     QKeyValue kv = null;
      c = null;
   .)
   [ "async"          (. isAsync = true;  .)
@@ -947,34 +951,34 @@ CallCmd<out Cmd c>
   [ "free"          (. isFree = true;  .)
   ]
   "call"                          (. x = t; .)
-  { Attribute<ref kv> }
-  CallParams<isAsync, isFree, kv, x, out c> (. .)
+  CallParams<isAsync, isFree, x, out c> (. .)
   .
 
 ParCallCmd<out Cmd d>
-= (. Contract.Ensures(Contract.ValueAtReturn(out d) != null); 
-     IToken x; 
-     QKeyValue kv = null;
-	 Cmd c = null;
-     List<CallCmd> callCmds = new List<CallCmd>();
+= (.
+    Contract.Ensures(Contract.ValueAtReturn(out d) != null);
+    IToken x;
+    Cmd c = null;
+    List<CallCmd> callCmds = new List<CallCmd>();
   .)
   "par"                          (. x = t; .)
-  { Attribute<ref kv> }
-  CallParams<false, false, kv, x, out c> (. callCmds.Add((CallCmd)c); .) 
-  { "|" CallParams<false, false, kv, x, out c> (. callCmds.Add((CallCmd)c); .) 
+  CallParams<false, false, x, out c> (. callCmds.Add((CallCmd)c); .)
+  { "|" CallParams<false, false, x, out c> (. callCmds.Add((CallCmd)c); .)
   }
-  ";" (. d = new ParCallCmd(x, callCmds, kv); .)
+  ";" (. d = new ParCallCmd(x, callCmds); .)
   .
 
-CallParams<bool isAsync, bool isFree, QKeyValue kv, IToken x, out Cmd c>
-= (. 
+CallParams<bool isAsync, bool isFree, IToken x, out Cmd c>
+= (.
+    QKeyValue kv = null;
     List<IdentifierExpr> ids = new List<IdentifierExpr>();
     List<Expr> es = new List<Expr>();
     Expr en;
-    IToken first; 
+    IToken first;
     IToken p;
 	c = null;
   .)
+  { Attribute<ref kv> }
   Ident<out first>
     ( "("
       [ Expression<out en>       (. es.Add(en); .)
@@ -1357,11 +1361,10 @@ SpecBlock<out Block/*!*/ b>
   .)
   Ident<out x> ":"
   { LabelOrCmd<out c, out label>
-                       (. if (c != null) {
-                            Contract.Assert(label == null);
+                       (. Contract.Assert(c == null || label == null);
+                          if (c != null) {
                             cs.Add(c);
-                          } else {
-                            Contract.Assert(label != null);
+                          } else if (label != null) {
                             SemErr("SpecBlock's can only have one label");
                           }
                        .)

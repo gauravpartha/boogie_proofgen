@@ -44,137 +44,105 @@ function {:inline} LockInv(StoreBufferPresent:[int][int]bool, StoreBufferVal:[in
 }
 
 // Layer 1
-procedure {:yields} {:layer 1} YieldLock()
-requires {:expand} {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-{
-    yield;
-    assert {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-}
+procedure {:yield_invariant} {:layer 1} YieldLock();
+requires {:expand} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 
-procedure {:yields} {:layer 1} YieldStoreBufferLockAddrPresent({:linear "tid"} tid:int)
-requires {:layer 1} StoreBufferPresent[tid][lockAddr];
-ensures {:layer 1} StoreBufferPresent[tid][lockAddr];
-{
-    yield;
-    assert {:layer 1} StoreBufferPresent[tid][lockAddr];
-}
+procedure {:yield_invariant} {:layer 1} YieldStoreBufferLockAddrPresent({:linear "tid"} tid:int);
+requires StoreBufferPresent[tid][lockAddr];
 
-procedure {:yields} {:layer 1} YieldStoreBufferLockAddrAbsent({:linear "tid"} tid:int)
-requires {:layer 1} !StoreBufferPresent[tid][lockAddr];
-ensures {:layer 1} !StoreBufferPresent[tid][lockAddr];
-{
-    yield;
-    assert {:layer 1} !StoreBufferPresent[tid][lockAddr];
-}
+procedure {:yield_invariant} {:layer 1} YieldStoreBufferLockAddrAbsent({:linear "tid"} tid:int);
+requires !StoreBufferPresent[tid][lockAddr];
 
 procedure {:right} {:layer 2} AtomicLockAcquire({:linear "tid"} tid: int)
 modifies lock;
 { assert mutatorOrGcTid(tid); assume lock == 0; lock := tid; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicLockAcquire"} LockAcquire({:linear "tid"} tid: int)
+procedure {:yields} {:layer 1} {:refines "AtomicLockAcquire"}
+{:yield_preserves "YieldLock"}
+LockAcquire({:linear "tid"} tid: int)
 requires {:layer 1} mutatorOrGcTid(tid);
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 {
     var status:bool;
-    call YieldLock();
     while (true)
-    invariant {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
+    invariant {:yields} {:layer 1} {:yield_loop "YieldLock"} true;
     {
         call status := LockCAS(tid);
         if (status)
         {
-            call YieldLock();
             return;
         }
-        call YieldLock();
     }
-    call YieldLock();
 }
 
 procedure {:atomic} {:layer 2} AtomicLockRelease({:linear "tid"} tid:int)
 modifies lock;
 { assert mutatorOrGcTid(tid); assert lock == tid; lock := 0; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicLockRelease"} LockRelease({:linear "tid"} tid:int)
+procedure {:yields} {:layer 1} {:refines "AtomicLockRelease"}
+{:yield_preserves "YieldLock"}
+{:yield_preserves "YieldStoreBufferLockAddrAbsent", tid}
+LockRelease({:linear "tid"} tid:int)
 requires {:layer 1} mutatorOrGcTid(tid);
-requires {:layer 1} !StoreBufferPresent[tid][lockAddr];
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} !StoreBufferPresent[tid][lockAddr];
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 {
-    par YieldLock() | YieldStoreBufferLockAddrAbsent(tid);
     call LockZero(tid);
     par YieldLock() | YieldStoreBufferLockAddrPresent(tid);
     call FlushStoreBufferEntryForLock(tid);
-    par YieldLock() | YieldStoreBufferLockAddrAbsent(tid);
 }
 
 procedure {:atomic} {:layer 2} AtomicReadCollectorPhaseLocked({:linear "tid"} tid: int) returns (phase: int)
 { assert mutatorOrGcTid(tid); assert lock == tid; phase := collectorPhase; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicReadCollectorPhaseLocked"} ReadCollectorPhaseLocked({:linear "tid"} tid: int) returns (phase: int)
+procedure {:yields} {:layer 1} {:refines "AtomicReadCollectorPhaseLocked"}
+{:yield_preserves "YieldLock"}
+ReadCollectorPhaseLocked({:linear "tid"} tid: int) returns (phase: int)
 requires {:layer 1} mutatorOrGcTid(tid);
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 {
-    call YieldLock();
     call phase := PrimitiveRead(tid, collectorPhaseAddr);
-    call YieldLock();
 }
 
 procedure {:atomic} {:layer 2} AtomicReadCollectorPhaseUnlocked({:linear "tid"} tid: int) returns (phase: int)
 { assert mutatorOrGcTid(tid); assert lock != tid; phase := collectorPhaseDelayed; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicReadCollectorPhaseUnlocked"} ReadCollectorPhaseUnlocked({:linear "tid"} tid: int) returns (phase: int)
+procedure {:yields} {:layer 1} {:refines "AtomicReadCollectorPhaseUnlocked"}
+{:yield_preserves "YieldLock"}
+ReadCollectorPhaseUnlocked({:linear "tid"} tid: int) returns (phase: int)
 requires {:layer 1} mutatorOrGcTid(tid);
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 {
-    call YieldLock();
     call phase := PrimitiveRead(tid, collectorPhaseAddr);
-    call YieldLock();
 }
 
 procedure {:atomic} {:layer 2} AtomicSetCollectorPhase({:linear "tid"} tid: int, phase: int)
 modifies collectorPhase;
 { assert mutatorOrGcTid(tid); assert lock == tid; assert collectorPhase == collectorPhaseDelayed; collectorPhase := phase; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicSetCollectorPhase"} SetCollectorPhase({:linear "tid"} tid: int, phase: int)
+procedure {:yields} {:layer 1} {:refines "AtomicSetCollectorPhase"}
+{:yield_preserves "YieldLock"}
+SetCollectorPhase({:linear "tid"} tid: int, phase: int)
 requires {:layer 1} mutatorOrGcTid(tid);
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 {
-    call YieldLock();
     call PrimitiveSetCollectorPhase(tid, phase);
-    call YieldLock();
 }
 
 procedure {:atomic} {:layer 2} AtomicSyncCollectorPhase({:linear "tid"} tid: int)
 modifies collectorPhaseDelayed;
 { collectorPhaseDelayed := collectorPhase; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicSyncCollectorPhase"} SyncCollectorPhase({:linear "tid"} tid: int)
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
+procedure {:yields} {:layer 1} {:refines "AtomicSyncCollectorPhase"}
+{:yield_preserves "YieldLock"}
+SyncCollectorPhase({:linear "tid"} tid: int)
 {
-    call YieldLock();
     call FlushStoreBufferEntryForCollectorPhase();
-    call YieldLock();
 }
 
 procedure {:atomic} {:layer 2} AtomicBarrier({:linear "tid"} tid: int)
 { assert mutatorOrGcTid(tid); assert lock == tid; assume collectorPhase == collectorPhaseDelayed; }
 
-procedure {:yields} {:layer 1} {:refines "AtomicBarrier"} Barrier({:linear "tid"} tid: int)
+procedure {:yields} {:layer 1} {:refines "AtomicBarrier"}
+{:yield_preserves "YieldLock"}
+Barrier({:linear "tid"} tid: int)
 requires {:layer 1} mutatorOrGcTid(tid);
-requires {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
-ensures {:layer 1} LockInv(StoreBufferPresent, StoreBufferVal, Mem, lock, collectorPhase, collectorPhaseDelayed);
 {
-   call YieldLock();
    call WaitForFlush(tid);
-   call YieldLock();
 }
 
 // Layer 0
