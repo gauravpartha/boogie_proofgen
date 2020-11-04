@@ -236,7 +236,8 @@ namespace Microsoft.Boogie.TypeErasure
 
     public VCExpr /*!*/ AddTypePremisses(List<VCExprLetBinding /*!*/> /*!*/ typeVarBindings,
       VCExpr /*!*/ typePremisses, bool universal,
-      VCExpr /*!*/ body)
+      VCExpr /*!*/ body,
+      bool simplify=true)
     {
       Contract.Requires(cce.NonNullElements(typeVarBindings));
       Contract.Requires(typePremisses != null);
@@ -246,9 +247,9 @@ namespace Microsoft.Boogie.TypeErasure
       VCExpr /*!*/
         bodyWithPremisses;
       if (universal)
-        bodyWithPremisses = Gen.ImpliesSimp(typePremisses, body);
+        bodyWithPremisses = simplify ? Gen.ImpliesSimp(typePremisses, body) : Gen.Implies(typePremisses, body);
       else
-        bodyWithPremisses = Gen.AndSimp(typePremisses, body);
+        bodyWithPremisses = simplify ? Gen.AndSimp(typePremisses, body) : Gen.And(typePremisses, body);
 
       return Gen.Let(typeVarBindings, bodyWithPremisses);
     }
@@ -1364,7 +1365,8 @@ namespace Microsoft.Boogie.TypeErasure
         bodyWithPremisses =
           AxBuilderPremisses.AddTypePremisses(typeVarBindings, typePremisses,
             node.Quan == Quantifier.ALL,
-            AxBuilder.Cast(newBody, Type.Bool));
+            AxBuilder.Cast(newBody, Type.Bool),
+            _extractTypeArgs);
       Contract.Assert(bodyWithPremisses != null);
       if (newBoundVars.Count == 0) // might happen that no bound variables are left
         return bodyWithPremisses;
