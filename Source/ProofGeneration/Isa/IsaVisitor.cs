@@ -56,6 +56,8 @@ namespace ProofGeneration.Isa
 
         public abstract R VisitTermQuantifier(TermQuantifier t);
 
+        public abstract R VisitTermCaseOf(TermCaseOf t);
+
         public abstract R VisitTermBinary(TermBinary t);
 
         public abstract R VisitTermUnary(TermUnary t);

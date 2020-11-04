@@ -156,7 +156,7 @@ namespace ProofGeneration.Isa
     public class TermQuantifier : Term
     {
         public readonly IList<Identifier> boundVars;
-        //if non-null,
+        //if boundVarTypes is null, then types must be inferred, otherwise a type is provided for each bound variable
         public readonly IList<TypeIsa> boundVarTypes;
         public readonly Term term;
 
@@ -213,6 +213,22 @@ namespace ProofGeneration.Isa
         }
     }
 
+    public class TermCaseOf : Term
+    {
+        public readonly Term termToMatch;
+        public readonly IEnumerable<Tuple<Term, Term>> matchCases;
+
+        public TermCaseOf(Term termToMatch, IEnumerable<Tuple<Term, Term>> matchCases)
+        {
+            this.termToMatch = termToMatch;
+            this.matchCases = matchCases;
+        }
+
+        public override T Dispatch<T>(TermVisitor<T> visitor)
+        {
+            return visitor.VisitTermCaseOf(this);
+        }
+    }
 
     public class TermBinary : Term
     {

@@ -124,6 +124,29 @@ namespace ProofGeneration.IsaPrettyPrint
             return sb.ToString();
         }
 
+        public override string VisitTermCaseOf(TermCaseOf t)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.Append("(case ");
+            sb.Append(t.termToMatch.Dispatch(this));
+            sb.AppendLine(" of ");
+            bool first = true;
+            foreach (var (item1, item2) in t.matchCases)
+            {
+                if (!first)
+                    sb.Append("|");
+                else
+                    first = false;
+                sb.Append(item1.Dispatch(this));
+                sb.Append(" \\<Rightarrow> ");
+                sb.AppendLine(item2.Dispatch(this));
+            }
+            sb.Append(")");
+
+            return sb.ToString();
+        }
+
         public string GetStringFromQuantifier(TermQuantifier.QuantifierKind q)
         {
             switch(q)
