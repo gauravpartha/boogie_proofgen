@@ -1,5 +1,6 @@
 ﻿using ProofGeneration.Isa;
 using System;
+using System.Collections.Generic;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
@@ -9,6 +10,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public static TermIdent VCTypeId { get; } = IsaCommonTerms.TermIdentFromName("vc_type_of_val");
         public static TermIdent TyToClosedId { get; } = IsaCommonTerms.TermIdentFromName("ty_to_closed");
         public static TermIdent ClosedToTyId { get; } = IsaCommonTerms.TermIdentFromName("closed_to_ty");
+        public static TermIdent ValOfClosedTyId { get; } = IsaCommonTerms.TermIdentFromName("val_of_closed_type");
 
         private static TermIdent TPrimClosedId { get;  } = IsaCommonTerms.TermIdentFromName("TPrimC");
         
@@ -52,6 +54,11 @@ namespace ProofGeneration.BoogieIsaInterface
         public static Term ClosedToTy(Term ty)
         {
             return new TermApp(ClosedToTyId, ty);
+        }
+
+        public static Term ValOfClosedTy(Term absValTyMap, Term ty)
+        {
+            return new TermApp(ValOfClosedTyId, new List<Term>{ absValTyMap, ty });
         }
 
     }

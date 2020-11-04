@@ -1,10 +1,24 @@
 ﻿using System.Diagnostics.Contracts;
+using ProofGeneration.IsaML;
 
 namespace ProofGeneration.VCProofGen
 {
-    public abstract class VCHint
+    public abstract class VCHint : INodeML
     {
-        public abstract string GetMLRepr();
+        //hint used to prove relationship between vc expression and Boogie expression in Assume/Assert statement
+        public VCExprHint ExprHint { get;  }
+
+        public VCHint(VCExprHint exprHint)
+        {
+            ExprHint = exprHint;
+        }
+
+        public string GetMLString()
+        {
+            return "(" + VCHintMLRepr() + "," + ExprHint.GetMLString() + ")";
+        }
+        
+        public abstract string VCHintMLRepr();
 
         /// <summary>
         /// returns whether the hint is supposed to be enough to solve the vc block lemma completely
@@ -16,7 +30,7 @@ namespace ProofGeneration.VCProofGen
 
         public override string ToString()
         {
-            return GetMLRepr();
+            return GetMLString();
         }
     }
 
@@ -26,12 +40,15 @@ namespace ProofGeneration.VCProofGen
 
         public enum AssumeSimpleType { ASSUME_TRUE, ASSUME_FALSE, ASSUME_NOT }
 
-        public AssumeSimpleHint(AssumeSimpleType hintType)
+        public AssumeSimpleHint(AssumeSimpleType hintType, VCExprHint exprHint) : base(exprHint)
         {
             this.hintType = hintType;
         }
 
-        public override string GetMLRepr()
+        public AssumeSimpleHint(AssumeSimpleType hintType) : this(hintType, VCExprHint.EmptyExprHint())
+        { }
+        
+        public override string VCHintMLRepr()
         {
             switch (hintType)
             {
@@ -63,7 +80,7 @@ namespace ProofGeneration.VCProofGen
         //total number of commands in this conjunct, -1 is unknown
         public int NumCommands { get; set; }
 
-        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands)
+        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands, VCExprHint vcExprHint) : base(vcExprHint)
         {
             Contract.Requires(nestLevel > 0);
             NestLevel = nestLevel;
@@ -71,7 +88,11 @@ namespace ProofGeneration.VCProofGen
             NumCommands = numCommands;
         }
 
-        public override string GetMLRepr()
+        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands) : 
+            this(nestLevel, numConjunctions, numCommands,VCExprHint.EmptyExprHint())
+        { }
+        
+        public override string VCHintMLRepr()
         {
             return "AssumeConjR " + NestLevel;
         }
@@ -83,10 +104,13 @@ namespace ProofGeneration.VCProofGen
 
         public enum AssertSimpleType { CONJ, NO_CONJ, SUBSUMPTION, ASSERT_TRUE, ASSERT_FALSE }
 
-        public AssertSimpleHint(AssertSimpleType hintType)
+        public AssertSimpleHint(AssertSimpleType hintType, VCExprHint vcExprHint) : base(vcExprHint)
         {
             this.hintType = hintType;
         }
+        
+        public AssertSimpleHint(AssertSimpleType hintType) : this(hintType, VCExprHint.EmptyExprHint())
+        { }
 
         public override bool IsFinal()
         {
@@ -97,7 +121,7 @@ namespace ProofGeneration.VCProofGen
             }
         }
 
-        public override string GetMLRepr()
+        public override string VCHintMLRepr()
         {
             switch (hintType)
             {

@@ -8,7 +8,19 @@ namespace ProofGeneration.ProgramToVCProof
 
         public static bool IsPrimitive(Type type)
         {
-            return type is BasicType;
+            Type actualType = type;
+
+            while (actualType is TypeSynonymAnnotation typeSynonym)
+            {
+                actualType = typeSynonym.ExpandedType;
+            }
+            
+            if (type is TypeProxy typeProxy)
+            {
+                actualType = typeProxy.ProxyFor;
+            } 
+            
+            return actualType is BasicType;
         }
         
         ///<summary>

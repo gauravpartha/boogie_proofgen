@@ -6,6 +6,7 @@ using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
+using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 
 namespace ProofGeneration
@@ -386,17 +387,7 @@ namespace ProofGeneration
 
         public static Term FunDecl(Function f, IVariableTranslationFactory varTranslationFactory, bool includeName=true)
         {
-            IVariableTranslation<TypeVariable> typeVarTranslation = varTranslationFactory.CreateEmptyTranslation().TypeVarTranslation;
-            
-            /*
-             * types variables are numbered as they appear in the list as opposed to type variables appearing later having a smaller number
-             * that's the reason the loop iterates in reverse order
-             */
-            foreach(TypeVariable tv in ((IEnumerable<TypeVariable>) f.TypeParameters).Reverse())
-            {
-                typeVarTranslation.AddBoundVariable(tv);
-            }
-            var typeIsaVisitor = new TypeIsaVisitor(typeVarTranslation);
+            var typeIsaVisitor = LemmaHelper.FunTypeIsaVisitor(f, varTranslationFactory);
 
             Term fname = new StringConst(f.Name);
             Term numTypeParams = new NatConst(f.TypeParameters.Count);
@@ -464,7 +455,7 @@ namespace ProofGeneration
             return new TermApp(axiomsSatId, new List<Term> { absValTyMap, funContext, normalState, axioms });
         }
 
-        public static Term ClosedType(Term ty)
+        public static Term IsClosedType(Term ty)
         {
             return new TermApp(closedTypeId, ty);
         }

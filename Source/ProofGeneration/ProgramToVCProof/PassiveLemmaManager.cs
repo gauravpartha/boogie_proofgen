@@ -37,6 +37,8 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly IVCVarFunTranslator vcTranslator;
 
+        private readonly AssumptionManager assmManager; 
+
         public PassiveLemmaManager(VCInstantiation<Block> vcinst, 
             BoogieMethodData methodData, 
             IEnumerable<Function> vcFunctions, 
@@ -64,6 +66,8 @@ namespace ProofGeneration.ProgramToVCProof
                 uniqueNamer);
             //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
             funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
+            
+            assmManager = new AssumptionManager(methodData.Functions, programVariables, variableFactory);
         }
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
@@ -144,41 +148,24 @@ namespace ProofGeneration.ProgramToVCProof
 
         public ContextElem Context()
         {
-            return new ContextElem(GlobalFixedVariables(), GlobalAssumptions(), AssumptionLabels());
+            return new ContextElem(
+                GlobalFixedVariables(), 
+                assmManager.AllAssumptions(funToInterpMapping, declToVCMapping, normalInitState, boogieContext, variableFactory.CreateTranslation().VarTranslation), 
+                assmManager.AllAssumptionLabels()
+                );
         }
 
         public IList<OuterDecl> Prelude()
         {
-            /* TODO
-            IList<string> assmLabels = AssumptionLabels();
+            IList<string> assmLabels = assmManager.AllAssumptionLabels();
             var globalAssmsLemmas = new LemmasDecl(globalAssmsName, assmLabels);
 
-            return new List<OuterDecl>() { globalAssmsLemmas };
-            */
-            return new List<OuterDecl>() { };
-        }
+            string closedAssm = assmManager.GetAssumptionLabel(AssumptionManager.SpecialAssumptionsKind.TypeValClosed);
 
-        private IList<string> AssumptionLabels()
-        {
-            return LemmaHelper.AssumptionLabels("G", 0, 2*(methodData.Functions).Count() + programVariables.Count());
-        }
+            LemmasDecl forallPolyThm = 
+                new LemmasDecl("forall_poly_thm", new List<string> {"forall_vc_type[OF " + closedAssm + "]"});
 
-        private IList<Term> GlobalAssumptions()
-        {
-            var results = new List<Term>();
-            results.AddRange(GlobalFunctionContextAssumptions());
-            results.AddRange(GlobalStateAssumptions());
-            return results;
-        }
-
-        private IList<Term> GlobalFunctionContextAssumptions()
-        {
-            return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext);            
-        }
-
-        private IList<Term> GlobalStateAssumptions()
-        {
-            return LemmaHelper.VariableAssumptions(programVariables, normalInitState, declToVCMapping, variableFactory.CreateTranslation().VarTranslation);
+            return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm };
         }
 
         private Proof BlockCorrectProof(Block b, string vcHintsName)
@@ -200,7 +187,7 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     "using assms ",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
-                    "apply (tactic \\<open> b_vc_hint_tac_2 @{context} @{thms "+ globalAssmsName + "} " + vcHintsName + " \\<close>)",
+                    "apply (tactic \\<open> boogie_vc_tac @{context} @{thms "+ globalAssmsName + "} " + "@{thm forall_poly_thm} " + vcHintsName + " \\<close>)",
                     "by (auto?)"
                 };                    
             }

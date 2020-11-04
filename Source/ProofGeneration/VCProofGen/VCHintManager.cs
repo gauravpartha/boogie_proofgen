@@ -3,6 +3,7 @@ using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using System.Collections.Generic;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -99,7 +100,7 @@ namespace ProofGeneration.VCProofGen
             var lemmaName = "expr_equiv_" + _lemmaId;
             _lemmaId++;
 
-            return new LemmaDecl(lemmaName, TermBinary.MetaImplies(lhs, rhs), new Proof(new List<string> {"oops"}));
+            return new LemmaDecl(lemmaName, TermBinary.MetaImplies(lhs, rhs), new Proof(new List<string> {"unfolding Let_def", "by clarsimp"}));
         }
         public bool TryGetHints(Block block, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls)
         {
@@ -153,10 +154,10 @@ namespace ProofGeneration.VCProofGen
                 {
                     if (nestLevel == 0)
                     {
-                        return new AssumeConjHint(0, 0, 1);
+                        return new AssumeConjHint(0, 0, 1, new VCExprHint(decl));
                     }
                     {
-                        return new AssumeConjHint(nestLevel, nestLevel, -1);
+                        return new AssumeConjHint(nestLevel, nestLevel, -1, new VCExprHint(decl));
                     }
                 }
                 else
@@ -221,7 +222,7 @@ namespace ProofGeneration.VCProofGen
                {
                    requiredDecl = LemmaForVc(cmd.Expr, exprVC, false);
                }
-               return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.NO_CONJ);
+               return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.NO_CONJ, new VCExprHint(requiredDecl));
             }
             else
             {
@@ -234,11 +235,11 @@ namespace ProofGeneration.VCProofGen
                    (subsumption == CommandLineOptions.SubsumptionOption.NotForQuantifiers && !(exprVC is VCExprQuantifier))
                )
                {
-                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.SUBSUMPTION);
+                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.SUBSUMPTION, new VCExprHint(requiredDecl));
                }
                else
                {
-                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.CONJ);
+                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.CONJ, new VCExprHint(requiredDecl));
                }
             }
         }

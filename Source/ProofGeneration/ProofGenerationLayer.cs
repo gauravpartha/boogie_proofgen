@@ -242,7 +242,16 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            var endToEnd = new EndToEndVCProof(finalProgData, programRepr, vcFunctions, vcinst, vcinstAxiom, afterUnreachablePruningCfg, varTranslationFactory);
+            var endToEnd = new EndToEndVCProof(
+                finalProgData, 
+                programRepr, 
+                vcFunctions, 
+                vcinst, 
+                vcinstAxiom, 
+                afterUnreachablePruningCfg, 
+                varTranslationFactory,
+                typePremiseEraserFactory,
+                gen);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
@@ -340,8 +349,9 @@ namespace ProofGeneration
                     //FIXME potential val name clash
                     vcHintsName = b.Label + "_hints";
                     var code = MLUtil.DefineVal(b.Label + "_hints", MLUtil.MLList(hints));
-                    result.Add(new MLDecl(code));
+                    //required declarations must be added first
                     result.AddRange(requiredDecls);
+                    result.Add(new MLDecl(code));
                 }
                 result.Add(passiveLemmaManager.GenerateBlockLemma(b, cfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b)), vcHintsName));
                 blockToLemmaDecls.Add(b, result);

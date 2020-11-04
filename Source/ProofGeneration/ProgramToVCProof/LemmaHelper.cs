@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
@@ -14,7 +15,7 @@ namespace ProofGeneration.ProgramToVCProof
 {
     static class LemmaHelper
     {
-        private static PureToBoogieValConverter pureToBoogieValConverter = new PureToBoogieValConverter();
+        private static readonly PureToBoogieValConverter pureToBoogieValConverter = new PureToBoogieValConverter();
 
         public static bool FinalStateIsMagic(Block block)
         {
@@ -38,22 +39,43 @@ namespace ProofGeneration.ProgramToVCProof
             return term.Aggregate((arg, res) => new TermBinary(arg, res, bop));
         }
 
-        public static IList<Term> VariableAssumptions(
-            IEnumerable<Variable> programVars,
+        public static Term StateVariableAssumption(Variable v, 
             Term state,
             IDictionary<NamedDeclaration, Term> declToVCMapping,
             IVariableTranslation<Variable> varTranslation)
         {
-            var result = new List<Term>();
-            foreach (Variable v in programVars)
-            {
-                result.Add(VariableAssumption(v, state, declToVCMapping[v], varTranslation));
-            }
-
-            return result;
+            return StateVariableAssumption(v, state, declToVCMapping[v], varTranslation);
+        }
+        public static Term VariableTypeAssumption(
+            Variable v,
+            Term vcVar,
+            TypeIsaVisitor typeIsaVisitor,
+            Term absValTyMap)
+        {
+            Term left = IsaBoogieTerm.TypeToVal(absValTyMap, vcVar);
+            Term right = typeIsaVisitor.Translate(v.TypedIdent.Type);
+            return TermBinary.Eq(left, right);
         }
 
-        public static Term VariableAssumption(Variable v, Term state, Term vcVar, IVariableTranslation<Variable> varTranslation)
+        /// <summary>
+        /// Returns type visitor that contains the type variables of f in the context
+        /// </summary>
+        public static TypeIsaVisitor FunTypeIsaVisitor(Function f, IVariableTranslationFactory varTranslationFactory)
+        {
+            IVariableTranslation<TypeVariable> typeVarTranslation = varTranslationFactory.CreateEmptyTranslation().TypeVarTranslation;
+            /*
+             * types variables are numbered as they appear in the list as opposed to type variables appearing later having a smaller number
+             * that's the reason the loop iterates in reverse order
+             */
+            foreach(TypeVariable tv in ((IEnumerable<TypeVariable>) f.TypeParameters).Reverse())
+            {
+                typeVarTranslation.AddBoundVariable(tv);
+            }
+            
+            return new TypeIsaVisitor(typeVarTranslation);
+        }
+
+        public static Term StateVariableAssumption(Variable v, Term state, Term vcVar, IVariableTranslation<Variable> varTranslation)
         {
             if (varTranslation.TryTranslateVariableId(v, out Term varId))
             {
@@ -74,103 +96,104 @@ namespace ProofGeneration.ProgramToVCProof
             return new TermBinary(left, rhs, TermBinary.BinaryOpCode.EQ);
         }
 
-        public static Term VariableTypeAssumption(Variable v, Term varContext, TypeIsaVisitor typeIsaVisitor)
+        public static Term VarContextTypeAssumption(Variable v, Term varContext, TypeIsaVisitor typeIsaVisitor)
         {
             Term left = new TermApp(varContext, new StringConst(v.Name));
             Term right = IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(v.TypedIdent.Type));
             return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
         }
 
-        public static IList<Term> FunctionAssumptions(
-            IEnumerable<Function> functions,
+        public static Term FunctionCtxtWfAssm(Function f,
+            IDictionary<Function, TermIdent> funInterpMapping,
+            BoogieContextIsa boogieContext
+            )
+        {
+            Term ctxWfLeft = new TermApp(IsaCommonTerms.Snd(boogieContext.funContext), new List<Term>() { new StringConst(f.Name) });
+            Term ctxWfRight = IsaCommonTerms.SomeOption(funInterpMapping[f]);
+
+            return new TermBinary(ctxWfLeft, ctxWfRight, TermBinary.BinaryOpCode.EQ);
+        }
+        public static Term FunctionVcCorresAssm(
+            Function f,
             IDictionary<Function, TermIdent> funInterpMapping,
             IDictionary<NamedDeclaration, Term> declToVCMapping,
             BoogieContextIsa boogieContext
         )
         {
-            IList<Term> assumptions = new List<Term>();
-
             var converter = new PureToBoogieValConverter();
 
-            foreach (Function f in functions)
+            //TODO: unique naming scheme
+            List<Identifier> boundParamVars = GetNames("farg", f.InParams.Count);
+            
+            TypeUtil.SplitTypeParams(f.TypeParameters, f.InParams.Select(v => v.TypedIdent.Type),
+                out List<TypeVariable> explicitTypeVars, out List<TypeVariable> implicitTypeVars);
+
+
+            List<Identifier> boundTypeVars = GetNames("targ", f.TypeParameters.Count);
+
+            IDictionary<TypeVariable, Term> substitution = new Dictionary<TypeVariable, Term>();
+            int i = 0;
+            foreach(var tv in f.TypeParameters)
             {
-                #region context well-formed
-                Term ctxWfLeft = new TermApp(IsaCommonTerms.Snd(boogieContext.funContext), new List<Term>() { new StringConst(f.Name) });
-                Term ctxWfRight = IsaCommonTerms.SomeOption(funInterpMapping[f]);
+                substitution.Add(tv, new TermIdent(boundTypeVars[i]));
+                i++;
+            }
+            
+            var varSubstitution = new SimpleVarSubstitution<TypeVariable>(substitution);
+            var typeIsaVisitor = new TypeIsaVisitor(varSubstitution);
 
-                assumptions.Add(new TermBinary(ctxWfLeft, ctxWfRight, TermBinary.BinaryOpCode.EQ));
-                #endregion                
+            IEnumerable<Term> typeArgConstraints =
+                    f.InParams
+                        .Select((v, idx) => 
+                            !TypeUtil.IsPrimitive(v.TypedIdent.Type) ? TermBinary.Eq(
+                            IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, new TermIdent(boundParamVars[idx])),
+                            typeIsaVisitor.Translate(v.TypedIdent.Type)) : null)
+                        .Where(t => t != null );
 
-                #region relation interpretation and pure function
-                //TODO: unique naming scheme
-                List<Identifier> boundParamVars = GetNames("farg", f.InParams.Count);
-                
-                TypeUtil.SplitTypeParams(f.TypeParameters, f.InParams.Select(v => v.TypedIdent.Type),
-                    out List<TypeVariable> explicitTypeVars, out List<TypeVariable> implicitTypeVars);
-
-
-                List<Identifier> boundTypeVars = GetNames("targ", f.TypeParameters.Count);
-
-                IDictionary<TypeVariable, Term> substitution = new Dictionary<TypeVariable, Term>();
-                int i = 0;
-                foreach(var tv in f.TypeParameters)
-                {
-                    substitution.Add(tv, new TermIdent(boundTypeVars[i]));
-                    i++;
-                }
-                
-                var varSubstitution = new SimpleVarSubstitution<TypeVariable>(substitution);
-                var typeIsaVisitor = new TypeIsaVisitor(varSubstitution);
-
-                IEnumerable<Term> typeArgConstraints =
-                        f.InParams.Where(v => !TypeUtil.IsPrimitive(v.TypedIdent.Type))
-                            .Select((v, idx) => TermBinary.Eq(
-                                IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, new TermIdent(boundParamVars[idx])),
-                                typeIsaVisitor.Translate(v.TypedIdent.Type)));
-
-                List<Term> boogieFunTyArgs = boundTypeVars.Select(id => (Term) new TermIdent(id)).ToList();
-                IEnumerable<Term> vcFunTyArgs =
-                    f.TypeParameters.Where(tv => explicitTypeVars.Contains(tv))
-                        .Select((tv, idx) => IsaBoogieVC.TyToClosed(boogieFunTyArgs[idx])
-                    );
-                List<Term> boogieFunValArgs =
-                    f.InParams.Select(
-                        (v, idx) => converter.ConvertToBoogieVal(v.TypedIdent.Type, new TermIdent(boundParamVars[idx]))
-                   ).ToList();
-
-                Term left = new TermApp(funInterpMapping[f], new List<Term>()
-                {
-                    new TermList(boogieFunTyArgs),
-                    new TermList(boogieFunValArgs)
-                });
-
-                Term right = IsaCommonTerms.SomeOption(
-                    converter.ConvertToBoogieVal(f.OutParams.First().TypedIdent.Type,
-                        new TermApp(declToVCMapping[f],
-                             vcFunTyArgs.Union(
-                                boundParamVars.Select(bv => (Term) new TermIdent(bv)).ToList()
-                            ).ToList())
-                    )
+            List<Term> boogieFunTyArgs = boundTypeVars.Select(id => (Term) new TermIdent(id)).ToList();
+            IEnumerable<Term> vcFunTyArgs =
+                f.TypeParameters.Where(tv => explicitTypeVars.Contains(tv))
+                    .Select((tv, idx) => IsaBoogieVC.TyToClosed(boogieFunTyArgs[idx])
                 );
+            List<Term> boogieFunValArgs =
+                f.InParams.Select(
+                    (v, idx) => converter.ConvertToBoogieVal(v.TypedIdent.Type, new TermIdent(boundParamVars[idx]))
+               ).ToList();
 
-                Term equation = TermBinary.Eq(left, right);
+            Term left = new TermApp(funInterpMapping[f], new List<Term>()
+            {
+                new TermList(boogieFunTyArgs),
+                new TermList(boogieFunValArgs)
+            });
 
-                if (typeArgConstraints.Any())
+            Term right = IsaCommonTerms.SomeOption(
+                converter.ConvertToBoogieVal(f.OutParams.First().TypedIdent.Type,
+                    new TermApp(declToVCMapping[f],
+                         vcFunTyArgs.Union(
+                            boundParamVars.Select(bv => (Term) new TermIdent(bv)).ToList()
+                        ).ToList())
+                )
+            );
+
+            Term equation = TermBinary.Eq(left, right);
+
+            if (typeArgConstraints.Any())
+            {
+                var aggregatedAssms = typeArgConstraints.Aggregate((t1, t2) => TermBinary.And(t2,t1));
+
+                if (boogieFunTyArgs.Any())
                 {
-                    var closednessAssms = boogieFunTyArgs.Select(t1 => IsaBoogieTerm.ClosedType(t1))
+                    var closednessAssms = boogieFunTyArgs.Select(t1 => IsaBoogieTerm.IsClosedType(t1))
                         .Aggregate((t1, t2) => TermBinary.And(t2, t1));
-                    var aggregatedAssms = typeArgConstraints.Aggregate((t1, t2) => TermBinary.And(t2,t1));
-                    assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), 
-                        TermBinary.Implies(closednessAssms, TermBinary.Implies(aggregatedAssms, equation))));
+                    return new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), 
+                        TermBinary.Implies(closednessAssms, TermBinary.Implies(aggregatedAssms, equation)));
                 }
-                else
-                { 
-                    assumptions.Add(new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), equation));
-                }
-                #endregion
+                
+                return new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), 
+                        TermBinary.Implies(aggregatedAssms, equation));
             }
 
-            return assumptions;
+            return new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), equation);
         }
 
         public static IDictionary<NamedDeclaration, Term> DeclToTerm(

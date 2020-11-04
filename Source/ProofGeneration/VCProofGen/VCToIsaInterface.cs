@@ -140,17 +140,19 @@ namespace ProofGeneration.VCProofGen
 
             vcOuterDecls.AddRange(axiomToDef.Values);
 
-            var vcFunctions = methodData.Functions.Select(f =>
-            {
-                if (varTranslator.TranslateBoogieFunction(f, out Function result))
-                {
-                    return result;
-                }
-                else
-                {
-                    throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface), "can't find function");
-                }
-            }).Union(otherFunctions);
+            var vcFunctions = methodData.Functions.
+                Where(f => varTranslator.TranslateBoogieFunction(f, out Function result))
+                .Select(f =>
+                    {
+                        if (varTranslator.TranslateBoogieFunction(f, out Function result))
+                        {
+                            return result;
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException();
+                        }
+                    }).Union(otherFunctions);
 
             vcTranslator = varTranslator;
             vcTypeFunctions = otherFunctions;

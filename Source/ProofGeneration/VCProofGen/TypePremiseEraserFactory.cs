@@ -1,4 +1,7 @@
-﻿using System.Diagnostics.Contracts;
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics.Contracts;
+using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.TypeErasure;
 using Microsoft.Boogie.VCExprAST;
@@ -42,16 +45,31 @@ namespace ProofGeneration.VCProofGen
         {
             return EraseVC(_vcTranslator.Translate(e));
         }
+
         /// <summary>
         /// Erases the types in <paramref name="vc"/>.
-        /// Note that this has a side-effect on the original vc object.
+        /// Note that this has a side-effect on <paramref name="vc"/>..
         /// </summary>
         public VCExpr EraseVC(VCExpr vc)
         {
-              VCExpr exprWithoutTypes = Eraser.Erase(vc, 1);
+              VCExpr exprWithoutTypes = Eraser.Erase(vc, -1);
               LetBindingSorter letSorter = new LetBindingSorter(_vcExprGen);
               Contract.Assert(letSorter != null);
               return letSorter.Mutate(exprWithoutTypes, true);
+        }
+
+        public VCExpr BestTypeVarExtractor(
+            TypeVariable typeVar, 
+            VCExprVar dummyVariable,
+            List<Type> vcFunctionValueTypes, 
+            List<VCExprVar> vcFunctionValueArgs)
+        {
+            var varBindings = new Dictionary<VCExprVar, VCExprVar>();
+            var typeVarBindings = new Dictionary<TypeVariable, VCExpr>();
+            typeVarBindings.Add(typeVar, dummyVariable);
+            VariableBindings b = new VariableBindings(varBindings, typeVarBindings);
+            List<VCExprLetBinding> binding = AxiomBuilder.BestTypeVarExtractors(new List<TypeVariable>() {typeVar}, vcFunctionValueTypes, vcFunctionValueArgs, b);
+            return binding[0].E;
         }
     }
 }
