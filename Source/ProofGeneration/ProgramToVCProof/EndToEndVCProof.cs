@@ -183,28 +183,27 @@ namespace ProofGeneration.ProgramToVCProof
             }
         }
 
-        private IDictionary<Function, DefDecl> VCFunDefinitions()
+        private IDictionary<Function, OuterDecl> VCFunDefinitions()
         {
             return BasicUtil.ApplyFunDict(methodData.Functions, VCFunDefinition);
         }
 
         //VC function that represents f
-        private DefDecl VCFunDefinition(Function f)
+        private OuterDecl VCFunDefinition(Function f)
         {
             IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
-            TypePremiseEraserProvider eraserProvider = eraserFactory.NewEraser();
             
             //LHS of function definition "vc_fun boogie_fun arg1 arg2 ... argN = ..." 
             Term funTerm = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(f, f.Name));
             IList<Term> argsLhs = new List<Term> { boogieContext.absValTyMap, funTerm };
 
-            List<Term> valParamsVC = new List<Term>();
             var vcVars = new List<VCExprVar>();
             var varToTerm = new Dictionary<VCExprVar, Term>();
+            List<Term> vcValueParams = new List<Term>();
             foreach (var v in f.InParams)
             {
                 Term vTerm = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name));
-                valParamsVC.Add(vTerm);
+                vcValueParams.Add(vTerm);
                 VCExprVar vVcVar = vcExprGen.Variable(v.Name, v.TypedIdent.Type);
                 vcVars.Add(vVcVar);
                 varToTerm.Add(vVcVar, vTerm); 
@@ -216,8 +215,9 @@ namespace ProofGeneration.ProgramToVCProof
                 out List<TypeVariable> implicitTypeVars);
 
             TypeExtractorTranslator extractorTranslator = new TypeExtractorTranslator(boogieContext, varToTerm);
-            List<Term> tyParamsBoogie = new List<Term>();
+            List<Term> boogieTyParams = new List<Term>();
             var typeVarToTerm = new Dictionary<TypeVariable, Term>();
+            TypePremiseEraserProvider eraserProvider = eraserFactory.NewEraser();
             VCExprVar dummyVar = vcExprGen.Variable("dummy", eraserProvider.AxiomBuilder.T);
             foreach (var typeVar in f.TypeParameters)
             {
@@ -238,19 +238,21 @@ namespace ProofGeneration.ProgramToVCProof
                     typeVarClosedIsa = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(typeVar, typeVar.Name));
                     argsLhs.Add(typeVarClosedIsa); 
                 }
-                tyParamsBoogie.Add(IsaBoogieVC.ClosedToTy(typeVarClosedIsa));
+                boogieTyParams.Add(IsaBoogieVC.ClosedToTy(typeVarClosedIsa));
                 typeVarToTerm.Add(typeVar, typeVarClosedIsa);
             }
             
-            argsLhs.AddRange(valParamsVC);
+            //add values after type variables
+            argsLhs.AddRange(vcValueParams);
+            
                 
             /* arguments used to invoke the Boogie function:
              * type parameters => use extractors
              * function values => same as for VC function, except for primitive typed arguments for which one must construct
              * the corersponding Boogie value
              */
-            List<Term> valParamsBoogie =
-                valParamsVC.Select((p, idx) =>
+            List<Term> boogieValParams =
+                vcValueParams.Select((p, idx) =>
                 {
                     var v = f.InParams[idx];
                     if (TypeUtil.IsPrimitive(v.TypedIdent.Type))
@@ -261,16 +263,16 @@ namespace ProofGeneration.ProgramToVCProof
                     return p;
                 }).ToList();
 
-            Term boogieFunApp = new TermApp(funTerm, new List<Term> { new TermList(tyParamsBoogie), new TermList(valParamsBoogie)}); 
+            Term boogieFunApp = new TermApp(funTerm, new List<Term> { new TermList(boogieTyParams), new TermList(boogieValParams)}); 
             
             //RHS of function definition, case splitting on whether boogie function reduces
             Term res = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName("res", "res"));
 
-            TypeIsaVisitor typeVisitorSubst = new TypeIsaVisitor(new SimpleVarSubstitution<TypeVariable>(typeVarToTerm));
+            TypeIsaVisitor typeVisitorSubst = new TypeIsaVisitor(new SimpleVarSubstitution<TypeVariable>(typeVarToTerm), true);
             Type outputType = f.OutParams[0].TypedIdent.Type;
             Term outputTypeIsa = typeVisitorSubst.Translate(outputType);
 
-            Term outputValueIfNotReduced = IsaBoogieVC.ValOfClosedTy(boogieContext.absValTyMap, IsaBoogieVC.TyToClosed(outputTypeIsa));
+            Term outputValueIfNotReduced = IsaBoogieVC.ValOfClosedTy(boogieContext.absValTyMap, outputTypeIsa);
             
             Term functionBody = new TermCaseOf(
                 boogieFunApp,
@@ -283,7 +285,7 @@ namespace ProofGeneration.ProgramToVCProof
                 }
                 );
 
-            return new DefDecl(VCFunName(f), Tuple.Create(argsLhs, functionBody));
+            return new FunDecl(VCFunName(f), null, new List<Tuple<IList<Term>, Term>>(){Tuple.Create(argsLhs, functionBody)});
         }
 
         private string VCFunName(Function f)
@@ -301,7 +303,7 @@ namespace ProofGeneration.ProgramToVCProof
             IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
 
             Term funTerm = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(f, f.Name));
-            /** vc function call **/
+            #region vc function call
             IList<Term> vcFunArgs = new List<Term> { boogieContext.absValTyMap, funTerm};
             
             TypeUtil.SplitTypeParams(f.TypeParameters, f.InParams.Select(v => v.TypedIdent.Type), 
@@ -310,13 +312,24 @@ namespace ProofGeneration.ProgramToVCProof
             vcFunArgs.AddRange(explicitTypeVars.Select(tv =>
                 IsaBoogieVC.TyToClosed(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(tv, tv.Name)))));
             
-            var vcValueParams = f.InParams.Select(v => IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name))).ToList();
+            var vcVars = new List<VCExprVar>();
+            var varToTerm = new Dictionary<VCExprVar, Term>();
+            var vcValueParams = new List<Term>();
+            foreach (var v in f.InParams)
+            {
+                Term vTerm = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name));
+                vcValueParams.Add(vTerm);
+                VCExprVar vVcVar = vcExprGen.Variable(v.Name, v.TypedIdent.Type);
+                vcVars.Add(vVcVar);
+                varToTerm.Add(vVcVar, vTerm); 
+            }
             vcFunArgs.AddRange(vcValueParams);
 
             Term vc_f = IsaCommonTerms.TermIdentFromName(VCFunName(f));
             var vcFunctionCall = new TermApp(vc_f, vcFunArgs);
+            #endregion
             
-            /** Boogie function call **/
+            #region Boogie function call
             var boogieTypeParams = f.TypeParameters.Select(tv => (Term) IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(tv, tv.Name))).ToList();
             var boogieTypeParamsList = new TermList(boogieTypeParams);
             var boogieValueParams = vcValueParams.Select((p, idx) =>
@@ -329,13 +342,14 @@ namespace ProofGeneration.ProgramToVCProof
                 }).ToList();
             var boogieValueParamsList = new TermList(boogieValueParams);
             var boogieFunctionCall = new TermApp(funTerm, new List<Term>() {boogieTypeParamsList, boogieValueParamsList});
+            #endregion
                 
-            /** assumptions **/
+            #region lemma assumptions
             List<Term> assms = new List<Term>();
             List<string> assmLabels = new List<string>();
-            Func<int, string> closedAssmLabel = i => "closed" + i;
-            Func<int, string> typeOfArgAssmLabel = i => "typeOfArg" + i;
-            
+            string ClosedAssmLabel(int i) => "closed" + i;
+            string TypeOfArgAssmLabel(int i) => "typeOfArg" + i;
+
             //funtion interpretation well-formed assumption
             assms.Add(IsaBoogieTerm.FunInterpSingleWf(boogieContext.absValTyMap, IsaBoogieTerm.FunDecl(f, varTranslationFactory, false), funTerm));
             assmLabels.Add(finterpAssmName);
@@ -346,66 +360,128 @@ namespace ProofGeneration.ProgramToVCProof
             foreach(var t in boogieTypeParams)
             { 
                 assms.Add(IsaBoogieTerm.IsClosedType(t));
-                assmLabels.Add(closedAssmLabel(closedIdx)); 
-                closedAssmLabels.Add(closedAssmLabel(closedIdx));
+                assmLabels.Add(ClosedAssmLabel(closedIdx)); 
+                closedAssmLabels.Add(ClosedAssmLabel(closedIdx));
                 closedIdx++;
             }
             
             //type of value arguments assumption
-            var typeIsaVisitor = LemmaHelper.FunTypeIsaVisitor(f, varTranslationFactory);
-            int idx = 0;
-            var typeOfValAssms = new List<string>();
-            foreach (var t in vcValueParams)
+            var typeVariableSubst = new Dictionary<TypeVariable, Term>();
             {
-                var paramType = f.InParams[idx].TypedIdent.Type;
-                if (!TypeUtil.IsPrimitive(paramType))
+                int idx = 0;
+                foreach (var tv in f.TypeParameters)
                 {
-                    assms.Add(
-                        TermBinary.Eq(IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, t),
-                            typeIsaVisitor.Translate(paramType))
-                    );
-                    assmLabels.Add(typeOfArgAssmLabel(idx));
-                    typeOfValAssms.Add(typeOfArgAssmLabel(idx));
+                    typeVariableSubst.Add(tv, boogieTypeParams[idx]);
+                    idx++;
+                }
+            }
+
+            var typeIsaFuncVisitor = new TypeIsaVisitor(new SimpleVarSubstitution<TypeVariable>(typeVariableSubst));
+            var typeOfValAssms = new List<string>();
+            {
+                int idx = 0;
+                foreach (var t in vcValueParams)
+                {
+                    var paramType = f.InParams[idx].TypedIdent.Type;
+                    if (!TypeUtil.IsPrimitive(paramType))
+                    {
+                        assms.Add(
+                            TermBinary.Eq(IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, t),
+                                typeIsaFuncVisitor.Translate(paramType))
+                        );
+                        assmLabels.Add(TypeOfArgAssmLabel(idx));
+                        typeOfValAssms.Add(TypeOfArgAssmLabel(idx));
+                    }
+
+                    idx++;
+                }
+            }
+            #endregion
+
+            #region lemma statement
+            Type outputType = f.OutParams[0].TypedIdent.Type;
+
+            Term ConstructOutputValue(Term rawOutputValue)
+            {
+                var result = rawOutputValue;
+                if (TypeUtil.IsPrimitive(outputType))
+                {
+                    result = pureValueIsaTransformer.ConstructValue(result, outputType);
                 }
 
-                idx++;
+                return result;
             }
 
-            /** statement **/
-            Term outputValue = vcFunctionCall;
-            Type outputType = f.OutParams[0].TypedIdent.Type;
-            if (TypeUtil.IsPrimitive(outputType))
-            {
-                outputValue = pureValueIsaTransformer.ConstructValue(outputValue, outputType);
-            }
-            Term conclusion = TermBinary.Eq(boogieFunctionCall, IsaCommonTerms.SomeOption(outputValue));
+            Term conclusion = TermBinary.Eq(boogieFunctionCall, IsaCommonTerms.SomeOption(ConstructOutputValue(vcFunctionCall)));
+            #endregion
 
-            /** proof **/
+            #region lemma proof
             string zReturnVal = uniqueNamer.GetName("z", "z");
             var proofMethods = new List<string>()
             {
                 "proof -",
                 "from " + IsaPrettyPrinterHelper.SpaceAggregate(typeOfValAssms) + " " + finterpAssmName +
-                " obtain " + zReturnVal + " where W:" + TermBinary.Eq(boogieFunctionCall,
-                    IsaCommonTerms.SomeOption(IsaCommonTerms.TermIdentFromName(zReturnVal))),
+                " obtain " + zReturnVal + " where W:" + IsaPrettyPrinterHelper.Inner(
+                    TermBinary.Eq(boogieFunctionCall,
+                    IsaCommonTerms.SomeOption(ConstructOutputValue(IsaCommonTerms.TermIdentFromName(zReturnVal)))).ToString()),
                 "  apply (simp only: fun_interp_single_wf.simps) ",
                 "  apply (erule allE[where ?x=" + IsaPrettyPrinterHelper.Inner(boogieTypeParamsList.ToString()) + "])",
-                "  apply (simp add: " + closedAssmLabels + ")",
+                "  apply (simp add: " + closedAssmLabels.SpaceAggregate() + ")",
                 "  apply (erule allE[where ?x=" + IsaPrettyPrinterHelper.Inner(boogieValueParamsList.ToString()) + "])",
-                "  by auto"
+                (outputType.IsBool ? "using tbool_boolv" : "") + (outputType.IsInt ? "using tint_intv" : "") + " by auto"
             };
             
             //prove that one can express each implicit type variable using a corresponding extractor
-            var proofMethodsExtractors = 
-                //only implicit?
-                f.TypeParameters.Select((tv, idx) =>
+            TypeExtractorTranslator extractorTranslator = new TypeExtractorTranslator(boogieContext, varToTerm);
+            TypePremiseEraserProvider eraserProvider = eraserFactory.NewEraser();
+            VCExprVar dummyVar = vcExprGen.Variable("dummy", eraserProvider.AxiomBuilder.T);
+            List<Type> valueParamTypes = f.InParams.Select(v => v.TypedIdent.Type).ToList();
+
+            var explicitTypeVarAssms = "";
+            var proofMethodsExtractors = new List<string>();
+            {
+                int idx = 0;
+                foreach (var tv in f.TypeParameters)
                 {
-                    "from " + typeOfArgAssmLabel(idx) + " have " + isa
-                    
+                    if (implicitTypeVars.Contains(tv))
+                    {
+                        VCExpr extractor = eraserProvider.BestTypeVarExtractor(
+                            tv,
+                            dummyVar,
+                            valueParamTypes,
+                            vcVars
+                        );
+                        Term extractorTerm = extractorTranslator.TranslateExtractor(extractor);
+                        
+                        string prefix = "moreover from ";
+                        if (idx == 0)
+                        {
+                            prefix = "from ";
+                        }
+                        proofMethodsExtractors.Add(
+                            prefix + IsaPrettyPrinterHelper.SpaceAggregate(typeOfValAssms) + " have " +
+                            " \" " + TermBinary.Eq(boogieTypeParams[idx], IsaBoogieVC.ClosedToTy(extractorTerm)) + "\"" +
+                            " using  closed_inv2 " + ClosedAssmLabel(idx) + " by auto"
+                        );
+                    }
+                    else
+                    {
+                        explicitTypeVarAssms = explicitTypeVarAssms + " " + "closed_inv2_2[OF " + ClosedAssmLabel(idx)+"]";
+                    }
+
+                    idx++;
                 }
+            }
+            
+            proofMethods.AddRange(proofMethodsExtractors);
+            
+            proofMethods.Add((proofMethodsExtractors.Count > 1 ? "ultimately " : "from this ") + 
+                             " show ?thesis using " + IsaPrettyPrinterHelper.SpaceAggregate(typeOfValAssms) + explicitTypeVarAssms);
+            proofMethods.Add("by (simp add: W)");
 
 
-
+            return new LemmaDecl(FunCorresName(f), ContextElem.CreateWithAssumptions(assms,assmLabels), conclusion, 
+                new Proof(proofMethods));
             /*
             var proofMethods = new List<string>()
             {
@@ -419,8 +495,7 @@ namespace ProofGeneration.ProgramToVCProof
                 "qed"
             };
             */
-
-            return new LemmaDecl(FunCorresName(f), ContextElem.CreateWithAssumptions(assms,assmLabels), conclusion, new Proof(new List<string>()));
+            #endregion
         }
 
         private LemmaDecl FinalLemma()
