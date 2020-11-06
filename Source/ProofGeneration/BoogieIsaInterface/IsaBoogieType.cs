@@ -6,10 +6,12 @@ namespace ProofGeneration
     class IsaBoogieType
     {
         private static readonly TermIdent tprimId = IsaCommonTerms.TermIdentFromName("TPrim");
+        private static readonly TermIdent tprimClosedId = IsaCommonTerms.TermIdentFromName("TPrimC");
         private static readonly TermIdent tboolId = IsaCommonTerms.TermIdentFromName("TBool");
         private static readonly TermIdent tintId = IsaCommonTerms.TermIdentFromName("TInt");
         private static readonly TermIdent tvarId = IsaCommonTerms.TermIdentFromName("TVar");
         private static readonly TermIdent tconId = IsaCommonTerms.TermIdentFromName("TCon");
+        private static readonly TermIdent tconClosedId = IsaCommonTerms.TermIdentFromName("TConC");
 
         public static TypeIsa BoogieType()
         {
@@ -21,9 +23,10 @@ namespace ProofGeneration
             return new TermApp(tvarId, new NatConst(n));
         }
 
-        public static Term PrimType(Term primType)
+        public static Term PrimType(Term primType, bool useClosedConstructor = false)
         {
-            return new TermApp(tprimId, primType);
+            var id = useClosedConstructor ? tprimClosedId : tprimId;
+            return new TermApp(id, primType);
         }
 
         public static Term BoolType()
@@ -36,9 +39,11 @@ namespace ProofGeneration
             return tintId;
         }
 
-        public static Term TConType(string constructorName, List<Term> constructorArgs)
+        public static Term TConType(string constructorName, List<Term> constructorArgs, bool useClosedConstructor=false)
         {
-            return new TermApp(new TermApp(tconId, new StringConst(constructorName)), new TermList(constructorArgs));
+
+            var id = useClosedConstructor ? tconClosedId : tconId;
+            return new TermApp(new TermApp(id, new StringConst(constructorName)), new TermList(constructorArgs));
         }
 
         public static TypeIsa ValType(TypeIsa absValType)

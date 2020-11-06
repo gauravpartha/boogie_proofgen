@@ -13,6 +13,7 @@ namespace ProofGeneration
     {
 
         private readonly IVariableTranslation<TypeVariable> typeVarTranslation;
+        private readonly bool usedClosedConstructors;
 
         [ContractInvariantMethod]
         void ObjectInvariant()
@@ -20,10 +21,11 @@ namespace ProofGeneration
             Contract.Invariant(Results != null);
             Contract.Invariant(Results.Count <= 1);
         }
-
-        public TypeIsaVisitor(IVariableTranslation<TypeVariable> typeVarTranslation)
+        
+        public TypeIsaVisitor(IVariableTranslation<TypeVariable> typeVarTranslation, bool usedClosedConstructors = false)
         {
             this.typeVarTranslation = typeVarTranslation;
+            this.usedClosedConstructors = usedClosedConstructors;
         }
 
 
@@ -42,7 +44,7 @@ namespace ProofGeneration
         {
             List<Term> argTypes = node.Arguments.Select(t => Translate(t)).ToList();
 
-            ReturnResult(IsaBoogieType.TConType(node.Decl.Name, argTypes));
+            ReturnResult(IsaBoogieType.TConType(node.Decl.Name, argTypes, usedClosedConstructors));
             return node;
         }
 
@@ -50,10 +52,10 @@ namespace ProofGeneration
         {
             if(node.IsBool)
             {
-                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.BoolType()));
+                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.BoolType(), usedClosedConstructors));
             } else if(node.IsInt)
             {
-                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType()));
+                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType(), usedClosedConstructors));
             } else
             {
                 throw new NotImplementedException();
