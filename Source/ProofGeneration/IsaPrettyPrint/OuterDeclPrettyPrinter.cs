@@ -46,8 +46,13 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override int VisitFunDecl(FunDecl d)
         {
-            _sb.Append("fun ").Append(d.name).Append(" :: ");
-            AppendInner(_typeIsaPrinter.Visit(d.type));
+            _sb.Append("fun ");
+            _sb.Append(d.name);
+            if (d.type != null)
+            {
+                _sb.Append(" :: ");
+                AppendInner(_typeIsaPrinter.Visit(d.type));
+            }
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
 
             bool first = true;
