@@ -33,6 +33,7 @@ namespace ProofGeneration.Isa
 
     public class FunDecl : OuterDecl
     {
+        //if type is null, then it must be inferred
         public readonly TypeIsa type;
         public readonly IList<Tuple<IList<Term>, Term>> equations;
 

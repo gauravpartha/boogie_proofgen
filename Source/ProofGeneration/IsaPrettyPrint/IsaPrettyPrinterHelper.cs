@@ -60,7 +60,7 @@ namespace ProofGeneration.IsaPrettyPrint
             }
         }
 
-        public static string SpaceAggregate<T>(IEnumerable<T> list)
+        public static string SpaceAggregate<T>(this IEnumerable<T> list)
         {
             if (!list.Any())
             {
