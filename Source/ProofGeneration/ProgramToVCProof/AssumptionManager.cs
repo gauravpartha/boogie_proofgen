@@ -118,7 +118,7 @@ namespace ProofGeneration.ProgramToVCProof
                     switch (kind)
                     {
                         case SpecialAssumptionsKind.TypeValClosed:
-                            assumptions.Add(ClosednessAssumption());
+                            assumptions.Add(LemmaHelper.ClosednessAssumption(boogieContext.absValTyMap));
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();

@@ -38,5 +38,15 @@ namespace ProofGeneration.Util
 
             return sb.ToString();
         }
+
+        public static string IsaToMLThm(string isaThm)
+        {
+            return "@{thm " + isaThm + "}";
+        }
+
+        public static string ContextAntiquotation()
+        {
+            return "@{context}";
+        }
     }
 }

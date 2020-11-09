@@ -1,4 +1,6 @@
-﻿using Microsoft.Boogie;
+﻿using System;
+using System.Collections;
+using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
@@ -124,7 +126,9 @@ namespace ProofGeneration
                     passiveToOrigVar.Add(vPassive, vOrig);
                 } else
                 {
-                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer), "Cannot predict mapping between passive and original variable");
+                    //TODO
+                    Console.Error.WriteLine("Cannot predict mapping between passive and original variable");
+                    //throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer), "Cannot predict mapping between passive and original variable");
                 }
             } 
         }
@@ -207,14 +211,21 @@ namespace ProofGeneration
                 out VCInstantiation<VCAxiom> vcinstAxiom,
                 out IVCVarFunTranslator vcTranslator,
                 out IEnumerable<Function> vcFunctions);
+
             
             var lemmaNamer = new IsaUniqueNamer();
 
             var fixedVarTranslation = new DeBruijnFixedVarTranslation(finalProgData);
             var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
-
-            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, vcFunctions, vcTranslator, varTranslationFactory);
+            
+            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", 
+                afterPassificationImpl.Name, 
+                finalProgData, varTranslationFactory, 
+                afterPassificationCfg, 
+                out IList<OuterDecl> programDecls,
+                out IDictionary<Block, OuterDecl> blockToDecl);
+            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, vcFunctions, blockToDecl, vcTranslator, varTranslationFactory);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
             // ignore peephole for now
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
@@ -228,9 +239,7 @@ namespace ProofGeneration
                 afterPassificationDecls.AddRange(v);
             }
             //afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
-          
-
-            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", afterPassificationImpl.Name, finalProgData, varTranslationFactory, beforeDagCfg, out IList<OuterDecl> programDecls);
+            
             afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
                 afterUnreachablePruningCfg,
                 programRepr.cfgDeclDef,

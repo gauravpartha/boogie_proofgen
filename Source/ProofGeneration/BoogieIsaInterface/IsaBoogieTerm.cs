@@ -269,13 +269,12 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("FunExp"), fnameAndArgs);
         }
 
-        public static Term MethodCFGBody(Term entryNode, Term nodeSet, Term outEdges, Term nodeToBlock)
+        public static Term MethodCFGBody(Term entryNode, Term outEdges, Term nodeToBlock)
         {
             var mapping =
                 new List<Tuple<string, Term>>()
                 {
                     new Tuple<string, Term>("entry", entryNode),
-                    new Tuple<string, Term>("nodes", nodeSet),
                     new Tuple<string, Term>("out_edges", outEdges),
                     new Tuple<string, Term>("node_to_block", nodeToBlock)
                 };

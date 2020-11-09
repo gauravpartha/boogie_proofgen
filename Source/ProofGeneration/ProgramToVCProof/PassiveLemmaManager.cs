@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
@@ -37,11 +38,14 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly IVCVarFunTranslator vcTranslator;
 
-        private readonly AssumptionManager assmManager; 
+        private readonly AssumptionManager assmManager;
+
+        private readonly IDictionary<Block, OuterDecl> blockToDecl;
 
         public PassiveLemmaManager(VCInstantiation<Block> vcinst, 
             BoogieMethodData methodData, 
             IEnumerable<Function> vcFunctions, 
+            IDictionary<Block, OuterDecl> blockToDecl,
             IVCVarFunTranslator vcTranslator,
             IVariableTranslationFactory variableFactory)
         {
@@ -49,6 +53,7 @@ namespace ProofGeneration.ProgramToVCProof
             this.methodData = methodData;
             programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
             initState = IsaBoogieTerm.Normal(normalInitState);
+            this.blockToDecl = blockToDecl;
             this.vcTranslator = vcTranslator;
             this.variableFactory = variableFactory;
             cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer, variableFactory);
@@ -72,8 +77,8 @@ namespace ProofGeneration.ProgramToVCProof
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
         {
-            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(blockToDecl[block].name), 
+                initState, finalState);
 
             List<Term> assumptions = new List<Term>() { cmdsReduce };
             assumptions.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
@@ -176,6 +181,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms " + globalAssmsName,
+                    "unfolding " + blockToDecl[b].name + "_def",
                     "apply cases",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (handle_cmd_list_full?)",
@@ -186,10 +192,12 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms ",
+                    "unfolding " + blockToDecl[b].name + "_def",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
-                    "apply (tactic \\<open> boogie_vc_tac @{context} @{thms "+ globalAssmsName + "} " + "@{thm forall_poly_thm} " + vcHintsName + " \\<close>)",
+                    "apply (tactic \\<open> boogie_vc_tac @{context} @{thms " + globalAssmsName + "} " +
+                    "@{thm forall_poly_thm} " + vcHintsName + " \\<close>)",
                     "by (auto?)"
-                };                    
+                };
             }
 
             return new Proof(methods);

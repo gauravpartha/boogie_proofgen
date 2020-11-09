@@ -38,6 +38,16 @@ namespace ProofGeneration.ProgramToVCProof
         {
             return term.Aggregate((arg, res) => new TermBinary(arg, res, bop));
         }
+        
+        
+        public static Term ClosednessAssumption(Term absValTyMap)
+        {
+            Identifier boundVar = new SimpleIdentifier("v");
+            return TermQuantifier.MetaAll(new List<Identifier>{boundVar},
+                null,
+                IsaBoogieTerm.IsClosedType(IsaBoogieTerm.TypeToVal(absValTyMap, new TermIdent(boundVar)))
+            );
+        }
 
         public static Term StateVariableAssumption(Variable v, 
             Term state,
@@ -151,10 +161,13 @@ namespace ProofGeneration.ProgramToVCProof
                         .Where(t => t != null );
 
             List<Term> boogieFunTyArgs = boundTypeVars.Select(id => (Term) new TermIdent(id)).ToList();
-            IEnumerable<Term> vcFunTyArgs =
-                f.TypeParameters.Where(tv => explicitTypeVars.Contains(tv))
-                    .Select((tv, idx) => IsaBoogieVC.TyToClosed(boogieFunTyArgs[idx])
-                );
+            List<Term> vcFunTyArgs = new List<Term>();
+            f.TypeParameters.ZipDo(boogieFunTyArgs, (tv, tvTerm) =>
+            {
+                if (explicitTypeVars.Contains(tv))
+                    vcFunTyArgs.Add(IsaBoogieVC.TyToClosed(tvTerm));
+            });
+            
             List<Term> boogieFunValArgs =
                 f.InParams.Select(
                     (v, idx) => converter.ConvertToBoogieVal(v.TypedIdent.Type, new TermIdent(boundParamVars[idx]))

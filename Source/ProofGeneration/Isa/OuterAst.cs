@@ -173,14 +173,10 @@ namespace ProofGeneration.Isa
             NORMAL, PROOF, VAL
         }
 
-        public MLDecl(string code, MLKind kind) : base("ML")
+        public MLDecl(string code, MLKind kind = MLKind.NORMAL) : base("ML")
         {
             this.code = code;
             this.kind = kind;
-        }
-
-        public MLDecl(string code) : this(code, MLKind.NORMAL)
-        {
         }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)

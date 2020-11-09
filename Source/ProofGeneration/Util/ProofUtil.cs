@@ -32,6 +32,11 @@ namespace ProofGeneration.Util
             return baseTheorem + "[OF " + IsaPrettyPrinterHelper.SpaceAggregate(inputTheorems) + "]";
         }
 
+        public static string MLTactic(string tactic, int subgoal)
+        {
+            return "apply (tactic \\<open> " + tactic + " " + subgoal + "\\<close>)";
+        }
+
         public static string TryRepeatConjI()
         {
             return "tryRepeatConjI";
