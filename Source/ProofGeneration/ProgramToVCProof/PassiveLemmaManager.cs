@@ -169,8 +169,12 @@ namespace ProofGeneration.ProgramToVCProof
 
             LemmasDecl forallPolyThm = 
                 new LemmasDecl("forall_poly_thm", new List<string> {"forall_vc_type[OF " + closedAssm + "]"});
+            
+            // if One_nat_def is not removed from the simpset, then there is an issue with the assumption "ns 1 = ...",
+            // since Isabelle rewrites it to Suc 0 and a subsequent step in the proof may fail
+            DeclareDecl decl = new DeclareDecl("Nat.One_nat_def[simp del]");
 
-            return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm };
+            return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm, decl };
         }
 
         private Proof BlockCorrectProof(Block b, string vcHintsName)
