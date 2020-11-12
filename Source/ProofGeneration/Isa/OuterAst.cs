@@ -164,6 +164,22 @@ namespace ProofGeneration.Isa
         }
     }
 
+    public class DeclareDecl : OuterDecl
+    {
+        public readonly string declaration;
+
+        public DeclareDecl(string declaration) : base("Declare")
+        {
+            this.declaration = declaration;
+        }
+
+        public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
+        {
+            return visitor.VisitDeclareDecl(this);
+        }
+    }
+        
+
     public class MLDecl : OuterDecl
     {
         public readonly string code;

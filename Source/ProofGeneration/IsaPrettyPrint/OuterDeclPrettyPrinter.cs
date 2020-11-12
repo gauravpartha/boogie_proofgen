@@ -133,6 +133,12 @@ namespace ProofGeneration.IsaPrettyPrint
             return 0;
         }
 
+        public override int VisitDeclareDecl(DeclareDecl d)
+        {
+            _sb.AppendLine("declare " + d.declaration);
+            return 0;
+        }
+
         public override int VisitMLDecl(MLDecl d)
         {
             _sb.Append(d.GetDeclId());

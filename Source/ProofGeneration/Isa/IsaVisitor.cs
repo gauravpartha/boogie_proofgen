@@ -20,6 +20,8 @@ namespace ProofGeneration.Isa
 
         public abstract R VisitLocaleDecl(LocaleDecl d);
 
+        public abstract R VisitDeclareDecl(DeclareDecl d);
+
         public abstract R VisitMLDecl(MLDecl d);
     }
 
