@@ -143,7 +143,7 @@ namespace ProofGeneration
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            ReturnResult(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl));            
+            ReturnResult(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl, out _));            
             return node;
         }
 

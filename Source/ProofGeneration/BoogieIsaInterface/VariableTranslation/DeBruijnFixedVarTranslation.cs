@@ -40,13 +40,14 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             if (paramsAndLocalMapping.TryGetValue(variable, out int localResult))
             {
                 return localResult;
-            } else if(globalsMapping.TryGetValue(variable, out int globalResult))
+            }
+
+            if(globalsMapping.TryGetValue(variable, out int globalResult))
             {
                 return globalResult;
-            } else
-            {
-                throw new ProofGenUnexpectedStateException(GetType(), "cannot find variable " + variable);
             }
+
+            throw new ProofGenUnexpectedStateException(GetType(), "cannot find variable " + variable);
         }
 
     }

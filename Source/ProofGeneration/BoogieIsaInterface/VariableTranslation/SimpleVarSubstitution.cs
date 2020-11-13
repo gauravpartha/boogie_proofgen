@@ -31,13 +31,15 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             throw new System.NotImplementedException();
         }
 
-        public Term TranslateVariable(T variable)
+        public Term TranslateVariable(T variable, out bool isBoundVar)
         {
+            isBoundVar = false;
             return substitution[variable];
         }
 
-        public bool TryTranslateVariableId(T variable, out Term id)
+        public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
         {
+            isBoundVar = false;
             throw new System.NotSupportedException();
         }
     }

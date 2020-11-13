@@ -14,6 +14,7 @@ namespace ProofGeneration
     {
         private MultiCmdIsaVisitor cmdIsaVisitor;
         private IVariableTranslationFactory varTranslationFactory;
+        private BoogieVariableTranslation varTranslation;
 
         public IsaProgramRepr GetIsaProgram(
             string localeName,
@@ -26,6 +27,7 @@ namespace ProofGeneration
             )
         {
             this.varTranslationFactory = varTranslationFactory;
+            varTranslation = varTranslationFactory.CreateTranslation();
             cmdIsaVisitor = new MultiCmdIsaVisitor(varTranslationFactory);
             Term entry = new IntConst(Microsoft.BaseTypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
 
@@ -40,6 +42,10 @@ namespace ProofGeneration
             OuterDecl parameters = GetVariableDeclarationsIsa("inParams", procName, methodData.InParams);
             OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, methodData.Locals);
 
+            TermList modifiedVariables = new TermList(new List<Term>()); //TODO
+            OuterDecl preconditions = GetPreconditionsIsa(procName, methodData.Preconditions);
+            OuterDecl postconditions = GetPostconditionsIsa(procName, methodData.Postcondtions);
+
             Term methodBodyCFG =
                 IsaBoogieTerm.MethodCFGBody(
                     entry, IsaCommonTerms.TermIdentFromName(outEdges.name), IsaCommonTerms.TermIdentFromName(nodesToBlocks.name)
@@ -47,7 +53,16 @@ namespace ProofGeneration
 
             DefDecl methodBodyDecl = GetMethodBodyCFGDecl(procName, methodBodyCFG);
 
-            Term method = IsaBoogieTerm.Method(procName, methodData.TypeParams.Count(), IsaCommonTerms.TermIdentFromName(parameters.name), IsaCommonTerms.TermIdentFromName(localVariables.name), IsaCommonTerms.TermIdentFromName(methodBodyDecl.name));
+            Term method = IsaBoogieTerm.Method(
+                procName, 
+                methodData.TypeParams.Count(), 
+                IsaCommonTerms.TermIdentFromName(parameters.name), 
+                IsaCommonTerms.TermIdentFromName(localVariables.name), 
+                modifiedVariables,
+                IsaCommonTerms.TermIdentFromName(preconditions.name),
+                IsaCommonTerms.TermIdentFromName(postconditions.name),
+                IsaCommonTerms.TermIdentFromName(methodBodyDecl.name)
+                    );
 
             //TODO: global variables
             Term program = IsaBoogieTerm.Program(IsaCommonTerms.TermIdentFromName(funcs.name),
@@ -67,7 +82,7 @@ namespace ProofGeneration
             decls.AddRange(
                 new List<OuterDecl>()
                 {
-                    outEdges, nodesToBlocks, funcs, axiomsDecl, parameters, localVariables, methodBodyDecl, programDefinition
+                    outEdges, nodesToBlocks, funcs, axiomsDecl, parameters, localVariables, preconditions, postconditions, methodBodyDecl, programDefinition
                 });
 
             return new IsaProgramRepr(
@@ -159,22 +174,47 @@ namespace ProofGeneration
 
         private DefDecl GetVariableDeclarationsIsa(string varKind, string methodName, IEnumerable<Variable> variables)
         {
-            var typeIsaVisitor = new TypeIsaVisitor(varTranslationFactory.CreateTranslation().TypeVarTranslation);
+            var typeIsaVisitor = new TypeIsaVisitor(varTranslation.TypeVarTranslation);
 
             var vdecls = new List<Term>();
 
             foreach (var v in variables)
             {
-                Term vName = new StringConst(v.Name);
-                Term vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
-
-                vdecls.Add( vType ); 
+                if (varTranslation.VarTranslation.TryTranslateVariableId(v, out Term resId, out bool isBoundVar))
+                {
+                    Term vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
+                    vdecls.Add(new TermTuple(new List<Term> {resId, vType}));
+                }
+                else
+                {
+                    throw new ProofGenUnexpectedStateException(GetType(),"Cannot translate variable " + v.Name);
+                }
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(vdecls));
             return new DefDecl(varKind + "_vdecls_" + methodName, equation);
         }
 
+        private DefDecl GetPreconditionsIsa(string methodName, IEnumerable<Requires> pres)
+        {
+            return GetExprListIsa("pre_"+methodName, new Func<Requires,Expr>(r => r.Condition), pres);
+        }
+
+        private DefDecl GetPostconditionsIsa(string methodName, IEnumerable<Ensures> post)
+        {
+            return GetExprListIsa("post_"+methodName, new Func<Ensures,Expr>(r => r.Condition), post);
+        }
+
+        private DefDecl GetExprListIsa<T>(string declName, Func<T, Expr> elemToExpr, IEnumerable<T> elems)
+        {
+            var result = new List<Term>();
+            foreach (var elem in elems)
+            {
+               result.Add(cmdIsaVisitor.Translate(elemToExpr(elem)).First()); 
+            }
+            return new DefDecl(declName, new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(result)));
+        }
+        
         private DefDecl GetMethodBodyCFGDecl(string methodName, Term methodBodyCFG)
         {
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), methodBodyCFG);

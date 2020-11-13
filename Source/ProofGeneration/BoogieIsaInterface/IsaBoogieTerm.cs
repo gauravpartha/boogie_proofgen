@@ -18,6 +18,13 @@ namespace ProofGeneration
         private readonly static TermIdent boolVId = IsaCommonTerms.TermIdentFromName("BoolV");
         private readonly static TermIdent intLitId = IsaCommonTerms.TermIdentFromName("LInt");
         private readonly static TermIdent boolLitId = IsaCommonTerms.TermIdentFromName("LBool");
+        
+        private readonly static TermIdent varId = IsaCommonTerms.TermIdentFromName("Var");
+        private readonly static TermIdent bvarId = IsaCommonTerms.TermIdentFromName("BVar");
+        
+        private readonly static TermIdent lookupVarId = IsaCommonTerms.TermIdentFromName("lookup_var");
+        private readonly static TermIdent localStateId = IsaCommonTerms.TermIdentFromName("local_state");
+        private readonly static TermIdent globalStateId = IsaCommonTerms.TermIdentFromName("global_state");
 
         private readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
         private readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
@@ -54,11 +61,14 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("Var"), new List<Term>() { stringConst });
         }
 
-        public static Term Var(int i)
+        public static Term VariableConstr(int i, bool isBoundVar)
         {
             Contract.Requires(i >= 0);
             Term natConst = new NatConst(i);
-            return new TermApp(IsaCommonTerms.TermIdentFromName("Var"), new List<Term>() { natConst });
+            if(!isBoundVar)
+                return new TermApp(varId, new List<Term>() { natConst });
+                
+            return new TermApp(bvarId, new List<Term>() { natConst });
         }
 
         public static Term BVar(int i)
@@ -122,9 +132,23 @@ namespace ProofGeneration
 
         public static Term BoolVal(Term b)
         {
-            return new TermApp(boolVId, new List<Term>() { b });
+            return new TermApp(boolVId, b );
         }
 
+        public static Term LookupVar(Term varContext, Term normalState, Term var)
+        {
+            return new TermApp(lookupVarId, new List<Term> {varContext, normalState, var});
+        }
+        public static Term LocalState(Term normalState)
+        {
+            return new TermApp(localStateId, normalState);
+        }
+
+        public static Term GlobalState(Term normalState)
+        {
+            return new TermApp(globalStateId, normalState);
+        }
+        
         public static Term Assert(Term arg)
         {
             return new TermApp(IsaCommonTerms.TermIdentFromName("Assert"), new List<Term>() { arg });
@@ -282,7 +306,14 @@ namespace ProofGeneration
             return new TermRecord(mapping);
         }
 
-        public static Term Method(string methodName, int numTypeParams, Term parameters, Term localVars, Term methodCFGBody)
+        public static Term Method(string methodName, 
+            int numTypeParams, 
+            Term parameters, 
+            Term localVars, 
+            Term modifiedVariables, 
+            Term pres, 
+            Term posts, 
+            Term methodCFGBody)
         {
             var elements =
                 new List<Term>()
@@ -291,6 +322,8 @@ namespace ProofGeneration
                     new NatConst(numTypeParams),
                     parameters,
                     localVars,
+                    modifiedVariables,
+                    new TermTuple(new List<Term>() {pres, posts}),
                     methodCFGBody
                 };
 
@@ -327,6 +360,7 @@ namespace ProofGeneration
                 new List<Term>()
                 {
                     boogieContext.absValTyMap,
+                    boogieContext.methodContext,
                     boogieContext.varContext,
                     boogieContext.funContext,
                     boogieContext.rtypeEnv,
@@ -344,6 +378,7 @@ namespace ProofGeneration
                 new List<Term>()
                 {
                     boogieContext.absValTyMap,
+                    boogieContext.methodContext,
                     boogieContext.varContext,
                     boogieContext.funContext,
                     boogieContext.rtypeEnv,
@@ -444,14 +479,14 @@ namespace ProofGeneration
             return new TermApp(funInterpSingleWfId, new List<Term> { absValTyMap, fdecl, fun });
         }
 
-        public static Term StateWf(Term absValTyMap, Term typeEnv, Term vdecls, Term state)
+        public static Term StateWf(Term absValTyMap, Term typeEnv, Term vdecls, Term normalState)
         {
-            return new TermApp(stateWfId, new List<Term> { absValTyMap, typeEnv, state, vdecls });
+            return new TermApp(stateWfId, new List<Term> { absValTyMap, typeEnv, normalState, vdecls });
         }
 
-        public static Term AxiomSat(Term absValTyMap, Term funContext, Term axioms, Term normalState)
+        public static Term AxiomSat(Term absValTyMap, Term varContext, Term funContext, Term axioms, Term normalState)
         {
-            return new TermApp(axiomsSatId, new List<Term> { absValTyMap, funContext, normalState, axioms });
+            return new TermApp(axiomsSatId, new List<Term> { absValTyMap, varContext, funContext, normalState, axioms });
         }
 
         public static Term IsClosedType(Term ty)

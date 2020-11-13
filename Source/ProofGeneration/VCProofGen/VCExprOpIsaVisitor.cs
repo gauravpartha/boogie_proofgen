@@ -20,6 +20,7 @@ namespace ProofGeneration.VCProofGen
             _uniqueNamer = functionNamer;
             var boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
+                IsaCommonTerms.TermIdentFromName("M"),
                 IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
                 IsaCommonTerms.TermIdentFromName("\\<Omega>"));

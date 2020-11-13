@@ -36,7 +36,7 @@ namespace ProofGeneration
 
         public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
         {
-            ReturnResult(typeVarTranslation.TranslateVariable(node));
+            ReturnResult(typeVarTranslation.TranslateVariable(node, out _));
             return node;
         }
 

@@ -5,7 +5,5 @@
         BoogieVariableTranslation CreateTranslation();
 
         BoogieVariableTranslation CreateEmptyTranslation();
-
-        BoogieVariableTranslation CreateOnlyGlobalTranslation();
     }
 }

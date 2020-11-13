@@ -10,13 +10,18 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 
         private readonly LinkedList<T> boundVariables = new LinkedList<T>();
 
-        private readonly Func<int, Term> variableConstructor;
+        private readonly Func<int,bool, Term> variableConstructor;
+
+        private readonly bool shiftFixedVar = false;
 
 
-        public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation, Func<int, Term> variableConstructor)
+        /// <param name="variableTranslation">Translation of non-bound variables in the context</param>
+        /// <param name="variableConstructor">Function that constructs a Variable term given the integer id and whether it is bound or not</param>
+        public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation, Func<int, bool, Term> variableConstructor, bool shiftFixedVar)
         {
             this.variableTranslation = variableTranslation;
             this.variableConstructor = variableConstructor;
+            this.shiftFixedVar = shiftFixedVar;
         }
 
         public void AddBoundVariable(T boundVar)
@@ -34,10 +39,10 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             return boundVariables.Count;
         }
         
-        private int TranslateVariableIdx(T variable)
+        private int TranslateVariableIdx(T variable, out bool isBoundVar)
         {
             int i = 0;
-            bool isBoundVar = false;
+            isBoundVar = false;
             for (var curNode = boundVariables.Last; curNode != null; curNode = curNode.Previous)
             {
                 if (curNode.Value.Equals(variable))
@@ -52,21 +57,20 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             {
                 return i;
             }
-            else
-            {
-                //variable is not bound, need to shift id by number of quantifiers
-                return variableTranslation.VariableId(variable) + i;
-            }
+            
+            //variable is not bound
+            return (shiftFixedVar ? i + variableTranslation.VariableId(variable) : variableTranslation.VariableId(variable));
         }
 
-        public Term TranslateVariable(T variable)
+        public Term TranslateVariable(T variable, out bool isBoundVar)
         {
-            return variableConstructor(TranslateVariableIdx(variable));
+            int idResult = TranslateVariableIdx(variable, out isBoundVar);
+            return variableConstructor(idResult, isBoundVar);
         }
 
-        public bool TryTranslateVariableId(T variable, out Term id)
+        public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
         {
-            id = new IntConst(TranslateVariableIdx(variable));
+            id = new IntConst(TranslateVariableIdx(variable, out isBoundVar));
             return true;
         }
     }

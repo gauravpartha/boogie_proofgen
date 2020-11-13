@@ -16,6 +16,7 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent SetOfListId = TermIdentFromName("set");
         private static readonly TermIdent MemberId = TermIdentFromName("Set.member");
 
+        public static TermIdent EmptyList => TermIdentFromName("[]");
         public static Term Let(Identifier boundVar, TypeIsa boundVarType, Term termSubst, Term body)
         {
             return new TermApp(
@@ -77,7 +78,7 @@ namespace ProofGeneration.Isa
         {
             return new TermApp(AppendId, new List<Term> { list1, list2 });
         }
-
+        
         public static Term SetOfList(Term list)
         {
             return new TermApp(SetOfListId, list);

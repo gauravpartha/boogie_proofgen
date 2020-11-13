@@ -49,13 +49,15 @@ namespace ProofGeneration.ProgramToVCProof
             );
         }
 
-        public static Term StateVariableAssumption(Variable v, 
+        public static Term LocalStateVariableAssumption(Variable v, 
+            Term varContext,
             Term state,
             IDictionary<NamedDeclaration, Term> declToVCMapping,
             IVariableTranslation<Variable> varTranslation)
         {
-            return StateVariableAssumption(v, state, declToVCMapping[v], varTranslation);
+            return LocalStateVariableAssumption(v, varContext, state, declToVCMapping[v], varTranslation);
         }
+        
         public static Term VariableTypeAssumption(
             Variable v,
             Term vcVar,
@@ -85,11 +87,11 @@ namespace ProofGeneration.ProgramToVCProof
             return new TypeIsaVisitor(typeVarTranslation);
         }
 
-        public static Term StateVariableAssumption(Variable v, Term state, Term vcVar, IVariableTranslation<Variable> varTranslation)
+        public static Term LocalStateVariableAssumption(Variable v, Term varContext,  Term normalState, Term vcVar, IVariableTranslation<Variable> varTranslation)
         {
-            if (varTranslation.TryTranslateVariableId(v, out Term varId))
+            if (varTranslation.TryTranslateVariableId(v, out Term varId, out bool isBoundVar) && !isBoundVar)
             {
-                Term left = new TermApp(state, varId);
+                Term left = IsaBoogieTerm.LookupVar(varContext, normalState, varId); 
                 Term right =
                     IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
                 return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);

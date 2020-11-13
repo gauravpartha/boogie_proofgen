@@ -59,6 +59,7 @@ namespace ProofGeneration.ProgramToVCProof
             cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer, variableFactory);
             boogieContext = new BoogieContextIsa(
               IsaCommonTerms.TermIdentFromName("A"),
+              IsaCommonTerms.TermIdentFromName("M"),
               IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
               IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
               IsaCommonTerms.TermIdentFromName("\\<Omega>")

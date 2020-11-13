@@ -104,7 +104,7 @@ namespace ProofGeneration.ProgramToVCProof
                     assumptions.Add(LemmaHelper.FunctionVcCorresAssm(f, funInterpMapping, declToVCMapping, boogieContext));
                 } else if (obj is Variable v)
                 {
-                    assumptions.Add(LemmaHelper.StateVariableAssumption(v,state, declToVCMapping, varTranslation));
+                    assumptions.Add(LemmaHelper.LocalStateVariableAssumption( v, boogieContext.varContext,state, declToVCMapping, varTranslation));
                     if (!TypeUtil.IsPrimitive(v.TypedIdent.Type))
                     {
                         assumptions.Add(LemmaHelper.VariableTypeAssumption(

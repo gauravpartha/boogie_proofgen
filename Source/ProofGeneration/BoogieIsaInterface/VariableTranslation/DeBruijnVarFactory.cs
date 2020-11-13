@@ -6,14 +6,15 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
     class DeBruijnVarFactory : IVariableTranslationFactory
     {
-        private readonly DeBruijnFixedVarTranslation varTranslation;
+        private readonly CounterFixedVarTranslation varTranslation;
         private readonly DeBruijnFixedTVarTranslation tvarTranslation;
         private readonly BoogieGlobalData globalData;
 
-        private readonly Func<int, Term> valueVarConstructor = i => IsaBoogieTerm.Var(i);
-        private readonly Func<int, Term> typeVarConstructor = i => IsaBoogieType.TVar(i);
+        private readonly Func<int, bool, Term> valueVarConstructor = IsaBoogieTerm.VariableConstr;
+        private readonly Func<int, bool, Term> typeVarConstructor = (i,isBound) => IsaBoogieType.TVar(i);
 
-        public DeBruijnVarFactory(DeBruijnFixedVarTranslation varTranslation,
+        public DeBruijnVarFactory(
+            CounterFixedVarTranslation varTranslation,
             DeBruijnFixedTVarTranslation tvarTranslation,
             BoogieGlobalData boogieGlobalData)
         {
@@ -25,24 +26,16 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         public BoogieVariableTranslation CreateTranslation()
         {
             return new BoogieVariableTranslation(
-                    new DeBruijnTranslation<Variable>(varTranslation, valueVarConstructor),
-                    new DeBruijnTranslation<TypeVariable>(tvarTranslation, typeVarConstructor)
+                    new DeBruijnTranslation<Variable>(varTranslation, valueVarConstructor, false),
+                    new DeBruijnTranslation<TypeVariable>(tvarTranslation, typeVarConstructor, true)
                     );
         }
 
         public BoogieVariableTranslation CreateEmptyTranslation()
         {
             return new BoogieVariableTranslation(
-                    new DeBruijnTranslation<Variable>(new DeBruijnFixedVarTranslation(BoogieMethodData.CreateEmpty()), valueVarConstructor),
-                    new DeBruijnTranslation<TypeVariable>(new DeBruijnFixedTVarTranslation(BoogieMethodData.CreateEmpty()), typeVarConstructor)
-                    );
-        }
-
-        public BoogieVariableTranslation CreateOnlyGlobalTranslation()
-        {
-            return new BoogieVariableTranslation(
-                    new DeBruijnTranslation<Variable>(new DeBruijnFixedVarTranslation(BoogieMethodData.CreateOnlyGlobal(globalData)), valueVarConstructor),
-                    new DeBruijnTranslation<TypeVariable>(new DeBruijnFixedTVarTranslation(BoogieMethodData.CreateOnlyGlobal(globalData)), typeVarConstructor)
+                    new DeBruijnTranslation<Variable>(varTranslation, valueVarConstructor, false),
+                    new DeBruijnTranslation<TypeVariable>(new DeBruijnFixedTVarTranslation(BoogieMethodData.CreateEmpty()), typeVarConstructor, true)
                     );
         }
     }

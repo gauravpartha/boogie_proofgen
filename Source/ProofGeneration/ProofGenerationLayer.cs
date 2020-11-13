@@ -73,7 +73,10 @@ namespace ProofGeneration
                 new List<TypeVariable>(impl.TypeParameters),
                 new List<Variable>(impl.InParams),
                 new List<Variable>(impl.LocVars),
-                new List<Variable>(impl.LocVars));
+                new List<Variable>(impl.LocVars),
+                new List<IdentifierExpr>(impl.Proc.Modifies),
+                new List<Requires>(impl.Proc.Requires),
+                new List<Ensures>(impl.Proc.Ensures));
         }
 
         /*
@@ -215,7 +218,7 @@ namespace ProofGeneration
             
             var lemmaNamer = new IsaUniqueNamer();
 
-            var fixedVarTranslation = new DeBruijnFixedVarTranslation(finalProgData);
+            var fixedVarTranslation = new CounterFixedVarTranslation();
             var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
             

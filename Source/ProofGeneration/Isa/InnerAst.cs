@@ -132,6 +132,9 @@ namespace ProofGeneration.Isa
             this.terms = terms;
         }
 
+        public TermTuple(Term t1, Term t2) : this(new List<Term> (){t1, t2})
+        { }
+
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
             return visitor.VisitTermTuple(this);

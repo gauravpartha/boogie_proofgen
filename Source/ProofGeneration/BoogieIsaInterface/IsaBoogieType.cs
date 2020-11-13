@@ -53,12 +53,12 @@ namespace ProofGeneration
 
         public static TypeIsa AbstractValueTyFunType(TypeIsa absValType)
         {
-            return new DataType("absval_ty_fun", new List<TypeIsa>() { absValType });
+            return new DataType("absval_ty_fun", new List<TypeIsa> { absValType });
         }
 
         public static TypeIsa NormalStateType(TypeIsa absValType)
         {
-            return new ArrowType(VnameType(), IsaCommonTypes.GetOptionType(ValType(absValType)));
+            return new DataType("nstate", new List<TypeIsa> { absValType });
         }
 
         public static TypeIsa StateType()
