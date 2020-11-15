@@ -15,6 +15,11 @@ namespace ProofGeneration.Util
             }
         }
 
+        public static string Apply(string s)
+        {
+            return "apply (" + s + ")";
+        }
+
         public static string SimpOnly(params string[] theorems)
         {
             if (theorems.Length == 0)

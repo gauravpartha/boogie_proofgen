@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics.Contracts;
+using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
 
 // Erasure of types using premisses   (forall x :: type(x)=T ==> p(x))
@@ -471,7 +472,10 @@ namespace Microsoft.Boogie.TypeErasure
           untypedFun.Attributes = fun.Attributes;
           res = new UntypedFunction(untypedFun, implicitParams, explicitParams);
           if (U.Equals(types[types.Length - 1]))
-            AddTypeAxiom(GenFunctionAxiom(res, fun));
+          {
+            var functionAxiom = GenFunctionAxiom(res, fun);
+            AddTypeAxiom(functionAxiom, new VcFunctionAxiomInfo(functionAxiom, fun));
+          }
         }
 
         Typed2UntypedFunctions.Add(fun, res);
@@ -584,9 +588,10 @@ namespace Microsoft.Boogie.TypeErasure
     {
       //Contract.Requires(originalType != null);
       //Contract.Requires(var != null);
-      AddTypeAxiom(GenVarTypeAxiom(var, originalType,
+      var varAxiom = GenVarTypeAxiom(var, originalType,
         // we don't have any bindings available
-        new Dictionary<TypeVariable /*!*/, VCExpr /*!*/>()));
+        new Dictionary<TypeVariable /*!*/, VCExpr /*!*/>());
+      AddTypeAxiom(varAxiom, new VarAxiomInfo(var, varAxiom));
     }
 
     public VCExpr GenVarTypeAxiom(VCExprVar var, Type originalType,

@@ -192,7 +192,7 @@ namespace ProofGeneration
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(vdecls));
-            return new DefDecl(varKind + "_vdecls_" + methodName, equation);
+            return new DefDecl(varKind + "_vdecls_" + methodName, IsaBoogieType.VariableDeclsType, equation);
         }
 
         private DefDecl GetPreconditionsIsa(string methodName, IEnumerable<Requires> pres)

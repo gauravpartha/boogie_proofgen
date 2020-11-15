@@ -8,6 +8,7 @@ using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
 using System.Diagnostics.Contracts;
 using Microsoft.BaseTypes;
+using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.VCProofGen;
 
@@ -1735,14 +1736,16 @@ namespace VC
         VCExpr erasedAxioms = eraseVC(declFreeProverContext.Axioms);
 
         VCExpr typeAxioms = null;
+        List<VCAxiomInfo> vcAxiomsInfo = null;
         if (premiseEraserProvider != null) {
-          typeAxioms = premiseEraserProvider.AxiomBuilder.GetNewAxioms();
+          typeAxioms = premiseEraserProvider.AxiomBuilder.GetNewAxiomsAndInfo(out vcAxiomsInfo);
         }
 
         ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(
             erasedVC, 
             erasedAxioms, 
             typeAxioms,
+            vcAxiomsInfo,
             checker.TheoremProver.VCExprGen, 
             checker.TheoremProver.Context.BoogieExprTranslator,
             premiseEraserProvider?.AxiomBuilder);

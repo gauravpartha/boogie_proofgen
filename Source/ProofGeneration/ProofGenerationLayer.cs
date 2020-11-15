@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
+using Microsoft.Boogie.ProofGen;
 using ProofGeneration.Util;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
@@ -182,15 +183,18 @@ namespace ProofGeneration
         }
 
         //axiom builder is null iff types are not erased (since no polymorphism in vc)
-        public static void VCGenerateAllProofs(VCExpr vc, 
+        public static void VCGenerateAllProofs(
+            VCExpr vc, 
             VCExpr vcAxioms, 
-            VCExpr typeAxioms, 
+            VCExpr typeAxioms,
+            List<VCAxiomInfo> typeAxiomInfo,
             VCExpressionGenerator gen, 
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
             List<VCExpr> vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
             int nAxioms = boogieGlobalData.Axioms.Count();
+            
             if (vcBoogieAxioms.Count() != nAxioms + 3)
             {
                 //+3, since we currently ignore the three type ordering axioms
@@ -198,6 +202,15 @@ namespace ProofGeneration
                     "vc axioms not in-sync with Boogie axioms");
             }
 
+            //we get rid of the axioms that are "True"
+            var typeAxiomInfoPruned = typeAxiomInfo.Where(a => !a.Expr.Equals(VCExpressionGenerator.True)).ToList(); 
+            List<VCExpr> vcTypeAxioms = DeconstructAxiomsNoChecks(typeAxioms).ToList();
+            if (vcTypeAxioms.Count != typeAxiomInfoPruned.Count)
+            {
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                    "type axiom info not in-sync with actual type axioms");
+            }
+            
             IEnumerable<VCExpr> vcAllAxioms =  vcBoogieAxioms.GetRange(3,nAxioms).Union(DeconstructAxiomsNoChecks(typeAxioms));
             
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
@@ -211,10 +224,9 @@ namespace ProofGeneration
                 finalProgData,
                 afterUnreachablePruningCfg,
                 out VCInstantiation<Block> vcinst,
-                out VCInstantiation<VCAxiom> vcinstAxiom,
+                out VCInstantiation<VCExpr> vcinstAxiom,
                 out IVCVarFunTranslator vcTranslator,
                 out IEnumerable<Function> vcFunctions);
-
             
             var lemmaNamer = new IsaUniqueNamer();
 
@@ -234,7 +246,8 @@ namespace ProofGeneration
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
 
             //Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
-
+            
+            
             
             List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
             foreach(var v in finalProgramLemmas.Values)
@@ -254,14 +267,18 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
+            List<VCAxiomInfo> allAxiomsInfo = GetBoogieAxiomInfo(boogieGlobalData.Axioms, vcBoogieAxioms.GetRange(3, nAxioms));
+            
+            var vcBoogieInfo = new VcBoogieInfo(vcinst, vcinstAxiom, vcAllAxioms, allAxiomsInfo.Union(typeAxiomInfoPruned));
+
             var endToEnd = new EndToEndVCProof(
                 finalProgData, 
                 programRepr, 
                 vcFunctions, 
-                vcinst, 
-                vcinstAxiom, 
+                vcBoogieInfo,
                 afterUnreachablePruningCfg, 
                 varTranslationFactory,
+                vcTranslator,
                 typePremiseEraserFactory,
                 gen);
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
@@ -271,6 +288,22 @@ namespace ProofGeneration
                 passiveOuterDecls);
 
             StoreTheory(theoryPassive);
+        }
+
+        /// <summary>
+        /// Get axiom information for those the user-defined axioms in the Boogie program.
+        /// <paramref name="vcAxioms" /> may contain more than elements than <paramref name="axioms"/>, but the first
+        /// n axioms should correspond to 
+        /// </summary>
+        private static List<VCAxiomInfo> GetBoogieAxiomInfo(IEnumerable<Axiom> axioms, List<VCExpr> vcAxioms)
+        {
+            var result = new List<VCAxiomInfo>();
+            axioms.ZipDo(vcAxioms, (axiom, expr) =>
+            {
+               result.Add(new VcBoogieAxiomInfo(expr, axiom)); 
+            });
+
+            return result;
         }
 
         private static IEnumerable<VCExpr> DeconstructAxiomsNoChecks(VCExpr vcAxioms)

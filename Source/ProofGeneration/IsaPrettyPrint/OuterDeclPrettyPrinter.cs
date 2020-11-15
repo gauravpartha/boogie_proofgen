@@ -32,6 +32,11 @@ namespace ProofGeneration.IsaPrettyPrint
         public override int VisitDefDecl(DefDecl d)
         {
             _sb.Append("definition ").Append(d.name);
+            if (d.type != null)
+            {
+                _sb.Append(" :: ");
+                AppendInner(_typeIsaPrinter.Visit(d.type));
+            }
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(2));
 

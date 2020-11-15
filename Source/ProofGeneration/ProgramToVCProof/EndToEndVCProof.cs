@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
+using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
 using Type = Microsoft.Boogie.Type;
 
@@ -23,16 +24,16 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IsaProgramRepr isaProgramRepr;
 
         private readonly IEnumerable<Function> vcFunctions;
-        private readonly VCInstantiation<Block> vcinst;
-        private readonly VCInstantiation<VCAxiom> vcinstAxiom;
+        private readonly VcBoogieInfo vcBoogieInfo;
         private readonly CFGRepr cfg;
 
         private readonly IVariableTranslationFactory varTranslationFactory;
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
         private readonly PureValueIsaTransformer pureValueIsaTransformer = new PureValueIsaTransformer();
         private readonly TypeIsaVisitor typeIsaVisitor;
+        private readonly IVCVarFunTranslator vcVarFunTranslator;
         private readonly IsaUniqueNamer stateCorresNamer = new IsaUniqueNamer();
-
+        
         private IDictionary<Axiom, int> axiomIdDict = null;
 
         private IEnumerable<Variable> ProgramVariables
@@ -58,29 +59,32 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly string vcAssmName = "VC";
         private readonly string closedAssmName = "Closed";
+        private readonly string nonEmptyTypesAssmName = "NonEmptyTypes";
         private readonly string finterpAssmName = "FInterp";
         private readonly string axiomAssmName = "Axioms";
         private readonly string paramsLocalsAssmName = "ParamsLocal";
         private readonly string RedAssmName = "Red";
+        private readonly string ctorDeclListName = "ctor_list";
+        private readonly string ctorName = "ctor";
 
         public EndToEndVCProof(
             BoogieMethodData methodData,
             IsaProgramRepr isaProgramRepr,
             IEnumerable<Function> vcFunctions, 
-            VCInstantiation<Block> vcinst,
-            VCInstantiation<VCAxiom> vcinstAxiom,
+            VcBoogieInfo vcBoogieInfo,
             CFGRepr cfg,
             IVariableTranslationFactory varTranslationFactory,
+            IVCVarFunTranslator vcVarFunTranslator,
             TypePremiseEraserFactory eraserFactory,
             VCExpressionGenerator vcExprGen)
         {
             this.methodData = methodData;
             this.vcFunctions = vcFunctions;
             this.isaProgramRepr = isaProgramRepr;
-            this.vcinst = vcinst;
-            this.vcinstAxiom = vcinstAxiom;
+            this.vcBoogieInfo = vcBoogieInfo;
             this.cfg = cfg;
             this.varTranslationFactory = varTranslationFactory;
+            this.vcVarFunTranslator = vcVarFunTranslator;
             this.eraserFactory = eraserFactory;
             this.vcExprGen = vcExprGen;
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(varTranslationFactory);
@@ -103,6 +107,8 @@ namespace ProofGeneration.ProgramToVCProof
             result.AddRange(membershipLemmas);
             result.AddRange(VCFunDefinitions().Values);
             result.AddRange(FunCorresLemmas().Values);
+            result.AddRange(ctorFun(vcBoogieInfo.VcAxiomsInfo));
+            result.Add(new DeclareDecl("One_nat_def[simp del]"));
             result.Add(FinalLemma());
             return result;
         }
@@ -517,10 +523,10 @@ namespace ProofGeneration.ProgramToVCProof
                 declTypes.Add(typeIsa);
             }
             
-            Term vcAssmWithoutAxioms = vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping);
+            Term vcAssmWithoutAxioms = vcBoogieInfo.VcInst.GetVCObjInstantiation(cfg.entry, declToVCMapping);
 
-            Term vcAssm = vcinstAxiom.Keys.Reverse().Aggregate(vcAssmWithoutAxioms, (current, vcAx) => 
-                new TermBinary(vcinstAxiom.GetVCObjInstantiation(vcAx, declToVCMapping), current, TermBinary.BinaryOpCode.META_IMP));
+            Term vcAssm = vcBoogieInfo.VcAxioms.Reverse().Aggregate(vcAssmWithoutAxioms, (current, vcAx) => 
+                new TermBinary(vcBoogieInfo.VcInstAxiom.GetVCObjInstantiation(vcAx, declToVCMapping), current, TermBinary.BinaryOpCode.META_IMP));
 
             /*List<TypeIsa> declTypes = methodData.Functions.Select(f => pureTyIsaTransformer.Translate(f)).ToList();
             declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));*/
@@ -529,6 +535,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term funContext = new TermTuple(new List<Term> { isaProgramRepr.funcsDeclDef, boogieContext.funContext });
 
             Term closedAssm = LemmaHelper.ClosednessAssumption(boogieContext.absValTyMap);
+            Term nonEmptyTypesAssm = LemmaHelper.NonEmptyTypesAssumption(boogieContext.absValTyMap);
             Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, isaProgramRepr.funcsDeclDef, boogieContext.funContext);
             //TODO constants
             //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
@@ -551,9 +558,96 @@ namespace ProofGeneration.ProgramToVCProof
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
             var contextElem = ContextElem.CreateWithAssumptions(
-                new List<Term> { vcAssm, closedAssm, finterpAssm, axiomAssm, paramsAssm, multiRed },
-                new List<string> { vcAssmName, closedAssmName, finterpAssmName, axiomAssmName, paramsLocalsAssmName, RedAssmName });
+                new List<Term> { vcAssm, closedAssm, nonEmptyTypesAssm, finterpAssm, axiomAssm, paramsAssm, multiRed },
+                new List<string> { vcAssmName, closedAssmName, nonEmptyTypesAssmName, finterpAssmName, axiomAssmName, paramsLocalsAssmName, RedAssmName });
             return new LemmaDecl("endToEnd", contextElem, conclusion, FinalProof());
+        }
+
+        private string ctorLemmaName(Type type)
+        {
+            return ctorName + "_" + type;
+        }
+
+        private string ctorLemmaName(TypeCtorDecl decl)
+        {
+            return ctorName + "_" + decl.Name;
+        }
+        
+        private List<OuterDecl> ctorFun(IEnumerable<VCAxiomInfo> vcAxiomsInfo)
+        {
+            List<Tuple<IList<Term>, Term>> funEquations = new List<Tuple<IList<Term>, Term>>();
+            List<Term> typeConstrCtorList = new List<Term>();
+            List<LemmaDecl> lemmas = new List<LemmaDecl>();
+
+            Term ctorFun = IsaCommonTerms.TermIdentFromName(ctorName);
+            Func<Type, Term, int, LemmaDecl> basicTypeLemma = (ty, tyTerm, ctorValue) =>
+            {
+                return
+                    new LemmaDecl(ctorLemmaName(ty),
+                        TermBinary.Eq(new TermApp(ctorFun, tyTerm), new IntConst(ctorValue)),
+                        new Proof(new List<string> {"by simp"}));
+            };
+            
+            foreach(var vcAxInfo in vcAxiomsInfo)
+            {
+                if (vcAxInfo is CtorBasicTypeAxiomInfo ctorBasicAxInfo)
+                {
+                    if (ctorBasicAxInfo.Type.IsInt)
+                    {
+                        funEquations.Add(new Tuple<IList<Term>, Term>(
+                            new List<Term>{IsaBoogieType.PrimType(IsaBoogieType.IntType(), true)},
+                            new IntConst(ctorBasicAxInfo.CtorValue)));
+                        lemmas.Add(basicTypeLemma(ctorBasicAxInfo.Type, IsaBoogieType.PrimType(IsaBoogieType.IntType(), true), ctorBasicAxInfo.CtorValue));
+                    } else if (ctorBasicAxInfo.Type.IsBool)
+                    {
+                        funEquations.Add(new Tuple<IList<Term>, Term>(
+                            new List<Term>{IsaBoogieType.PrimType(IsaBoogieType.BoolType(), true)},
+                            new IntConst(ctorBasicAxInfo.CtorValue)));
+                        lemmas.Add(basicTypeLemma(ctorBasicAxInfo.Type, IsaBoogieType.PrimType(IsaBoogieType.BoolType(), true), ctorBasicAxInfo.CtorValue));
+                    }
+                    else
+                    {
+                        throw new NotImplementedException();
+                    }
+                } else if (vcAxInfo is CtorDeclAxiomInfo ctorDeclAxInfo)
+                {
+                    typeConstrCtorList.Add(new TermTuple(
+                        new StringConst(ctorDeclAxInfo.Decl.Name),
+                        new IntConst(ctorDeclAxInfo.CtorValue)));
+
+                    List<Identifier> ids = Enumerable.Range(1, ctorDeclAxInfo.Decl.Arity).Select(i => (Identifier) new SimpleIdentifier("t"+i)).ToList();
+                    var ctorApp =
+                        new TermApp(ctorFun,
+                            new TermApp(
+                                IsaBoogieVC.VCTypeConstructor(ctorDeclAxInfo.Decl.Name, ctorDeclAxInfo.Decl.Arity),
+                                ids.Select(id => (Term) new TermIdent(id)).ToList())
+                        );
+                    var statement = TermQuantifier.ForAll(ids, null,
+                        TermBinary.Eq(ctorApp, new IntConst(ctorDeclAxInfo.CtorValue)));
+                    lemmas.Add(new LemmaDecl(ctorLemmaName(ctorDeclAxInfo.Decl), statement,
+                        new Proof(new List<string> {"by " + ProofUtil.Simp(ctorDeclListName+"_def")})));
+                }
+            }
+
+            var def = new DefDecl(ctorDeclListName,
+                new Tuple<IList<Term>, Term>(new List<Term> { }, new TermList(typeConstrCtorList)));
+            
+            funEquations.Add(new Tuple<IList<Term>, Term>(
+                new List<Term>{IsaCommonTerms.TermIdentFromName("(TConC s _)")},
+                IsaCommonTerms.TheOption(new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), 
+                    new List<Term>{ IsaCommonTerms.TermIdentFromName(ctorDeclListName), IsaCommonTerms.TermIdentFromName("s")})
+                )));
+
+            var result =
+                new List<OuterDecl>
+                {
+                    def,
+                    new FunDecl(ctorName,
+                        new ArrowType(IsaBoogieVC.BoogieClosedType(), new PrimitiveType(Isa.SimpleType.Int)),
+                        funEquations)
+                };
+            result.AddRange(lemmas);
+            return result;
         }
 
         private Proof FinalProof()
@@ -598,8 +692,6 @@ namespace ProofGeneration.ProgramToVCProof
             AppendStateCorres(sb, paramsLocalsAssmName, methodData.Locals);
 
             //axioms
-            Term funContext = new TermTuple(new List<Term> { isaProgramRepr.funcsDeclDef, boogieContext.funContext });
-
             foreach(Axiom ax in methodData.Axioms)
             {
                 Term axiomTerm = basicCmdIsaVisitor.Translate(ax.Expr);
@@ -659,6 +751,8 @@ namespace ProofGeneration.ProgramToVCProof
 
             sb.AppendLine("apply " + ProofUtil.Simp(closedAssmName));
             sb.AppendLine("apply (rule " + vcAssmName + ")");
+            
+            AppendVcAxiomsProof(vcBoogieInfo.VcAxiomsInfo, sb);
 
             /* TODO
             foreach(Axiom ax in methodData.Axioms)
@@ -668,10 +762,78 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine("apply(tactic \\<open> b_vc_expr_rel_tac @{context} " + storedFunctionThms + " [] 1 \\<close>)");
             }
             */
+            
             sb.AppendLine("done");
             sb.AppendLine("qed");
 
             return new Proof(new List<string> { sb.ToString() });
+        }
+
+        private void AppendVcAxiomsProof(IEnumerable<VCAxiomInfo> vcAxiomsInfo, StringBuilder sb)
+        {
+            foreach (var vcAx in vcAxiomsInfo)
+            {
+                sb.AppendLine("unfolding " + vcBoogieInfo.VcInstAxiom.GetVCObjNameRef(vcAx.Expr) + "_def");
+                if (vcAx is VcBoogieAxiomInfo)
+                {
+                    throw new NotImplementedException();
+                } else if (vcAx is VcFunctionAxiomInfo vcFunAxInfo)
+                {
+                    sb.AppendLine(ProofUtil.Apply("fun_output_axiom NonEmptyTypes: " + nonEmptyTypesAssmName));
+                    sb.AppendLine("using closed_inv1 " +
+                                  ProofUtil.OF("finterp_extract_2", 
+                                      finterpAssmName,
+                                      MembershipName(vcFunAxInfo.Function),
+                                      InterpMemName(vcFunAxInfo.Function)) + " " +
+                                  ProofUtil.Apply("simp")
+                    );
+                } else if (vcAx is VarAxiomInfo varAxiomInfo)
+                {
+                    if (vcVarFunTranslator.TranslateVCVar(varAxiomInfo.VcVar, out Variable v))
+                        sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("HOL.conjunct2", MembershipName(v))));
+                    else
+                        throw new ProofGenUnexpectedStateException(GetType(), 
+                            "Can't translate vc variable to Boogie variable");
+                } else if (vcAx is CtorBasicTypeAxiomInfo ctorBasicTyAxiomInfo)
+                {
+                    sb.AppendLine(ProofUtil.Apply("rule " + ctorLemmaName(ctorBasicTyAxiomInfo.Type)));
+                } else if (vcAx is CtorDeclAxiomInfo ctorDeclAxiomInfo)
+                {
+                    sb.AppendLine(ProofUtil.Apply("rule " + ctorLemmaName(ctorDeclAxiomInfo.Decl)));
+                } else if (vcAx is LeftInverseAxiomInfo leftInvInfo)
+                {
+                    sb.AppendLine(ProofUtil.Apply("rule " + IsaBoogieVC.LeftInvLemmaName(leftInvInfo.projectedIdx, leftInvInfo.Decl.Arity)));
+                } else if (vcAx is BasicTypeCastAxiomInfo castAxiomInfo)
+                {
+                    bool isBool = castAxiomInfo.Type.IsBool;
+                    if(!isBool && !castAxiomInfo.Type.IsInt)
+                        throw new ProofGenUnexpectedStateException(GetType(), "only support int and bools as built-in types");
+                    
+                    switch (castAxiomInfo.CastKind)
+                    {
+                        case TypeCastKind.BoxedOfUnboxed:
+                            if (isBool)
+                                sb.AppendLine(ProofUtil.Apply("rule bool_inverse_1"));
+                            else 
+                                sb.AppendLine(ProofUtil.Apply("rule int_inverse_1"));
+                            break;
+                        case TypeCastKind.UnboxedOfBoxed:
+                            if (isBool)
+                                sb.AppendLine(ProofUtil.Apply("rule bool_inverse_2"));
+                            else 
+                                sb.AppendLine(ProofUtil.Apply("rule int_inverse_2"));
+                            break;
+                        case TypeCastKind.TypeOfBoxed:
+                            if (isBool)
+                                sb.AppendLine(ProofUtil.Apply("rule bool_type"));
+                            else 
+                                sb.AppendLine(ProofUtil.Apply("rule int_type"));
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                }
+            }
         }
 
         private void AppendStateCorres(StringBuilder sb, string assm, IEnumerable<Variable> vars)
@@ -699,7 +861,8 @@ namespace ProofGeneration.ProgramToVCProof
                     sb.AppendLine();
                     sb.AppendLine("apply " + ProofUtil.SimpOnly("state_typ_wf_def"));
                     sb.AppendLine("apply (erule allE, erule allE, erule impE, rule " + MembershipName(v) +")");
-                    sb.AppendLine("by (fastforce simp: " + ProofUtil.OF("lookup_var_local","m_y") + " dest: tint_intv tbool_boolv)");
+                    sb.AppendLine("apply (subst " + ProofUtil.OF("lookup_var_local", MembershipName(v)) + ")+");
+                    sb.AppendLine("by (fastforce dest: tint_intv tbool_boolv)");
                 }
             }
         }

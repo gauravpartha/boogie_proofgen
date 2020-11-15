@@ -7,6 +7,9 @@ using ProofGeneration.Isa;
 
 namespace ProofGeneration.ProgramToVCProof
 {
+    /// <summary>
+    /// Responsible for handling assumptions for the VC to final Boogie program proof
+    /// </summary>
     public class AssumptionManager
     {
         private readonly IDictionary<object, List<string>> _assumptionLabelMap = new Dictionary<object, List<string>>();

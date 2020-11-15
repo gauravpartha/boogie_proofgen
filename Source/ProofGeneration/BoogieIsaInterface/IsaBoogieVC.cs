@@ -35,6 +35,13 @@ namespace ProofGeneration.BoogieIsaInterface
             var id = IsaCommonTerms.TermIdentFromName("vc_type_constr" + nArgs);
             return new TermApp(id, new StringConst(constrName));
         }
+
+        public static Term LeftInvLemmaName(int projIdx, int constrArity)
+        {
+            if(projIdx > 4 || constrArity > 5)
+                throw new ArgumentException("only support type constructors with at most 5 arguments");
+            return IsaCommonTerms.TermIdentFromName( "vc_inv_constr_"+constrArity+ projIdx);
+        }
         
         public static TypeIsa BoogieClosedType()
         {

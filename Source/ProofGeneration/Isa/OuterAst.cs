@@ -51,13 +51,21 @@ namespace ProofGeneration.Isa
 
     public class DefDecl : OuterDecl
     {
-        /* arguments and right hand side */
+        // if type is null, then type is inferred
+        public readonly TypeIsa type;
+        
+        // arguments and right hand side 
         public readonly Tuple<IList<Term>, Term> equation;
 
-        public DefDecl(string name, Tuple<IList<Term>, Term> equation) : base(name)
+        public DefDecl(string name, TypeIsa type, Tuple<IList<Term>, Term> equation) : base(name)
         {
+            this.type = type;
             this.equation = equation;
         }
+        
+        
+        public DefDecl(string name, Tuple<IList<Term>, Term> equation) : this(name, null, equation)
+        { }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {

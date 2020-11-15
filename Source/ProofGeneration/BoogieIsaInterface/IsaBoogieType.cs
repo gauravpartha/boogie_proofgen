@@ -13,6 +13,8 @@ namespace ProofGeneration
         private static readonly TermIdent tconId = IsaCommonTerms.TermIdentFromName("TCon");
         private static readonly TermIdent tconClosedId = IsaCommonTerms.TermIdentFromName("TConC");
 
+        public static TypeIsa VariableDeclsType => IsaCommonTypes.GetDataTypeNoArg("vdecls");
+
         public static TypeIsa BoogieType()
         {
             return IsaCommonTypes.GetDataTypeNoArg("ty");

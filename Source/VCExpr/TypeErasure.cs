@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using Microsoft.BaseTypes;
+using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
 
 // different classes for erasing complex types in VCExprs, replacing them
@@ -179,6 +180,8 @@ namespace Microsoft.Boogie.TypeErasure
     private readonly List<VCExpr /*!*/> /*!*/
       AllTypeAxioms;
 
+    private readonly List<VCAxiomInfo> VcAxiomsInfo;
+
     [ContractInvariantMethod]
     void AllTypeAxiomsInvariantMethod()
     {
@@ -188,6 +191,7 @@ namespace Microsoft.Boogie.TypeErasure
     // list in which type axioms are incrementally collected
     private readonly List<VCExpr /*!*/> /*!*/
       IncTypeAxioms;
+    
 
     [ContractInvariantMethod]
     void IncTypeAxiomsInvariantMethod()
@@ -195,11 +199,22 @@ namespace Microsoft.Boogie.TypeErasure
       Contract.Invariant(cce.NonNullElements(IncTypeAxioms));
     }
 
-    internal void AddTypeAxiom(VCExpr axiom)
+    /// <param name="axiom">Axiom to be added for the VC. </param>
+    /// <param name="vcAxiomInfoType">vcAxiomType provides further information on the axiom. This is used by the proof
+    /// generation. The default is set to null here to be backwards compatible with clients of this method
+    /// that are not supported by the proof generation
+    /// </param>
+    /// <exception cref="ArgumentException">Thrown if vcAxiomType is null. </exception>
+    internal void AddTypeAxiom(VCExpr axiom, VCAxiomInfo vcAxiomInfoType = null)
     {
       Contract.Requires(axiom != null);
+      if (vcAxiomInfoType == null)
+      {
+        throw new ArgumentException("Axiom is added without providing further details for proof gen.");
+      }
       AllTypeAxioms.Add(axiom);
       IncTypeAxioms.Add(axiom);
+      VcAxiomsInfo.Add(vcAxiomInfoType);
     }
 
     // Return all axioms that were added since the last time NewAxioms
@@ -211,6 +226,14 @@ namespace Microsoft.Boogie.TypeErasure
         res = Gen.NAry(VCExpressionGenerator.AndOp, IncTypeAxioms);
       IncTypeAxioms.Clear();
       return res;
+    }
+
+    public VCExpr GetNewAxiomsAndInfo(out List<VCAxiomInfo> vcAxiomsInfo)
+    {
+      var result = GetNewAxioms();
+      vcAxiomsInfo = new List<VCAxiomInfo>(this.VcAxiomsInfo);
+      this.VcAxiomsInfo.Clear();
+      return result;
     }
 
     // mapping from a type to its constructor number/index
@@ -325,7 +348,9 @@ namespace Microsoft.Boogie.TypeErasure
       if (!BasicTypeReprs.TryGetValue(type, out res))
       {
         res = Gen.Function(HelperFuns.BoogieFunction(type.ToString() + "Type", T));
-        AddTypeAxiom(GenCtorAssignment(res));
+        var ctorNum = CurrentCtorNum.ToIntSafe;
+        var ctorAssignmentAxiom = GenCtorAssignment(res);
+        AddTypeAxiom(ctorAssignmentAxiom, new CtorBasicTypeAxiomInfo(type, ctorNum, ctorAssignmentAxiom));
         BasicTypeReprs.Add(type, res);
       }
 
@@ -350,7 +375,9 @@ namespace Microsoft.Boogie.TypeErasure
         Function /*!*/
           ctor = HelperFuns.UniformBoogieFunction(decl.Name + "Type", decl.Arity, T);
         Contract.Assert(ctor != null);
-        AddTypeAxiom(GenCtorAssignment(ctor));
+        var ctorNum = CurrentCtorNum.ToIntSafe;
+        var ctorAssignmentAxiom = GenCtorAssignment(ctor);
+        AddTypeAxiom(ctorAssignmentAxiom, new CtorDeclAxiomInfo(decl, ctorNum, ctorAssignmentAxiom));
 
         List<Function /*!*/> /*!*/
           dtors = new List<Function /*!*/>(decl.Arity);
@@ -359,7 +386,8 @@ namespace Microsoft.Boogie.TypeErasure
           Function /*!*/
             dtor = HelperFuns.UniformBoogieFunction(decl.Name + "TypeInv" + i, 1, T);
           dtors.Add(dtor);
-          AddTypeAxiom(GenLeftInverseAxiom(ctor, dtor, i));
+          var leftInverseAxiom = GenLeftInverseAxiom(ctor, dtor, i);
+          AddTypeAxiom(leftInverseAxiom, new LeftInverseAxiomInfo(decl, i, leftInverseAxiom));
         }
 
         reprSet = new TypeCtorRepr(ctor, dtors);
@@ -524,6 +552,7 @@ namespace Microsoft.Boogie.TypeErasure
       Contract.Requires(gen != null);
       this.Gen = gen;
       AllTypeAxioms = new List<VCExpr /*!*/>();
+      VcAxiomsInfo = new List<VCAxiomInfo>();
       IncTypeAxioms = new List<VCExpr /*!*/>();
       BasicTypeReprs = new Dictionary<Type /*!*/, VCExpr /*!*/>();
       CurrentCtorNum = BigNum.ZERO;
@@ -565,6 +594,7 @@ namespace Microsoft.Boogie.TypeErasure
       Gen = builder.Gen;
       AllTypeAxioms = new List<VCExpr /*!*/>(builder.AllTypeAxioms);
       IncTypeAxioms = new List<VCExpr /*!*/>(builder.IncTypeAxioms);
+      VcAxiomsInfo = new List<VCAxiomInfo>(builder.VcAxiomsInfo);
 
       UDecl = builder.UDecl;
       U = builder.U;
@@ -725,9 +755,12 @@ namespace Microsoft.Boogie.TypeErasure
         Function /*!*/
           castFromU = HelperFuns.BoogieFunction("U_2_" + type.ToString(), U, type);
 
-        AddTypeAxiom(GenLeftInverseAxiom(castToU, castFromU, 0));
-        AddTypeAxiom(GenReverseCastAxiom(castToU, castFromU));
-        AddTypeAxiom(GenCastTypeAxioms(castToU, castFromU));
+        var leftInverseAxiom = GenLeftInverseAxiom(castToU, castFromU, 0);
+        AddTypeAxiom(leftInverseAxiom, new BasicTypeCastAxiomInfo(type, TypeCastKind.BoxedOfUnboxed, leftInverseAxiom));
+        var reverseCastAxiom = GenReverseCastAxiom(castToU, castFromU);
+        AddTypeAxiom(reverseCastAxiom, new BasicTypeCastAxiomInfo(type, TypeCastKind.UnboxedOfBoxed, reverseCastAxiom));
+        var castTypeAxiom = GenCastTypeAxioms(castToU, castFromU);
+        AddTypeAxiom(castTypeAxiom, new BasicTypeCastAxiomInfo(type, TypeCastKind.TypeOfBoxed, castTypeAxiom));
 
         res = new TypeCastSet(castToU, castFromU);
         TypeCasts.Add(type, res);
