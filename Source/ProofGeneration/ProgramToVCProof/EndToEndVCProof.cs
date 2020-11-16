@@ -790,7 +790,7 @@ namespace ProofGeneration.ProgramToVCProof
                 } else if (vcAx is VarAxiomInfo varAxiomInfo)
                 {
                     if (vcVarFunTranslator.TranslateVCVar(varAxiomInfo.VcVar, out Variable v))
-                        sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("HOL.conjunct2", MembershipName(v))));
+                        sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp(ProofUtil.OF("HOL.conjunct2", StateCorresName(v)))));
                     else
                         throw new ProofGenUnexpectedStateException(GetType(), 
                             "Can't translate vc variable to Boogie variable");
