@@ -488,7 +488,9 @@ namespace ProofGeneration.ProgramToVCProof
             proofMethods.AddRange(proofMethodsExtractors);
             
             proofMethods.Add((proofMethodsExtractors.Count > 1 ? "ultimately " : "from this ") + 
-                             " show ?thesis using " + IsaPrettyPrinterHelper.SpaceAggregate(typeOfValAssms) + explicitTypeVarAssms);
+                             " show ?thesis " + 
+                             (typeOfValAssms.Any() ?"using " + IsaPrettyPrinterHelper.SpaceAggregate(typeOfValAssms) + explicitTypeVarAssms : "")
+                             );
             proofMethods.Add("by (simp add: W) qed");
 
 
@@ -622,8 +624,8 @@ namespace ProofGeneration.ProgramToVCProof
                                 IsaBoogieVC.VCTypeConstructor(ctorDeclAxInfo.Decl.Name, ctorDeclAxInfo.Decl.Arity),
                                 ids.Select(id => (Term) new TermIdent(id)).ToList())
                         );
-                    var statement = TermQuantifier.ForAll(ids, null,
-                        TermBinary.Eq(ctorApp, new IntConst(ctorDeclAxInfo.CtorValue)));
+                    var body = TermBinary.Eq(ctorApp, new IntConst(ctorDeclAxInfo.CtorValue));
+                    var statement = ids.Any() ? (Term) TermQuantifier.ForAll(ids, null, body) : body;
                     lemmas.Add(new LemmaDecl(ctorLemmaName(ctorDeclAxInfo.Decl), statement,
                         new Proof(new List<string> {"by " + ProofUtil.Simp(ctorDeclListName+"_def")})));
                 }
@@ -668,14 +670,16 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.Append("let " + FunAbbrev(f) + " = ");
                 sb.AppendInner("opaque_comp the " + boogieContext.funContext + " " + fStringConst);
                 sb.AppendLine();
-                sb.Append("from " + finterpAssmName + " have " + InterpMemName(f) + ":");
+                sb.Append("have " + InterpMemName(f) + ":");
                 sb.AppendInner(
                 new TermBinary(new TermApp(boogieContext.funContext, fStringConst), 
                     IsaCommonTerms.SomeOption(IsaCommonTerms.TermIdentFromName(FunAbbrev(f))),
                     TermBinary.BinaryOpCode.EQ).ToString());
                 sb.AppendLine();
                 sb.AppendLine("apply " + ProofUtil.SimpOnly("opaque_comp_def"));
-                sb.AppendLine("using " + "fun_interp_wf_def " + MembershipName(f) + " option.sel by metis");
+                sb.AppendLine("by (rule " + ProofUtil.OF(
+                    "finterp_member", finterpAssmName, MembershipName(f)) + ")"
+                );
 
                 /*
                 sb.Append("from " + finterpAssmName + " have " + WfName(f) + ":");

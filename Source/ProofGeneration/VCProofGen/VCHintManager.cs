@@ -100,7 +100,7 @@ namespace ProofGeneration.VCProofGen
             var lemmaName = "expr_equiv_" + _lemmaId;
             _lemmaId++;
 
-            return new LemmaDecl(lemmaName, TermBinary.MetaImplies(lhs, rhs), new Proof(new List<string> {"unfolding Let_def", "by clarsimp"}));
+            return new LemmaDecl(lemmaName, TermBinary.MetaImplies(lhs, rhs), new Proof(new List<string> {"unfolding Let_def", "by blast"}));
         }
         public bool TryGetHints(Block block, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls)
         {
