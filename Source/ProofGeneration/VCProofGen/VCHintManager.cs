@@ -11,7 +11,7 @@ namespace ProofGeneration.VCProofGen
     public class VCHintManager
     {
         private int _lemmaId = 0;
-        private readonly TypeQuantChecker _typeQuantChecker = new TypeQuantChecker();
+        private readonly ErasureOptimizationChecker _erasureOptimizationChecker = new ErasureOptimizationChecker();
         
         private readonly IDictionary<Block, VCHintBlock> _blockTo = new Dictionary<Block, VCHintBlock>();
 
@@ -130,7 +130,7 @@ namespace ProofGeneration.VCProofGen
                 return specialHint;
             }
 
-            if (_typeQuantChecker.HasTypeQuantification(assumeCmd.Expr))
+            if (_erasureOptimizationChecker.ErasureSimplifiesExpression(assumeCmd.Expr))
             {
                 decl = LemmaForVc(assumeCmd.Expr, exprVC, true);
             }
@@ -218,7 +218,7 @@ namespace ProofGeneration.VCProofGen
             }
             else if (postVC.Equals(VCExpressionGenerator.True))
             {
-               if (_typeQuantChecker.HasTypeQuantification(cmd.Expr))
+               if (_erasureOptimizationChecker.ErasureSimplifiesExpression(cmd.Expr))
                {
                    requiredDecl = LemmaForVc(cmd.Expr, exprVC, false);
                }
@@ -226,7 +226,7 @@ namespace ProofGeneration.VCProofGen
             }
             else
             {
-               if (_typeQuantChecker.HasTypeQuantification(cmd.Expr))
+               if (_erasureOptimizationChecker.ErasureSimplifiesExpression(cmd.Expr))
                {
                    requiredDecl = LemmaForVc(cmd.Expr, exprVC, false);
                }
