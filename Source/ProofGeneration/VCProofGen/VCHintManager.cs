@@ -39,16 +39,14 @@ namespace ProofGeneration.VCProofGen
             CommandLineOptions.SubsumptionOption subsumption) 
         {
             VCHint vcHint;
-            OuterDecl requiredDecl;
+            List<LemmaDecl> requiredDecls;
             
             if (cmd is AssumeCmd assumeCmd)
             {
-                vcHint = AssumeStmtHint(assumeCmd, exprVC, postVC, resultVC, out LemmaDecl requiredDecl1);
-                requiredDecl = requiredDecl1;
+                vcHint = AssumeStmtHint(assumeCmd, exprVC, postVC, resultVC, out requiredDecls);
             } else if (cmd is AssertCmd assertCmd)
             {
-                vcHint = AssertStmtHint(assertCmd, exprVC, postVC, subsumption, out LemmaDecl requiredDecl2);
-                requiredDecl = requiredDecl2;
+                vcHint = AssertStmtHint(assertCmd, exprVC, postVC, subsumption, out requiredDecls);
             } else
             {
                 throw new ProofGenUnexpectedStateException(GetType(), "expected an assert or assume cmd");
@@ -60,47 +58,73 @@ namespace ProofGeneration.VCProofGen
                 _blockTo.Add(block, vcHintBlock);
             }
 
-            if (requiredDecl != null)
+            if (requiredDecls != null)
             {
-                vcHintBlock.AddRequiredDecl(requiredDecl);                
+                vcHintBlock.AddRequiredDecls(requiredDecls);                
             }
             
             vcHintBlock.AddHint(cmd, vcHint);
         }
         
         /// <summary>
-        /// return Isabelle lemma with which one can exchange vc expression required for proof 
+        /// return declarations to rewrite vc expression
         /// </summary>
-        private LemmaDecl LemmaForVc(Expr expr, VCExpr translatedVcExpr, bool isAssumeCmd)
+        private List<LemmaDecl> RewriteVcLemmas(Expr expr, VCExpr translatedVcExpr, bool isAssumeCmd,
+            bool hasTypeQuantification)
         {
             // To be safe create new erasers (erasers have state that change when certain methods are applied)
             /* Note that vcExtracted is supposed to be the same as directly erasing translatedVcExpr. The reason we
              translate the Boogie expression again to a VC expression before erasing it, is that erasure of a VCExpr
              has side effects on that VCExpr. 
              */
-            VCExpr vcExtracted = _typeEraserFactory.NewEraser(true).TranslateAndErase(expr);
-            VCExpr vcNotExtracted = _typeEraserFactory.NewEraser(false).TranslateAndErase(expr);
-            
-            Term lhs, rhs;
+            //TODO: figure out when the polarity can have an effect on the expression
+            Func<bool, int, VCExpr> eraseToVc = (b, i) =>
+                _typeEraserFactory.NewEraser(b).TranslateAndErase(expr, i);
+
+            bool lhsExtractArgs;
+            string proofMethod;
             if (isAssumeCmd)
             {
-                // using the Boogie expression need to prove that the extracted vc expr holds, but want to instead prove
-                // that the non-extracted vc expr holds: Prove vcNotExtracted ==> vcExtracted
-                lhs = _vcToIsaTranslator.Translate(vcNotExtracted);
-                rhs = _vcToIsaTranslator.Translate(vcExtracted);
+                /* Using the Boogie expression need to prove that the extracted vc expr holds, but want to instead prove
+                 * that the non-extracted vc expr holds: Prove vcNotExtracted ==> vcExtracted.
+                 * This is the harder direction. */
+                lhsExtractArgs = false;
+                if (hasTypeQuantification)
+                    proofMethod = "unfolding Let_def using prim_type_vc_lemmas by blast";
+                else
+                    proofMethod = "by blast";
             }
             else
             {
-                // using the extracted VC expression, need to prove the Boogie expression holds, but want to use the
-                // non-extracted VC expression holds: Prove vcExtracted ==> vcNotExtracted
-                lhs = _vcToIsaTranslator.Translate(vcExtracted);
-                rhs = _vcToIsaTranslator.Translate(vcNotExtracted);
+                /* Using the extracted VC expression, need to prove the Boogie expression holds, but want to use the
+                 * non-extracted VC expression holds: Prove vcExtracted ==> vcNotExtracted.
+                 * This is the easier direction, because the type quantifiers in the premise can be directly instantiated
+                 * with the extracted versions. */
+                lhsExtractArgs = true;
+                if (hasTypeQuantification)
+                    proofMethod = "using vc_extractor_lemmas by smt";
+                else
+                    proofMethod = "by blast";
             }
 
-            var lemmaName = "expr_equiv_" + _lemmaId;
+            var lemmaNameNeg = "expr_equiv_" + _lemmaId + "_neg";
+            var lemmaNamePos= "expr_equiv_" + _lemmaId + "_pos";
             _lemmaId++;
 
-            return new LemmaDecl(lemmaName, TermBinary.MetaImplies(lhs, rhs), new Proof(new List<string> {"unfolding Let_def", "by blast"}));
+            Term lhsNeg = _vcToIsaTranslator.Translate(eraseToVc(lhsExtractArgs, -1));
+            Term lhsPos = _vcToIsaTranslator.Translate(eraseToVc(lhsExtractArgs, 1));
+            
+            Term rhsNeg = _vcToIsaTranslator.Translate(eraseToVc(!lhsExtractArgs, -1));
+            Term rhsPos = _vcToIsaTranslator.Translate(eraseToVc(!lhsExtractArgs, 1));
+
+            var result = new List<LemmaDecl>
+            {
+                new LemmaDecl(lemmaNameNeg, TermBinary.MetaImplies(lhsNeg, rhsNeg),
+                    new Proof(new List<string> {proofMethod})),
+                new LemmaDecl(lemmaNamePos, TermBinary.MetaImplies(lhsPos, rhsPos),
+                    new Proof(new List<string> {proofMethod}))
+            };
+            return result;
         }
         public bool TryGetHints(Block block, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls)
         {
@@ -122,7 +146,7 @@ namespace ProofGeneration.VCProofGen
         /// <summary>
         /// If no lemma is required for the proof, then <paramref name="decl"/> is null.
         /// </summary>
-        private VCHint AssumeStmtHint(AssumeCmd assumeCmd, VCExpr exprVC, VCExpr postVC, VCExpr resultVC, out LemmaDecl decl)
+        private VCHint AssumeStmtHint(AssumeCmd assumeCmd, VCExpr exprVC, VCExpr postVC, VCExpr resultVC, out List<LemmaDecl> decl)
         {
             if(IsSpecialAssumeStmt(assumeCmd, exprVC, postVC, out VCHint specialHint))
             {
@@ -130,9 +154,9 @@ namespace ProofGeneration.VCProofGen
                 return specialHint;
             }
 
-            if (_erasureOptimizationChecker.ErasureSimplifiesExpression(assumeCmd.Expr))
+            if (_erasureOptimizationChecker.ErasureSimplifiesExpression(assumeCmd.Expr, out bool hasTypeQuantification))
             {
-                decl = LemmaForVc(assumeCmd.Expr, exprVC, true);
+                decl = RewriteVcLemmas(assumeCmd.Expr, exprVC, true, hasTypeQuantification);
             }
             else
             {
@@ -204,9 +228,9 @@ namespace ProofGeneration.VCProofGen
             VCExpr exprVC,
             VCExpr postVC,
             CommandLineOptions.SubsumptionOption subsumption,
-            out LemmaDecl requiredDecl)
+            out List<LemmaDecl> requiredDecls)
         {
-            requiredDecl = null;
+            requiredDecls = null;
 
             if (exprVC.Equals(VCExpressionGenerator.False) || postVC.Equals(VCExpressionGenerator.False))
             {
@@ -218,28 +242,28 @@ namespace ProofGeneration.VCProofGen
             }
             else if (postVC.Equals(VCExpressionGenerator.True))
             {
-               if (_erasureOptimizationChecker.ErasureSimplifiesExpression(cmd.Expr))
+               if (_erasureOptimizationChecker.ErasureSimplifiesExpression(cmd.Expr, out bool hasTypeQuantification))
                {
-                   requiredDecl = LemmaForVc(cmd.Expr, exprVC, false);
+                   requiredDecls = RewriteVcLemmas(cmd.Expr, exprVC, false, hasTypeQuantification);
                }
-               return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.NO_CONJ, new VCExprHint(requiredDecl));
+               return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.NO_CONJ, new VCExprHint(requiredDecls));
             }
             else
             {
-               if (_erasureOptimizationChecker.ErasureSimplifiesExpression(cmd.Expr))
+               if (_erasureOptimizationChecker.ErasureSimplifiesExpression(cmd.Expr, out bool hasTypeQuantification))
                {
-                   requiredDecl = LemmaForVc(cmd.Expr, exprVC, false);
+                   requiredDecls = RewriteVcLemmas(cmd.Expr, exprVC, false, hasTypeQuantification);
                }
                if (
                    subsumption == CommandLineOptions.SubsumptionOption.Always ||
                    (subsumption == CommandLineOptions.SubsumptionOption.NotForQuantifiers && !(exprVC is VCExprQuantifier))
                )
                {
-                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.SUBSUMPTION, new VCExprHint(requiredDecl));
+                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.SUBSUMPTION, new VCExprHint(requiredDecls));
                }
                else
                {
-                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.CONJ, new VCExprHint(requiredDecl));
+                   return new AssertSimpleHint(AssertSimpleHint.AssertSimpleType.CONJ, new VCExprHint(requiredDecls));
                }
             }
         }

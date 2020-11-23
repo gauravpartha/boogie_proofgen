@@ -1,4 +1,6 @@
-﻿using ProofGeneration.Isa;
+﻿using System.Collections.Generic;
+using System.Linq;
+using ProofGeneration.Isa;
 using ProofGeneration.IsaML;
 
 namespace ProofGeneration.VCProofGen
@@ -6,9 +8,9 @@ namespace ProofGeneration.VCProofGen
     public class VCExprHint : INodeML
     {
         //if it is null, then no lemma should be applied, otherwise the lemma should be applied to rewrite the VC expression
-        public LemmaDecl LemmaToApplyBefore { get; }
+        public List<LemmaDecl> LemmaToApplyBefore { get; }
 
-        public VCExprHint(LemmaDecl lemmaToApplyBefore)
+        public VCExprHint(List<LemmaDecl> lemmaToApplyBefore)
         {
             LemmaToApplyBefore = lemmaToApplyBefore;
         }
@@ -26,7 +28,9 @@ namespace ProofGeneration.VCProofGen
             }
             else
             {
-                return "SOME (RewriteVC @{thm " + LemmaToApplyBefore.name + "}" + ")";
+                var list = LemmaToApplyBefore.Select(lem => "@{thm " + lem.name + "}");
+                var listString = "[" + string.Join(",", list) + "]";
+                return "SOME (RewriteVC " + listString+ ")";
             }
         }
             

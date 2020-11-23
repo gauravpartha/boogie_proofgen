@@ -1,6 +1,7 @@
 ﻿using Microsoft.Boogie;
 using System.Collections.Generic;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -50,6 +51,11 @@ namespace ProofGeneration.VCProofGen
             nextCmd--;
         }
 
+        public void AddRequiredDecls(List<LemmaDecl> decls)
+        {
+            OuterDecls.AddRange(decls);
+        }
+        
         public void AddRequiredDecl(OuterDecl decl)
         {
             OuterDecls.Add(decl);

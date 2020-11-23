@@ -10,18 +10,20 @@ namespace ProofGeneration.VCProofGen
 
         private bool _result;
         private int _withinNumQuantifier;
+        private bool _hasTypeQuantification;
 
         /// <summary>
         /// returns false, if the erasure of e to a VCExpr does not use any optimizations
         /// if true is returned, then erasure may use optimizations (but not necessarily)
         /// </summary>
-        public bool ErasureSimplifiesExpression(Expr e)
+        public bool ErasureSimplifiesExpression(Expr e, out bool hasTypeQuantification)
         {
             _withinNumQuantifier = 0;
             _result = false;
+            _hasTypeQuantification = false;
             Visit(e);
             var finalResult = _result;
-            _result = false;
+            hasTypeQuantification = _hasTypeQuantification;
             return finalResult;
         }
 
@@ -30,7 +32,6 @@ namespace ProofGeneration.VCProofGen
             if (_withinNumQuantifier > 0 && node.Fun is BinaryOperator bop && bop.Op == BinaryOperator.Opcode.Imp)
             {
                 _result = true;
-                return node;
             }
 
             return base.VisitNAryExpr(node);
@@ -41,13 +42,12 @@ namespace ProofGeneration.VCProofGen
             if (node.TypeParameters.Count > 0)
             {
                 _result = true;
+                _hasTypeQuantification = true;
             }
-            else
-            {
-                _withinNumQuantifier++;
-                Visit(node._Body);
-                _withinNumQuantifier--;
-            }
+            
+            _withinNumQuantifier++;
+            Visit(node._Body);
+            _withinNumQuantifier--;
 
             return node;
         }

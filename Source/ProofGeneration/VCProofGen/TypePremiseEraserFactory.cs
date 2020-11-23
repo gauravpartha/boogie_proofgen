@@ -1,10 +1,12 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.TypeErasure;
 using Microsoft.Boogie.VCExprAST;
+using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -41,18 +43,18 @@ namespace ProofGeneration.VCProofGen
             _vcTranslator = vcTranslator;
         }
 
-        public VCExpr TranslateAndErase(Expr e)
+        public VCExpr TranslateAndErase(Expr e, int polarity = -1)
         {
-            return EraseVC(_vcTranslator.Translate(e));
+            return EraseVC(_vcTranslator.Translate(e), polarity);
         }
 
         /// <summary>
         /// Erases the types in <paramref name="vc"/>.
         /// Note that this has a side-effect on <paramref name="vc"/>..
         /// </summary>
-        public VCExpr EraseVC(VCExpr vc)
+        public VCExpr EraseVC(VCExpr vc, int polarity = -1)
         {
-              VCExpr exprWithoutTypes = Eraser.Erase(vc, -1);
+              VCExpr exprWithoutTypes = Eraser.Erase(vc, polarity);
               LetBindingSorter letSorter = new LetBindingSorter(_vcExprGen);
               Contract.Assert(letSorter != null);
               return letSorter.Mutate(exprWithoutTypes, true);
