@@ -159,6 +159,12 @@ namespace ProofGeneration
             return new TermApp(IsaCommonTerms.TermIdentFromName("Assume"), new List<Term>() { arg });
         }
 
+
+        public static Term Assign(Term lhsTerm, Term rhsTerm)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("Assign"), new List<Term> { lhsTerm, rhsTerm });
+        }
+        
         public static Term Assign(IList<Term> lhsTerms, IList<Term> rhsTerms)
         {
             if ((lhsTerms.Count !=rhsTerms.Count))

@@ -95,25 +95,39 @@ namespace ProofGeneration
 
         public override Cmd VisitAssignCmd(AssignCmd node)
         {
-            if ((node.Lhss.Count != node.Rhss.Count))
+            if (node.Lhss.Count != node.Rhss.Count)
             {
                 throw new ProofGenUnexpectedStateException(typeof(BasicCmdIsaVisitor), "different number of lhs and rhs");
             }
 
+            if (node.Lhss.Count != 1)
+            {
+                throw new NotImplementedException("Parallel assignments are not supported.");
+            }
+
+            /*
             var lhsResults = node.Lhss.Select(lhs => Translate(lhs)).ToList();
             var rhsResults = node.Rhss.Select(rhs => Translate(rhs)).ToList();
-
             IList<Term> results = new List<Term>();
             lhsResults.ZipDo(rhsResults, (lhs, rhs) => results.Add(new TermTuple(new List<Term>() { lhs, rhs })));
+            */
 
-            ReturnResult(IsaBoogieTerm.Assign(lhsResults, rhsResults));
+            Term lhs = Translate(node.Lhss[0]);
+            Term rhs = Translate(node.Rhss[0]);
+            ReturnResult(IsaBoogieTerm.Assign(lhs, rhs));
+            
             return node;
         }
 
         public override AssignLhs VisitSimpleAssignLhs(SimpleAssignLhs node)
         {
-            ReturnResult(new StringConst(GetStringFromIdentifierExpr(node.AssignedVariable)));
-            return node;
+            if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(node.AssignedVariable.Decl, out Term varId, out _))
+            {
+                ReturnResult(varId);
+                return node;
+            }
+            throw new ProofGenUnexpectedStateException(GetType(), 
+                "Cannot extract id from variable " + node.AssignedVariable.Name);
         }
 
         public override Expr VisitNAryExpr(NAryExpr node)
