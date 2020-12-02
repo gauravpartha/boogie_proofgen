@@ -24,6 +24,7 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
         private readonly Term initState;
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
+        private readonly TermIdent finalNode = IsaCommonTerms.TermIdentFromName("m'");
 
         private readonly IDictionary<NamedDeclaration, Term> declToVCMapping;
         private readonly IDictionary<Function, TermIdent> funToInterpMapping;
@@ -40,12 +41,12 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly AssumptionManager assmManager;
 
-        private readonly IDictionary<Block, OuterDecl> blockToDecl;
+        private readonly IsaBlockInfo isaBlockInfo;
 
         public PassiveLemmaManager(VCInstantiation<Block> vcinst, 
             BoogieMethodData methodData, 
             IEnumerable<Function> vcFunctions, 
-            IDictionary<Block, OuterDecl> blockToDecl,
+            IsaBlockInfo isaBlockInfo,
             IVCVarFunTranslator vcTranslator,
             IVariableTranslationFactory variableFactory)
         {
@@ -53,7 +54,7 @@ namespace ProofGeneration.ProgramToVCProof
             this.methodData = methodData;
             programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
             initState = IsaBoogieTerm.Normal(normalInitState);
-            this.blockToDecl = blockToDecl;
+            this.isaBlockInfo = isaBlockInfo;
             this.vcTranslator = vcTranslator;
             this.variableFactory = variableFactory;
             cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer, variableFactory);
@@ -78,10 +79,10 @@ namespace ProofGeneration.ProgramToVCProof
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
         {
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(blockToDecl[block].name), 
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(isaBlockInfo.BlockCmdsDefs[block].name), 
                 initState, finalState);
 
-            List<Term> assumptions = new List<Term>() { cmdsReduce };
+            List<Term> assumptions = new List<Term> { cmdsReduce };
             assumptions.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
 
             Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst, LemmaHelper.FinalStateIsMagic(block));
@@ -89,6 +90,46 @@ namespace ProofGeneration.ProgramToVCProof
             Proof proof = BlockCorrectProof(block, vcHintsName);
 
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
+        }
+
+        public LemmaDecl GenerateCfgLemma(Block block, IEnumerable<Block> successors, Term cfg, Func<Block, string> cfgLemmaName, LemmaDecl BlockLemma)
+        {
+            Term red = IsaBoogieTerm.RedCFGMulti(
+                boogieContext,
+                cfg,
+                IsaBoogieTerm.CFGConfigNode(new NatConst(isaBlockInfo.BlockIds[block]),
+                    IsaBoogieTerm.Normal(normalInitState)),
+                IsaBoogieTerm.CFGConfig(finalNode, finalState));
+            List<Term> assumption = new List<Term> { red, vcinst.GetVCObjInstantiation(block, declToVCMapping) };
+            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+
+            string nodeLemma = isaBlockInfo.BlockCmdsLemmas[block].name;
+            string outEdgesLemma = isaBlockInfo.BlockOutEdgesLemmas[block].name;
+            var proofMethods = new List<string>();
+            if (successors.Any())
+            {
+                proofMethods.Add("apply (rule converse_rtranclpE2[OF assms(1)], fastforce)");
+                proofMethods.Add(ProofUtil.Apply("rule " +
+                                 ProofUtil.OF("red_cfg_multi_backwards_step", "assms(1)", nodeLemma)));
+                proofMethods.Add(ProofUtil.Apply("erule " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)")));
+                proofMethods.Add("apply (" + ProofUtil.Simp(outEdgesLemma) + ")");
+                foreach (var bSuc in successors)
+                {
+                    proofMethods.Add("apply (erule member_elim, simp)");
+                    proofMethods.Add("apply (erule " + cfgLemmaName(bSuc) + ", simp" + ")");
+                }
+                proofMethods.Add("by (simp add: member_rec(2))");
+            }
+            else
+            {
+                proofMethods.Add("apply (rule converse_rtranclpE2[OF assms(1)], fastforce)");
+                proofMethods.Add("apply (rule " + ProofUtil.OF("red_cfg_multi_backwards_step_no_succ", "assms(1)",
+                    nodeLemma, outEdgesLemma)+")");
+                proofMethods.Add("using " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)") + " by blast");
+            }
+
+            return new LemmaDecl(cfgLemmaName(block), ContextElem.CreateWithAssumptions(assumption), conclusion,
+                new Proof(proofMethods));
         }
 
         public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
@@ -186,7 +227,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms " + globalAssmsName,
-                    "unfolding " + blockToDecl[b].name + "_def",
+                    "unfolding " + isaBlockInfo.BlockCmdsDefs[b].name + "_def",
                     "apply cases",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (handle_cmd_list_full?)",
@@ -197,7 +238,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms ",
-                    "unfolding " + blockToDecl[b].name + "_def",
+                    "unfolding " + isaBlockInfo.BlockCmdsDefs[b].name + "_def",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (tactic \\<open> boogie_vc_tac @{context} @{thms " + globalAssmsName + "} " +
                     "@{thm forall_poly_thm} " + vcHintsName + " \\<close>)",

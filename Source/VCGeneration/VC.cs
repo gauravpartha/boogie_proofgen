@@ -3288,7 +3288,7 @@ namespace VC
         {
           RemoveEmptyBlocks(impl.Blocks);
             #region proofgen
-            ProofGeneration.ProofGenerationLayer.AfterEmptyBlockRemoval(impl);
+            //ProofGeneration.ProofGenerationLayer.AfterEmptyBlockRemoval(impl);
             #endregion
 
           impl.PruneUnreachableBlocks();

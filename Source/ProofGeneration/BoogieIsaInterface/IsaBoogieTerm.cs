@@ -32,6 +32,10 @@ namespace ProofGeneration
         private readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
         private readonly static TermIdent magicStateId = IsaCommonTerms.TermIdentFromName("Magic");
         private readonly static TermIdent failureStateId = IsaCommonTerms.TermIdentFromName("Failure");
+
+        private readonly static TermIdent outEdgesId = IsaCommonTerms.TermIdentFromName("out_edges");
+        private readonly static TermIdent nodeToBlockId = IsaCommonTerms.TermIdentFromName("node_to_block");
+        
         public static TermIdent ConvertValToBoolId { get; }= IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
         public static TermIdent ConvertValToIntId { get;  }= IsaCommonTerms.TermIdentFromName("convert_val_to_int");
         private readonly static TermIdent funInterpWfId = IsaCommonTerms.TermIdentFromName("fun_interp_wf");
@@ -312,6 +316,16 @@ namespace ProofGeneration
             return new TermRecord(mapping);
         }
 
+        public static Term OutEdges(Term cfg, int idx)
+        {
+            return IsaCommonTerms.ListLookup(new TermApp(outEdgesId, cfg), idx);
+        }
+
+        public static Term NodeToBlock(Term cfg, int idx)
+        {
+            return IsaCommonTerms.ListLookup(new TermApp(nodeToBlockId, cfg), idx);
+        }
+        
         public static Term Method(string methodName, 
             int numTypeParams, 
             Term parameters, 

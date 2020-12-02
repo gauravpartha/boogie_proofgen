@@ -7,14 +7,11 @@ using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
-using ProofGeneration.VCProofGen;
 
 namespace ProofGeneration.ProgramToVCProof
 {
-    /*
     class PrePassiveLemmaManager : IBlockLemmaManager
     {
-        private readonly VCInstantiation<Block> vcinst;
         private readonly CFGRepr cfg;
         private readonly IDictionary<Block, Block> origToPassiveBlock;
         private readonly IDictionary<Block, Block> passiveToOrigBlock;
@@ -32,8 +29,6 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly Term initState;
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
 
-        private readonly IDictionary<NamedDeclaration, TermIdent> declToVCMapping;        
-
         private readonly IDictionary<Function, TermIdent> funToInterpMapping;
 
         private readonly MultiCmdIsaVisitor cmdIsaVisitor;
@@ -47,20 +42,25 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly string funAssmsName = "fun_assms";
         private readonly string varAssmsName = "var_assms";
 
+        private readonly IsaBlockInfo blockInfo;
+        private readonly IsaBlockInfo passiveBlockInfo;
+
         public PrePassiveLemmaManager(
-            VCInstantiation<Block> vcinst,
             CFGRepr cfg,
             IDictionary<Block, Block> origToPassiveBlock,
+            IsaBlockInfo blockInfo,
+            IsaBlockInfo passiveBlockInfo,
             IDictionary<Variable, Variable> passiveToOrigVar,
             IDictionary<Block, IDictionary<Variable, Expr>> constantEntry,
             IDictionary<Block, IDictionary<Variable, Expr>> constantExit,
             BoogieMethodData methodData,
             IVariableTranslationFactory varTranslationFactory)
         {
-            this.vcinst = vcinst;
             this.cfg = cfg;
             this.origToPassiveBlock = origToPassiveBlock;
             passiveToOrigBlock = origToPassiveBlock.ToDictionary((i) => i.Value, (i) => i.Key);
+            this.blockInfo = blockInfo;
+            this.passiveBlockInfo = passiveBlockInfo;
             this.passiveToOrigVar = passiveToOrigVar;
             this.constantEntry = constantEntry;
             this.constantExit = constantExit;
@@ -69,12 +69,12 @@ namespace ProofGeneration.ProgramToVCProof
             initState = IsaBoogieTerm.Normal(normalInitState);
             this.varTranslationFactory = varTranslationFactory;
             cmdIsaVisitor = new MultiCmdIsaVisitor(boogieVarUniqueNamer, varTranslationFactory);
-            declToVCMapping = LemmaHelper.DeclToTerm(((IEnumerable<NamedDeclaration>) methodData.Functions).Union(programVariables), uniqueNamer);
             //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
             funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
 
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
+                IsaCommonTerms.TermIdentFromName("M"),
                 IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
                 IsaCommonTerms.TermIdentFromName("\\<Omega>")
@@ -86,58 +86,34 @@ namespace ProofGeneration.ProgramToVCProof
             if (vcHintsName != null)
                 throw new ProofGenUnexpectedStateException(GetType(), "did not expect any hints");
 
-            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
+            //Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
+            Term cmds = IsaCommonTerms.TermIdentFromName(blockInfo.CmdsQualifiedName(block));
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
 
-            List<Term> assumptions = new List<Term>() { cmdsReduce };
-
             Block origBlock = origToPassiveBlock[block];
+            //Term passiveCmds = new TermList(cmdIsaVisitor.Translate(origBlock.Cmds));
+            Term passiveCmds = IsaCommonTerms.TermIdentFromName(passiveBlockInfo.CmdsQualifiedName(origBlock));
+            Term passiveCmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, passiveCmds, initState, finalState);
+            
+            List<Term> assumptions = new List<Term>() { cmdsReduce, passiveCmdsReduce };
 
-            constantEntry.TryGetValue(block, out IDictionary<Variable, Expr> blockConstEntry);
+            //constantEntry.TryGetValue(block, out IDictionary<Variable, Expr> blockConstEntry);
 
-            assumptions.AddRange(EntryStateAssumptions(block, normalInitState));
-
-            //add VC assumption
-            assumptions.Add(
-                vcinst.GetVCObjInstantiation(origBlock, passiveDecl =>
-                {
-                    if (passiveDecl is Function)
-                    {
-                        return declToVCMapping[passiveDecl];
-                    }
-                    else
-                    {
-                        return declToVCMapping[passiveToOrigVar[(Variable)passiveDecl]];
-                    }
-                }
-                )
-            );
+            //assumptions.AddRange(EntryStateAssumptions(block, normalInitState));
 
             //conclusion
-            Term conclusion = ConclusionBlock(block, passiveSuc, LemmaHelper.FinalStateIsMagic(block));
+            //Term conclusion = ConclusionBlock(block, passiveSuc, LemmaHelper.FinalStateIsMagic(block));
+            Term conclusion = new BoolConst(true);
 
-            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, BlockCorrectProof(origBlock, true));
-        }
+            Proof proof = new Proof(new List<string> {"oops"});
 
-        private Proof BlockCorrectProof(Block b, bool unfoldVC)
-        {
-            List<string> methods = new List<string>
-            {
-                "using assms " + (methodData.Functions.Any() ? funAssmsName : ""),
-                "apply cases"
-            };
-
-            if (unfoldVC)
-                methods.Add("apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)");
-
-            methods.Add("apply (handle_cmd_list_full v_assms: " + varAssmsName + ")?");
-            methods.Add("by (auto?)");
-
-            return new Proof(methods);
+            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
         }
 
         private Term ConstantOptionValue(Expr eConst, Term state)
         {
+            throw new NotImplementedException();
+            /*
             if(eConst is LiteralExpr lit)
             {
                 return IsaCommonTerms.SomeOption(IsaBoogieTerm.ValFromLiteral(lit));
@@ -148,10 +124,12 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 throw new ProofGenUnexpectedStateException(this.GetType(), "unexpected constant value");
             }
+            */
         }
 
         public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> succPassive, string lemmaName)
         {
+            /*
             Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
             List<Term> assumptions = new List<Term>() { cmdsReduce };
@@ -168,6 +146,8 @@ namespace ProofGeneration.ProgramToVCProof
             Proof proof = BlockCorrectProof(origToPassiveBlock[block], false);
 
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
+            */
+            throw new NotImplementedException();
         }
 
         public ContextElem Context()
@@ -201,11 +181,14 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Term> GlobalFunctionContextAssumptions()
         {
-            return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext.funContext);
+            throw new NotImplementedException();
+            //return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext.funContext);
         }
 
         private IList<Term> GlobalVarContextAssumptions()
         {
+            throw new NotImplementedException();
+            /*
             var assms = new List<Term>();
             foreach (Variable v in programVariables)
             {
@@ -213,6 +196,7 @@ namespace ProofGeneration.ProgramToVCProof
                     new TypeIsaVisitor(varTranslationFactory.CreateTranslation().TypeVarTranslation)));
             }
             return assms;
+            */
         }
 
         private IList<string> AssumptionLabels()
@@ -250,104 +234,6 @@ namespace ProofGeneration.ProgramToVCProof
             }
 
             return result;
-        }
-
-        private Term ConclusionBlock(Block b,
-            IEnumerable<Block> passiveSuc,
-            bool useMagicFinalState = false)
-        {
-            if (useMagicFinalState)
-                return new TermBinary(finalState, IsaBoogieTerm.Magic(), TermBinary.BinaryOpCode.EQ);
-
-            Term nonFailureConclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
-
-            var bSuccessors = cfg.GetSuccessorBlocks(b);
-
-            if (!bSuccessors.Any())
-            {
-                if(passiveSuc.Any())
-                {
-                    throw new ProofGenUnexpectedStateException(this.GetType(), "at least one passive successor but no actual successors");
-                }
-                return nonFailureConclusion;
-            }
-
-            TermIdent normalFinalState = IsaCommonTerms.TermIdentFromName("n_s'");
-
-            Term ifNormalConclusionLhs = new TermBinary(finalState, IsaBoogieTerm.Normal(normalFinalState), TermBinary.BinaryOpCode.EQ);
-
-
-            var correctValues = ExitStateAssumptions(b, passiveSuc, normalFinalState, out IEnumerable<Variable> boundVars);
-
-            var successorVCs = new List<Term>();
-            foreach (Block bSuc in passiveSuc)
-            {
-                //successor vc
-                successorVCs.Add(
-                    vcinst.GetVCObjInstantiation(bSuc, passiveDecl =>
-                    {
-                        if (passiveDecl is Function)
-                            return declToVCMapping[passiveDecl];
-                        else
-                            return declToVCMapping[passiveToOrigVar[(Variable)passiveDecl]];
-                    }
-                ));
-            }
-
-            if(!correctValues.Any() && !successorVCs.Any())
-            {
-                return nonFailureConclusion;
-            }
-            
-            Term ifNormalConclusionRhs;
-            if(correctValues.Any())
-            {
-                Term GetRHS(Term sucVCTerm)
-                {
-                    Term activeCorrectValuesCollect = LemmaHelper.BinaryOpAggregate(correctValues, TermBinary.BinaryOpCode.AND);
-                    Term ifNormalConclusionRhsBody =
-                      (sucVCTerm != null ? new TermBinary(activeCorrectValuesCollect, sucVCTerm, TermBinary.BinaryOpCode.AND)
-                                         : activeCorrectValuesCollect)
-                        ;
-                    if (boundVars.Any())
-                    {
-                        return
-                            new TermQuantifier(TermQuantifier.QuantifierKind.EX,
-                            boundVars.Select(v => declToVCMapping[v].id).ToList(),
-                            ifNormalConclusionRhsBody
-                        );
-                    }
-                    else
-                    {
-                        return ifNormalConclusionRhsBody;
-                    }
-                }
-
-                if (successorVCs.Any())
-                {
-                    Term successorVCsCollect = LemmaHelper.BinaryOpAggregate(successorVCs, TermBinary.BinaryOpCode.AND);
-                    ifNormalConclusionRhs = GetRHS(successorVCsCollect);
-                } else
-                {
-                    ifNormalConclusionRhs = GetRHS(null);
-                }
-            }
-            else
-            {
-                ifNormalConclusionRhs = LemmaHelper.BinaryOpAggregate(successorVCs, TermBinary.BinaryOpCode.AND);
-            }
-
-            Term ifNormalConclusion =
-                new TermQuantifier(
-                    TermQuantifier.QuantifierKind.ALL,
-                    new List<Identifier>() { normalFinalState.id },
-                    new TermBinary(
-                        ifNormalConclusionLhs,
-                        ifNormalConclusionRhs,
-                        TermBinary.BinaryOpCode.IMPLIES)
-                    );
-
-            return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);
         }
 
         private List<Term> EntryStateAssumptions(Block block, Term normalState)
@@ -447,6 +333,8 @@ namespace ProofGeneration.ProgramToVCProof
 
         private List<Term> ActiveVarAssumptions(Block blockPassive, Term normalState, Predicate<Variable> includeVar, out ISet<Variable> includedVars)
         {
+            throw new NotImplementedException();
+            /*
             var result = new List<Term>();
             includedVars = new HashSet<Variable>();
 
@@ -466,6 +354,7 @@ namespace ProofGeneration.ProgramToVCProof
             }
 
             return result;
+            */
         }
 
         //Each variable that is live but not active or constant must map to a correctly typed value
@@ -473,6 +362,8 @@ namespace ProofGeneration.ProgramToVCProof
         //such variables are not necessarily active, since they could be universally quantified within some other block     
         private List<Term> LiveVarAssumptions(Block b, Term normalState, Predicate<Variable> includeVar, out ISet<Variable> includedVars)
         {
+            throw new NotImplementedException();
+            /*
             var result = new List<Term>();
             includedVars = new HashSet<Variable>();
 
@@ -486,6 +377,7 @@ namespace ProofGeneration.ProgramToVCProof
                 }
             }
             return result;
+            */
         }
 
         public LemmaDecl MethodVerifiesLemma(CFGRepr cfg2, Term methodCfg, string lemmaName)
@@ -493,5 +385,4 @@ namespace ProofGeneration.ProgramToVCProof
             throw new NotImplementedException();
         }
     }
-    */
 }

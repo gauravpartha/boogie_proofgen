@@ -57,13 +57,13 @@ namespace ProofGeneration
 
         public static void BeforeCFGToDAG(Implementation impl)
         {
-            beforeDagCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforeDagOrigBlock, false);
+            beforeDagCfg = CFGReprTransformer.GetCfgRepresentation(impl, true, out beforeDagOrigBlock, false);
             beforeDagData = MethodDataFromImpl(impl, boogieGlobalData);
         }
 
         public static void BeforePassification(Implementation impl)
         {
-            beforePassificationCfg = CFGReprTransformer.getCFGRepresentation(impl, true, out beforePassiveOrigBlock);
+            beforePassificationCfg = CFGReprTransformer.GetCfgRepresentation(impl, true, out beforePassiveOrigBlock);
             beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData);
         }
 
@@ -137,10 +137,14 @@ namespace ProofGeneration
             } 
         }
 
+        /*
         public static void AfterEmptyBlockRemoval(Implementation impl)
         {
-            noEmptyBlocksCfg = CFGReprTransformer.getCFGRepresentation(impl);
+            need to check predecessor issue
+            //beforeDagCfg = CFGReprTransformer.GetCfgRepresentation(impl, true, out beforeDagOrigBlock, false);
+            // noEmptyBlocksCfg = CFGReprTransformer.getCFGRepresentation(impl);
         }
+        */
 
         public static void AfterUnreachablePruning(Implementation impl)
         {
@@ -233,28 +237,31 @@ namespace ProofGeneration
             var fixedVarTranslation = new CounterFixedVarTranslation();
             var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
-            
-            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram("progLocale", 
+
+            string finalProgTheoryName = afterPassificationImpl.Name + "_passive_prog";
+            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName, 
                 afterPassificationImpl.Name, 
                 finalProgData, varTranslationFactory, 
-                afterPassificationCfg, 
+                afterUnreachablePruningCfg, 
                 out IList<OuterDecl> programDecls,
-                out IDictionary<Block, OuterDecl> blockToDecl);
-            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, vcFunctions, blockToDecl, vcTranslator, varTranslationFactory);
+                out IsaBlockInfo blockInfo);
+            
+            StoreTheory(new Theory(finalProgTheoryName, new List<string> { "Boogie_Lang.Lang" }, programDecls));
+            
+            var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, vcFunctions, blockInfo, vcTranslator, varTranslationFactory);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
-            // ignore peephole for now
+            IDictionary<Block, OuterDecl> cfgProgramLemmas = GenerateCfgLemmas(afterUnreachablePruningCfg, finalProgramLemmas, passiveLemmaManager, new TermIdent(programRepr.cfgDeclDef.id));
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
 
             //Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
-            
-            
             
             List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
             foreach(var v in finalProgramLemmas.Values)
             {
                 afterPassificationDecls.AddRange(v);
             }
-            //afterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
+            //fterPassificationDecls.AddRange(beforePeepholeEmptyLemmas.Values);
+            afterPassificationDecls.AddRange(cfgProgramLemmas.Values);
             
             afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
                 afterUnreachablePruningCfg,
@@ -288,6 +295,55 @@ namespace ProofGeneration
                 passiveOuterDecls);
 
             StoreTheory(theoryPassive);
+            
+            #region before passive
+            
+            var fixedVarTranslation2 = new CounterFixedVarTranslation();
+            var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
+            var varTranslationFactory2 = new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
+
+            string beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
+            IsaProgramRepr programReprPassive = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName, 
+                afterPassificationImpl.Name, 
+                finalProgData, varTranslationFactory, 
+                beforePassificationCfg, 
+                out IList<OuterDecl> programDeclsBeforePassive,
+                out IsaBlockInfo isaBlockInfoBeforePassive);
+            var passificationProgTheory = new Theory(beforePassiveProgTheoryName,
+                new List<string> {"Boogie_Lang.Lang"}, programDeclsBeforePassive);
+            StoreTheory(passificationProgTheory);
+
+            var passificationProofDecls = new List<OuterDecl>();
+            
+            var beforePassiveLemmaManager = new PrePassiveLemmaManager(
+                beforePassificationCfg,
+                beforePassiveOrigBlock,
+                isaBlockInfoBeforePassive,
+                blockInfo,
+                null,
+                null,
+                null,
+                beforePassiveData,
+                varTranslationFactory2
+                );
+
+            int i = 0;
+            foreach (var block in beforePassificationCfg.GetBlocksBackwards())
+            {
+                Block origBlock = beforePassiveOrigBlock[block];
+                if (afterUnreachablePruningCfg.ContainsBlock(origBlock))
+                {
+                    var lemma = beforePassiveLemmaManager.GenerateBlockLemma(block, null, "b_" + i, null);
+                    passificationProofDecls.Add(lemma);
+                    i++;
+                }
+            }
+            
+            Theory passificationProofTheory = new Theory(afterPassificationImpl.Name+"_passification_proof",
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", passificationProgTheory.theoryName, finalProgTheoryName, "Boogie_Lang.Passification"},
+                passificationProofDecls);
+            StoreTheory(passificationProofTheory);
+            #endregion
         }
 
         /// <summary>
@@ -403,6 +459,23 @@ namespace ProofGeneration
             }
 
             return blockToLemmaDecls;
+        }
+        private static IDictionary<Block, OuterDecl> GenerateCfgLemmas(CFGRepr cfg, IDictionary<Block, IList<OuterDecl>> lemmaDecls, PassiveLemmaManager passiveLemmaManager, Term cfgTerm)
+        {
+            var blockToLemmaDecls = new Dictionary<Block, OuterDecl>();
+
+            foreach (Block b in cfg.GetBlocksBackwards())
+            {
+                //TODO move elsewhere
+                var lemma = passiveLemmaManager.GenerateCfgLemma(b, cfg.GetSuccessorBlocks(b), cfgTerm, CfgLemmaName, (LemmaDecl) lemmaDecls[b].Last());
+                blockToLemmaDecls.Add(b, lemma);
+            }
+
+            return blockToLemmaDecls;
+        }
+        private static string CfgLemmaName(Block b)
+        {
+            return "cfg_correct_" + b.Label;
         }
 
         //return first reachable blocks from block which are non-empty

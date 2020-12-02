@@ -18,31 +18,34 @@ namespace ProofGeneration.CFGRepresentation
         //blocks are not copied
         public static CFGRepr getCFGRepresentation(Implementation impl)
         {
-            return getCFGRepresentation(impl, false, out IDictionary<Block, Block> newToOldMapping);
+            return GetCfgRepresentation(impl, false, out IDictionary<Block, Block> newToOldMapping);
         }
 
         //if "generateCopy", then blocks will be copied and the mapping from the copied blocks to the original blocks is given by "newToOldBlocks"
-        public static CFGRepr getCFGRepresentation(Implementation impl, bool generateCopy, out IDictionary<Block, Block> newToOldBlocks, bool isAcyclic = true)
+        public static CFGRepr GetCfgRepresentation(Implementation impl, bool generateCopy, out IDictionary<Block, Block> newToOldBlocks, bool isAcyclic = true)
         {
             Contract.Requires(impl != null);
             Contract.Ensures((generateCopy && newToOldBlocks != null) || (!generateCopy && newToOldBlocks == null));
-
+            var predecessorMap = ComputePredecessors(impl.Blocks);
             IList<Block> blocksToConvert;
+            Func<Block, List<Block>> predecessorFunc;
 
             if(generateCopy)
             {
-                blocksToConvert = CopyBlocks(impl.Blocks);
+                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap);
 
                 var newToOldInternal = new Dictionary<Block, Block>();
                 blocksToConvert.ZipDo(impl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
                 newToOldBlocks = newToOldInternal;
+                predecessorFunc = b => b.Predecessors;
             } else
             {
                 blocksToConvert = impl.Blocks;
                 newToOldBlocks = null;
+                predecessorFunc = b => predecessorMap[b];
             }                
 
-            AlternateCFGRepr(blocksToConvert, out Block entryBlock, out IDictionary<Block, IList<Block >> outgoingBlocks);
+            AlternateCFGRepr(blocksToConvert, out Block entryBlock, predecessorFunc, out IDictionary<Block, IList<Block >> outgoingBlocks);
             IDictionary<Block, int> labeling;
             if (isAcyclic)
             {
@@ -61,7 +64,11 @@ namespace ProofGeneration.CFGRepresentation
             return new CFGRepr(outgoingBlocks, labeling, entryBlock);
         }
 
-        private static void AlternateCFGRepr(IList<Block> blocks, out Block entryBlock, out IDictionary<Block, IList<Block>> outgoingBlocks)
+        private static void AlternateCFGRepr(
+            IList<Block> blocks, 
+            out Block entryBlock, 
+            Func<Block, List<Block>> predecessorFunc, 
+            out IDictionary<Block, IList<Block>> outgoingBlocks)
         {
             entryBlock = null;
             int blockNum = 0;
@@ -69,7 +76,7 @@ namespace ProofGeneration.CFGRepresentation
 
             foreach (var block in blocks)
             {
-                if (block.Predecessors.Count == 0)
+                if (predecessorFunc(block).Count == 0)
                 {
                     if (entryBlock != null)
                     {
@@ -93,6 +100,37 @@ namespace ProofGeneration.CFGRepresentation
             {
                 throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.CFG_NO_ENTRY);
             }
+        }
+
+
+        /// <summary>
+        /// Copy from <see cref="Implementation"/>. We compute predecessors ourselves, since at certain points the
+        /// predecessors property for blocks is not in-sync with the CFG (and we do not want to adjust the Boogie
+        /// objects)
+        /// </summary>
+        private static Dictionary<Block, List<Block>>  ComputePredecessors(IEnumerable<Block> blocks)
+        { 
+            var predecessors = new Dictionary<Block, List<Block>>();
+            foreach (Block b in blocks)
+            {
+                predecessors.Add(b, new List<Block>());
+            }
+
+            foreach (Block b in blocks)
+            {
+                GotoCmd gtc = b.TransferCmd as GotoCmd;
+                if (gtc != null)
+                {
+                    Contract.Assert(gtc.labelTargets != null);
+                    foreach (Block /*!*/ dest in gtc.labelTargets)
+                    {
+                        Contract.Assert(dest != null);
+                        predecessors[dest].Add(b);
+                    }
+                }
+            }
+
+            return predecessors;
         }
 
         private static IDictionary<Block, int> GetTopologicalLabeling(IList<Block> blocks)
@@ -132,7 +170,11 @@ namespace ProofGeneration.CFGRepresentation
             return retLabels;
         }
 
-        private static IList<Block> CopyBlocks(IList<Block> blocks)
+        /// <summary>
+        /// Makes a shallow copy of <paramref name="blocks"/>. The predecessors of <paramref name="blocks"/> is set
+        /// correctly.
+        /// </summary>
+        private static IList<Block> CopyBlocks(IList<Block> blocks, Dictionary<Block, List<Block>> predecessorMap)
         {
             //shallow copy of each block + update edges to copied blocks
             //TODO:  need to make sure this is sufficient
@@ -150,6 +192,7 @@ namespace ProofGeneration.CFGRepresentation
 
                 Block copyBlock = (Block)CloneMethod.Invoke(b, null);
                 copyBlock.Cmds = copyCmds;
+                copyBlock.Predecessors = predecessorMap[b];
 
                 copyBlocks.Add(copyBlock);
                 oldToNewBlock.Add(b, copyBlock);
