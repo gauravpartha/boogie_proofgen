@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
@@ -23,6 +25,11 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             nameToId.Add(v, result);
             nextId++;
             return result;
+        }
+
+        public string OutputMapping()
+        {
+            return string.Join(Environment.NewLine, nameToId);
         }
     }
 }

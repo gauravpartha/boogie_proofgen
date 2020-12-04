@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
@@ -6,9 +7,10 @@ using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 
-namespace ProofGeneration.ProgramToVCProof
+namespace ProofGeneration.Passification
 {
     class PrePassiveLemmaManager : IBlockLemmaManager
     {
@@ -16,14 +18,17 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IDictionary<Block, Block> origToPassiveBlock;
         private readonly IDictionary<Block, Block> passiveToOrigBlock;
 
-        private readonly IDictionary<Variable, Variable> passiveToOrigVar;
-        private readonly IDictionary<Block, IDictionary<Variable, Expr>> constantEntry;
-        private readonly IDictionary<Block, IDictionary<Variable, Expr>> constantExit;
-
         private readonly BoogieMethodData methodData;
         private readonly IEnumerable<Variable> programVariables;
 
+        private readonly PassiveRelationGen _relationGen;
+
         private readonly BoogieContextIsa boogieContext;
+
+        private readonly TermIdent passiveVarContext = IsaCommonTerms.TermIdentFromName("\\<Gamma>'");
+        private readonly TermIdent passiveStates = IsaCommonTerms.TermIdentFromName("U0");
+        private readonly TermIdent constrainedVars = IsaCommonTerms.TermIdentFromName("D0");
+        private readonly TermIdent stateRel = IsaCommonTerms.TermIdentFromName("R");
 
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
         private readonly Term initState;
@@ -34,6 +39,9 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly MultiCmdIsaVisitor cmdIsaVisitor;
 
         private readonly IVariableTranslationFactory varTranslationFactory;
+
+        private readonly IVariableTranslation<Variable> varTranslation; 
+        private readonly IVariableTranslation<Variable> passiveVarTranslation; 
 
         private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
         private readonly IsaUniqueNamer boogieVarUniqueNamer = new IsaUniqueNamer();
@@ -50,24 +58,24 @@ namespace ProofGeneration.ProgramToVCProof
             IDictionary<Block, Block> origToPassiveBlock,
             IsaBlockInfo blockInfo,
             IsaBlockInfo passiveBlockInfo,
-            IDictionary<Variable, Variable> passiveToOrigVar,
-            IDictionary<Block, IDictionary<Variable, Expr>> constantEntry,
-            IDictionary<Block, IDictionary<Variable, Expr>> constantExit,
+            PassificationHintManager hintManager,
+            IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping,
             BoogieMethodData methodData,
-            IVariableTranslationFactory varTranslationFactory)
+            IVariableTranslationFactory varTranslationFactory,
+            IVariableTranslationFactory passiveTranslationFactory)
         {
             this.cfg = cfg;
             this.origToPassiveBlock = origToPassiveBlock;
             passiveToOrigBlock = origToPassiveBlock.ToDictionary((i) => i.Value, (i) => i.Key);
             this.blockInfo = blockInfo;
             this.passiveBlockInfo = passiveBlockInfo;
-            this.passiveToOrigVar = passiveToOrigVar;
-            this.constantEntry = constantEntry;
-            this.constantExit = constantExit;
+            this._relationGen = new PassiveRelationGen(hintManager, initialVarMapping, origToPassiveBlock);
             this.methodData = methodData;
             programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
             initState = IsaBoogieTerm.Normal(normalInitState);
             this.varTranslationFactory = varTranslationFactory;
+            varTranslation = varTranslationFactory.CreateTranslation().VarTranslation;
+            passiveVarTranslation = passiveTranslationFactory.CreateTranslation().VarTranslation;
             cmdIsaVisitor = new MultiCmdIsaVisitor(boogieVarUniqueNamer, varTranslationFactory);
             //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
             funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
@@ -81,33 +89,85 @@ namespace ProofGeneration.ProgramToVCProof
                 );
         }
 
-        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> passiveSuc, string lemmaName, string vcHintsName)           
+        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)           
         {
             if (vcHintsName != null)
                 throw new ProofGenUnexpectedStateException(GetType(), "did not expect any hints");
 
-            //Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             Term cmds = IsaCommonTerms.TermIdentFromName(blockInfo.CmdsQualifiedName(block));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
 
-            Block origBlock = origToPassiveBlock[block];
-            //Term passiveCmds = new TermList(cmdIsaVisitor.Translate(origBlock.Cmds));
-            Term passiveCmds = IsaCommonTerms.TermIdentFromName(passiveBlockInfo.CmdsQualifiedName(origBlock));
-            Term passiveCmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, passiveCmds, initState, finalState);
+            Block passiveBlock = origToPassiveBlock[block];
+            Term passiveCmds = IsaCommonTerms.TermIdentFromName(passiveBlockInfo.CmdsQualifiedName(passiveBlock));
             
-            List<Term> assumptions = new List<Term>() { cmdsReduce, passiveCmdsReduce };
+            List<Tuple<Variable,Expr>> modifiedVarRel = _relationGen.GenerateVariableRelation(block, passiveBlock, successors);
+
+            var modifiedVarRelTerm = modifiedVarRel.Select( tuple =>
+            {
+                var origVar = tuple.Item1;
+                if (tuple.Item2 is IdentifierExpr ie)
+                {
+                    var passiveVar = ie.Decl;
+                    if (varTranslation.TryTranslateVariableId(origVar, out var origVarTerm, out _) &&
+                        passiveVarTranslation.TryTranslateVariableId(passiveVar, out var passiveVarTerm, out _))
+                    {
+                        return (Term) new TermTuple(origVarTerm, passiveVarTerm);
+                    }
+                }
+                
+                throw new ProofGenUnexpectedStateException(GetType(), "Could not translate variables.");
+            }).ToList();
+
+            //second element of each tuple in the relation is a variable that is constrained
+            var constrainedPassiveVars = modifiedVarRelTerm.Select(tuple => ((TermTuple) tuple).terms[1]).ToList();
+            
+            var passiveWitness = new PassificationWitness(
+                passiveVarContext,
+                new TermList(constrainedPassiveVars),
+                new TermList(modifiedVarRelTerm),
+                stateRel,
+                passiveStates,
+                constrainedVars);
+
+            List<Term> assumptions = new List<Term>
+            {
+               BlockLemmaAssumption(boogieContext, passiveWitness, cmds, normalInitState, finalState),
+            };
+
+            var stateRelation = _relationGen.GenerateStateRelation(block);
+
+            foreach (var tupleRel in stateRelation)
+            {
+                var (origVar, passiveExpr) = tupleRel;
+                assumptions.Add(StateRelAssm(stateRel, origVar, passiveExpr));
+            }
 
             //constantEntry.TryGetValue(block, out IDictionary<Variable, Expr> blockConstEntry);
 
             //assumptions.AddRange(EntryStateAssumptions(block, normalInitState));
 
             //conclusion
-            //Term conclusion = ConclusionBlock(block, passiveSuc, LemmaHelper.FinalStateIsMagic(block));
-            Term conclusion = new BoolConst(true);
+            Term conclusion =
+                BlockLemmaConclusion(boogieContext, passiveWitness, passiveCmds, finalState);
 
             Proof proof = new Proof(new List<string> {"oops"});
 
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
+        }
+
+        private Term StateRelAssm(Term stateRelation, Variable origVar, Expr passiveExpr)
+        {
+            if (passiveExpr is IdentifierExpr ie)
+            {
+                if (varTranslation.TryTranslateVariableId(origVar, out Term origVarTerm, out _) &&
+                    passiveVarTranslation.TryTranslateVariableId(ie.Decl, out Term passiveVarTerm, out _))
+                {
+                    return TermBinary.Eq(
+                        new TermApp(stateRelation, origVarTerm), 
+                        IsaCommonTerms.SomeOption(passiveVarTerm));
+                }
+            }
+
+            throw new NotImplementedException();
         }
 
         private Term ConstantOptionValue(Expr eConst, Term state)
@@ -218,8 +278,6 @@ namespace ProofGeneration.ProgramToVCProof
 
         private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
         {
-            PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
-
             VarType absValType = new VarType("a");
 
             var result = new List<Tuple<TermIdent, TypeIsa>>()
@@ -236,6 +294,63 @@ namespace ProofGeneration.ProgramToVCProof
             return result;
         }
 
+        private static Term BlockLemmaAssumption(
+            BoogieContextIsa boogieContextSource,
+            PassificationWitness passificationWitness,
+            Term nonPassiveCmds,
+            Term initNonPassiveState,
+            Term finalState)
+        {
+            var args = new List<Term>
+            {
+                boogieContextSource.absValTyMap,
+                boogieContextSource.methodContext,
+                boogieContextSource.varContext,
+                passificationWitness.VarContext,
+                boogieContextSource.funContext,
+                boogieContextSource.rtypeEnv,
+                passificationWitness.ModifiedVars,
+                passificationWitness.StateRelation,
+                passificationWitness.PassiveStates,
+                passificationWitness.ConstrainedVariables,
+                nonPassiveCmds,
+                initNonPassiveState,
+                finalState
+            };
+            // IsaCommonTerms.SetUnion(passificationWitness.ConstrainedVariables, passificationWitness.ModifiedVars),
+           
+            return new TermApp(IsaCommonTerms.TermIdentFromName("passive_block_assms"), args);
+        }
+            
+        private static Term BlockLemmaConclusion(
+            BoogieContextIsa boogieContextSource,
+            PassificationWitness passificationWitness,
+            Term passiveCmds,
+            Term finalState)
+        {
+            var args = new List<Term>
+            {
+                boogieContextSource.absValTyMap,
+                boogieContextSource.methodContext,
+                boogieContextSource.varContext,
+                passificationWitness.VarContext,
+                boogieContextSource.funContext,
+                boogieContextSource.rtypeEnv,
+                passificationWitness.PassiveStates,
+                IsaCommonTerms.SetUnion(passificationWitness.ConstrainedVariables, 
+                    IsaCommonTerms.SetOfList(passificationWitness.ModifiedVars)),
+                new TermApp(IsaCommonTerms.TermIdentFromName("update_nstate_rel"), 
+                    passificationWitness.StateRelation,
+                    passificationWitness.ModifiedVarsRelation),
+                passiveCmds,
+                finalState
+            };
+            // IsaCommonTerms.SetUnion(passificationWitness.ConstrainedVariables, passificationWitness.ModifiedVars),
+           
+            return new TermApp(IsaCommonTerms.TermIdentFromName("passive_block_conclusion"), args);
+        }
+
+        /*
         private List<Term> EntryStateAssumptions(Block block, Term normalState)
         {
             bool constantPred(Variable v) => block.liveVarsBefore.Contains(v);
@@ -301,6 +416,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             return correctValueAssms;
         }
+        */
 
         private List<Term> ConstantVarAssumptions(
             Block b, 

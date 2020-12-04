@@ -15,6 +15,7 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent AppendId = TermIdentFromName("append");
         private static readonly TermIdent SetOfListId = TermIdentFromName("set");
         private static readonly TermIdent MemberId = TermIdentFromName("Set.member");
+        private static readonly TermIdent SetUnionId = TermIdentFromName("Set.union");
         private static readonly TermIdent Nth = TermIdentFromName("nth");
 
         public static TermIdent EmptyList => TermIdentFromName("[]");
@@ -98,6 +99,11 @@ namespace ProofGeneration.Isa
             return new TermApp(MemberId, new List<Term> { element, set });
         }
 
+        public static Term SetUnion(Term set1, Term set2)
+        {
+            return new TermApp(SetUnionId, new List<Term> { set1, set2 });
+        }
+        
         public static TermIdent TermIdentFromName(string name)
         {
             return new TermIdent(new SimpleIdentifier(name));

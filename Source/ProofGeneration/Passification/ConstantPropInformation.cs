@@ -3,7 +3,7 @@ using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Util;
 using System.Collections.Generic;
 
-namespace ProofGeneration.ProgramToVCProof
+namespace ProofGeneration.Passification
 {
     public static class ConstantPropInformation
     {

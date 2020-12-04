@@ -171,7 +171,7 @@ namespace VC
             Contract.Assert(ctxt.Label2absy != null);
             #region proofgeneration
 
-            ProofGeneration.ProofGenerationLayer.NextHintForBlock(
+            ProofGeneration.ProofGenerationLayer.NextVcHintForBlock(
                 cmd,
                 b,
                 exprVC,
@@ -233,7 +233,7 @@ namespace VC
         }
 
         #region proofgeneration
-        ProofGeneration.ProofGenerationLayer.NextHintForBlock(
+        ProofGeneration.ProofGenerationLayer.NextVcHintForBlock(
             cmd,
             b,
             expr,

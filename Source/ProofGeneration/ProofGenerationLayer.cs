@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
@@ -16,6 +15,7 @@ using ProofGeneration.Util;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using Microsoft.Boogie.TypeErasure;
+using ProofGeneration.Passification;
 
 namespace ProofGeneration
 {
@@ -43,12 +43,15 @@ namespace ProofGeneration
 
         private static BoogieGlobalData boogieGlobalData;
 
-        private static IDictionary<Block, IDictionary<Variable, Variable>> finalVarMapping = new Dictionary<Block, IDictionary<Variable, Variable>>();
+        private static IDictionary<Block, IDictionary<Variable, Expr>> initialVarMapping = new Dictionary<Block, IDictionary<Variable, Expr>>();
         private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
 
         //VC Automation Hints
         private static VCHintManager vcHintManager;
         private static TypePremiseEraserFactory typePremiseEraserFactory;
+        
+        //Passification Automation Hints
+        private static PassificationHintManager passificationHintManager; 
 
         public static void Program(Program p)
         {
@@ -65,6 +68,7 @@ namespace ProofGeneration
         {
             beforePassificationCfg = CFGReprTransformer.GetCfgRepresentation(impl, true, out beforePassiveOrigBlock);
             beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData);
+            passificationHintManager = new PassificationHintManager(beforePassiveOrigBlock);
         }
 
         private static BoogieMethodData MethodDataFromImpl(Implementation impl, BoogieGlobalData globalData)
@@ -80,33 +84,13 @@ namespace ProofGeneration
                 new List<Ensures>(impl.Proc.Ensures));
         }
 
-        /*
-        public static void RecordFinalVariableMapping(Block b, IDictionary<Variable, Expr> variableToExpr)
+        public static void RecordInitialVariableMapping(Block b, IDictionary<Variable, Expr> variableToExpr)
         {
             Contract.Requires(b != null);
             Contract.Requires(variableToExpr != null);
 
-            var origVarToPassiveVar = new Dictionary<Variable, Variable>();
-
-            foreach (var kv in variableToExpr)
-            {
-                if (kv.Value is IdentifierExpr ie && ie.Decl is Variable vPassive)
-                {
-                    origVarToPassiveVar.Add(kv.Key, vPassive);
-                    if (passiveToOrigVar.TryGetValue(vPassive, out Variable origVarInMap))
-                    {
-                        if (origVarInMap != kv.Key)
-                            throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer), "passive variable corresponds to more than one original variables");
-                    } else
-                    {
-                        passiveToOrigVar.Add(vPassive, kv.Key);
-                    }
-                }
-            }
-
-            finalVarMapping.Add(b, origVarToPassiveVar);
+            initialVarMapping.Add(b, new Dictionary<Variable, Expr>(variableToExpr));
         }
-        */
 
         public static void AfterPassification(Implementation impl)
         {
@@ -156,7 +140,7 @@ namespace ProofGeneration
         /// <param name="postVC">the computed postcondition of the command</param>
         /// <param name="resultVC">Wlp(cmd, postVC)</param>
         /// <param name="subsumptionOption">The subsumption option for this cmd.</param>
-        public static void NextHintForBlock(
+        public static void NextVcHintForBlock(
             Cmd cmd, 
             Block block, 
             VCExpr exprVC, 
@@ -166,6 +150,11 @@ namespace ProofGeneration
             )
         {
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
+        }
+
+        public static void NextPassificationHint(Block block, Cmd cmd, Variable origVar, Expr passiveExpr)
+        {
+           passificationHintManager.AddHint(block, cmd, origVar, passiveExpr); 
         }
 
         public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)
@@ -302,16 +291,21 @@ namespace ProofGeneration
             var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
             var varTranslationFactory2 = new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
 
+            Console.WriteLine("**Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
+            
             string beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
             IsaProgramRepr programReprPassive = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName, 
                 afterPassificationImpl.Name, 
-                finalProgData, varTranslationFactory, 
+                beforePassiveData, varTranslationFactory2, 
                 beforePassificationCfg, 
                 out IList<OuterDecl> programDeclsBeforePassive,
                 out IsaBlockInfo isaBlockInfoBeforePassive);
             var passificationProgTheory = new Theory(beforePassiveProgTheoryName,
                 new List<string> {"Boogie_Lang.Lang"}, programDeclsBeforePassive);
             StoreTheory(passificationProgTheory);
+            
+            Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
+            Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
 
             var passificationProofDecls = new List<OuterDecl>();
             
@@ -320,11 +314,11 @@ namespace ProofGeneration
                 beforePassiveOrigBlock,
                 isaBlockInfoBeforePassive,
                 blockInfo,
-                null,
-                null,
-                null,
+                passificationHintManager,
+                initialVarMapping,
                 beforePassiveData,
-                varTranslationFactory2
+                varTranslationFactory2,
+                varTranslationFactory
                 );
 
             int i = 0;
@@ -333,7 +327,8 @@ namespace ProofGeneration
                 Block origBlock = beforePassiveOrigBlock[block];
                 if (afterUnreachablePruningCfg.ContainsBlock(origBlock))
                 {
-                    var lemma = beforePassiveLemmaManager.GenerateBlockLemma(block, null, "b_" + i, null);
+                    var lemma = beforePassiveLemmaManager.GenerateBlockLemma(block, 
+                        beforePassificationCfg.GetSuccessorBlocks(block), GetLemmaName(block), null);
                     passificationProofDecls.Add(lemma);
                     i++;
                 }

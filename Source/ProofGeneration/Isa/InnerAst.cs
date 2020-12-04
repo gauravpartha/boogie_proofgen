@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 
 namespace ProofGeneration.Isa
 {
@@ -65,9 +66,9 @@ namespace ProofGeneration.Isa
             this.arg = arg;
         }
 
-        public TermApp(Term fun, Term arg) : this(fun, new List<Term>() { arg })
+        public TermApp(Term fun, params Term [] args) : this(fun, args.ToList())
         {
-
+            
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
