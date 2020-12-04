@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
 using System.Diagnostics.Contracts;
+using ProofGeneration;
 using Set = Microsoft.Boogie.GSet<object>;
 
 namespace VC
@@ -911,7 +912,7 @@ namespace VC
         ChecksumHelper.ComputeChecksums(c, currentImplementation, variableCollector.UsedVariables, currentChecksum);
         variableCollector.Visit(c);
         currentChecksum = c.Checksum;
-        TurnIntoPassiveCmd(c, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
+        TurnIntoPassiveCmd(c, incarnationMap, oldFrameSubst, passiveCmds, mvInfo, b);
       }
 
       b.Checksum = currentChecksum;
@@ -1033,6 +1034,7 @@ namespace VC
         Contract.Assert(b != null);
         Contract.Assert(!block2Incarnation.ContainsKey(b));
         Dictionary<Variable, Expr> incarnationMap = ComputeIncarnationMap(b, block2Incarnation);
+        ProofGenerationLayer.RecordInitialVariableMapping(b, incarnationMap);
 
         // b.liveVarsBefore has served its purpose in the just-finished call to ComputeIncarnationMap; null it out.
         b.liveVarsBefore = null;
@@ -1184,7 +1186,7 @@ namespace VC
     /// Meanwhile, record any information needed to later reconstruct a model view.
     /// </summary>
     protected void TurnIntoPassiveCmd(Cmd c, Dictionary<Variable, Expr> incarnationMap, Substitution oldFrameSubst,
-      List<Cmd> passiveCmds, ModelViewInfo mvInfo)
+      List<Cmd> passiveCmds, ModelViewInfo mvInfo, Block block = null)
     {
       Contract.Requires(c != null);
       Contract.Requires(incarnationMap != null);
@@ -1395,14 +1397,21 @@ namespace VC
           if (rhs is LiteralExpr)
           {
             incarnationMap[lhs] = rhs;
+            ProofGenerationLayer.NextPassificationHint(block, c, lhs, rhs);
           }
           else if (rhs is IdentifierExpr)
           {
             IdentifierExpr ie = (IdentifierExpr) rhs;
             if (incarnationMap.ContainsKey(cce.NonNull(ie.Decl)))
+            {
               newIncarnationMappings[lhs] = cce.NonNull((Expr) incarnationMap[ie.Decl]);
+              ProofGenerationLayer.NextPassificationHint(block, c, lhs, incarnationMap[ie.Decl]);
+            }
             else
+            {
               newIncarnationMappings[lhs] = ie;
+              ProofGenerationLayer.NextPassificationHint(block, c, lhs, ie);
+            }
           }
           else
           {
@@ -1414,12 +1423,14 @@ namespace VC
             {
               // incarnations are already written only once, no need to make an incarnation of an incarnation
               x_prime_exp = lhsIdExpr;
+              throw new NotSupportedException("Proof generation does not support this case: incarnation on lhs of assignment");
             }
             else
             {
               Variable v = CreateIncarnation(lhs, c);
               x_prime_exp = new IdentifierExpr(lhsIdExpr.tok, v);
               newIncarnationMappings[lhs] = x_prime_exp;
+              ProofGenerationLayer.NextPassificationHint(block, c, lhs, x_prime_exp);
             }
 
             #endregion
@@ -1516,6 +1527,7 @@ namespace VC
             Variable x = cce.NonNull(ie.Decl);
             Variable x_prime = CreateIncarnation(x, c);
             incarnationMap[x] = new IdentifierExpr(x_prime.tok, x_prime);
+            ProofGenerationLayer.NextPassificationHint(block, c, x, incarnationMap[x]);
           }
         }
 
@@ -1561,7 +1573,7 @@ namespace VC
         Contract.Assert(sug != null);
         Cmd cmd = sug.Desugaring;
         Contract.Assert(cmd != null);
-        TurnIntoPassiveCmd(cmd, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
+        TurnIntoPassiveCmd(cmd, incarnationMap, oldFrameSubst, passiveCmds, mvInfo, block);
       }
       else if (c is StateCmd)
       {
@@ -1583,7 +1595,7 @@ namespace VC
         foreach (Cmd s in st.Cmds)
         {
           Contract.Assert(s != null);
-          TurnIntoPassiveCmd(s, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
+          TurnIntoPassiveCmd(s, incarnationMap, oldFrameSubst, passiveCmds, mvInfo, block);
         }
 
         // remove the local variables from the incarnation map
