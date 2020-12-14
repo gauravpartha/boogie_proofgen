@@ -3271,7 +3271,8 @@ namespace VC
       Convert2PassiveCmd(impl, mvInfo);
 
       #region proofgen
-      ProofGeneration.ProofGenerationLayer.AfterPassification(impl);
+      //ProofGeneration.ProofGenerationLayer.AfterPassification(impl);
+      ProofGeneration.ProofGenerationLayer.AfterPassificationCheckGlobalMap(impl);
       #endregion
 
             if (QKeyValue.FindBoolAttribute(impl.Attributes, "may_unverified_instrumentation"))

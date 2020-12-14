@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 
@@ -9,7 +10,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         private readonly IDictionary<Variable, int> paramsAndLocalMapping;
         private readonly IDictionary<Variable, int> globalsMapping;
 
-        public DeBruijnFixedVarTranslation(BoogieMethodData methodData)
+        public DeBruijnFixedVarTranslation(BoogieMethodData methodData, bool globalsBeforeLocals=true)
         {
             paramsAndLocalMapping = new Dictionary<Variable, int>();
             globalsMapping = new Dictionary<Variable, int>();
@@ -30,9 +31,20 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             }
 
             //order important
-            AddVarsToMapping(methodData.InParams, paramsAndLocalMapping);
-            AddVarsToMapping(methodData.Locals, paramsAndLocalMapping);
-            AddVarsToMapping(methodData.GlobalVars.Union(methodData.Constants), globalsMapping);
+            if (globalsBeforeLocals)
+            {
+                AddVarsToMapping(methodData.Constants, globalsMapping);
+                AddVarsToMapping(methodData.GlobalVars, globalsMapping);
+                AddVarsToMapping(methodData.InParams, paramsAndLocalMapping);
+                AddVarsToMapping(methodData.Locals, paramsAndLocalMapping);
+            }
+            else
+            {
+                AddVarsToMapping(methodData.InParams, paramsAndLocalMapping);
+                AddVarsToMapping(methodData.Locals, paramsAndLocalMapping);
+                AddVarsToMapping(methodData.Constants, globalsMapping);
+                AddVarsToMapping(methodData.GlobalVars, globalsMapping);
+            }
         }
 
         public int VariableId(Variable variable)
@@ -48,6 +60,16 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             }
 
             throw new ProofGenUnexpectedStateException(GetType(), "cannot find variable " + variable);
+        }
+        
+        
+        public string OutputMapping()
+        {
+            return
+                "constants and globals: " + Environment.NewLine +
+                 string.Join(Environment.NewLine, globalsMapping) + Environment.NewLine + 
+                " params and locals:" + Environment.NewLine + 
+                string.Join(Environment.NewLine, paramsAndLocalMapping);
         }
 
     }

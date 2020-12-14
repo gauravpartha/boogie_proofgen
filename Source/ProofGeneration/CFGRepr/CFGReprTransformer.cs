@@ -6,6 +6,7 @@ using System.Linq;
 using ProofGeneration.Util;
 using System.Reflection;
 using System;
+using Type = System.Type;
 
 namespace ProofGeneration.CFGRepresentation
 {
@@ -80,7 +81,7 @@ namespace ProofGeneration.CFGRepresentation
                 {
                     if (entryBlock != null)
                     {
-                        throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.CFG_NOT_UNIQUE_ENTRY);
+                        throw new ProofGenUnexpectedStateException(typeof(CFGReprTransformer), "no unique CFG entry");
                     }
                     entryBlock = block;
                 }
@@ -97,8 +98,8 @@ namespace ProofGeneration.CFGRepresentation
             }
 
             if (entryBlock == null)
-            {
-                throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.CFG_NO_ENTRY);
+            { 
+                throw new ProofGenUnexpectedStateException(typeof(CFGReprTransformer), "no CFG entry");
             }
         }
 
@@ -141,21 +142,7 @@ namespace ProofGeneration.CFGRepresentation
                              Contract.Result<IDictionary<Block, int>>().Values.Max() == blocks.Count-1);
 
             //adusted code from VC.cs
-            Graph<Block> dag = new Graph<Block>();
-            dag.AddSource(blocks[0]);
-            foreach (Block b in blocks)
-            {
-                GotoCmd gtc = b.TransferCmd as GotoCmd;
-                if (gtc != null)
-                {
-                    Contract.Assume(gtc.labelTargets != null);
-                    foreach (Block dest in gtc.labelTargets)
-                    {
-                        Contract.Assert(dest != null);
-                        dag.AddEdge(dest, b);
-                    }
-                }
-            }
+            Graph<Block> dag = GraphUtil.GraphFromBlocks(blocks, true);
             IEnumerable<Block> sortedNodes = dag.TopologicalSort();
             Contract.Assert(sortedNodes != null);
 

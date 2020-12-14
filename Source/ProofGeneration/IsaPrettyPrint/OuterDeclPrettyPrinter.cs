@@ -1,5 +1,7 @@
 ﻿using ProofGeneration.Isa;
 using System;
+using System.Collections.Generic;
+using System.Reflection.Metadata;
 using System.Text;
 
 namespace ProofGeneration.IsaPrettyPrint
@@ -31,19 +33,28 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override int VisitDefDecl(DefDecl d)
         {
-            _sb.Append("definition ").Append(d.name);
-            if (d.type != null)
+            return HandleAbbrevOrDef(d, "definition", d.type, "=", d.equation);
+        }
+        public override int VisitAbbreviationDecl(AbbreviationDecl d)
+        {
+            return HandleAbbrevOrDef(d, "abbreviation", d.type, "\\<equiv>", d.equation);
+        }
+
+        private int HandleAbbrevOrDef(OuterDecl d, string topLevel, TypeIsa type, string equality, Tuple<IList<Term>, Term> equation)
+        {
+            _sb.Append(topLevel + " ").Append(d.name);
+            if (type != null)
             {
                 _sb.Append(" :: ");
-                AppendInner(_typeIsaPrinter.Visit(d.type));
+                AppendInner(_typeIsaPrinter.Visit(type));
             }
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(2));
 
-            string args = IsaPrettyPrinterHelper.SpaceAggregate(_termPrinter.VisitList(d.equation.Item1));
+            string args = IsaPrettyPrinterHelper.SpaceAggregate(_termPrinter.VisitList(equation.Item1));
 
             AppendInner(
-               () => _sb.Append(d.name).Append(" ").Append(args).Append(" = ").Append(_termPrinter.Visit(d.equation.Item2))
+               () => _sb.Append(d.name).Append(" ").Append(args).Append(" " + equality + " ").Append(_termPrinter.Visit(equation.Item2))
             );
 
             return 0;

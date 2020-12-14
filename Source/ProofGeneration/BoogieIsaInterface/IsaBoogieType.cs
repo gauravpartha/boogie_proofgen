@@ -101,10 +101,16 @@ namespace ProofGeneration
             return new DataType("var_context", new List<TypeIsa>() { });
         }
 
+        /*
         public static TypeIsa FunContextType(TypeIsa absValType)
         {
             return new DataType("fun_context", new List<TypeIsa>() { absValType } );
         }
+        */
 
+        public static TypeIsa FunInterpType(TypeIsa absValType)
+        {
+            return new DataType("fun_interp", new List<TypeIsa>() { absValType } );
+        }
     }
 }

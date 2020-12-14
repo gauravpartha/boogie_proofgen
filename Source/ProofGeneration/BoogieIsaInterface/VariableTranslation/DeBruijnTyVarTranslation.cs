@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
@@ -39,6 +40,12 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             {
                 throw new ProofGenUnexpectedStateException(GetType(), "cannot find variable " + tyVariable);
             }
+        }
+        
+        
+        public string OutputMapping()
+        {
+            return string.Join(Environment.NewLine, methodTyVarMapping);
         }
     }
 }

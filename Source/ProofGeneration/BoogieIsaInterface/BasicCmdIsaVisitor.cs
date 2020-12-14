@@ -52,7 +52,7 @@ namespace ProofGeneration
                 cmdsIsa.Add(Translate(cmd));
                 if (!StateIsFresh())
                 {
-                    throw new IsaCFGGeneratorException(IsaCFGGeneratorException.Reason.VISITOR_NOT_FRESH);
+                    throw new ProofGenUnexpectedStateException(GetType(), "Visitor not fresh");
                 }
             }
 

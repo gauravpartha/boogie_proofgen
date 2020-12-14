@@ -8,17 +8,23 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent SomeId = TermIdentFromName("Some");
         private static readonly TermIdent NoneId = TermIdentFromName("None");
         private static readonly TermIdent TheId = TermIdentFromName("the");
-        private static readonly TermIdent FstId = TermIdentFromName("fst");
+        public static TermIdent FstId { get;  } = TermIdentFromName("fst");
         private static readonly TermIdent SndId = TermIdentFromName("snd");
         private static readonly TermIdent InlId = TermIdentFromName("Inl");
         private static readonly TermIdent InrId = TermIdentFromName("Inr");
         private static readonly TermIdent AppendId = TermIdentFromName("append");
+        private static readonly TermIdent MapId = TermIdentFromName("map");
         private static readonly TermIdent SetOfListId = TermIdentFromName("set");
         private static readonly TermIdent MemberId = TermIdentFromName("Set.member");
+        private static readonly TermIdent SetMaxId = TermIdentFromName("Max");
+        private static readonly TermIdent SetMinId = TermIdentFromName("Min");
         private static readonly TermIdent SetUnionId = TermIdentFromName("Set.union");
+        private static readonly TermIdent SetInterId = TermIdentFromName("Set.inter");
         private static readonly TermIdent Nth = TermIdentFromName("nth");
 
         public static TermIdent EmptyList => TermIdentFromName("[]");
+        public static TermIdent EmptySet => TermIdentFromName("{}");
+        
         public static Term Let(Identifier boundVar, TypeIsa boundVarType, Term termSubst, Term body)
         {
             return new TermApp(
@@ -80,6 +86,11 @@ namespace ProofGeneration.Isa
         {
             return new TermApp(AppendId, new List<Term> { list1, list2 });
         }
+
+        public static Term Map(Term fun, Term list)
+        {
+            return new TermApp(MapId, fun, list);
+        }
         
         public static Term SetOfList(Term list)
         {
@@ -102,6 +113,21 @@ namespace ProofGeneration.Isa
         public static Term SetUnion(Term set1, Term set2)
         {
             return new TermApp(SetUnionId, new List<Term> { set1, set2 });
+        }
+
+        public static Term SetInter(Term set1, Term set2)
+        {
+            return new TermApp(SetInterId, new List<Term> { set1, set2 });
+        }
+        
+        public static Term SetMax(Term set)
+        {
+            return new TermApp(SetMaxId, set);
+        }
+        
+        public static Term SetMin(Term set)
+        {
+            return new TermApp(SetMinId, set);
         }
         
         public static TermIdent TermIdentFromName(string name)

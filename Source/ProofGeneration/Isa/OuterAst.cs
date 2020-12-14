@@ -72,6 +72,31 @@ namespace ProofGeneration.Isa
             return visitor.VisitDefDecl(this);
         }
     }
+    
+    public class AbbreviationDecl : OuterDecl
+    {
+        // if type is null, then type is inferred
+        public readonly TypeIsa type;
+        
+        // arguments and right hand side 
+        public readonly Tuple<IList<Term>, Term> equation;
+
+        public AbbreviationDecl(string name, TypeIsa type, Tuple<IList<Term>, Term> equation) : base(name)
+        {
+            this.type = type;
+            this.equation = equation;
+        }
+        
+        
+        public AbbreviationDecl(string name, Tuple<IList<Term>, Term> equation) : this(name, null, equation)
+        { }
+
+        public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
+        {
+            return visitor.VisitAbbreviationDecl(this);
+        }
+    }
+    
 
     public class ContextElem
     {

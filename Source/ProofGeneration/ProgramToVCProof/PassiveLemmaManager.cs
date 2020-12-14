@@ -79,7 +79,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
         {
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(isaBlockInfo.BlockCmdsDefs[block].name), 
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(isaBlockInfo.CmdsQualifiedName(block)), 
                 initState, finalState);
 
             List<Term> assumptions = new List<Term> { cmdsReduce };
@@ -103,8 +103,8 @@ namespace ProofGeneration.ProgramToVCProof
             List<Term> assumption = new List<Term> { red, vcinst.GetVCObjInstantiation(block, declToVCMapping) };
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
-            string nodeLemma = isaBlockInfo.BlockCmdsLemmas[block].name;
-            string outEdgesLemma = isaBlockInfo.BlockOutEdgesLemmas[block].name;
+            string nodeLemma = isaBlockInfo.BlockCmdsMembershipLemma(block);
+            string outEdgesLemma = isaBlockInfo.OutEdgesMembershipLemma(block);
             var proofMethods = new List<string>();
             if (successors.Any())
             {
@@ -164,7 +164,7 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),
                 Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
-                Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunContextType(absValType)),
+                Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType)),
                 Tuple.Create(normalInitState, IsaBoogieType.NormalStateType(absValType))
             };
 
@@ -215,7 +215,7 @@ namespace ProofGeneration.ProgramToVCProof
             // if One_nat_def is not removed from the simpset, then there is an issue with the assumption "ns 1 = ...",
             // since Isabelle rewrites it to Suc 0 and a subsequent step in the proof may fail
             DeclareDecl decl = new DeclareDecl("Nat.One_nat_def[simp del]");
-
+            
             return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm, decl };
         }
 
@@ -227,7 +227,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms " + globalAssmsName,
-                    "unfolding " + isaBlockInfo.BlockCmdsDefs[b].name + "_def",
+                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def",
                     "apply cases",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (handle_cmd_list_full?)",
@@ -238,7 +238,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methods = new List<string>
                 {
                     "using assms ",
-                    "unfolding " + isaBlockInfo.BlockCmdsDefs[b].name + "_def",
+                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def",
                     "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
                     "apply (tactic \\<open> boogie_vc_tac @{context} @{thms " + globalAssmsName + "} " +
                     "@{thm forall_poly_thm} " + vcHintsName + " \\<close>)",

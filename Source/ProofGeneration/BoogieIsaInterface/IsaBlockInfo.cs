@@ -19,12 +19,17 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public IDictionary<Block, LemmaDecl> BlockOutEdgesLemmas { get; }
         
-        public string OutEdgesQualifiedName(Block b)
+        public string OutEdgesMembershipLemma(Block b)
         {
             return QualifiedName(BlockOutEdgesLemmas[b]);
         }
         
         public IDictionary<Block, LemmaDecl> BlockCmdsLemmas { get; }
+
+        public string BlockCmdsMembershipLemma(Block b)
+        {
+            return QualifiedName(BlockCmdsLemmas[b]);
+        }
         
         private string QualifiedName(OuterDecl decl)
         {

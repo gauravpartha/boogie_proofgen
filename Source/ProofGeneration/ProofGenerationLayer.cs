@@ -92,6 +92,33 @@ namespace ProofGeneration
             initialVarMapping.Add(b, new Dictionary<Variable, Expr>(variableToExpr));
         }
 
+        public static void AfterPassificationCheckGlobalMap(Implementation impl)
+        {
+            finalProgData = MethodDataFromImpl(impl, boogieGlobalData);
+            afterPassificationImpl = impl;
+            afterPassificationCfg = CFGReprTransformer.getCFGRepresentation(impl);
+
+            var passiveBlocks = new List<Block>(impl.Blocks);
+            
+            GlobalVersion globalVersion = new GlobalVersion();
+            var globalVersionMap = globalVersion.GlobalVersionMap(
+                beforePassificationCfg.entry.liveVarsBefore,
+                afterPassificationCfg.entry, 
+                passiveBlocks);
+            
+            Console.WriteLine("Version map: " + string.Join(Environment.NewLine, globalVersionMap));
+            
+            var versionMapCorrect = 
+                GlobalVersionChecker.CheckVersionMap(globalVersionMap, 
+                passificationHintManager, initialVarMapping,
+                beforePassificationCfg, beforePassiveOrigBlock);
+
+            if (!versionMapCorrect)
+            {
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer), "Incorrect version map");
+            }
+        }
+        
         public static void AfterPassification(Implementation impl)
         {
             finalProgData = MethodDataFromImpl(impl, boogieGlobalData);
@@ -136,6 +163,8 @@ namespace ProofGeneration
         }
 
         /// <summary> Records hint for a cmd in the final passified Boogie program</summary>
+        /// <param name="cmd">command</param>
+        /// <param name="block">block containing command</param>
         /// <param name="exprVC">the computed VC for the expression in the command</param>
         /// <param name="postVC">the computed postcondition of the command</param>
         /// <param name="resultVC">Wlp(cmd, postVC)</param>
@@ -185,6 +214,25 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
+            #region before passive program
+            var fixedVarTranslation2 = new DeBruijnFixedVarTranslation(beforePassiveData);
+            var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
+            var varTranslationFactory2 = new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
+
+            Console.WriteLine("**Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
+            
+            string beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
+            var beforePassiveConfig = new IsaProgramGeneratorConfig(null, true,true, true, true);
+            var beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName, 
+                afterPassificationImpl.Name, 
+                beforePassiveData, beforePassiveConfig, varTranslationFactory2, 
+                beforePassificationCfg, 
+                out IList<OuterDecl> programDeclsBeforePassive,
+                out IsaBlockInfo isaBlockInfoBeforePassive);
+            #endregion
+            
+            
+            
             List<VCExpr> vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
             int nAxioms = boogieGlobalData.Axioms.Count();
             
@@ -223,23 +271,24 @@ namespace ProofGeneration
             
             var lemmaNamer = new IsaUniqueNamer();
 
-            var fixedVarTranslation = new CounterFixedVarTranslation();
+            var fixedVarTranslation = new DeBruijnFixedVarTranslation(finalProgData);
             var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
             string finalProgTheoryName = afterPassificationImpl.Name + "_passive_prog";
-            IsaProgramRepr programRepr = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName, 
+            var passiveProgConfig = new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, false);
+            var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName, 
                 afterPassificationImpl.Name, 
-                finalProgData, varTranslationFactory, 
+                finalProgData, passiveProgConfig, varTranslationFactory, 
                 afterUnreachablePruningCfg, 
                 out IList<OuterDecl> programDecls,
                 out IsaBlockInfo blockInfo);
             
-            StoreTheory(new Theory(finalProgTheoryName, new List<string> { "Boogie_Lang.Lang" }, programDecls));
+            StoreTheory(new Theory(finalProgTheoryName, new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName() }, programDecls));
             
             var passiveLemmaManager = new PassiveLemmaManager(vcinst, finalProgData, vcFunctions, blockInfo, vcTranslator, varTranslationFactory);
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = GenerateVCLemmas(afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
-            IDictionary<Block, OuterDecl> cfgProgramLemmas = GenerateCfgLemmas(afterUnreachablePruningCfg, finalProgramLemmas, passiveLemmaManager, new TermIdent(programRepr.cfgDeclDef.id));
+            IDictionary<Block, OuterDecl> cfgProgramLemmas = GenerateCfgLemmas(afterUnreachablePruningCfg, finalProgramLemmas, passiveLemmaManager, passiveProgAccess.CfgDecl());
             //IDictionary<Block, LemmaDecl> beforePeepholeEmptyLemmas = GetAdjustedLemmas(afterPassificationCfg, afterUnreachablePruningCfg, passiveLemmaManager, lemmaNamer);
 
             //Contract.Assert(!finalProgramLemmas.Keys.Intersect(beforePeepholeEmptyLemmas.Keys).Any());
@@ -254,13 +303,12 @@ namespace ProofGeneration
             
             afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
                 afterUnreachablePruningCfg,
-                programRepr.cfgDeclDef,
+                passiveProgAccess.CfgDecl(),
                 "method_verifies"));
 
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
             var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
-            passiveOuterDecls.AddRange(programDecls);
             passiveOuterDecls.Add(afterPassificationLocale);
 
             List<VCAxiomInfo> allAxiomsInfo = GetBoogieAxiomInfo(boogieGlobalData.Axioms, vcBoogieAxioms.GetRange(3, nAxioms));
@@ -269,7 +317,7 @@ namespace ProofGeneration
 
             var endToEnd = new EndToEndVCProof(
                 finalProgData, 
-                programRepr, 
+                passiveProgAccess, 
                 vcFunctions, 
                 vcBoogieInfo,
                 afterUnreachablePruningCfg, 
@@ -280,28 +328,16 @@ namespace ProofGeneration
             passiveOuterDecls.AddRange(endToEnd.GenerateProof());
 
             Theory theoryPassive = new Theory(afterPassificationImpl.Name+"_passive",
-                new List<string>() { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML" },
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML", 
+                    passiveProgAccess.TheoryName(), beforePassiveProgAccess.TheoryName() },
                 passiveOuterDecls);
 
             StoreTheory(theoryPassive);
             
             #region before passive
             
-            var fixedVarTranslation2 = new CounterFixedVarTranslation();
-            var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
-            var varTranslationFactory2 = new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
-
-            Console.WriteLine("**Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
-            
-            string beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
-            IsaProgramRepr programReprPassive = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName, 
-                afterPassificationImpl.Name, 
-                beforePassiveData, varTranslationFactory2, 
-                beforePassificationCfg, 
-                out IList<OuterDecl> programDeclsBeforePassive,
-                out IsaBlockInfo isaBlockInfoBeforePassive);
             var passificationProgTheory = new Theory(beforePassiveProgTheoryName,
-                new List<string> {"Boogie_Lang.Lang"}, programDeclsBeforePassive);
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforePassive);
             StoreTheory(passificationProgTheory);
             
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
@@ -313,7 +349,9 @@ namespace ProofGeneration
                 beforePassificationCfg,
                 beforePassiveOrigBlock,
                 isaBlockInfoBeforePassive,
+                beforePassiveProgAccess,
                 blockInfo,
+                passiveProgAccess,
                 passificationHintManager,
                 initialVarMapping,
                 beforePassiveData,
@@ -321,7 +359,8 @@ namespace ProofGeneration
                 varTranslationFactory
                 );
 
-            int i = 0;
+            passificationProofDecls.AddRange(beforePassiveLemmaManager.Prelude());
+            
             foreach (var block in beforePassificationCfg.GetBlocksBackwards())
             {
                 Block origBlock = beforePassiveOrigBlock[block];
@@ -330,12 +369,11 @@ namespace ProofGeneration
                     var lemma = beforePassiveLemmaManager.GenerateBlockLemma(block, 
                         beforePassificationCfg.GetSuccessorBlocks(block), GetLemmaName(block), null);
                     passificationProofDecls.Add(lemma);
-                    i++;
                 }
             }
             
             Theory passificationProofTheory = new Theory(afterPassificationImpl.Name+"_passification_proof",
-                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", passificationProgTheory.theoryName, finalProgTheoryName, "Boogie_Lang.Passification"},
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(), passiveProgAccess.TheoryName(), "Boogie_Lang.Passification"},
                 passificationProofDecls);
             StoreTheory(passificationProofTheory);
             #endregion

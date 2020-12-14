@@ -6,7 +6,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
     class DeBruijnVarFactory : IVariableTranslationFactory
     {
-        private readonly CounterFixedVarTranslation varTranslation;
+        private readonly IFixedVariableTranslation<Variable> varTranslation;
         private readonly DeBruijnFixedTVarTranslation tvarTranslation;
         private readonly BoogieGlobalData globalData;
 
@@ -14,7 +14,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         private readonly Func<int, bool, Term> typeVarConstructor = (i,isBound) => IsaBoogieType.TVar(i);
 
         public DeBruijnVarFactory(
-            CounterFixedVarTranslation varTranslation,
+            IFixedVariableTranslation<Variable> varTranslation,
             DeBruijnFixedTVarTranslation tvarTranslation,
             BoogieGlobalData boogieGlobalData)
         {

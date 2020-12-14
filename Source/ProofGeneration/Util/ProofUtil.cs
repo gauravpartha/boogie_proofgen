@@ -4,6 +4,11 @@ namespace ProofGeneration.Util
 {
     public static class ProofUtil
     {
+
+        public static string DefLemma(string defName)
+        {
+            return defName + "_def";
+        }
         public static string Simp(params string [] theorems)
         {
             if(theorems.Length == 0)

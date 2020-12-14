@@ -14,6 +14,8 @@ namespace ProofGeneration.Isa
           
         public abstract R VisitDefDecl(DefDecl d);
 
+        public abstract R VisitAbbreviationDecl(AbbreviationDecl d);
+
         public abstract R VisitLemmaDecl(LemmaDecl d);
 
         public abstract R VisitLemmasDecl(LemmasDecl d);

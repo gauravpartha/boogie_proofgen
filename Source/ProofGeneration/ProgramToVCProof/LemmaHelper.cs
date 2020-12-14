@@ -134,7 +134,7 @@ namespace ProofGeneration.ProgramToVCProof
             BoogieContextIsa boogieContext
             )
         {
-            Term ctxWfLeft = new TermApp(IsaCommonTerms.Snd(boogieContext.funContext), new List<Term>() { new StringConst(f.Name) });
+            Term ctxWfLeft = new TermApp(boogieContext.funContext, new List<Term>() { new StringConst(f.Name) });
             Term ctxWfRight = IsaCommonTerms.SomeOption(funInterpMapping[f]);
 
             return new TermBinary(ctxWfLeft, ctxWfRight, TermBinary.BinaryOpCode.EQ);
