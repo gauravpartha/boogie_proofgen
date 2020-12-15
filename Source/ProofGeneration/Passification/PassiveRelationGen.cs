@@ -11,14 +11,17 @@ namespace ProofGeneration.Passification
         private readonly PassificationHintManager hintManager;
         private readonly IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping;
         private readonly IDictionary<Block, Block> newToOrigCopy;
+        private readonly IDictionary<Block, IEnumerable<Variable>> liveVarsBefore;
         
         public PassiveRelationGen(PassificationHintManager hintManager, 
             IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping,
-            IDictionary<Block, Block> newToOrigCopy)
+            IDictionary<Block, Block> newToOrigCopy,
+            IDictionary<Block, IEnumerable<Variable>> liveVarsBefore)
         {
             this.hintManager = hintManager;
             this.initialVarMapping = initialVarMapping;
             this.newToOrigCopy = newToOrigCopy;
+            this.liveVarsBefore = liveVarsBefore;
         }
 
         public List<Tuple<Variable, Expr>> GenerateStateRelation(Block nonPassiveBlock)
@@ -27,7 +30,7 @@ namespace ProofGeneration.Passification
 
             var result = new List<Tuple<Variable, Expr>>();
 
-            foreach (Variable liveVar in nonPassiveBlock.liveVarsBefore)
+            foreach (Variable liveVar in liveVarsBefore[nonPassiveBlock])
             {
                 if (initMappingBlock.TryGetValue(liveVar, out Expr passiveExpr))
                 {

@@ -16,7 +16,7 @@ namespace ProofGeneration.Passification
             IDictionary<Block, Block> beforeToPassiveBlocks
         )
         {
-           PassiveRelationGen relationGen = new PassiveRelationGen(hintManager, initialVarMapping, beforeToPassiveBlocks);
+           PassiveRelationGen relationGen = new PassiveRelationGen(hintManager, initialVarMapping, beforeToPassiveBlocks, ProofGenLiveVarAnalysis.ComputeLiveVariables(beforePassiveBlocks));
            
            HashSet<Cmd> syncCmds = new HashSet<Cmd>();
 

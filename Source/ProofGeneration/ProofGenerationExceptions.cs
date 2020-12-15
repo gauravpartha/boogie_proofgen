@@ -12,6 +12,8 @@ namespace ProofGeneration
             this.TriggeringClass = triggeringClass;
         }
 
+        public ProofGenUnexpectedStateException(string message) : base(message)
+        { }
         public ProofGenUnexpectedStateException(Type triggeringClass)
         {
             this.TriggeringClass = triggeringClass;

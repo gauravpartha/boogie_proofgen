@@ -81,7 +81,7 @@ namespace ProofGeneration.Passification
             this.programAccessor = programAccessor;
             this.passiveBlockInfo = passiveBlockInfo;
             this.passiveProgramAccessor = passiveProgramAccessor;
-            this._relationGen = new PassiveRelationGen(hintManager, initialVarMapping, origToPassiveBlock);
+            this._relationGen = new PassiveRelationGen(hintManager, initialVarMapping, origToPassiveBlock, ProofGenLiveVarAnalysis.ComputeLiveVariables(cfg));
             this.methodData = methodData;
             programVariables = methodData.InParams.Union(methodData.Locals);
             initState = IsaBoogieTerm.Normal(normalInitState);
@@ -199,7 +199,7 @@ namespace ProofGeneration.Passification
                 {
                     ProofUtil.Apply("rule passification_block_lemma_compact[OF assms(1-2)]"),
                     "unfolding " + ProofUtil.DefLemma(cmdsDefName) + " " + ProofUtil.DefLemma(passiveCmdsDefName),
-                    ProofUtil.Apply("passive_rel_tac R_def: assms(3-)"),
+                    ProofUtil.Apply("passive_rel_tac " + (stateRelation.Any() ? "R_def: assms(3-)" : "")),
                 };
             
             proofMethods.Add("apply (unfold type_rel_def, simp, (intro conjI)?)");
@@ -232,7 +232,7 @@ namespace ProofGeneration.Passification
                     }
                 } else if (passiveExpr is LiteralExpr lit)
                 {
-                    rhsValue = IsaCommonTerms.Inr(cmdIsaVisitor.Translate(lit).First());
+                    rhsValue = IsaCommonTerms.Inr(IsaBoogieTerm.Literal(lit));
                 }
                 else
                 {
