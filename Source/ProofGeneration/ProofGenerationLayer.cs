@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
@@ -60,25 +61,45 @@ namespace ProofGeneration
 
         public static void BeforeCFGToDAG(Implementation impl)
         {
-            beforeDagCfg = CFGReprTransformer.GetCfgRepresentation(impl, true, out beforeDagOrigBlock, false);
-            beforeDagData = MethodDataFromImpl(impl, boogieGlobalData);
+            beforeDagCfg = CFGReprTransformer.GetCfgRepresentation(impl, 
+                true, 
+                true, 
+                out beforeDagOrigBlock, 
+                out List<Variable> newVarsFromDesugaring, 
+                false);
+            beforeDagData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
         }
 
         public static void BeforePassification(Implementation impl)
         {
-            beforePassificationCfg = CFGReprTransformer.GetCfgRepresentation(impl, true, out beforePassiveOrigBlock);
-            beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData);
+            beforePassificationCfg = CFGReprTransformer.GetCfgRepresentation(
+                impl, 
+                true,
+                true,
+                out beforePassiveOrigBlock,
+                out List<Variable> newVarsFromDesugaring
+                );
+            beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
             passificationHintManager = new PassificationHintManager(beforePassiveOrigBlock);
         }
 
-        private static BoogieMethodData MethodDataFromImpl(Implementation impl, BoogieGlobalData globalData)
+        private static BoogieMethodData MethodDataFromImpl(
+            Implementation impl, 
+            BoogieGlobalData globalData,
+            List<Variable> extraLocalVariables = null
+            )
         {
+            //add out params to local variables for now
+            var locals = new List<Variable>(impl.LocVars).Union(impl.OutParams);
+            if (extraLocalVariables != null)
+                locals = locals.Union(extraLocalVariables);
+            
             return new BoogieMethodData(
                 globalData,
                 new List<TypeVariable>(impl.TypeParameters),
                 new List<Variable>(impl.InParams),
-                new List<Variable>(impl.LocVars),
-                new List<Variable>(impl.LocVars),
+                locals,
+                null,
                 new List<IdentifierExpr>(impl.Proc.Modifies),
                 new List<Requires>(impl.Proc.Requires),
                 new List<Ensures>(impl.Proc.Ensures));
@@ -127,12 +148,12 @@ namespace ProofGeneration
 
             var nameToVar = new Dictionary<string, Variable>();
 
-            foreach(Variable v in beforePassiveData.InParams.Union(beforePassiveData.Locals).Union(beforePassiveData.OutParams))
+            foreach(Variable v in beforePassiveData.InParams.Union(beforePassiveData.Locals))
             {
                 nameToVar.Add(v.Name, v);
             }
 
-            foreach(Variable vPassive in finalProgData.InParams.Union(finalProgData.Locals).Union(finalProgData.OutParams))
+            foreach(Variable vPassive in finalProgData.InParams.Union(finalProgData.Locals))
             {
                 //heuristic to get mapping
                 string [] split = vPassive.Name.Split('@');
@@ -214,6 +235,8 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
+            if(axiomBuilder == null && typeAxioms != null)
+                throw new ArgumentException("type axioms can only be null if axiom builder is null");
             #region before passive program
             var fixedVarTranslation2 = new DeBruijnFixedVarTranslation(beforePassiveData);
             var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
@@ -235,24 +258,56 @@ namespace ProofGeneration
             
             List<VCExpr> vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
             int nAxioms = boogieGlobalData.Axioms.Count();
+
+            List<VCExpr> consideredVCBoogieAxioms;
             
-            if (vcBoogieAxioms.Count() != nAxioms + 3)
+            if (axiomBuilder != null)
             {
-                //+3, since we currently ignore the three type ordering axioms
-                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                if(vcBoogieAxioms.Count != nAxioms + 3 )
+                    //+3, since we currently ignore the three type ordering axioms
+                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
                     "vc axioms not in-sync with Boogie axioms");
+
+                consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(3, nAxioms);
+            }
+            else
+            {
+                if (nAxioms == 0)  
+                {
+                    if(vcBoogieAxioms.Count != 1 || !vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
+                        throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                            "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
+
+                    consideredVCBoogieAxioms = new List<VCExpr>();
+                }
+                else
+                {
+                    if (vcBoogieAxioms.Count != nAxioms)
+                    {
+                        throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                            "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
+                    }
+
+                    consideredVCBoogieAxioms = new List<VCExpr>(vcBoogieAxioms);
+                }
             }
 
+
             //we get rid of the axioms that are "True"
-            var typeAxiomInfoPruned = typeAxiomInfo.Where(a => !a.Expr.Equals(VCExpressionGenerator.True)).ToList(); 
-            List<VCExpr> vcTypeAxioms = DeconstructAxiomsNoChecks(typeAxioms).ToList();
-            if (vcTypeAxioms.Count != typeAxiomInfoPruned.Count)
+            List<VCAxiomInfo> typeAxiomInfoPruned = new List<VCAxiomInfo>();
+            List<VCExpr> vcTypeAxioms = new List<VCExpr>();
+            if (axiomBuilder != null)
             {
-                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
-                    "type axiom info not in-sync with actual type axioms");
+                typeAxiomInfoPruned = typeAxiomInfo.Where(a => !a.Expr.Equals(VCExpressionGenerator.True)).ToList();
+                vcTypeAxioms = DeconstructAxiomsNoChecks(typeAxioms).ToList();
+                if (vcTypeAxioms.Count != typeAxiomInfoPruned.Count)
+                {
+                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                        "type axiom info not in-sync with actual type axioms");
+                }
             }
-            
-            IEnumerable<VCExpr> vcAllAxioms =  vcBoogieAxioms.GetRange(3,nAxioms).Union(DeconstructAxiomsNoChecks(typeAxioms));
+
+            IEnumerable<VCExpr> vcAllAxioms =  consideredVCBoogieAxioms.Union(vcTypeAxioms);
             
             LocaleDecl vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
@@ -311,7 +366,7 @@ namespace ProofGeneration
             var passiveOuterDecls = new List<OuterDecl>() { vcLocale };
             passiveOuterDecls.Add(afterPassificationLocale);
 
-            List<VCAxiomInfo> allAxiomsInfo = GetBoogieAxiomInfo(boogieGlobalData.Axioms, vcBoogieAxioms.GetRange(3, nAxioms));
+            List<VCAxiomInfo> allAxiomsInfo = GetBoogieAxiomInfo(boogieGlobalData.Axioms, consideredVCBoogieAxioms);
             
             var vcBoogieInfo = new VcBoogieInfo(vcinst, vcinstAxiom, vcAllAxioms, allAxiomsInfo.Union(typeAxiomInfoPruned));
 

@@ -51,9 +51,9 @@ namespace ProofGeneration.BoogieIsaInterface
             return cmdsIsa;
         }
 
-        public Term TranslateIdentifierExpr(IdentifierExpr id)
+        private Term TranslateIdentifierExpr(IdentifierExpr id)
         {
-            return new StringConst(basicCmdVisitor.GetStringFromIdentifierExpr(id));
+            return basicCmdVisitor.GetIdFromIdentifierExpr(id);
         }
 
         //desugar into single havoc commands

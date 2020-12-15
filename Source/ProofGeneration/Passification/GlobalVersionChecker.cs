@@ -22,7 +22,7 @@ namespace ProofGeneration.Passification
 
            foreach (Block b in beforePassiveBlocks.GetBlocksBackwards())
            {
-               relationGen.GenerateVariableRelation(b,
+               relationGen.GenerateVariableRelUpdates(b,
                    beforeToPassiveBlocks[b],
                    beforePassiveBlocks.GetSuccessorBlocks(b),
                    out HashSet<Cmd> newSyncCmds);

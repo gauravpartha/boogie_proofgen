@@ -52,7 +52,7 @@ namespace ProofGeneration.ProgramToVCProof
         {
             this.vcinst = vcinst;
             this.methodData = methodData;
-            programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
+            programVariables = methodData.InParams.Union(methodData.Locals);
             initState = IsaBoogieTerm.Normal(normalInitState);
             this.isaBlockInfo = isaBlockInfo;
             this.vcTranslator = vcTranslator;

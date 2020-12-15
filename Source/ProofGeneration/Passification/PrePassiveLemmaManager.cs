@@ -83,7 +83,7 @@ namespace ProofGeneration.Passification
             this.passiveProgramAccessor = passiveProgramAccessor;
             this._relationGen = new PassiveRelationGen(hintManager, initialVarMapping, origToPassiveBlock);
             this.methodData = methodData;
-            programVariables = methodData.InParams.Union(methodData.Locals).Union(methodData.OutParams);
+            programVariables = methodData.InParams.Union(methodData.Locals);
             initState = IsaBoogieTerm.Normal(normalInitState);
             this.varTranslationFactory = varTranslationFactory;
             varTranslation = varTranslationFactory.CreateTranslation().VarTranslation;
@@ -114,13 +114,13 @@ namespace ProofGeneration.Passification
             string passiveCmdsDefName = passiveBlockInfo.CmdsQualifiedName(passiveBlock);
             Term passiveCmds = IsaCommonTerms.TermIdentFromName(passiveCmdsDefName);
             
-            List<Tuple<Variable,Expr>> modifiedVarRel = _relationGen.GenerateVariableRelation(block, passiveBlock, successors, out _);
+            List<Tuple<Variable,Expr, bool>> varRelUpdates = _relationGen.GenerateVariableRelUpdates(block, passiveBlock, successors, out _);
 
             List<Term> constrainedPassiveVars = new List<Term>();
             List<Term> modifiedVarRelTerm = new List<Term>();
-            List<Tuple<string, string>> lookupModRelLemmas = new List<Tuple<string, string>>();
+            List<Tuple<string, string>> lookupTyUpdatesLemmas = new List<Tuple<string, string>>();
 
-            foreach (var tuple in modifiedVarRel)
+            foreach (var tuple in varRelUpdates)
             {
                 var origVar = tuple.Item1;
                 if (varTranslation.TryTranslateVariableId(origVar, out var origVarTerm, out _))
@@ -131,8 +131,13 @@ namespace ProofGeneration.Passification
                         if (passiveVarTranslation.TryTranslateVariableId(passiveVar, out var passiveVarTerm, out _))
                         {
                             modifiedVarRelTerm.Add(new TermTuple(origVarTerm, IsaCommonTerms.Inl(passiveVarTerm)));
-                            constrainedPassiveVars.Add(passiveVarTerm);
-                            lookupModRelLemmas.Add(
+                            /* don't add variable to newly constrained variables if update is associated with constant propagation
+                             * in which case the variable is not newly constrained */
+                            if (!tuple.Item3)
+                            {
+                                constrainedPassiveVars.Add(passiveVarTerm);
+                            }
+                            lookupTyUpdatesLemmas.Add(
                                 Tuple.Create(programAccessor.LookupVarTyLemma(origVar), passiveProgramAccessor.LookupVarTyLemma(passiveVar))
                                 );
                         }
@@ -143,7 +148,7 @@ namespace ProofGeneration.Passification
                     }
                     else if (tuple.Item2 is LiteralExpr lit)
                     {
-                        Term litTerm = cmdIsaVisitor.Translate(lit).First();
+                        Term litTerm = IsaBoogieTerm.Literal(lit);
                         modifiedVarRelTerm.Add(new TermTuple(origVarTerm, IsaCommonTerms.Inr(litTerm)));
                     }
                     else
@@ -200,7 +205,7 @@ namespace ProofGeneration.Passification
             proofMethods.Add("apply (unfold type_rel_def, simp, (intro conjI)?)");
             
             proofMethods.AddRange(
-            lookupModRelLemmas.Select(t => ProofUtil.Apply(ProofUtil.Simp(t.Item1, t.Item2)))
+            lookupTyUpdatesLemmas.Select(t => ProofUtil.Apply(ProofUtil.Simp(t.Item1, t.Item2)))
             );
             
             proofMethods.Add("by simp");
@@ -372,7 +377,7 @@ namespace ProofGeneration.Passification
         {
             VarType absValType = new VarType("a");
 
-            var result = new List<Tuple<TermIdent, TypeIsa>>()
+            var result = new List<Tuple<TermIdent, TypeIsa>>
             {
                 Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
                 Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType))

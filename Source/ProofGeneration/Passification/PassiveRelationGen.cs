@@ -43,24 +43,24 @@ namespace ProofGeneration.Passification
             return result;
         }
 
-        public List<Tuple<Variable, Expr>> GenerateVariableRelation(
+        public List<Tuple<Variable, Expr, bool>> GenerateVariableRelUpdates(
             Block nonPassiveBlock,
             Block passiveBlock,
             IEnumerable<Block> nonPassiveSuccessors,
             out HashSet<Cmd> syncCmds)
         {
-            return GenerateVariableRelation(nonPassiveBlock, passiveBlock, nonPassiveSuccessors,
+            return GenerateVariableRelUpdates(nonPassiveBlock, passiveBlock, nonPassiveSuccessors,
                 hintManager.GetHint(nonPassiveBlock), out syncCmds);
         }
         
-        private List<Tuple<Variable, Expr>> GenerateVariableRelation(
+        private List<Tuple<Variable, Expr, bool>> GenerateVariableRelUpdates(
             Block nonPassiveBlock, 
             Block passiveBlock,
             IEnumerable<Block> nonPassiveSuccessors,
             IEnumerable<PassificationHint> hints,
             out HashSet<Cmd> syncCmds)
         {
-            var result = new List<Tuple<Variable, Expr>>();
+            var result = new List<Tuple<Variable, Expr, bool>>();
             syncCmds = new HashSet<Cmd>();
 
             using (var hintsEnumerator = hints.GetEnumerator())
@@ -89,14 +89,19 @@ namespace ProofGeneration.Passification
                         if (nonPassiveCmd is AssignCmd assignCmd)
                         {
                             checkNextHint(assignCmd, assignCmd.Lhss[0].DeepAssignedVariable);
-                            result.Add(Tuple.Create(hintsEnumerator.Current.OrigVar, hintsEnumerator.Current.PassiveExpr));
 
-                            if (!(assignCmd.Rhss[0] is LiteralExpr _))
+                            if (!(assignCmd.Rhss[0] is LiteralExpr _) && !(assignCmd.Rhss[0] is IdentifierExpr _))
                             {
+                                result.Add(Tuple.Create(hintsEnumerator.Current.OrigVar, hintsEnumerator.Current.PassiveExpr, false));
                                //no constant propagation: we expect an assume command
                                 if(!passiveEnumerator.MoveNext() || !(passiveEnumerator.Current is AssumeCmd))
                                     throw new ProofGenUnexpectedStateException(typeof(PassiveRelationGen),
                                         "No matching passive cmd for assignment");
+                            }
+                            else
+                            {
+                                //constant propagation
+                                result.Add(Tuple.Create(hintsEnumerator.Current.OrigVar, hintsEnumerator.Current.PassiveExpr, true));
                             }
                         }
                         else if (nonPassiveCmd is HavocCmd havocCmd)
@@ -104,7 +109,7 @@ namespace ProofGeneration.Passification
                             foreach (IdentifierExpr id in havocCmd.Vars)
                             {
                                 checkNextHint(havocCmd, id.Decl);
-                                result.Add(Tuple.Create(hintsEnumerator.Current.OrigVar, hintsEnumerator.Current.PassiveExpr));
+                                result.Add(Tuple.Create(hintsEnumerator.Current.OrigVar, hintsEnumerator.Current.PassiveExpr, false));
                             }
                         }
                         else if (nonPassiveCmd is AssumeCmd _ || nonPassiveCmd is AssertCmd _)
@@ -157,7 +162,7 @@ namespace ProofGeneration.Passification
                             if(origVar == null)
                                 throw new ProofGenUnexpectedStateException(GetType(),"Could not find original variable for synchronization assumption.");
                             
-                            result.Add(Tuple.Create(origVar, (Expr) lhs));
+                            result.Add(Tuple.Create(origVar, (Expr) lhs, false));
                         }
                         else
                         {
@@ -171,17 +176,27 @@ namespace ProofGeneration.Passification
             return result;
         }
 
-        private static bool IsSynchronizationCommand(Cmd cmd, out IdentifierExpr lhs, out IdentifierExpr rhs)
+        private static bool IsSynchronizationCommand(Cmd cmd, out IdentifierExpr lhs, out Expr rhs)
         {
             if (cmd is AssumeCmd assumeCmd)
             {
                 if (assumeCmd.Expr is NAryExpr nary && nary.Fun is BinaryOperator bop && bop.Op.Equals(BinaryOperator.Opcode.Eq))
                 {
-                    if (nary.Args[0] is IdentifierExpr ieLeft && nary.Args[1] is IdentifierExpr ieRight)
+                    if (nary.Args[0] is IdentifierExpr ieLeft)
                     {
-                        lhs = ieLeft;
-                        rhs = ieRight;
-                        return true;
+                        if (nary.Args[1] is IdentifierExpr ieRight)
+                        {
+                            lhs = ieLeft;
+                            rhs = ieRight;
+                            return true;
+                        }
+
+                        if (nary.Args[1] is LiteralExpr lit)
+                        {
+                            lhs = ieLeft;
+                            rhs = lit;
+                            return true;
+                        }
                     }
                 }
             }

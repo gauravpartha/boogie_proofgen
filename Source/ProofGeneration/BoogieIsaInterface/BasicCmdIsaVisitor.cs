@@ -148,9 +148,12 @@ namespace ProofGeneration
         }
 
         //potential side effect
-        public string GetStringFromIdentifierExpr(IdentifierExpr node)
+        public Term GetIdFromIdentifierExpr(IdentifierExpr node)
         {
-            return node.Name;
+            if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(node.Decl, out Term varId, out _))
+                return varId;
+            
+            throw new ProofGenUnexpectedStateException(GetType(), "Could not get id for variable " + node.Decl.Name);
             //TODO: check whether need unique name or not (under assumption that there are no variable name clashes, i.e., no shadowing)
             //return uniqueNamer.GetName(node.Decl, node.Name);
         }

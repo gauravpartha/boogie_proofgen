@@ -16,7 +16,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public IEnumerable<TypeVariable> TypeParams { get; }
         public IEnumerable<Variable> InParams { get; }
         public IEnumerable<Variable> Locals { get; }
-        public IEnumerable<Variable> OutParams { get; }
+        //public IEnumerable<Variable> OutParams { get; }
         public IEnumerable<IdentifierExpr> ModifiedVars { get; }
         public IEnumerable<Requires> Preconditions { get; }
         public IEnumerable<Ensures> Postcondtions { get; }
@@ -35,7 +35,7 @@ namespace ProofGeneration.BoogieIsaInterface
             this.TypeParams = typeParams;
             this.InParams = inParams;
             this.Locals = locals;
-            this.OutParams = outParams;
+            //this.OutParams = outParams;
             this.ModifiedVars = modifies;
             this.Preconditions = pres;
             this.Postcondtions = posts;

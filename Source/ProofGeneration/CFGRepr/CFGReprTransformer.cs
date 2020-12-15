@@ -19,21 +19,43 @@ namespace ProofGeneration.CFGRepresentation
         //blocks are not copied
         public static CFGRepr getCFGRepresentation(Implementation impl)
         {
-            return GetCfgRepresentation(impl, false, out IDictionary<Block, Block> newToOldMapping);
+            return GetCfgRepresentation(impl, false, false, out IDictionary<Block, Block> newToOldMapping, out _);
         }
 
-        //if "generateCopy", then blocks will be copied and the mapping from the copied blocks to the original blocks is given by "newToOldBlocks"
-        public static CFGRepr GetCfgRepresentation(Implementation impl, bool generateCopy, out IDictionary<Block, Block> newToOldBlocks, bool isAcyclic = true)
+        //if "generateCopy", 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="impl">Input implementation</param>
+        /// <param name="generateCopy">If set to true, then blocks will be copied and the mapping from the copied blocks to the original blocks is given by "newToOldBlocks"</param>
+        /// <param name="desugarCalls">If set to true, then calls will be desugared (but can only be set to true if <paramref name="generateCopy"/> is set to true</param>
+        /// <param name="newToOldBlocks">Copy mapping if <paramref name="generateCopy"/> is set to true</param>
+        /// <param name="newVarsFromDesugaring">New local variables obtained from desugared commands <paramref name="desugarCalls"/> is set to true</param>
+        /// <param name="isAcyclic">Set to true iff input CFG is acyclic</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        public static CFGRepr GetCfgRepresentation(
+            Implementation impl, 
+            bool generateCopy, 
+            bool desugarCalls,
+            out IDictionary<Block, Block> newToOldBlocks,
+            out List<Variable> newVarsFromDesugaring,
+            bool isAcyclic = true)
         {
             Contract.Requires(impl != null);
             Contract.Ensures((generateCopy && newToOldBlocks != null) || (!generateCopy && newToOldBlocks == null));
+            if (!generateCopy && desugarCalls)
+            {
+                throw new ArgumentException("Cannot desugar calls without generating copy");
+            }
+            
             var predecessorMap = ComputePredecessors(impl.Blocks);
             IList<Block> blocksToConvert;
             Func<Block, List<Block>> predecessorFunc;
 
             if(generateCopy)
             {
-                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap);
+                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap, desugarCalls, out newVarsFromDesugaring);
 
                 var newToOldInternal = new Dictionary<Block, Block>();
                 blocksToConvert.ZipDo(impl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
@@ -41,6 +63,7 @@ namespace ProofGeneration.CFGRepresentation
                 predecessorFunc = b => b.Predecessors;
             } else
             {
+                newVarsFromDesugaring = new List<Variable>();
                 blocksToConvert = impl.Blocks;
                 newToOldBlocks = null;
                 predecessorFunc = b => predecessorMap[b];
@@ -161,7 +184,11 @@ namespace ProofGeneration.CFGRepresentation
         /// Makes a shallow copy of <paramref name="blocks"/>. The predecessors of <paramref name="blocks"/> is set
         /// correctly.
         /// </summary>
-        private static IList<Block> CopyBlocks(IList<Block> blocks, Dictionary<Block, List<Block>> predecessorMap)
+        private static IList<Block> CopyBlocks(
+            IList<Block> blocks, 
+            Dictionary<Block, List<Block>> predecessorMap, 
+            bool desugarCalls,
+            out List<Variable> newVarsFromDesugaring)
         {
             //shallow copy of each block + update edges to copied blocks
             //TODO:  need to make sure this is sufficient
@@ -169,12 +196,26 @@ namespace ProofGeneration.CFGRepresentation
 
             IList<Block> copyBlocks = new List<Block>();
 
+            newVarsFromDesugaring = new List<Variable>();
+
             foreach (Block b in blocks)
             {
                 List<Cmd> copyCmds = new List<Cmd>();
                 foreach(var cmd in b.Cmds)
                 {
-                    copyCmds.Add((Cmd) CloneMethod.Invoke(cmd,null));
+                    if (cmd is SugaredCmd sugaredCmd && desugarCalls)
+                    {
+                        StateCmd stateCmd = sugaredCmd.Desugaring as StateCmd;
+                        newVarsFromDesugaring.AddRange(stateCmd.Locals);
+                        foreach (var desugaredCmd in stateCmd.Cmds)
+                        {
+                            copyCmds.Add((Cmd) CloneMethod.Invoke(desugaredCmd,null));
+                        }
+                    }
+                    else
+                    {
+                        copyCmds.Add((Cmd) CloneMethod.Invoke(cmd,null));
+                    }
                 }
 
                 Block copyBlock = (Block)CloneMethod.Invoke(b, null);

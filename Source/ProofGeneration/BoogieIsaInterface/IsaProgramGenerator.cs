@@ -65,8 +65,8 @@ namespace ProofGeneration
             OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, methodData.Locals);
 
             TermList modifiedVariables = new TermList(new List<Term>()); //TODO
-            OuterDecl preconditions = GetPreconditionsIsa(procName, methodData.Preconditions);
-            OuterDecl postconditions = GetPostconditionsIsa(procName, methodData.Postcondtions);
+            //OuterDecl preconditions = GetPreconditionsIsa(procName, methodData.Preconditions);
+            //OuterDecl postconditions = GetPostconditionsIsa(procName, methodData.Postcondtions);
 
             Term methodBodyCFG =
                 IsaBoogieTerm.MethodCFGBody(
@@ -145,7 +145,7 @@ namespace ProofGeneration
             decls.AddRange(
         new List<OuterDecl>()
                 {
-                    outEdges, nodesToBlocks, parameters, localVariables, preconditions, postconditions, methodBodyDecl
+                    outEdges, nodesToBlocks, parameters, localVariables, methodBodyDecl
                 });
             
             decls.AddRange(blockInfo.BlockCmdsLemmas.Values);

@@ -6,7 +6,6 @@ namespace ProofGeneration.Passification
     {
         public Variable OrigVar { get; }
         public Expr PassiveExpr { get; }
-        
         public Cmd Cmd { get; }
         
         public PassificationHint(Cmd cmd, Variable origVar, Expr passiveExpr)
