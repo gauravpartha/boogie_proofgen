@@ -45,10 +45,12 @@ namespace ProofGeneration.BoogieIsaInterface
         private readonly string globalsLocalsDisjName = "globals_locals_disj";
 
         private readonly IsaProgramGeneratorConfig config;
+        private readonly IsaBlockInfo isaBlockInfo;
         
         public MembershipLemmaManager(
             IsaProgramGeneratorConfig config,
             IsaProgramRepr isaProgramRepr,
+            IsaBlockInfo isaBlockInfo,
             IVariableTranslationFactory factory,
             string theoryName
         )
@@ -58,6 +60,7 @@ namespace ProofGeneration.BoogieIsaInterface
             this.factory = factory;
             this.theoryName = theoryName;
             this.config = config;
+            this.isaBlockInfo = isaBlockInfo;
             typeIsaVisitor = new TypeIsaVisitor(factory.CreateTranslation().TypeVarTranslation);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(factory);
             paramsAndLocalsDefs =
@@ -146,6 +149,11 @@ namespace ProofGeneration.BoogieIsaInterface
                 return QualifyAccessName(membershipLemmas[d].name);
                 
             return parent.MembershipLemma(d);
+        }
+
+        public IsaBlockInfo BlockInfo()
+        {
+            return isaBlockInfo;
         }
 
         public string LookupVarTyLemma(Variable v)

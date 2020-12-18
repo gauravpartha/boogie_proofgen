@@ -6,7 +6,7 @@ namespace ProofGeneration.BoogieIsaInterface
     public interface IProgramAccessor
     {
         public string TheoryName();
-
+        
         public Term FunctionsDecl();
         public Term AxiomsDecl();
         public Term CfgDecl();
@@ -23,6 +23,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public Term VarContext();
 
         public string MembershipLemma(Declaration d);
+
+        public IsaBlockInfo BlockInfo();
 
         public string GlobalsLocalsDisjointLemma();
 

@@ -21,7 +21,6 @@ namespace ProofGeneration.VCProofGen
             VCExpr vc,
             IEnumerable<VCExpr> vcAxioms,
             IActiveDeclGenerator activeDeclGenerator,
-            VCExpressionGenerator gen,
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder,
             BoogieMethodData methodData,

@@ -24,6 +24,12 @@ namespace ProofGeneration.Util
         {
             return "apply (" + s + ")";
         }
+        
+        
+        public static string By(string s)
+        {
+            return "by (" + s + ")";
+        }
 
         public static string SimpOnly(params string[] theorems)
         {

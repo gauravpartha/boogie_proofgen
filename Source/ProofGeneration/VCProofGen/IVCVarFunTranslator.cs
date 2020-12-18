@@ -3,7 +3,7 @@ using Microsoft.Boogie.VCExprAST;
 
 namespace ProofGeneration.VCProofGen
 {
-    interface IVCVarFunTranslator
+    public interface IVCVarFunTranslator
     {
         bool TranslateBoogieVar(Variable boogieVar, out VCExprVar result);
         bool TranslateVCVar(VCExprVar vcVar, out Variable result);

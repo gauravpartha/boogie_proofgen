@@ -4,7 +4,7 @@ using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
-    class BoogieMethodData
+    public class BoogieMethodData
     {
         private readonly BoogieGlobalData globalData;
 

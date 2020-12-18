@@ -19,7 +19,7 @@ namespace ProofGeneration.Passification
 
         private enum CaseType {
             Undefined, Case1 ,Case2
-        };
+        }
         
         public IDictionary<Variable, int> GlobalVersionMap(IEnumerable<Variable> entryVariables, Block entry, IList<Block> blocks)
         {

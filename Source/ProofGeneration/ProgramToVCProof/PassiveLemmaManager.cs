@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
@@ -92,7 +91,14 @@ namespace ProofGeneration.ProgramToVCProof
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
         }
 
-        public LemmaDecl GenerateCfgLemma(Block block, IEnumerable<Block> successors, Term cfg, Func<Block, string> cfgLemmaName, LemmaDecl BlockLemma)
+        public LemmaDecl GenerateCfgLemma(
+            Block block, 
+            bool isContainedInFinalCfg,
+            IEnumerable<Block> successors, 
+            IEnumerable<Block> finalCfgSuccessors,
+            Term cfg, 
+            Func<Block, string> cfgLemmaName, 
+            LemmaDecl BlockLemma)
         {
             Term red = IsaBoogieTerm.RedCFGMulti(
                 boogieContext,
@@ -100,23 +106,51 @@ namespace ProofGeneration.ProgramToVCProof
                 IsaBoogieTerm.CFGConfigNode(new NatConst(isaBlockInfo.BlockIds[block]),
                     IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNode, finalState));
-            List<Term> assumption = new List<Term> { red, vcinst.GetVCObjInstantiation(block, declToVCMapping) };
+            List<Term> assumption = new List<Term> { red };
+            if (isContainedInFinalCfg)
+            {
+                assumption.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
+            }
+            else
+            {
+                //vc assumption is conjunction of reachable successors in final cfg
+                if (finalCfgSuccessors.Any())
+                {
+                    assumption.Add(
+                        LemmaHelper.ConjunctionOfSuccessorBlocks(finalCfgSuccessors, declToVCMapping, vcinst));
+                }
+            }
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
             string nodeLemma = isaBlockInfo.BlockCmdsMembershipLemma(block);
             string outEdgesLemma = isaBlockInfo.OutEdgesMembershipLemma(block);
             var proofMethods = new List<string>();
-            if (successors.Any())
+
+            if (isContainedInFinalCfg && LemmaHelper.FinalStateIsMagic(block))
             {
                 proofMethods.Add("apply (rule converse_rtranclpE2[OF assms(1)], fastforce)");
                 proofMethods.Add(ProofUtil.Apply("rule " +
-                                 ProofUtil.OF("red_cfg_multi_backwards_step", "assms(1)", nodeLemma)));
+                                 ProofUtil.OF("red_cfg_multi_backwards_step_magic", "assms(1)", nodeLemma)));
+                proofMethods.Add(ProofUtil.By("erule " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)")));
+                return new LemmaDecl(cfgLemmaName(block), ContextElem.CreateWithAssumptions(assumption), conclusion,
+                    new Proof(proofMethods));
+            }
+            
+            if (successors.Any())
+            {
+                proofMethods.Add("apply (rule converse_rtranclpE2[OF assms(1)], fastforce)");
+                string cfg_lemma = (finalCfgSuccessors.Any()
+                    ? "red_cfg_multi_backwards_step"
+                    : "red_cfg_multi_backwards_step_2");
+                
+                proofMethods.Add(ProofUtil.Apply("rule " +
+                                 ProofUtil.OF(cfg_lemma, "assms(1)", nodeLemma)));
                 proofMethods.Add(ProofUtil.Apply("erule " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)")));
                 proofMethods.Add("apply (" + ProofUtil.Simp(outEdgesLemma) + ")");
                 foreach (var bSuc in successors)
                 {
                     proofMethods.Add("apply (erule member_elim, simp)");
-                    proofMethods.Add("apply (erule " + cfgLemmaName(bSuc) + ", simp" + ")");
+                    proofMethods.Add("apply (erule " + cfgLemmaName(bSuc) + ", simp?" + ")");
                 }
                 proofMethods.Add("by (simp add: member_rec(2))");
             }
@@ -125,7 +159,10 @@ namespace ProofGeneration.ProgramToVCProof
                 proofMethods.Add("apply (rule converse_rtranclpE2[OF assms(1)], fastforce)");
                 proofMethods.Add("apply (rule " + ProofUtil.OF("red_cfg_multi_backwards_step_no_succ", "assms(1)",
                     nodeLemma, outEdgesLemma)+")");
-                proofMethods.Add("using " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)") + " by blast");
+                if(isContainedInFinalCfg)
+                    proofMethods.Add("using " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)") + " by blast");
+                else 
+                    proofMethods.Add("using " + BlockLemma.name + " by blast");
             }
 
             return new LemmaDecl(cfgLemmaName(block), ContextElem.CreateWithAssumptions(assumption), conclusion,
@@ -134,10 +171,11 @@ namespace ProofGeneration.ProgramToVCProof
 
         public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
         {
-            Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
-            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState);
-
-            List<Term> assumptions = new List<Term>() { cmdsReduce };
+            //Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
+            String blockDefName = isaBlockInfo.CmdsQualifiedName(block);
+            Term blockDefTerm = IsaCommonTerms.TermIdentFromName(blockDefName);
+            Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, blockDefTerm, initState, finalState);
+            List<Term> assumptions = new List<Term> { cmdsReduce };
             if (successors.Any())
                 assumptions.Add(LemmaHelper.ConjunctionOfSuccessorBlocks(successors, declToVCMapping, vcinst));
 
@@ -147,6 +185,7 @@ namespace ProofGeneration.ProgramToVCProof
                 new List<string>()
                 {
                     "using assms",
+                    "unfolding " + blockDefName + "_def",
                     "apply cases",
                     "by auto"
                 }

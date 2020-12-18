@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
-    class BoogieGlobalData
+    public class BoogieGlobalData
     {
         public IEnumerable<Function> Functions { get; }
         public IEnumerable<Axiom> Axioms { get; }

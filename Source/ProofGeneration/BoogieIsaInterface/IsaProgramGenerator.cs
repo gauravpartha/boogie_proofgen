@@ -48,8 +48,7 @@ namespace ProofGeneration
             IsaProgramGeneratorConfig config,
             IVariableTranslationFactory varTranslationFactory,
             CFGRepr cfg,
-            out IList<OuterDecl> decls,
-            out IsaBlockInfo blockInfo
+            out IList<OuterDecl> decls
             )
         {
             this.varTranslationFactory = varTranslationFactory;
@@ -58,13 +57,13 @@ namespace ProofGeneration
             Term entry = new IntConst(Microsoft.BaseTypes.BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
 
             OuterDecl outEdges = GetOutEdgesIsa(procName, cfg, out Dictionary<Block, LemmaDecl> edgeLemmas);
-            blockInfo = BlockToInfo(theoryName, procName, cfg, edgeLemmas);
+            IsaBlockInfo blockInfo = BlockToInfo(theoryName, procName, cfg, edgeLemmas);
             OuterDecl nodesToBlocks = GetNodeToBlocksIsa(procName, cfg, blockInfo.BlockCmdsDefs);
 
             OuterDecl parameters = GetVariableDeclarationsIsa("inParams", procName, methodData.InParams);
             OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, methodData.Locals);
 
-            TermList modifiedVariables = new TermList(new List<Term>()); //TODO
+            //TermList modifiedVariables = new TermList(new List<Term>()); //TODO
             //OuterDecl preconditions = GetPreconditionsIsa(procName, methodData.Preconditions);
             //OuterDecl postconditions = GetPostconditionsIsa(procName, methodData.Postcondtions);
 
@@ -114,7 +113,7 @@ namespace ProofGeneration
                             parameters.name,
                             localVariables.name,
                             methodBodyDecl.name);
-            MembershipLemmaManager membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, varTranslationFactory, theoryName);
+            MembershipLemmaManager membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo, varTranslationFactory, theoryName);
 
             if (config.GenerateAxioms)
             {

@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
@@ -55,18 +53,14 @@ namespace ProofGeneration.Passification
         private readonly string funAssmsName = "fun_assms";
         private readonly string varAssmsName = "var_assms";
 
-        private readonly IsaBlockInfo blockInfo;
         private readonly IProgramAccessor programAccessor;
-        private readonly IsaBlockInfo passiveBlockInfo;
         private readonly IProgramAccessor passiveProgramAccessor;
 
 
         public PrePassiveLemmaManager(
             CFGRepr cfg,
             IDictionary<Block, Block> origToPassiveBlock,
-            IsaBlockInfo blockInfo,
             IProgramAccessor programAccessor,
-            IsaBlockInfo passiveBlockInfo,
             IProgramAccessor passiveProgramAccessor,
             PassificationHintManager hintManager,
             IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping,
@@ -77,9 +71,7 @@ namespace ProofGeneration.Passification
             this.cfg = cfg;
             this.origToPassiveBlock = origToPassiveBlock;
             passiveToOrigBlock = origToPassiveBlock.ToDictionary((i) => i.Value, (i) => i.Key);
-            this.blockInfo = blockInfo;
             this.programAccessor = programAccessor;
-            this.passiveBlockInfo = passiveBlockInfo;
             this.passiveProgramAccessor = passiveProgramAccessor;
             this._relationGen = new PassiveRelationGen(hintManager, initialVarMapping, origToPassiveBlock, ProofGenLiveVarAnalysis.ComputeLiveVariables(cfg));
             this.methodData = methodData;
@@ -107,11 +99,11 @@ namespace ProofGeneration.Passification
             if (vcHintsName != null)
                 throw new ProofGenUnexpectedStateException(GetType(), "did not expect any hints");
 
-            string cmdsDefName = blockInfo.CmdsQualifiedName(block);
+            string cmdsDefName = programAccessor.BlockInfo().CmdsQualifiedName(block);
             Term cmds = IsaCommonTerms.TermIdentFromName(cmdsDefName);
 
             Block passiveBlock = origToPassiveBlock[block];
-            string passiveCmdsDefName = passiveBlockInfo.CmdsQualifiedName(passiveBlock);
+            string passiveCmdsDefName = passiveProgramAccessor.BlockInfo().CmdsQualifiedName(passiveBlock);
             Term passiveCmds = IsaCommonTerms.TermIdentFromName(passiveCmdsDefName);
             
             List<Tuple<Variable,Expr, bool>> varRelUpdates = _relationGen.GenerateVariableRelUpdates(block, passiveBlock, successors, out _);
@@ -175,7 +167,7 @@ namespace ProofGeneration.Passification
             List<Term> assumptions = new List<Term>
             {
                 IsaBoogieTerm.RedCmdList(boogieContext, cmds, initState, finalState),
-                BlockLemmaAssumption(boogieContext, passiveWitness, cmds, normalInitState),
+                BlockLemmaAssumption(boogieContext, passiveWitness, normalInitState),
             };
 
             var stateRelation = _relationGen.GenerateStateRelation(block);
@@ -185,10 +177,6 @@ namespace ProofGeneration.Passification
                 var (origVar, passiveExpr) = tupleRel;
                 assumptions.Add(StateRelAssm(stateRel, origVar, passiveExpr));
             }
-
-            //constantEntry.TryGetValue(block, out IDictionary<Variable, Expr> blockConstEntry);
-
-            //assumptions.AddRange(EntryStateAssumptions(block, normalInitState));
 
             //conclusion
             Term conclusion =
@@ -247,23 +235,6 @@ namespace ProofGeneration.Passification
             {
                 throw new ProofGenUnexpectedStateException(GetType(), "unsupported passive expression");    
             }
-        }
-
-        private Term ConstantOptionValue(Expr eConst, Term state)
-        {
-            throw new NotImplementedException();
-            /*
-            if(eConst is LiteralExpr lit)
-            {
-                return IsaCommonTerms.SomeOption(IsaBoogieTerm.ValFromLiteral(lit));
-            } else if(eConst is IdentifierExpr id)
-            {
-                return new TermApp(state, cmdIsaVisitor.TranslateIdentifierExpr(id));
-            } else
-            {
-                throw new ProofGenUnexpectedStateException(this.GetType(), "unexpected constant value");
-            }
-            */
         }
 
         public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> succPassive, string lemmaName)
@@ -394,7 +365,6 @@ namespace ProofGeneration.Passification
         private static Term BlockLemmaAssumption(
             BoogieContextIsa boogieContextSource,
             PassificationWitness passificationWitness,
-            Term nonPassiveCmds,
             Term initNonPassiveState)
         {
             var args = new List<Term>
@@ -410,7 +380,6 @@ namespace ProofGeneration.Passification
                 passificationWitness.OldStateRelation,
                 passificationWitness.PassiveStates,
                 passificationWitness.ConstrainedVariables,
-                nonPassiveCmds,
                 initNonPassiveState
             };
             // IsaCommonTerms.SetUnion(passificationWitness.ConstrainedVariables, passificationWitness.ModifiedVars),
@@ -438,158 +407,13 @@ namespace ProofGeneration.Passification
                 new TermApp(IsaCommonTerms.TermIdentFromName("update_nstate_rel"), 
                     passificationWitness.StateRelation,
                     passificationWitness.ModifiedVarsRelation),
+                passificationWitness.OldStateRelation,
                 passiveCmds,
                 finalState
             };
             // IsaCommonTerms.SetUnion(passificationWitness.ConstrainedVariables, passificationWitness.ModifiedVars),
            
             return new TermApp(IsaCommonTerms.TermIdentFromName("passive_block_conclusion"), args);
-        }
-
-        /*
-        private List<Term> EntryStateAssumptions(Block block, Term normalState)
-        {
-            bool constantPred(Variable v) => block.liveVarsBefore.Contains(v);
-            var result = ConstantVarAssumptions(block, normalState, constantEntry, constantPred, out ISet<Variable> recordedVars);
-
-            result.AddRange(ActiveVarAssumptions(origToPassiveBlock[block], normalState, (Variable v) => true, out ISet<Variable> newVars));
-            recordedVars.UnionWith(newVars);
-
-            bool livePred(Variable v) => !recordedVars.Contains(v);
-            result.AddRange(LiveVarAssumptions(block, normalState, livePred, out ISet<Variable> newLiveVars));
-            recordedVars.UnionWith(newVars);
-
-            return result;
-        }
-
-        private List<Term> PrunedBlockEntryStateAssms(Block block, IEnumerable<Block> bSuccessorsPassive, Term normalState)
-        {
-            bool constantPred(Variable v) => block.liveVarsBefore.Contains(v);
-            var result = ConstantVarAssumptions(block, normalState, constantEntry, constantPred, out ISet<Variable> recordedVars);
-
-            var activeVars = new HashSet<Variable>();
-            bool activePred(Variable v) => !activeVars.Contains(v);
-
-            foreach (Block bSuc in bSuccessorsPassive)
-            {
-                result.AddRange(ActiveVarAssumptions(bSuc, normalState, activePred, out ISet<Variable> newVars));
-                activeVars.UnionWith(newVars);
-            }
-
-            recordedVars.UnionWith(activeVars);
-
-            bool livePred(Variable v) => !recordedVars.Contains(v);
-            result.AddRange(LiveVarAssumptions(block, normalState, livePred, out ISet<Variable> newLiveVars));
-            recordedVars.UnionWith(newLiveVars);
-
-            return result;
-        }
-
-        private List<Term> ExitStateAssumptions(Block block, IEnumerable<Block> bSuccessorsPassive, Term normalState, out IEnumerable<Variable> boundVars)
-        {
-            var bSuccessors = cfg.GetSuccessorBlocks(block);
-
-            bool constantPred(Variable v) => bSuccessors.Any(bSuc => bSuc.liveVarsBefore.Contains(v));
-            var correctValueAssms = ConstantVarAssumptions(block, normalState, constantExit, constantPred, out ISet<Variable> constantVars);
-
-            var activeVars = new HashSet<Variable>();
-            bool activePred(Variable v) => !activeVars.Contains(v);
-
-            foreach (Block bSuc in bSuccessorsPassive)
-            {
-                correctValueAssms.AddRange(ActiveVarAssumptions(bSuc, normalState, activePred, out ISet<Variable> newVars));
-                activeVars.UnionWith(newVars);
-            }
-
-            bool livePred(Variable v) => !activeVars.Contains(v) && !constantVars.Contains(v);
-            foreach (Block bSuc in bSuccessors)
-            {
-                correctValueAssms.AddRange(LiveVarAssumptions(bSuc, normalState, livePred, out ISet<Variable> newLiveVars));
-                activeVars.UnionWith(newLiveVars);
-            }
-
-            boundVars = activeVars;
-
-            return correctValueAssms;
-        }
-        */
-
-        private List<Term> ConstantVarAssumptions(
-            Block b, 
-            Term normalState,
-            IDictionary<Block, IDictionary<Variable, Expr>> constantInfo, 
-            Predicate<Variable> includeVariable,
-            out ISet<Variable> includedVars)
-        {
-            var result = new List<Term>();
-            includedVars = new HashSet<Variable>();
-
-            if (constantInfo == null)
-                return result;
-
-            if (constantInfo.TryGetValue(b, out IDictionary<Variable, Expr> blockConst))
-            {
-                foreach (var varAndExp in blockConst)
-                {
-                    if (includeVariable(varAndExp.Key))
-                    {
-                        Term rhsTerm = ConstantOptionValue(varAndExp.Value, normalState);
-                        result.Add(LemmaHelper.VariableAssumptionExplicit(varAndExp.Key, normalState, rhsTerm, boogieVarUniqueNamer));
-                        includedVars.Add(varAndExp.Key);
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        private List<Term> ActiveVarAssumptions(Block blockPassive, Term normalState, Predicate<Variable> includeVar, out ISet<Variable> includedVars)
-        {
-            throw new NotImplementedException();
-            /*
-            var result = new List<Term>();
-            includedVars = new HashSet<Variable>();
-
-            foreach (NamedDeclaration decl in vcinst.GetVCObjParameters(blockPassive))
-            {
-                if (decl is Variable vPassive)
-                {
-                    Variable vOrig = passiveToOrigVar[vPassive];
-
-                    if (includeVar(vOrig))
-                    {
-                        result.Add(LemmaHelper.VariableAssumption(vOrig, normalState, declToVCMapping[vOrig], 
-                            varTranslationFactory.CreateTranslation().VarTranslation));
-                        includedVars.Add(vOrig);
-                    }
-                }
-            }
-
-            return result;
-            */
-        }
-
-        //Each variable that is live but not active or constant must map to a correctly typed value
-        //this can happen for variables that have not been touched yet, but will be used in the future 
-        //such variables are not necessarily active, since they could be universally quantified within some other block     
-        private List<Term> LiveVarAssumptions(Block b, Term normalState, Predicate<Variable> includeVar, out ISet<Variable> includedVars)
-        {
-            throw new NotImplementedException();
-            /*
-            var result = new List<Term>();
-            includedVars = new HashSet<Variable>();
-
-            foreach (Variable v in b.liveVarsBefore)
-            {
-                if (includeVar(v))
-                {
-                    result.Add(LemmaHelper.VariableAssumption(v, normalState, declToVCMapping[v], 
-                        varTranslationFactory.CreateTranslation().VarTranslation));
-                    includedVars.Add(v);
-                }
-            }
-            return result;
-            */
         }
 
         public LemmaDecl MethodVerifiesLemma(CFGRepr cfg2, Term methodCfg, string lemmaName)
