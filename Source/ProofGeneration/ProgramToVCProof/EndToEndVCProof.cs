@@ -645,9 +645,10 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine("apply " + ProofUtil.Simp(InterpMemName(f)));
                 sb.AppendLine("apply (rule+)");
                 sb.AppendLine(
+                    ProofUtil.Apply(
                     ProofUtil.MLTactic("vc_fun_corres_tac " + MLUtil.ContextAntiquotation() + " " + MLUtil.IsaToMLThm(FunCorresName(f)) + " " +
                               MLUtil.IsaToMLThm(finterpAssmName) + " " + MLUtil.IsaToMLThm(programAccessor.MembershipLemma(f)) + " " +
-                              MLUtil.IsaToMLThm(InterpMemName(f)), 1));
+                              MLUtil.IsaToMLThm(InterpMemName(f)), 1)));
                 //sb.AppendLine(ProofUtil.OF(FunCorresName(f), WfName(f)));
             }
 

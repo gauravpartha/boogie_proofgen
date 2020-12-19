@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Microsoft.Boogie;
+using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
 
 namespace ProofGeneration.Passification
@@ -13,9 +14,11 @@ namespace ProofGeneration.Passification
     {
 
         //cfg must be acyclic
-        public static IDictionary<Block, IEnumerable<Variable>> ComputeLiveVariables(CFGRepr cfg)
+        public static IDictionary<Block, IEnumerable<Variable>> ComputeLiveVariables(CFGRepr cfg, BoogieMethodData methodData)
         {
             var liveVarsBefore = new Dictionary<Block, IEnumerable<Variable>>();
+
+            var allVarsSet = new HashSet<Variable>(methodData.AllVariables());
 
             foreach (Block b in cfg.GetBlocksBackwards())
             {
@@ -29,6 +32,9 @@ namespace ProofGeneration.Passification
                 {
                    UpdateLiveSet(b.cmds[idx], bCurLiveVars); 
                 }
+
+                //due to the VariableCollector's implementation bound variables may also have been included
+                bCurLiveVars.RemoveWhere(v => !allVarsSet.Contains(v));
                 liveVarsBefore.Add(b, bCurLiveVars);
             }
 

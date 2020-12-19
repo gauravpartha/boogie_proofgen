@@ -14,7 +14,18 @@ namespace ProofGeneration.Util
             return "val " + varName + " = " + value;
         }
 
+
         public static string MLList<T>(IEnumerable<T> e) where T : INodeML
+        {
+            return MLList(e, n => n.GetMLString());
+        }
+        
+        public static string MLList(IEnumerable<string> e) 
+        {
+            return MLList(e, n =>  n);
+        }
+
+        public static string MLList<T>(IEnumerable<T> e, Func<T, string> stringReprFun)
         {
             var sb = new StringBuilder();
             sb.Append("[");
@@ -31,7 +42,7 @@ namespace ProofGeneration.Util
                     first = false;
                 }
                 sb.AppendLine();
-                sb.Append(elem.GetMLString());
+                sb.Append(stringReprFun(elem));
             }
 
             sb.Append("]");
@@ -39,9 +50,19 @@ namespace ProofGeneration.Util
             return sb.ToString();
         }
 
+        public static string MLTuple(string item1, string item2)
+        {
+            return "(" + item1 + "," + item2 + ")";
+        }
+
         public static string IsaToMLThm(string isaThm)
         {
             return "@{thm " + isaThm + "}";
+        }
+        
+        public static string IsaToMLThms(string isaThms)
+        {
+            return "@{thms " + isaThms + "}";
         }
 
         public static string ContextAntiquotation()

@@ -52,7 +52,10 @@ namespace ProofGeneration
         private static TypePremiseEraserFactory typePremiseEraserFactory;
         
         //Passification Automation Hints
-        private static PassificationHintManager passificationHintManager; 
+        private static PassificationHintManager passificationHintManager;
+
+        private static PassiveRelationGen passiveRelationGen;
+        private static IDictionary<Variable, int> globalVersionMap;
 
         public static void Program(Program p)
         {
@@ -122,17 +125,26 @@ namespace ProofGeneration
             var passiveBlocks = new List<Block>(impl.Blocks);
             
             GlobalVersion globalVersion = new GlobalVersion();
-            var globalVersionMap = globalVersion.GlobalVersionMap(
-                beforePassificationCfg.entry.liveVarsBefore,
+
+            passiveRelationGen = new PassiveRelationGen(
+                beforePassificationCfg,
+                passificationHintManager,
+                initialVarMapping,
+                beforePassiveOrigBlock,
+                ProofGenLiveVarAnalysis.ComputeLiveVariables(beforePassificationCfg, beforePassiveData)
+            );
+            
+            //all variables before passification are the initial versions and already constrained
+            globalVersionMap = globalVersion.GlobalVersionMap(
+                passiveRelationGen,
+                beforePassiveData.AllVariables(),
                 afterPassificationCfg.entry, 
                 passiveBlocks);
             
             //Console.WriteLine("Version map: " + string.Join(Environment.NewLine, globalVersionMap));
             
             var versionMapCorrect = 
-                GlobalVersionChecker.CheckVersionMap(globalVersionMap, 
-                passificationHintManager, initialVarMapping,
-                beforePassificationCfg, beforePassiveOrigBlock);
+                GlobalVersionChecker.CheckVersionMap(globalVersionMap, passiveRelationGen, beforePassificationCfg, beforePassiveOrigBlock);
 
             if (!versionMapCorrect)
             {
@@ -247,7 +259,8 @@ namespace ProofGeneration
                 out IVCVarFunTranslator vcTranslator,
                 out IEnumerable<Function> vcFunctions);
             
-            var fixedVarTranslation = new DeBruijnFixedVarTranslation(finalProgData);
+            //use global version map for translation 
+            var fixedVarTranslation = new SimpleFixedVarTranslation(globalVersionMap);
             var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
@@ -291,19 +304,17 @@ namespace ProofGeneration
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforePassive);
             StoreTheory(passificationProgTheory);
             
-            //Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
+            Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
             //Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
 
             
             var passificationProofTheory = PassificationManager.PassificationProof(
                 afterPassificationImpl.Name+"_passification_proof",
                 beforePassificationCfg,
-                afterUnreachablePruningCfg,
                 beforePassiveOrigBlock,
+                passiveRelationGen,
                 beforePassiveProgAccess,
                 passiveProgAccess,
-                passificationHintManager,
-                initialVarMapping,
                 beforePassiveData,
                 varTranslationFactory2,
                 varTranslationFactory

@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-
+using System.Linq;
 using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface
@@ -63,6 +63,12 @@ namespace ProofGeneration.BoogieIsaInterface
                 new List<IdentifierExpr>(),
                 new List<Requires>(),
                 new List<Ensures>());
+        }
+
+        //in the following order: constants then globals then parameters then locals
+        public IEnumerable<Variable> AllVariables()
+        {
+            return Constants.Concat(GlobalVars).Concat(Locals).Concat(InParams);
         }
     }
 }

@@ -261,6 +261,11 @@ namespace ProofGeneration.Isa
             return new TermBinary(argLeft, argRight, BinaryOpCode.EQ);
         }
         
+        public static TermBinary Neq(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.NEQ);
+        }
+        
         public static TermBinary And(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.AND);

@@ -4,6 +4,7 @@ using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
 {
@@ -12,12 +13,10 @@ namespace ProofGeneration.Passification
        public static Theory PassificationProof(
            string theoryName,
            CFGRepr beforePassificationCfg,
-           CFGRepr finalCfg,
-           IDictionary<Block, Block> origToPassiveBlock,
+           IDictionary<Block, Block> nonPassiveToPassiveBlock,
+           PassiveRelationGen relationGen,
            IProgramAccessor beforePassiveProgAccess,
            IProgramAccessor passiveProgAccess,
-           PassificationHintManager hintManager,
-           IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping,
            BoogieMethodData beforePassiveData,
            IVariableTranslationFactory beforePassiveFactory,
            IVariableTranslationFactory passiveFactory)
@@ -25,39 +24,49 @@ namespace ProofGeneration.Passification
             
             var beforePassiveLemmaManager = new PrePassiveLemmaManager(
                 beforePassificationCfg,
-                origToPassiveBlock,
+                nonPassiveToPassiveBlock,
                 beforePassiveProgAccess,
                 passiveProgAccess,
-                hintManager,
-                initialVarMapping,
+                relationGen,
                 beforePassiveData,
                 beforePassiveFactory, 
                 passiveFactory 
                 );
-
+            
+            var lemmaNamer = new IsaUniqueNamer();
             var passificationProofDecls = new List<OuterDecl>();
             passificationProofDecls.AddRange(beforePassiveLemmaManager.Prelude());
+
+            var cfgLemmas = new List<OuterDecl>();
             
             foreach (var block in beforePassificationCfg.GetBlocksBackwards())
             {
-                Block origBlock = origToPassiveBlock[block];
-                if (true)
-                {
-                    var lemma = beforePassiveLemmaManager.GenerateBlockLemma(block, 
-                        beforePassificationCfg.GetSuccessorBlocks(block), GetLemmaName(block), null);
-                    passificationProofDecls.Add(lemma);
-                }
+                var localAndCfgLemma= 
+                    beforePassiveLemmaManager.GenerateBlockLemma(
+                        block, 
+                        GetLemmaName(block, lemmaNamer),
+                        b => GetCfgLemmaName(b, lemmaNamer));
+                passificationProofDecls.Add(localAndCfgLemma.Item1);
+                cfgLemmas.Add(localAndCfgLemma.Item2);
             }
             
+            //add cfg lemmas at the end
+            passificationProofDecls.AddRange(cfgLemmas);
+            
             return new Theory(theoryName,
-                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(), passiveProgAccess.TheoryName(), "Boogie_Lang.Passification"},
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(), passiveProgAccess.TheoryName(), "Boogie_Lang.PassificationML"},
                 passificationProofDecls);
        }
        
        
-       private static string GetLemmaName(Block b)
+       private static string GetLemmaName(Block b, IsaUniqueNamer namer)
        {
-           return "block_" + b.Label;
+           return namer.GetName(b, "block_" + b.Label);
+       }
+
+       private static string GetCfgLemmaName(Block b, IsaUniqueNamer namer)
+       {
+           return "cfg_"+namer.GetName(b, b.Label);
        }
     }
 }

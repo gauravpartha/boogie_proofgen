@@ -1,32 +1,45 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.Boogie;
+using ProofGeneration.CFGRepresentation;
 
 namespace ProofGeneration.Passification
 {
     public class PassiveRelationGen
     {
+        private readonly CFGRepr beforePassiveCfg;
         private readonly PassificationHintManager hintManager;
         private readonly IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping;
-        private readonly IDictionary<Block, Block> newToOrigCopy;
+        private readonly IDictionary<Block, Block> nonPassiveToPassive;
+        private readonly IDictionary<Block, Block> passiveToNonPassive;
         private readonly IDictionary<Block, IEnumerable<Variable>> liveVarsBefore;
         
-        public PassiveRelationGen(PassificationHintManager hintManager, 
+        public PassiveRelationGen(
+            CFGRepr beforePassiveCfg,
+            PassificationHintManager hintManager, 
             IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping,
-            IDictionary<Block, Block> newToOrigCopy,
+            IDictionary<Block, Block> nonPassiveToPassive,
             IDictionary<Block, IEnumerable<Variable>> liveVarsBefore)
         {
+            this.beforePassiveCfg = beforePassiveCfg;
             this.hintManager = hintManager;
             this.initialVarMapping = initialVarMapping;
-            this.newToOrigCopy = newToOrigCopy;
+            this.nonPassiveToPassive = nonPassiveToPassive;
+            this.passiveToNonPassive = nonPassiveToPassive.ToDictionary(x => x.Value, x => x.Key);
             this.liveVarsBefore = liveVarsBefore;
+        }
+
+        public IEnumerable<Variable> LiveVarsBeforeBlock(Block b)
+        {
+            return liveVarsBefore[b];
         }
 
         public List<Tuple<Variable, Expr>> GenerateStateRelation(Block nonPassiveBlock)
         { 
-            var initMappingBlock = initialVarMapping[newToOrigCopy[nonPassiveBlock]];
+            var initMappingBlock = initialVarMapping[nonPassiveToPassive[nonPassiveBlock]];
 
             var result = new List<Tuple<Variable, Expr>>();
 
@@ -46,13 +59,19 @@ namespace ProofGeneration.Passification
             return result;
         }
 
-        public List<Tuple<Variable, Expr, bool>> GenerateVariableRelUpdates(
-            Block nonPassiveBlock,
+
+        public List<Tuple<Variable, Expr, bool>> GenerateVariableRelUpdatesFromPassive(
             Block passiveBlock,
-            IEnumerable<Block> nonPassiveSuccessors,
             out HashSet<Cmd> syncCmds)
         {
-            return GenerateVariableRelUpdates(nonPassiveBlock, passiveBlock, nonPassiveSuccessors,
+            return GenerateVariableRelUpdates(passiveToNonPassive[passiveBlock], out syncCmds);
+        }
+
+        public List<Tuple<Variable, Expr, bool>> GenerateVariableRelUpdates(
+            Block nonPassiveBlock,
+            out HashSet<Cmd> syncCmds)
+        {
+            return GenerateVariableRelUpdates(nonPassiveBlock, nonPassiveToPassive[nonPassiveBlock], beforePassiveCfg.GetSuccessorBlocks(nonPassiveBlock),
                 hintManager.GetHint(nonPassiveBlock), out syncCmds);
         }
         
@@ -150,7 +169,7 @@ namespace ProofGeneration.Passification
                             Variable origVar = null;
                             foreach (var succ in nonPassiveSuccessors)
                             {
-                                var succVarMapping = initialVarMapping[newToOrigCopy[succ]];
+                                var succVarMapping = initialVarMapping[nonPassiveToPassive[succ]];
                                 foreach (var varExprPair in succVarMapping)
                                 {
                                     if (varExprPair.Value is IdentifierExpr ie && ie.Decl.Equals(lhs.Decl))

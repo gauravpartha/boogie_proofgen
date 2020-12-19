@@ -15,14 +15,17 @@ namespace ProofGeneration.Passification
         private HashSet<Block> _versionedBlocks;
         private IDictionary<Variable, int> _versionMap;
 
+        private PassiveRelationGen _relationGen;
+
         private int _nextVersion = 0;
 
         private enum CaseType {
             Undefined, Case1 ,Case2
         }
         
-        public IDictionary<Variable, int> GlobalVersionMap(IEnumerable<Variable> entryVariables, Block entry, IList<Block> blocks)
+        public IDictionary<Variable, int> GlobalVersionMap(PassiveRelationGen relationGen, IEnumerable<Variable> entryVariables, Block entry, IList<Block> blocks)
         {
+            _relationGen = relationGen;
             _versionedBlocks = new HashSet<Block>();
             _versionMap = new Dictionary<Variable , int>();
             _nextVersion = 0;
@@ -90,12 +93,11 @@ namespace ProofGeneration.Passification
 
         public static bool CheckIsGlobal(
             IList<Block> blocks,
+            PassiveRelationGen relationGen,
             IDictionary<Variable, int> versionMap,
-            IEnumerable<Variable> entryVars,
-            HashSet<Cmd> isSyncStmt)
+            IEnumerable<Variable> entryVars)
         {
             var largestVersion = new Dictionary<Block, int>();
-            var markedVars = new HashSet<Variable>(entryVars);
             var graph = GraphUtil.GraphFromBlocks(blocks);
 
             var sortedNodes = graph.TopologicalSort();
@@ -104,7 +106,6 @@ namespace ProofGeneration.Passification
             
             foreach (Block b in sortedNodes)
             {
-
                 var predecessors = graph.Predecessors(b).ToList();
                 int maxVersionPred;
                 if (predecessors.Any())
@@ -116,7 +117,7 @@ namespace ProofGeneration.Passification
                     maxVersionPred = maxVersionInitVars;
                 }
 
-                bool correct = findLargestVersion(b, versionMap, maxVersionPred, markedVars, isSyncStmt, out int maxVersionBlock);
+                bool correct = findLargestVersion(b, relationGen, versionMap, maxVersionPred, out int maxVersionBlock);
                 if (!correct)
                     return false;
                 largestVersion.Add(b, maxVersionBlock);
@@ -127,35 +128,26 @@ namespace ProofGeneration.Passification
 
         public static bool findLargestVersion(
             Block b, 
+            PassiveRelationGen relationGen,
             IDictionary<Variable, int> versionMap, 
             int maxVersionPred, 
-            HashSet<Variable> markedVars, 
-            HashSet<Cmd> isSyncStmt,
             out int maxVersion)
         {
             maxVersion = maxVersionPred;
-            foreach (var cmd in b.Cmds)
-            {
-                if (cmd is AssumeCmd assumeCmd)
-                {
-                     if (assumeCmd.Expr is NAryExpr nary && nary.Fun is BinaryOperator bop && bop.Op.Equals(BinaryOperator.Opcode.Eq))
-                     {
-                         if (nary.Args[0] is IdentifierExpr ieLeft)
-                         {
-                             var lhs = ieLeft.Decl;
-                             if (isSyncStmt.Contains(assumeCmd) || !markedVars.Contains(lhs))
-                             {
-                                 //lhs is a new variable
-                                 if (versionMap[lhs] <= maxVersionPred)
-                                 {
-                                     return false;
-                                 }
+            var updates = relationGen.GenerateVariableRelUpdatesFromPassive(b, out _);
 
-                                 markedVars.Add(lhs);
-                                 maxVersion = Math.Max(versionMap[lhs], maxVersion);
-                             }
-                         }
-                     }
+            foreach (var update in updates)
+            {
+                if (!update.Item3)
+                {
+                    //not constant propagation
+                    Variable constrainedVariable = (update.Item2 as IdentifierExpr).Decl;
+                    if (versionMap[constrainedVariable] <= maxVersionPred)
+                    {
+                        return false;
+                    }
+                     
+                    maxVersion = Math.Max(versionMap[constrainedVariable], maxVersion);
                 }
             }
 
@@ -182,20 +174,18 @@ namespace ProofGeneration.Passification
 
         private void VersionBlock(Block b)
         {
-            /* new variables can only be variables on the left hand side of an equality assumption (but need not be) */
-            foreach (var cmd in b.Cmds)
+            var updates = _relationGen.GenerateVariableRelUpdatesFromPassive(b, out _);
+
+            foreach (var update in updates)
             {
-                if (cmd is AssumeCmd assumeCmd)
+                if (!update.Item3)
                 {
-                     if (assumeCmd.Expr is NAryExpr nary && nary.Fun is BinaryOperator bop && bop.Op.Equals(BinaryOperator.Opcode.Eq))
-                     {
-                         if (nary.Args[0] is IdentifierExpr ieLeft)
-                         {
-                             VersionVariable(ieLeft.Decl);
-                         }
-                     }                   
+                    //not constant propagation
+                    Variable constrainedVariable = (update.Item2 as IdentifierExpr).Decl;
+                    VersionVariable(constrainedVariable);
                 }
             }
+            
             _versionedBlocks.Add(b);
         }
 

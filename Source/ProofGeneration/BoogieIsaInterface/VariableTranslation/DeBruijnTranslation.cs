@@ -70,7 +70,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 
         public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
         {
-            id = new IntConst(TranslateVariableIdx(variable, out isBoundVar));
+            id = new NatConst(TranslateVariableIdx(variable, out isBoundVar));
             return true;
         }
     }

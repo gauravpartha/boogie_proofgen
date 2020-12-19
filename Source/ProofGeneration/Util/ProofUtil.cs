@@ -50,7 +50,7 @@ namespace ProofGeneration.Util
 
         public static string MLTactic(string tactic, int subgoal)
         {
-            return "apply (tactic \\<open> " + tactic + " " + subgoal + "\\<close>)";
+            return "(tactic \\<open> " + tactic + " " + subgoal + "\\<close>)";
         }
 
         public static string TryRepeatConjI()

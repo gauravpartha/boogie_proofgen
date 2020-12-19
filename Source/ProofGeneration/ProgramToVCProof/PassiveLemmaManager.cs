@@ -107,9 +107,11 @@ namespace ProofGeneration.ProgramToVCProof
                     IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNode, finalState));
             List<Term> assumption = new List<Term> { red };
+            bool hasVcAssm = false;
             if (isContainedInFinalCfg)
             {
                 assumption.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
+                hasVcAssm = true;
             }
             else
             {
@@ -118,6 +120,7 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     assumption.Add(
                         LemmaHelper.ConjunctionOfSuccessorBlocks(finalCfgSuccessors, declToVCMapping, vcinst));
+                    hasVcAssm = true;
                 }
             }
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
@@ -126,12 +129,16 @@ namespace ProofGeneration.ProgramToVCProof
             string outEdgesLemma = isaBlockInfo.OutEdgesMembershipLemma(block);
             var proofMethods = new List<string>();
 
+
+            string eruleLocalBlock =
+                "erule " + (hasVcAssm ? ProofUtil.OF(BlockLemma.name, "_", "assms(2)") : BlockLemma.name);
+
             if (isContainedInFinalCfg && LemmaHelper.FinalStateIsMagic(block))
             {
                 proofMethods.Add("apply (rule converse_rtranclpE2[OF assms(1)], fastforce)");
                 proofMethods.Add(ProofUtil.Apply("rule " +
                                  ProofUtil.OF("red_cfg_multi_backwards_step_magic", "assms(1)", nodeLemma)));
-                proofMethods.Add(ProofUtil.By("erule " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)")));
+                proofMethods.Add(ProofUtil.By(eruleLocalBlock));
                 return new LemmaDecl(cfgLemmaName(block), ContextElem.CreateWithAssumptions(assumption), conclusion,
                     new Proof(proofMethods));
             }
@@ -145,7 +152,7 @@ namespace ProofGeneration.ProgramToVCProof
                 
                 proofMethods.Add(ProofUtil.Apply("rule " +
                                  ProofUtil.OF(cfg_lemma, "assms(1)", nodeLemma)));
-                proofMethods.Add(ProofUtil.Apply("erule " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)")));
+                proofMethods.Add(ProofUtil.Apply(eruleLocalBlock));
                 proofMethods.Add("apply (" + ProofUtil.Simp(outEdgesLemma) + ")");
                 foreach (var bSuc in successors)
                 {
