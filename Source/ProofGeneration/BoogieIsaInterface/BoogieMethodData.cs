@@ -68,7 +68,7 @@ namespace ProofGeneration.BoogieIsaInterface
         //in the following order: constants then globals then parameters then locals
         public IEnumerable<Variable> AllVariables()
         {
-            return Constants.Concat(GlobalVars).Concat(Locals).Concat(InParams);
+            return Constants.Concat(GlobalVars).Concat(InParams).Concat(Locals);
         }
     }
 }
