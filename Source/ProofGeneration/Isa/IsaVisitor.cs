@@ -94,6 +94,8 @@ namespace ProofGeneration.Isa
         public abstract R VisitVarType(VarType t);
 
         public abstract R VisitTupleType(TupleType t);
+        
+        public abstract R VisitSumType(SumType t);
 
         public abstract R VisitArrowType(ArrowType t);
 

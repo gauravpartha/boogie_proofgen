@@ -24,6 +24,8 @@ namespace ProofGeneration.Isa
 
         public static TermIdent EmptyList => TermIdentFromName("[]");
         public static TermIdent EmptySet => TermIdentFromName("{}");
+
+        public static Term EmptyMap => TermIdentFromName("Map.empty");
         
         public static Term Let(Identifier boundVar, TypeIsa boundVarType, Term termSubst, Term body)
         {

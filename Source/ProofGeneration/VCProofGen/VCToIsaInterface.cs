@@ -39,7 +39,7 @@ namespace ProofGeneration.VCProofGen
             var declCollector = new VCFunDeclCollector();
             IDictionary<Function, Function> funToVCfun =
                 (declCollector.CollectFunDeclarations(new List<VCExpr>() {vc}.Concat(vcAxioms), methodData.Functions));
-            IVCVarFunTranslator varTranslator = new VCVarFunTranslator(methodData.InParams.Union(methodData.Locals), funToVCfun, translator, axiomBuilder);
+            IVCVarFunTranslator varTranslator = new VCVarFunTranslator(methodData.AllVariables(), funToVCfun, translator, axiomBuilder);
 
             IDictionary<Block, ISet<NamedDeclaration>> activeDeclsPerBlock = 
                 activeDeclGenerator.GetActiveDeclsPerBlock(blockToVC, varTranslator, cfg, out IDictionary<Block, ISet<Variable>> blockToNewVars);
@@ -80,7 +80,7 @@ namespace ProofGeneration.VCProofGen
 
             var blockToIsaTranslator = new VCBlockToIsaTranslator(uniqueNamer);
             IDictionary<Block, DefDecl> blockToVCExpr = 
-                blockToIsaTranslator.IsaDefsFromVC(blockToVC, activeVarsPerBlock, cfg, methodData, blockToNewVCVars);
+                blockToIsaTranslator.IsaDefsFromVC(blockToVC, activeVarsPerBlock, cfg, blockToNewVCVars);
 
             //add vc definitions of blocks in correct order
             IList<OuterDecl> vcOuterDecls = new List<OuterDecl>();

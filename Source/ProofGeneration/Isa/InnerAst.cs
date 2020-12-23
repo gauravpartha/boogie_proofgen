@@ -266,6 +266,16 @@ namespace ProofGeneration.Isa
             return new TermBinary(argLeft, argRight, BinaryOpCode.NEQ);
         }
         
+        public static TermBinary Le(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.LE);
+        }
+        
+        public static TermBinary Ge(Term argLeft, Term argRight)
+        {
+            return new TermBinary(argLeft, argRight, BinaryOpCode.GE);
+        }
+        
         public static TermBinary And(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.AND);
@@ -440,6 +450,11 @@ namespace ProofGeneration.Isa
             this.args = args;
         }
 
+        public DataType(string name, params TypeIsa [] args) : this(name, new List<TypeIsa> (args))
+        {
+            
+        }
+        
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
             return visitor.VisitDataType(this);
@@ -455,9 +470,33 @@ namespace ProofGeneration.Isa
             this.args = args;
         }
 
+        public TupleType(params TypeIsa[] args) : this(new List<TypeIsa>(args))
+        {
+            
+        }
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
             return visitor.VisitTupleType(this);
+        }
+    }
+    
+    public class SumType : TypeIsa
+    {
+        public readonly IList<TypeIsa> args;
+
+        public SumType(IList<TypeIsa> args)
+        {
+            this.args = args;
+        }
+
+        public SumType(params TypeIsa[] args) : this(new List<TypeIsa>(args))
+        {
+            
+        }
+
+        public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
+        {
+            return visitor.VisitSumType(this);
         }
     }
 

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
@@ -12,6 +13,9 @@ namespace ProofGeneration.Passification
     {
        public static Theory PassificationProof(
            string theoryName,
+           string boogieToVcTheoryName,
+           LemmaDecl boogieToVcLemma,
+           Term vcAssm,
            CFGRepr beforePassificationCfg,
            IDictionary<Block, Block> nonPassiveToPassiveBlock,
            PassiveRelationGen relationGen,
@@ -21,20 +25,37 @@ namespace ProofGeneration.Passification
            IVariableTranslationFactory beforePassiveFactory,
            IVariableTranslationFactory passiveFactory)
        {
+            string varContextName = "\\<Lambda>1";
+            string passiveVarContextName = "\\<Lambda>2";
+            var varContextNonPassivePassive = Tuple.Create(varContextName, passiveVarContextName);
             
             var beforePassiveLemmaManager = new PrePassiveLemmaManager(
                 beforePassificationCfg,
                 nonPassiveToPassiveBlock,
                 beforePassiveProgAccess,
                 passiveProgAccess,
+                varContextNonPassivePassive,
                 relationGen,
-                beforePassiveData,
                 beforePassiveFactory, 
                 passiveFactory 
                 );
             
             var lemmaNamer = new IsaUniqueNamer();
             var passificationProofDecls = new List<OuterDecl>();
+            
+            var varContextAbbrev = new AbbreviationDecl(
+                varContextName,
+                new Tuple<IList<Term>, Term>(new List<Term>(), beforePassiveProgAccess.VarContext())
+                );
+            
+            var passiveVarContextAbbrev = new AbbreviationDecl(
+                passiveVarContextName,
+                new Tuple<IList<Term>, Term>(new List<Term>(), passiveProgAccess.VarContext())
+                );
+            
+            passificationProofDecls.Add(varContextAbbrev);
+            passificationProofDecls.Add(passiveVarContextAbbrev);
+            
             passificationProofDecls.AddRange(beforePassiveLemmaManager.Prelude());
 
             var cfgLemmas = new List<OuterDecl>();
@@ -53,8 +74,23 @@ namespace ProofGeneration.Passification
             //add cfg lemmas at the end
             passificationProofDecls.AddRange(cfgLemmas);
             
+            var endToEnd = new PassificationEndToEnd();
+
+            passificationProofDecls.AddRange(endToEnd.EndToEndProof(
+                GetCfgLemmaName(beforePassificationCfg.entry, lemmaNamer),
+                boogieToVcTheoryName+"."+boogieToVcLemma.name,
+                vcAssm,
+                beforePassiveProgAccess,
+                passiveProgAccess,
+                varContextNonPassivePassive,
+                beforePassificationCfg,
+                relationGen.LiveVarsBeforeBlock(beforePassificationCfg.entry),
+                passiveFactory.CreateTranslation().VarTranslation
+            ));
+            
             return new Theory(theoryName,
-                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(), passiveProgAccess.TheoryName(), "Boogie_Lang.PassificationML"},
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(), 
+                    passiveProgAccess.TheoryName(), "Boogie_Lang.PassificationEndToEnd", "Boogie_Lang.PassificationML", boogieToVcTheoryName},
                 passificationProofDecls);
        }
        

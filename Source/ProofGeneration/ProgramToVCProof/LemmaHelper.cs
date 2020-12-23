@@ -63,6 +63,14 @@ namespace ProofGeneration.ProgramToVCProof
             );
         }
 
+        public static Term BinderStateEmpty(Term normalState)
+        {
+            return TermBinary.Eq(
+                IsaBoogieTerm.BinderState(normalState),
+                IsaCommonTerms.EmptyMap
+            );
+        }
+
         public static Term LocalStateVariableAssumption(Variable v, 
             Term varContext,
             Term state,

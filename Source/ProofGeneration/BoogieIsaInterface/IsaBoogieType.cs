@@ -53,6 +53,11 @@ namespace ProofGeneration
             return new DataType("val", new List<TypeIsa>() { absValType });
         }
 
+        public static TypeIsa LitType()
+        {
+            return new DataType("lit");
+        }
+
         public static TypeIsa AbstractValueTyFunType(TypeIsa absValType)
         {
             return new DataType("absval_ty_fun", new List<TypeIsa> { absValType });
@@ -63,14 +68,19 @@ namespace ProofGeneration
             return new DataType("nstate", new List<TypeIsa> { absValType });
         }
 
-        public static TypeIsa StateType()
+        public static TypeIsa StateType(TypeIsa absValType)
         {
-            return IsaCommonTypes.GetDataTypeNoArg("state");
+            return IsaCommonTypes.GetDataTypeSingle("state", absValType);
         }
 
         public static TypeIsa GetCFGNodeType()
         {
             return new DataType("node", new List<TypeIsa>());
+        }
+        
+        public static TypeIsa CFGNodeOrReturnType()
+        {
+            return new SumType(GetCFGNodeType(), IsaCommonTypes.GetUnitType()); 
         }
 
         public static TypeIsa GetBlockType()
@@ -101,6 +111,11 @@ namespace ProofGeneration
             return new DataType("var_context", new List<TypeIsa>() { });
         }
 
+        public static TypeIsa MethodContextType()
+        {
+            return new DataType("method_context", new List<TypeIsa>() { });
+        }
+
         /*
         public static TypeIsa FunContextType(TypeIsa absValType)
         {
@@ -111,6 +126,11 @@ namespace ProofGeneration
         public static TypeIsa FunInterpType(TypeIsa absValType)
         {
             return new DataType("fun_interp", new List<TypeIsa>() { absValType } );
+        }
+        
+        public static TypeIsa RuntimeTypeEnvType()
+        {
+            return new DataType("rtype_env", new List<TypeIsa>() { });
         }
     }
 }

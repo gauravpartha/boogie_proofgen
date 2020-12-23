@@ -53,5 +53,12 @@ namespace ProofGeneration.IsaPrettyPrint
             string aggr = rArgs.Aggregate((s1, s2) => s1 + " " + IsaPrettyPrinterHelper.TIMES + " " + s2);
             return IsaPrettyPrinterHelper.Parenthesis(aggr);
         }
+
+        public override string VisitSumType(SumType t)
+        {
+            IList<string> rArgs = VisitList(t.args);
+            string aggr = rArgs.Aggregate((s1, s2) => s1 + " + " + s2);
+            return IsaPrettyPrinterHelper.Parenthesis(aggr);
+        }
     }
 }

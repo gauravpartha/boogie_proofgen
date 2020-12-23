@@ -11,7 +11,7 @@ using ProofGeneration.VCProofGen;
 
 namespace ProofGeneration.ProgramToVCProof
 {
-    class PassiveLemmaManager : IBlockLemmaManager
+    class PassiveLemmaManager
     {
         private readonly VCInstantiation<Block> vcinst;
 
@@ -28,15 +28,11 @@ namespace ProofGeneration.ProgramToVCProof
         private readonly IDictionary<NamedDeclaration, Term> declToVCMapping;
         private readonly IDictionary<Function, TermIdent> funToInterpMapping;
 
-        private readonly MultiCmdIsaVisitor cmdIsaVisitor;
-
         private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
 
         private readonly IVariableTranslationFactory variableFactory;
 
         private readonly string globalAssmsName = "global_assms";
-
-        private readonly IVCVarFunTranslator vcTranslator;
 
         private readonly AssumptionManager assmManager;
 
@@ -46,17 +42,14 @@ namespace ProofGeneration.ProgramToVCProof
             BoogieMethodData methodData, 
             IEnumerable<Function> vcFunctions, 
             IsaBlockInfo isaBlockInfo,
-            IVCVarFunTranslator vcTranslator,
             IVariableTranslationFactory variableFactory)
         {
             this.vcinst = vcinst;
             this.methodData = methodData;
-            programVariables = methodData.InParams.Union(methodData.Locals);
+            programVariables = methodData.AllVariables();
             initState = IsaBoogieTerm.Normal(normalInitState);
             this.isaBlockInfo = isaBlockInfo;
-            this.vcTranslator = vcTranslator;
             this.variableFactory = variableFactory;
-            cmdIsaVisitor = new MultiCmdIsaVisitor(uniqueNamer, variableFactory);
             boogieContext = new BoogieContextIsa(
               IsaCommonTerms.TermIdentFromName("A"),
               IsaCommonTerms.TermIdentFromName("M"),
@@ -337,24 +330,5 @@ namespace ProofGeneration.ProgramToVCProof
             return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);
         }
 
-        public LemmaDecl MethodVerifiesLemma(CFGRepr cfg, Term methodCfg, string lemmaName)
-        {
-            Term initConfig = IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState));
-            Term finalNodeOrDone = IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(new object(), "m'"));
-
-            Term finalConfig = IsaBoogieTerm.CFGConfig(finalNodeOrDone, finalState);
-
-            Term redCfgMulti = IsaBoogieTerm.RedCFGMulti(boogieContext, methodCfg, initConfig, finalConfig);
-
-            List<Term> assumptions = new List<Term>() { redCfgMulti };
-            assumptions.Add(vcinst.GetVCObjInstantiation(cfg.entry, declToVCMapping));
-
-            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
-
-            //TODO add full proof
-            Proof proof = new Proof(new List<string> { "sorry" });
-
-            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
-        }
     }   
 }

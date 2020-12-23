@@ -26,6 +26,7 @@ namespace ProofGeneration.BoogieIsaInterface
         protected override bool TranslatePrecondition(Absy node)
         {
             return node is GlobalVariable ||
+                   node is Constant ||
                 node is LocalVariable ||
                 node is Formal ||
                 node is Function || 
@@ -46,6 +47,16 @@ namespace ProofGeneration.BoogieIsaInterface
         public override LocalVariable VisitLocalVariable(LocalVariable node)
         {
             return (LocalVariable) VisitVariable(node); 
+        }
+
+        public override Constant VisitConstant(Constant node)
+        {
+            return (Constant) VisitVariable(node); 
+        }
+
+        public override GlobalVariable VisitGlobalVariable(GlobalVariable node)
+        {
+            return (GlobalVariable) VisitVariable(node);
         }
 
         public override Function VisitFunction(Function node)

@@ -26,6 +26,7 @@ namespace ProofGeneration
         private readonly static TermIdent lookupVarTyId = IsaCommonTerms.TermIdentFromName("lookup_var_ty");
         private readonly static TermIdent localStateId = IsaCommonTerms.TermIdentFromName("local_state");
         private readonly static TermIdent globalStateId = IsaCommonTerms.TermIdentFromName("global_state");
+        private readonly static TermIdent binderStateId = IsaCommonTerms.TermIdentFromName("binder_state");
 
         private readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
         private readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
@@ -52,6 +53,9 @@ namespace ProofGeneration
         private readonly static TermIdent existsTypeId = IsaCommonTerms.TermIdentFromName("ExistsT");
 
         private readonly static TermIdent closedTypeId = IsaCommonTerms.TermIdentFromName("closed");
+        private readonly static TermIdent instTypeId = IsaCommonTerms.TermIdentFromName("instantiate");
+
+        private readonly static TermIdent axiomAssmId = IsaCommonTerms.TermIdentFromName("axiom_assm");
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
@@ -158,6 +162,11 @@ namespace ProofGeneration
         public static Term GlobalState(Term normalState)
         {
             return new TermApp(globalStateId, normalState);
+        }
+        
+        public static Term BinderState(Term normalState)
+        {
+            return new TermApp(binderStateId, normalState);
         }
         
         public static Term Assert(Term arg)
@@ -516,9 +525,19 @@ namespace ProofGeneration
             return new TermApp(axiomsSatId, new List<Term> { absValTyMap, varContext, funContext, normalState, axioms });
         }
 
+        public static Term AxiomAssm(Term absValTyMap, Term funContext, Term consts, Term normalState, Term axioms)
+        {
+            return new TermApp(axiomAssmId, absValTyMap, funContext, consts, normalState, axioms);
+        }
+
         public static Term IsClosedType(Term ty)
         {
             return new TermApp(closedTypeId, ty);
+        }
+
+        public static Term InstantiateType(Term rtypeEnv, Term ty)
+        {
+            return new TermApp(instTypeId, rtypeEnv, ty);
         }
     }
 }

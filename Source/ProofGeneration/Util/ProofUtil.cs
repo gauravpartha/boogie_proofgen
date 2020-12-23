@@ -1,4 +1,5 @@
-﻿using ProofGeneration.IsaPrettyPrint;
+﻿using System.Collections.Generic;
+using ProofGeneration.IsaPrettyPrint;
 
 namespace ProofGeneration.Util
 {
@@ -9,22 +10,52 @@ namespace ProofGeneration.Util
         {
             return defName + "_def";
         }
-        public static string Simp(params string [] theorems)
+
+        public static string Simp(params string[] theorems)
         {
+            return Simp(false, theorems);
+        }
+        
+        public static string SimpAll(params string[] theorems)
+        {
+            return Simp(true, theorems);
+        }
+        
+        public static string Simp(bool allGoals, string [] theorems)
+        {
+            string simpTac = "simp" + (allGoals ? "_all" : "");
             if(theorems.Length == 0)
             {
-                return "simp";
+                return simpTac;
             } else
             {
-                return "(simp add:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
+                return "(" + simpTac + " add:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
             }
         }
+
+        public static string SimpAddDel(IEnumerable<string> deleteTheorems, params string[] addTheorems)
+        {
+            var addString = addTheorems.Length == 0 ? "" : " add: " + IsaPrettyPrinterHelper.SpaceAggregate(addTheorems);
+            var delString = addTheorems.Length == 0 ? "" : " del: " + IsaPrettyPrinterHelper.SpaceAggregate(deleteTheorems);
+
+            return "(simp" + addString + delString + ")";
+        }
+
 
         public static string Apply(string s)
         {
             return "apply (" + s + ")";
         }
+
+        public static string Rule(string s)
+        {
+            return "rule " + s;
+        }
         
+        public static string Erule(string s)
+        {
+            return "erule " + s;
+        }
         
         public static string By(string s)
         {

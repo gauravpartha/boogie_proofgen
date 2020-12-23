@@ -19,6 +19,8 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public string ConstsDecl();
         public string GlobalsDecl();
+        public string ParamsDecl();
+        public string LocalsDecl();
 
         public Term VarContext();
 
@@ -27,6 +29,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public IsaBlockInfo BlockInfo();
 
         public string GlobalsLocalsDisjointLemma();
+        public string GlobalsAtMostMax();
+        public string LocalsAtLeastMin();
 
         public string LookupVarTyLemma(Variable v);
     }

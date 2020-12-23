@@ -294,7 +294,9 @@ namespace ProofGeneration
                 vcProofData,
                 varTranslationFactory,
                 typePremiseEraserFactory,
-                gen
+                gen,
+                out Term vcAssm,
+                out LemmaDecl endToEndLemma
             );
             StoreTheory(theoryPassive);
             
@@ -305,11 +307,14 @@ namespace ProofGeneration
             StoreTheory(passificationProgTheory);
             
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
-            //Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
+            Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
 
             
             var passificationProofTheory = PassificationManager.PassificationProof(
                 afterPassificationImpl.Name+"_passification_proof",
+                theoryPassive.theoryName,
+                endToEndLemma,
+                vcAssm,
                 beforePassificationCfg,
                 beforePassiveOrigBlock,
                 passiveRelationGen,

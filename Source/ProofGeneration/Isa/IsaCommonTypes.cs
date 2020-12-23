@@ -4,6 +4,11 @@ namespace ProofGeneration.Isa
 {
     class IsaCommonTypes
     {
+        public static TypeIsa GetUnitType()
+        {
+            return GetDataTypeNoArg("unit");
+        }
+        
         public static TypeIsa GetOptionType(TypeIsa elemType)
         {
             return GetDataTypeSingle("option", elemType);

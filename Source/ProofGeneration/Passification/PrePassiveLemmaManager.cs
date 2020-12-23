@@ -15,18 +15,11 @@ namespace ProofGeneration.Passification
     {
         private readonly CFGRepr cfg;
         private readonly IDictionary<Block, Block> origToPassiveBlock;
-        private readonly IDictionary<Block, Block> passiveToOrigBlock;
-
-        private readonly BoogieMethodData methodData;
-        private readonly IEnumerable<Variable> programVariables;
 
         private readonly PassiveRelationGen _relationGen;
 
         private readonly BoogieContextIsa boogieContext;
-        private readonly string varContextName = "\\<Lambda>1";
-        
         private readonly TermIdent passiveVarContext;
-        private readonly string passiveVarContextName = "\\<Lambda>2";
         
         private readonly TermIdent passiveStates = IsaCommonTerms.TermIdentFromName("U0");
         private readonly TermIdent constrainedVars = IsaCommonTerms.TermIdentFromName("D0");
@@ -38,16 +31,9 @@ namespace ProofGeneration.Passification
         private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
         private readonly TermIdent finalNode = IsaCommonTerms.TermIdentFromName("m'");
 
-        private readonly IDictionary<Function, TermIdent> funToInterpMapping;
-
-        private readonly MultiCmdIsaVisitor cmdIsaVisitor;
-
-        private readonly IVariableTranslationFactory varTranslationFactory;
-
         private readonly IVariableTranslation<Variable> varTranslation; 
         private readonly IVariableTranslation<Variable> passiveVarTranslation; 
 
-        private readonly IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
         private readonly IsaUniqueNamer boogieVarUniqueNamer = new IsaUniqueNamer();
         //use this for concrete Boogie variable names (i.e., ns ''someVariableName'' = ...)
     
@@ -65,35 +51,29 @@ namespace ProofGeneration.Passification
             IDictionary<Block, Block> origToPassiveBlock,
             IProgramAccessor programAccessor,
             IProgramAccessor passiveProgramAccessor,
+            Tuple<string, string> varContextNonPassivePassive,
             PassiveRelationGen relationGen,
-            BoogieMethodData methodData,
             IVariableTranslationFactory varTranslationFactory,
             IVariableTranslationFactory passiveTranslationFactory)
         {
             this.cfg = cfg;
             this.origToPassiveBlock = origToPassiveBlock;
-            passiveToOrigBlock = origToPassiveBlock.ToDictionary((i) => i.Value, (i) => i.Key);
             this.programAccessor = programAccessor;
             this.passiveProgramAccessor = passiveProgramAccessor;
             this._relationGen = relationGen;
-            this.methodData = methodData;
-            programVariables = methodData.InParams.Union(methodData.Locals);
             initState = IsaBoogieTerm.Normal(normalInitState);
-            this.varTranslationFactory = varTranslationFactory;
             varTranslation = varTranslationFactory.CreateTranslation().VarTranslation;
             passiveVarTranslation = passiveTranslationFactory.CreateTranslation().VarTranslation;
-            cmdIsaVisitor = new MultiCmdIsaVisitor(boogieVarUniqueNamer, varTranslationFactory);
             //separate unique namer for function interpretations (since they already have a name in uniqueNamer): possible clashes
-            funToInterpMapping = LemmaHelper.FunToTerm(methodData.Functions, new IsaUniqueNamer());
 
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
                 IsaCommonTerms.TermIdentFromName("M"),
-                IsaCommonTerms.TermIdentFromName(varContextName),
+                IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item1),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
                 IsaCommonTerms.TermIdentFromName("\\<Omega>")
                 );
-            passiveVarContext = IsaCommonTerms.TermIdentFromName(passiveVarContextName);
+            passiveVarContext = IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item2);
         }
         
         //must be called in a topological backwards order
@@ -245,6 +225,7 @@ namespace ProofGeneration.Passification
             Term cfgConclusion = CfgLemmaConclusion(
                 boogieContext,
                 passiveWitness,
+                passiveProgramAccessor,
                 IsaCommonTerms.Inl(new NatConst(programAccessor.BlockInfo().BlockIds[block])),
                 finalState);
 
@@ -299,20 +280,6 @@ namespace ProofGeneration.Passification
         public IList<OuterDecl> Prelude()
         {
             var result = new List<OuterDecl>();
-            
-            var varContextAbbrev = new AbbreviationDecl(
-                varContextName,
-                new Tuple<IList<Term>, Term>(new List<Term>(), programAccessor.VarContext())
-                );
-            
-            var passiveVarContextAbbrev = new AbbreviationDecl(
-                passiveVarContextName,
-                new Tuple<IList<Term>, Term>(new List<Term>(), passiveProgramAccessor.VarContext())
-                );
-            
-            result.Add(varContextAbbrev);
-            result.Add(passiveVarContextAbbrev);
-            
             /*
             if(programVariables.Any())
             {
@@ -326,68 +293,6 @@ namespace ProofGeneration.Passification
             */
             
             result.Add(new DeclareDecl("One_nat_def[simp del]"));
-
-            return result;
-        }
-
-        private IList<Term> GlobalAssumptions()
-        {
-            IList<Term> globalAssms = GlobalVarContextAssumptions();
-            globalAssms.AddRange(GlobalFunctionContextAssumptions());
-            return globalAssms;
-        }
-
-        private IList<Term> GlobalFunctionContextAssumptions()
-        {
-            throw new NotImplementedException();
-            //return LemmaHelper.FunctionAssumptions(methodData.Functions, funToInterpMapping, declToVCMapping, boogieContext.funContext);
-        }
-
-        private IList<Term> GlobalVarContextAssumptions()
-        {
-            throw new NotImplementedException();
-            /*
-            var assms = new List<Term>();
-            foreach (Variable v in programVariables)
-            {
-                assms.Add(LemmaHelper.VariableTypeAssumption(v, boogieContext.varContext, 
-                    new TypeIsaVisitor(varTranslationFactory.CreateTranslation().TypeVarTranslation)));
-            }
-            return assms;
-            */
-        }
-
-        private IList<string> AssumptionLabels()
-        {
-            IList<string> result = VarAssumptionLabels();
-            result.AddRange(FunAssumptionLabels());
-            return result;
-        }
-
-        private IList<string> VarAssumptionLabels()
-        {
-            return LemmaHelper.AssumptionLabels("V", 0, programVariables.Count());
-        }
-
-        private IList<string> FunAssumptionLabels()
-        {
-            return LemmaHelper.AssumptionLabels("F", programVariables.Count(), 2*methodData.Functions.Count());
-        }
-
-        private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
-        {
-            VarType absValType = new VarType("a");
-
-            var result = new List<Tuple<TermIdent, TypeIsa>>
-            {
-                Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
-                Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType))
-            };
-
-            foreach (KeyValuePair<Function, TermIdent> kv in funToInterpMapping)
-            {
-                result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType(absValType)));
-            }
 
             return result;
         }
@@ -473,9 +378,10 @@ namespace ProofGeneration.Passification
             return new TermApp(IsaCommonTerms.TermIdentFromName("passive_block_conclusion"), args);
         }
 
-        private Term CfgLemmaConclusion(
+        public static Term CfgLemmaConclusion(
             BoogieContextIsa boogieContextSource,
             PassificationWitness passificationWitness,
+            IProgramAccessor passiveProgramAccessor,
             Term blockNodeId,
             Term finalState)
         {
@@ -545,11 +451,6 @@ namespace ProofGeneration.Passification
             };
 
             return new Proof(proofMethods);
-        }
-
-        public LemmaDecl MethodVerifiesLemma(CFGRepr cfg2, Term methodCfg, string lemmaName)
-        {
-            throw new NotImplementedException();
         }
     }
 }

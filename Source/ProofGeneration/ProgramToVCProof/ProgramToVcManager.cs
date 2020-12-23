@@ -48,7 +48,9 @@ namespace ProofGeneration.ProgramToVCProof
             ProgramVcProofData vcProofData,
             IVariableTranslationFactory varFactory,
             TypePremiseEraserFactory eraserFactory,
-            VCExpressionGenerator gen)
+            VCExpressionGenerator gen,
+            out Term vcAssm,
+            out LemmaDecl endToEndLemma)
         {
             var lemmaNamer = new IsaUniqueNamer();
             var passiveLemmaManager = new PassiveLemmaManager(
@@ -56,7 +58,7 @@ namespace ProofGeneration.ProgramToVCProof
                 methodData, 
                 vcProofData.VcFunctions, 
                 passiveProgAccess.BlockInfo(), 
-                vcProofData.VcTranslator, varFactory);
+                varFactory);
 
             var reachableBlocks = ReachableBlocks(afterPassificationCfg);
             
@@ -73,10 +75,10 @@ namespace ProofGeneration.ProgramToVCProof
             }
             afterPassificationDecls.AddRange(cfgProgramLemmas.Values);
             
-            afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
+            /*afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
                 finalCfg,
                 passiveProgAccess.CfgDecl(),
-                "method_verifies"));
+                "method_verifies"));*/
 
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
@@ -88,12 +90,13 @@ namespace ProofGeneration.ProgramToVCProof
                 passiveProgAccess, 
                 vcProofData.VcFunctions, 
                 vcProofData.VcBoogieInfo,
-                finalCfg, 
+                afterPassificationCfg, 
+                afterPassificationLocale.name + "." + cfgProgramLemmas[afterPassificationCfg.entry].name,
                 varFactory,
                 vcProofData.VcTranslator,
                 eraserFactory,
                 gen);
-            passiveOuterDecls.AddRange(endToEnd.GenerateProof());
+            passiveOuterDecls.AddRange(endToEnd.GenerateProof(out vcAssm, out endToEndLemma));
 
             return 
                 new Theory(theoryName,
@@ -229,7 +232,7 @@ namespace ProofGeneration.ProgramToVCProof
             return "block_" + b.Label;
         }
 
-        private static LocaleDecl GenerateLocale(string localeName, IBlockLemmaManager lemmaManager, IList<OuterDecl> coreLemmas)
+        private static LocaleDecl GenerateLocale(string localeName, PassiveLemmaManager lemmaManager, IList<OuterDecl> coreLemmas)
         {
             IList<OuterDecl> prelude = lemmaManager.Prelude();
             prelude.AddRange(coreLemmas);

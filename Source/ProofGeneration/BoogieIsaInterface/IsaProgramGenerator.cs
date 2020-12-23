@@ -113,7 +113,12 @@ namespace ProofGeneration
                             parameters.name,
                             localVariables.name,
                             methodBodyDecl.name);
-            MembershipLemmaManager membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo, varTranslationFactory, theoryName);
+            // assume single versioning and order on constants, globals, params, locals
+            int globalsMax = methodData.Constants.Count() + methodData.GlobalVars.Count() - 1;
+            int localsMin = globalsMax + 1;
+            if (globalsMax < 0)
+                globalsMax = 0;
+            MembershipLemmaManager membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo, Tuple.Create(globalsMax, localsMin), varTranslationFactory, theoryName);
 
             if (config.GenerateAxioms)
             {
@@ -126,23 +131,19 @@ namespace ProofGeneration
                 decls.Add(GetFunctionDeclarationsIsa(procName, methodData.Functions));
                 membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions);
             }
-
-            if (config.GenerateGlobals)
-            {
-                decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
-                membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, true);
-            }
             
-            if (config.GenerateConstants)
-            {
-                decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
-                membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, true);
-            }
+            // for globals and constants we still generate the type lookup lemmas, but not the membership lemmas,
+            // since the membership lemmas should come from the parent (we assume that the constants and globals are the same for both)
+            decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, true, config.GenerateGlobals);
             
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams.Union(methodData.Locals), false);
+            decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, true, config.GenerateConstants);
+            
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams.Union(methodData.Locals), false, true);
             
             decls.AddRange(
-        new List<OuterDecl>()
+        new List<OuterDecl>
                 {
                     outEdges, nodesToBlocks, parameters, localVariables, methodBodyDecl
                 });
