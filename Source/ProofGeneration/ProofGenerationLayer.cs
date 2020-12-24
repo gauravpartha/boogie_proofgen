@@ -220,10 +220,23 @@ namespace ProofGeneration
         {
             if(axiomBuilder == null && typeAxioms != null)
                 throw new ArgumentException("type axioms can only be null if axiom builder is null");
-            #region before passive program
+            
             var fixedVarTranslation2 = new DeBruijnFixedVarTranslation(beforePassiveData);
             var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
             var varTranslationFactory2 = new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
+            
+            #region before cfg to dag program
+            string beforeCfgToDagTheoryName = afterPassificationImpl.Name + "_before_cfg_to_dag_prog";
+            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(null, true,true, true, true);
+            var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
+                beforeCfgToDagTheoryName, 
+                afterPassificationImpl.Name, 
+                beforePassiveData, beforeCfgToDagConfig, varTranslationFactory2, 
+                beforeDagCfg, 
+                out IList<OuterDecl> programDeclsBeforeCfgToDag);
+            #endregion
+            
+            #region before passive program
 
             //Console.WriteLine("**Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             
@@ -326,6 +339,12 @@ namespace ProofGeneration
                 );
 
             StoreTheory(passificationProofTheory);
+            #endregion
+            
+            #region cfg to dag
+            var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
+            StoreTheory(beforeCfgToDagProgTheory);
             #endregion
         }
         
