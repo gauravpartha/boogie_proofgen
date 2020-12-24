@@ -1,8 +1,8 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 // XFAIL: *
 
-var {:layer 0,3} x:int;  
+var {:layer 0,3} x:int;
 
 procedure {:both}{:layer 3} Client_atomic ()
 modifies x;

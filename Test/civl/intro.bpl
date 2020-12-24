@@ -1,4 +1,4 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 var {:layer 1,2} y:int;
@@ -24,7 +24,7 @@ requires {:layer 1} x == y;
   call set_y_to_x();
 }
 
-procedure {:intro} {:layer 1,1} set_y_to_x ()
+procedure {:intro} {:layer 1} set_y_to_x ()
 modifies y;
 {
   y := x;

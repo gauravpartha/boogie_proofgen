@@ -10,7 +10,7 @@
 // Both lines are assumed to be atomic. This algorithm has the property that
 // once all processes have finished, at least one y[j] == 1.
 
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 // Number of processes in the algorithm. There needs to be at least one.
@@ -33,7 +33,7 @@ Main()
   assert {:layer 1} Trigger(0);
   i := 0;
   while (i < N)
-  invariant {:terminates} {:layer 1} true;
+  invariant {:cooperates} {:layer 1} true;
   invariant {:layer 1} ind_inv(done, y, x);
   {
     async call Proc(i);

@@ -90,7 +90,7 @@ requires {:layer 1} InitLow(acceptorState, joinChannel, voteChannel, permJoinCha
   r := 0;
   rs' := rs;
   while (*)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 0 <= r;
   invariant {:layer 1} (forall r': Round :: r < r' ==> rs'[r']);
   invariant {:layer 1} PAs == (lambda pa: PA :: if (is#StartRound_PA(pa) && round#StartRound_PA(pa) == round_lin#StartRound_PA(pa) && Round(round#StartRound_PA(pa)) && round#StartRound_PA(pa) <= r) then 1 else 0);
@@ -116,7 +116,7 @@ requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permV
   call ps, ps' := SplitPermissions(r_lin);
   n := 1;
   while (n <= numNodes)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= n && n <= numNodes+1;
   invariant {:layer 1} (forall n': Node :: n <= n' && n' <= numNodes ==> ps[JoinPerm(r, n')]);
   invariant {:layer 1} PAs == (lambda pa: PA :: if is#Join_PA(pa) && round#Join_PA(pa) == r && 1 <= node#Join_PA(pa) && node#Join_PA(pa) < n && p#Join_PA(pa) == JoinPerm(round#Join_PA(pa), node#Join_PA(pa)) then 1 else 0);
@@ -196,7 +196,7 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
   call ps', cp := SplitConcludePermission(r, ps);
   n := 1;
   while (n <= numNodes)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= n && n <= numNodes+1;
   invariant {:layer 1} (forall n': Node :: n <= n' && n' <= numNodes ==> ps'[VotePerm(r, n')]);
   invariant {:layer 1} PAs == (lambda pa: PA :: if is#Vote_PA(pa) && round#Vote_PA(pa) == r && 1 <= node#Vote_PA(pa) && node#Vote_PA(pa) < n && value#Vote_PA(pa) == maxValue && p#Vote_PA(pa) == VotePerm(round#Vote_PA(pa), node#Vote_PA(pa)) then 1 else 0);
@@ -302,13 +302,13 @@ modifies voteInfo;
 procedure {:intro}{:layer 1} AddPendingAsyncs(PAs: [PA]int)
 modifies pendingAsyncs;
 {
-  pendingAsyncs := MapAddPA(pendingAsyncs, PAs);
+  pendingAsyncs := MapAdd(pendingAsyncs, PAs);
 }
 
 procedure {:intro}{:layer 1} RemovePendingAsyncs(PAs: [PA]int)
 modifies pendingAsyncs;
 {
-  pendingAsyncs := MapSubPA(pendingAsyncs, PAs);
+  pendingAsyncs := MapSub(pendingAsyncs, PAs);
 }
 
 // Trusted lemmas for the proof of Propose and Conclude
@@ -322,7 +322,7 @@ ensures Cardinality(q') == Cardinality(q) + 1;
 
 procedure {:lemma} MaxRoundLemma(voteInfo:[Round]OptionVoteInfo, r: Round, ns1: NodeSet, ns2: NodeSet);
 requires Round(r);
-ensures MaxRound(r, MapOrNode(ns1, ns2), voteInfo) ==
+ensures MaxRound(r, MapOr(ns1, ns2), voteInfo) ==
          if (MaxRound(r, ns1, voteInfo) < MaxRound(r, ns2, voteInfo))
          then MaxRound(r, ns2, voteInfo)
          else MaxRound(r, ns1, voteInfo);
@@ -487,7 +487,7 @@ returns ({:linear "perm"} ps': [Permission]bool, {:linear "perm"} p: Permission)
 procedure {:intro}{:layer 1} InitializePermissions()
 returns ({:linear "perm"} receivedPermissions: [Permission]bool)
 {
-  receivedPermissions := MapConstPermission(false);
+  receivedPermissions := MapConst(false);
 }
 
 procedure {:intro}{:layer 1} AddPermission({:linear_in "perm"} receivedPermissions: [Permission]bool, {:linear_in "perm"} p: Permission)

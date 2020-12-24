@@ -1,8 +1,8 @@
-﻿using Microsoft.BaseTypes;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Microsoft.BaseTypes;
 
 namespace ProofGeneration.Isa
 {

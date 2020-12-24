@@ -1,157 +1,19 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{8F6517B5-87D6-4281-9F9D-74288AA36A14}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>ProofGeneration</RootNamespace>
-    <AssemblyName>ProofGeneration</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Deterministic>true</Deterministic>
-    <TargetFrameworkProfile />
+    <AssemblyName>BoogieProofGeneration</AssemblyName>
+    <RootNamespace>ProofGeneration-NetCore</RootNamespace>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>InterimKey.snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
-  <PropertyGroup>
-    <StartupObject />
-  </PropertyGroup>
+  
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
+    <ProjectReference Include="..\Basetypes\Basetypes-NetCore.csproj" />
+    <ProjectReference Include="..\Core\Core-NetCore.csproj" />
+    <ProjectReference Include="..\Core\Core.csproj" />
+    <ProjectReference Include="..\Graph\Graph-NetCore.csproj" />
+    <ProjectReference Include="..\ParserHelper\ParserHelper-NetCore.csproj" />
+    <ProjectReference Include="..\VCExpr\VCExpr-NetCore.csproj" />
+    <ProjectReference Include="..\VCExpr\VCExpr.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="BoogieIsaInterface\ApplicableIsaVisitor.cs" />
-    <Compile Include="BoogieIsaInterface\BasicCmdIsaVisitor.cs" />
-    <Compile Include="BoogieIsaInterface\BoogieContextIsa.cs" />
-    <Compile Include="BoogieIsaInterface\BoogieGlobalData.cs" />
-    <Compile Include="BoogieIsaInterface\BoogieMethodData.cs" />
-    <Compile Include="BoogieIsaInterface\IsaBoogieVCTerm.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\BoogieFixedVarTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\BoogieVariableTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnTyVarTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnFixedVarTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\DeBruijnVarFactory.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\IVariableTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\IFixedVariableTranslation.cs" />
-    <Compile Include="BoogieIsaInterface\IsaBoogieTerm.cs" />
-    <Compile Include="BoogieIsaInterface\IsaBoogieType.cs" />
-    <Compile Include="BoogieIsaInterface\IsaProgramGenerator.cs" />
-    <Compile Include="BoogieIsaInterface\IsaProgramRepr.cs" />
-    <Compile Include="BoogieIsaInterface\MultiCmdIsaVisitor.cs" />
-    <Compile Include="BoogieIsaInterface\PureValueIsaTransformer.cs" />
-    <Compile Include="BoogieIsaInterface\TypeIsaVisitor.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\IVariableTranslationFactory.cs" />
-    <Compile Include="BoogieIsaInterface\VariableTranslation\SimpleVarSubstitution.cs" />
-    <Compile Include="CFGRepr\CFGRepr.cs" />
-    <Compile Include="CFGRepr\CFGReprTransformer.cs" />
-    <Compile Include="IsaPrettyPrint\IsaPrettyPrinterHelper.cs" />
-    <Compile Include="IsaPrettyPrint\OuterDeclPrettyPrinter.cs" />
-    <Compile Include="IsaPrettyPrint\TermPrettyPrinter.cs" />
-    <Compile Include="IsaPrettyPrint\TypeIsaPrettyPrinter.cs" />
-    <Compile Include="Isa\InnerAst.cs" />
-    <Compile Include="Isa\IsaCommonTerms.cs" />
-    <Compile Include="Isa\IsaCommonTypes.cs" />
-    <Compile Include="IsaPrettyPrint\IsaPrettyPrinter.cs" />
-    <Compile Include="Isa\IsaVisitor.cs" />
-    <Compile Include="Isa\OuterAst.cs" />
-    <Compile Include="Isa\ProofAst.cs" />
-    <Compile Include="ProgramToVCProof\ConstantPropInformation.cs" />
-    <Compile Include="ProgramToVCProof\EndToEndVCProof.cs" />
-    <Compile Include="ProgramToVCProof\IBlockLemmaGenerator.cs" />
-    <Compile Include="ProgramToVCProof\LemmaHelper.cs" />
-    <Compile Include="ProgramToVCProof\PassiveLemmaManager.cs" />
-    <Compile Include="ProgramToVCProof\PrePassiveLemmaManager.cs" />
-    <Compile Include="ProgramToVCProof\PureToBoogieValConverter.cs" />
-    <Compile Include="ProgramToVCProof\TypeUtil.cs" />
-    <Compile Include="ProofGenerationExceptions.cs" />
-    <Compile Include="ProofGenerationLayer.cs" />
-    <Compile Include="ResultReadOnlyVisitor.cs" />
-    <Compile Include="Util\BasicUtil.cs" />
-    <Compile Include="BoogieIsaInterface\PureTyIsaTransformer.cs" />
-    <Compile Include="Util\IsaUniqueNamer.cs" />
-    <Compile Include="Util\MLUtil.cs" />
-    <Compile Include="Util\ProofUtil.cs" />
-    <Compile Include="VCProofGen\ConcreteTypeDeclTranslation.cs" />
-    <Compile Include="VCProofGen\IActiveDeclGenerator.cs" />
-    <Compile Include="VCProofGen\PassiveActiveDecl.cs" />
-    <Compile Include="VCProofGen\StandardActiveDecl.cs" />
-    <Compile Include="VCProofGen\VCBlockExtractor.cs" />
-    <Compile Include="VCProofGen\VCFunDeclCollector.cs" />
-    <Compile Include="VCProofGen\VCExprDeclCollector.cs" />
-    <Compile Include="VCProofGen\VCExprOpIsaVisitor.cs" />
-    <Compile Include="VCProofGen\VCExprToIsaTranslator.cs" />
-    <Compile Include="VCProofGen\VCHint.cs" />
-    <Compile Include="VCProofGen\VCHintBlock.cs" />
-    <Compile Include="VCProofGen\VCHintManager.cs" />
-    <Compile Include="VCProofGen\VCInstantiation.cs" />
-    <Compile Include="VCProofGen\VCToIsaInterface.cs" />
-    <Compile Include="VCProofGen\VCBlockToIsaTranslator.cs" />
-    <Compile Include="VCProofGen\IVCVarFunTranslator.cs" />
-    <Compile Include="VCProofGen\VCTypeDeclTranslation.cs" />
-    <Compile Include="VCProofGen\VCVarFunTranslator.cs" />
-    <Compile Include="version.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Basetypes\Basetypes.csproj">
-      <Project>{43DFAD18-3E35-4558-9BE2-CAFF6B5BA8A0}</Project>
-      <Name>Basetypes</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Core\Core.csproj">
-      <Project>{b230a69c-c466-4065-b9c1-84d80e76d802}</Project>
-      <Name>Core</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Graph\Graph.csproj">
-      <Project>{69A2B0B8-BCAC-4101-AE7A-556FCC58C06E}</Project>
-      <Name>Graph</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\ParserHelper\ParserHelper.csproj">
-      <Project>{fcd3ac7f-9dfd-46c8-ab1e-09f0b0f16dc5}</Project>
-      <Name>ParserHelper</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\VCExpr\VCExpr.csproj">
-      <Project>{56ffdbca-7d14-43b8-a6ca-22a20e417ee1}</Project>
-      <Name>VCExpr</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="InterimKey.snk" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  
 </Project>

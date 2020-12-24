@@ -1,6 +1,7 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
+type {:linear "pid"} Pid = int;
 const n:int;
 axiom n >= 1;
 
@@ -59,7 +60,7 @@ function NoPAs() : [PA]int { (lambda pa:PA :: 0) }
 function {:inline} Init(pids:[int]bool, channel:[int][int]int,
   terminated:[int]bool, id:[int]int, leader:[int]bool) : bool
 {
-  pids == MapConstBool(true) &&
+  pids == MapConst(true) &&
   channel == (lambda i:int :: EmptyChannel()) &&
   terminated == (lambda i:int :: false) &&
   leader == (lambda i:int :: false) &&
@@ -263,7 +264,7 @@ requires {:layer 1} Init(pids, channel, terminated, id, leader);
   pids' := pids;
   i := 1;
   while (i <= n)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} (forall ii:int :: pid(ii) && ii >= i ==> pids'[ii]);
   invariant {:layer 1} PAs == (lambda pa:PA :: if is#PInit_PA(pa) && pid(pid#PInit_PA(pa)) && pid#PInit_PA(pa) < i then 1 else 0);
@@ -357,18 +358,3 @@ returns ({:linear "pid"} p:int, {:linear "pid"} pids':[int]bool)
 
 procedure {:yields}{:layer 0}{:refines "LINEAR_TRANSFER"} linear_transfer(i:int, {:linear_in "pid"} pids:[int]bool)
 returns ({:linear "pid"} p:int, {:linear "pid"} pids':[int]bool);
-
-////////////////////////////////////////////////////////////////////////////////
-
-function {:builtin "MapConst"} MapConstBool (bool) : [int]bool;
-function {:builtin "MapOr"} MapOr ([int]bool, [int]bool) : [int]bool;
-
-function {:inline}{:linear "pid"} PidCollector (pid:int) : [int]bool
-{
-  MapConstBool(false)[pid := true]
-}
-
-function {:inline}{:linear "pid"} PidSetCollector (pids:[int]bool) : [int]bool
-{
-  pids
-}

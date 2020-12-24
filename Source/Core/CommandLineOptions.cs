@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Diagnostics.Contracts;
 using System.Text.RegularExpressions;
-using System.Diagnostics; // required for Mono Build
 
 namespace Microsoft.Boogie
 {
@@ -54,8 +53,9 @@ namespace Microsoft.Boogie
       }
     }
 
+    public bool VersionRequested = false;
     public bool HelpRequested = false;
-    public bool AttrHelpRequested = false;
+    public bool AttributeHelpRequested = false;
 
     public CommandLineOptionEngine(string toolName, string descriptiveName)
     {
@@ -131,25 +131,12 @@ namespace Microsoft.Boogie
       Contract.Requires(name != null);
       Contract.Requires(ps != null);
 
-      switch (name)
+      if (ps.CheckBooleanFlag("version", ref VersionRequested) ||
+          ps.CheckBooleanFlag("help", ref HelpRequested) ||
+          ps.CheckBooleanFlag("?", ref HelpRequested) ||
+          ps.CheckBooleanFlag("attrHelp", ref AttributeHelpRequested))
       {
-        case "help":
-        case "?":
-          if (ps.ConfirmArgumentCount(0))
-          {
-            HelpRequested = true;
-          }
-
-          return true;
-        case "attrHelp":
-          if (ps.ConfirmArgumentCount(0))
-          {
-            AttrHelpRequested = true;
-          }
-
-          return true;
-        default:
-          break;
+        return true;
       }
 
       return false; // unrecognized option
@@ -361,27 +348,43 @@ namespace Microsoft.Boogie
       }
     }
 
-    public virtual void Usage()
-    {
-      Console.WriteLine("{0}: usage:  {0} [ option ... ] [ filename ... ]", ToolName);
-      Console.WriteLine(@"  where <option> is one of
+    public virtual string Help =>
+      $"Usage: {ToolName} [ option ... ] [ filename ... ]" + @"
 
   ---- General options -------------------------------------------------------
 
-  /help         this message
-  /attrHelp     print a message about declaration attributes supported by
-                this implementation");
-    }
+  /version      print the " + ToolName + @" version number
+  /help         print this message
+  /attrHelp     print a message about supported declaration attributes";
 
-    public virtual void AttributeUsage()
-    {
-    }
+    public virtual string AttributeHelp => "";
 
     /// <summary>
     /// This method is called after all parsing is done, if no parse errors were encountered.
     /// </summary>
     public virtual void ApplyDefaultOptions()
     {
+    }
+
+    public virtual bool ProcessInfoFlags()
+    {
+      if (VersionRequested)
+      {
+        Console.WriteLine(Version);
+        return true;
+      }
+      if (HelpRequested)
+      {
+        Console.WriteLine(Help);
+        return true;
+      }
+      if (AttributeHelpRequested)
+      {
+        Console.WriteLine(AttributeHelp);
+        return true;
+      }
+      
+      return false;
     }
 
     /// <summary>
@@ -439,21 +442,9 @@ namespace Microsoft.Boogie
         ps.i = ps.nextIndex;
       }
 
-      if (HelpRequested)
-      {
-        Usage();
-      }
-      else if (AttrHelpRequested)
-      {
-        AttributeUsage();
-      }
-      else if (ps.EncounteredErrors)
-      {
-        Console.WriteLine("Use /help for available options");
-      }
-
       if (ps.EncounteredErrors)
       {
+        Console.Error.WriteLine("Use /help for available options");
         return false;
       }
       else
@@ -466,7 +457,7 @@ namespace Microsoft.Boogie
 
   /// <summary>
   /// Boogie command-line options (other tools can subclass this class in order to support a
-  /// superset of Boogie's options.
+  /// superset of Boogie's options).
   /// </summary>
   public class CommandLineOptions : CommandLineOptionEngine
   {
@@ -494,8 +485,6 @@ namespace Microsoft.Boogie
       Contract.Requires(options != null);
       clo = options;
     }
-
-    public const long Megabyte = 1048576;
 
     // Flags and arguments
 
@@ -590,7 +579,6 @@ namespace Microsoft.Boogie
     public bool
       UseProverEvaluate = false; // Use ProverInterface's Evaluate method, instead of model to get variable values
 
-    public bool UseUncheckedContracts = false;
     public bool SoundnessSmokeTest = false;
     public int KInductionDepth = -1;
     public int EnableUnSatCoreExtract = 0;
@@ -622,7 +610,6 @@ namespace Microsoft.Boogie
     }
 
     public ProverWarnings PrintProverWarnings = ProverWarnings.None;
-    public int ProverShutdownLimit = 0;
 
     public enum SubsumptionOption
     {
@@ -643,17 +630,16 @@ namespace Microsoft.Boogie
     }
 
     public ShowEnvironment ShowEnv = ShowEnvironment.DuringPrint;
-    public bool DontShowLogo = false;
     public bool ShowVerifiedProcedureCount = true;
 
     [ContractInvariantMethod]
     void ObjectInvariant3()
     {
-      Contract.Invariant((0 <= PrintErrorModel && PrintErrorModel <= 2) || PrintErrorModel == 4);
+      Contract.Invariant(0 <= PrintErrorModel && PrintErrorModel <= 1);
       Contract.Invariant(0 <= EnhancedErrorMessages && EnhancedErrorMessages < 2);
       Contract.Invariant(0 <= Ai.StepsBeforeWidening && Ai.StepsBeforeWidening <= 9);
       Contract.Invariant(-1 <= this.bracketIdsInVC && this.bracketIdsInVC <= 1);
-      Contract.Invariant(cce.NonNullElements(this.proverOptions));
+      Contract.Invariant(cce.NonNullElements(this.ProverOptions));
     }
 
     public int LoopUnrollCount = -1; // -1 means don't unroll loops
@@ -689,24 +675,7 @@ namespace Microsoft.Boogie
     [Rep] public ProverFactory TheProverFactory;
     public string ProverDllName;
     public bool ProverHelpRequested = false;
-    [Peer] private List<string> proverOptions = new List<string>();
-
-    public IEnumerable<string> ProverOptions
-    {
-      set
-      {
-        Contract.Requires(cce.NonNullElements(value));
-
-        this.proverOptions = new List<string>(value);
-      }
-      get
-      {
-        Contract.Ensures(cce.NonNullElements(Contract.Result<IEnumerable<string>>()));
-
-        foreach (string s in this.proverOptions)
-          yield return s;
-      }
-    }
+    public List<string> ProverOptions = new List<string>();
 
     private int bracketIdsInVC = -1; // -1 - not specified, 0 - no, 1 - yes
 
@@ -755,27 +724,6 @@ namespace Microsoft.Boogie
       }
     }
 
-    // Maximum amount of virtual memory (in bytes) for the prover to use
-    //
-    // Non-positive number indicates unbounded.
-    public long MaxProverMemory = 100 * Megabyte;
-
-    // Minimum number of prover calls before restart
-    public int MinNumOfProverCalls = 5;
-
-    public enum PlatformType
-    {
-      notSpecified,
-      v1,
-      v11,
-      v2,
-      cli1
-    }
-
-    public PlatformType TargetPlatform;
-    public string TargetPlatformLocation;
-    public string StandardLibraryLocation;
-
     // whether procedure inlining is enabled at call sites.
     public enum Inlining
     {
@@ -792,7 +740,6 @@ namespace Microsoft.Boogie
     public string SecureVcGen = null;
     public int StratifiedInlining = 0;
     public string FixedPointEngine = null;
-    public int StratifiedInliningOption = 0;
     public bool StratifiedInliningWithoutModels = false; // disable model generation for SI
     public int StratifiedInliningVerbose = 0; // verbosity level
     public int RecursionBound = 500;
@@ -827,25 +774,14 @@ namespace Microsoft.Boogie
 
     public TypeEncoding TypeEncodingMethod = TypeEncoding.Predicates;
 
+    public bool Monomorphize = false;
+
     public bool ReflectAdd = false;
 
     public int LiveVariableAnalysis = 1;
 
-    // Static constructor
-    static CommandLineOptions()
-    {
-      if (System.Type.GetType("Mono.Runtime") == null)
-      {
-        // MONO
-#if !COREFX_SUBSET
-        TraceListenerCollection/*!*/ dbl = Debug.Listeners;
-        Contract.Assert(dbl != null);
-        Contract.Assume(cce.IsPeerConsistent(dbl));  // hangs off static field
-        dbl.Add(new DefaultTraceListener());
-#endif
-      }
-    }
-
+    public bool UseLibrary = false;
+    
     // Note that procsToCheck stores all patterns <p> supplied with /proc:<p>
     // (and similarly procsToIgnore for /noProc:<p>). Thus, if procsToCheck
     // is empty it means that all procedures should be checked.
@@ -942,6 +878,14 @@ namespace Microsoft.Boogie
 
           return true;
 
+        case "lib":
+          if (ps.ConfirmArgumentCount(0))
+          {
+            this.UseLibrary = true;
+          }
+
+          return true;
+        
         case "proc":
           if (ps.ConfirmArgumentCount(1))
           {
@@ -1032,10 +976,6 @@ namespace Microsoft.Boogie
 
           return true;
 
-        case "proverShutdownLimit":
-          ps.GetNumericArgument(ref ProverShutdownLimit);
-          return true;
-
         case "errorTrace":
           ps.GetNumericArgument(ref ErrorTrace, 3);
           return true;
@@ -1119,12 +1059,6 @@ namespace Microsoft.Boogie
                 break;
               case "1":
                 PrintErrorModel = 1;
-                break;
-              case "2":
-                PrintErrorModel = 2;
-                break;
-              case "4":
-                PrintErrorModel = 4;
                 break;
               default:
                 ps.Error("Invalid argument \"{0}\" to option {1}", args[ps.i], ps.s);
@@ -1314,15 +1248,7 @@ namespace Microsoft.Boogie
         case "proverOpt":
           if (ps.ConfirmArgumentCount(1))
           {
-            ProverOptions = ProverOptions.Concat1(cce.NonNull(args[ps.i]));
-          }
-
-          return true;
-
-        case "proverHelp":
-          if (ps.ConfirmArgumentCount(0))
-          {
-            ProverHelpRequested = true;
+            ProverOptions.Add(cce.NonNull(args[ps.i]));
           }
 
           return true;
@@ -1466,14 +1392,6 @@ namespace Microsoft.Boogie
           }
 
           return true;
-        case "stratifiedInlineOption":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            StratifiedInliningOption = Int32.Parse(cce.NonNull(args[ps.i]));
-          }
-
-          return true;
-
         case "inferLeastForUnsat":
           if (ps.ConfirmArgumentCount(1))
           {
@@ -1481,7 +1399,7 @@ namespace Microsoft.Boogie
           }
 
           return true;
-
+        
         case "typeEncoding":
           if (ps.ConfirmArgumentCount(1))
           {
@@ -1501,6 +1419,14 @@ namespace Microsoft.Boogie
             }
           }
 
+          return true;
+
+        case "monomorphize":
+          if (ps.ConfirmArgumentCount(0))
+          {
+            Monomorphize = true;
+          }
+          
           return true;
 
         case "instrumentInfer":
@@ -1549,17 +1475,6 @@ namespace Microsoft.Boogie
         case "vcBrackets":
           ps.GetNumericArgument(ref bracketIdsInVC, 2);
           return true;
-
-        case "proverMemoryLimit":
-        {
-          int d = 0;
-          if (ps.GetNumericArgument(ref d))
-          {
-            MaxProverMemory = d * Megabyte;
-          }
-
-          return true;
-        }
 
         case "vcsMaxCost":
           ps.GetNumericArgument(ref VcsMaxCost);
@@ -1645,37 +1560,6 @@ namespace Microsoft.Boogie
           ps.GetNumericArgument(ref TraceCaching, 4);
           return true;
 
-        case "platform":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            StringCollection platformOptions = this.ParseNamedArgumentList(args[ps.i]);
-            if (platformOptions != null && platformOptions.Count > 0)
-            {
-              try
-              {
-                this.TargetPlatform =
-                  (PlatformType) cce.NonNull(Enum.Parse(typeof(PlatformType), cce.NonNull(platformOptions[0])));
-              }
-              catch
-              {
-                ps.Error("Bad /platform type '{0}'", platformOptions[0]);
-                break;
-              }
-
-              if (platformOptions.Count > 1)
-              {
-                this.TargetPlatformLocation = platformOptions[1];
-                if (!Directory.Exists(platformOptions[1]))
-                {
-                  ps.Error("/platform directory '{0}' does not exist", platformOptions[1]);
-                  break;
-                }
-              }
-            }
-          }
-
-          return true;
-
         case "kInductionDepth":
           ps.GetNumericArgument(ref KInductionDepth);
           return true;
@@ -1702,7 +1586,7 @@ namespace Microsoft.Boogie
               ps.CheckBooleanFlag("noVerify", ref Verify, false) ||
               ps.CheckBooleanFlag("traceverify", ref TraceVerify) ||
               ps.CheckBooleanFlag("alwaysAssumeFreeLoopInvariants", ref AlwaysAssumeFreeLoopInvariants, true) ||
-              ps.CheckBooleanFlag("nologo", ref DontShowLogo) ||
+              ps.CheckBooleanFlag("proverHelp", ref ProverHelpRequested) ||
               ps.CheckBooleanFlag("proverLogAppend", ref ProverLogFileAppend) ||
               ps.CheckBooleanFlag("soundLoopUnrolling", ref SoundLoopUnrolling) ||
               ps.CheckBooleanFlag("checkInfer", ref InstrumentWithAsserts) ||
@@ -1769,11 +1653,6 @@ namespace Microsoft.Boogie
         TheProverFactory = ProverFactory.Load(ProverDllName);
       }
 
-      if (ProverHelpRequested)
-      {
-        Console.WriteLine(TheProverFactory.BlankProverOptions().Help);
-      }
-
       if (inferLeastForUnsat != null)
       {
         StratifiedInlining = 1;
@@ -1784,7 +1663,6 @@ namespace Microsoft.Boogie
         TypeEncodingMethod = TypeEncoding.Monomorphic;
         UseArrayTheory = true;
         UseAbstractInterpretation = false;
-        MaxProverMemory = 0; // no max: avoids restarts
         if (ProverDllName == "SMTLib")
         {
           ErrorLimit = 1;
@@ -1800,6 +1678,21 @@ namespace Microsoft.Boogie
       }
     }
 
+    public override bool ProcessInfoFlags()
+    {
+      if (base.ProcessInfoFlags())
+      {
+        return true;
+      }
+
+      if (ProverHelpRequested)
+      {
+        Console.WriteLine(ProverHelp);
+        return true;
+      }
+
+      return false;
+    }
 
     public bool UserWantsToCheckRoutine(string methodFullname)
     {
@@ -1807,6 +1700,9 @@ namespace Microsoft.Boogie
       Func<string, bool> match = s => Regex.IsMatch(methodFullname, "^" + Regex.Escape(s).Replace(@"\*", ".*") + "$");
       return (procsToCheck.Count == 0 || procsToCheck.Any(match)) && !procsToIgnore.Any(match);
     }
+
+    // Used by Dafny to decide if it should perform compilation
+    public bool UserConstrainedProcsToCheck => procsToCheck.Count > 0 || procsToIgnore.Count > 0;
 
     public virtual StringCollection ParseNamedArgumentList(string argList)
     {
@@ -1848,10 +1744,10 @@ namespace Microsoft.Boogie
       return semicolonIndex;
     }
 
-    public override void AttributeUsage()
-    {
-      Console.WriteLine(
-        @"Boogie: The following attributes are supported by this implementation.
+    public string ProverHelp => TheProverFactory.BlankProverOptions().Help;
+
+    public override string AttributeHelp =>
+@"Boogie: The following attributes are supported by this version.
 
   ---- On top-level declarations ---------------------------------------------
 
@@ -1898,8 +1794,8 @@ namespace Microsoft.Boogie
        it, and the second one disables all verification after.
 
      {:priority N}
-       Assign a positive priority 'N' to an implementation to control the order
-       in which implementations are verified (default: N = 1).
+       Assign a positive priority 'N' to an implementation to control the
+       order in which implementations are verified (default: N = 1).
 
      {:id <string>}
        Assign a unique ID to an implementation to be used for verification
@@ -1970,24 +1866,103 @@ namespace Microsoft.Boogie
        Prints <string> rather than the standard message for assertion failure.
        Also applicable to requires and ensures declarations. 
 
----- On statements --------------------------------------------------
+  ---- On statements ---------------------------------------------------------
 
      {:print e0, e1, e2, ...}
-       Indicates that expressions e0, e1, e2, ... must be printed.  Must be used 
-       in conjunction with /enhancedErrorMessages:n command-line option.  
+       Indicates that expressions e0, e1, e2, ... must be printed.  Must be
+       used in conjunction with /enhancedErrorMessages:n command-line option.
 
      {:captureState s}
        Indicates that state must be captured under the name s.  Must be used
        together with /mv:<string> command-line option.
 
-  ---- The end ---------------------------------------------------------------
-");
-    }
+  ---- CIVL ------------------------------------------------------------------
 
-    public override void Usage()
-    {
-      Console.WriteLine(@"
-  /nologo       suppress printing of version number, copyright message
+     {:yields}
+       Yielding procedure.
+
+     {:atomic}
+     {:right}
+     {:left}
+     {:both}
+       Mover type of atomic action or mover procedure.
+
+     {:intro}
+       Introduction action.
+
+     {:lemma}
+       Lemma procedure.
+
+     {:yield_invariant}
+       Yield invariant.
+
+     {:layer N}
+     {:layer M, N}
+     {:layer N1, N2, ...}
+       Layer number, layer range, or set of layer numbers, respectively.
+
+     {:hide}
+       Hidden input/output parameter.
+
+     {:yield_requires ""inv"", e0, e1, ...}
+     {:yield_ensures ""inv"", e0, e1, ...}
+     {:yield_preserves ""inv"", e0, e1, ...}
+     {:yield_loop ""inv"", e0, e1, ...}
+       Invocation of yield invariant.
+
+     {:refines ""action""}
+       Refined atomic action of a yielding procedure.
+
+     {:cooperates}
+       Cooperating loop or mover procedure.
+
+     {:linear ""domain""}
+       Permission type for domain.
+       Collector function for domain.
+       Linear variable (both global and local).
+
+     {:linear_in ""domain""}
+     {:linear_out ""domain""}
+       Linear input/output parameter.
+
+     {:witness ""g""}
+     {:commutativity ""A"", ""B""}
+       Function provides witness for global variable g in commutativity check
+       between action A and action B. Multiple declarations of :commutativity
+       are supported.
+
+     {:pending_async}
+       Pending async datatype.
+       Local variable collecting pending asyncs in yielding procedure.
+     {:pending_async ""action""}
+       Pending async datatype constructor for action.
+     {:pending_async ""action1"", ""action2"", ...}
+       Output parameter of atomic action.
+
+     {:sync}
+       Synchronized async call.
+
+     {:IS ""B"", ""I""}
+       Apply inductive sequentialization to convert an action into action B
+       using invariant action I
+     {:elim ""A""}
+     {:elim ""A"", ""A'""}
+       by eliminating multiple actions A (optionally using abstraction A')
+     {:choice}
+       and optionally using an output parameter to indicate the selected
+       pending async.
+
+     {:IS_invariant}
+     {:IS_abstraction}
+       Actions that are only used as invariant actions or abstractions in
+       inductive sequentialization. These are exempt from the overall pool of
+       actions for commutativity checking.
+
+     {:backward}
+       Backward assignment in atomic action.";
+
+    public override string Help =>
+      base.Help + @"
   /env:<n>      print command line arguments
                   0 - never, 1 (default) - during BPL print and prover log,
                   2 - like 1 and also to standard output
@@ -2002,6 +1977,7 @@ namespace Microsoft.Boogie
   Multiple .bpl files supplied on the command line are concatenated into one
   Boogie program.
 
+  /lib           : Include library definitions
   /proc:<p>      : Only check procedures matched by pattern <p>. This option
                    may be specified multiple times to match multiple patterns.
                    The pattern <p> matches the whole procedure name and may
@@ -2039,11 +2015,10 @@ namespace Microsoft.Boogie
   /printModel:<n>
                 0 (default) - do not print Z3's error model
                 1 - print Z3's error model
-                2 - print Z3's error model plus reverse mappings
-                4 - print Z3's error model in a more human readable way
   /printModelToFile:<file>
                 print model to <file> instead of console
-  /mv:<file>    Specify file where to save the model in BVD format
+  /mv:<file>    Specify file to save the model with captured states 
+                (see documentation for :captureState attribute)
   /enhancedErrorMessages:<n>
                 0 (default) - no enhanced error messages
                 1 - Z3 error model enhanced error messages
@@ -2173,6 +2148,9 @@ namespace Microsoft.Boogie
                    a = arguments
                 Boogie automatically detects monomorphic programs and enables
                 monomorphic VC generation, thereby overriding the above option.
+  /monomorphize
+                Try to monomorphize program. An error is reported if
+                monomorphization is not possible. This feature is experimental!
   /useArrayTheory
                 Use the SMT theory of arrays (as opposed to axioms). Supported
                 only for monomorphic programs.
@@ -2281,18 +2259,7 @@ namespace Microsoft.Boogie
   /proverWarnings
                 0 (default) - don't print, 1 - print to stdout,
                 2 - print to stderr
-  /proverMemoryLimit:<num>
-                Limit on the virtual memory for prover before
-                restart in MB (default:100MB)
   /restartProver
-                Restart the prover after each query
-  /proverShutdownLimit<num>
-                Time between closing the stream to the prover and
-                killing the prover process (default: 0s)
-  /platform:<ptype>,<location>
-                ptype = v11,v2,cli1
-                location = platform libraries directory
-");
-    }
+                Restart the prover after each query";
   }
 }

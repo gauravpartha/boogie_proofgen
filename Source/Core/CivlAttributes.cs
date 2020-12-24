@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Microsoft.Boogie
 {
@@ -25,7 +26,7 @@ namespace Microsoft.Boogie
     public static string REFINES = "refines";
     public static string HIDE = "hide";
 
-    public const string TERMINATES = "terminates";
+    public const string COOPERATES = "cooperates";
 
     public const string LINEAR = "linear";
     public const string LINEAR_IN = "linear_in";
@@ -51,11 +52,24 @@ namespace Microsoft.Boogie
       COMMUTATIVITY, LEMMA, WITNESS,
       PENDING_ASYNC, IS, IS_INVARIANT, IS_ABSTRACTION, ELIM, CHOICE,
       YIELD_REQUIRES, YIELD_ENSURES, YIELD_PRESERVES, YIELD_LOOP,
-      TERMINATES
+      COOPERATES
     };
 
     private static string[] LINEAR_ATTRIBUTES =
       {LINEAR, LINEAR_IN, LINEAR_OUT};
+
+    public static bool HasCivlAttribute(this ICarriesAttributes obj)
+    {
+      for (var kv = obj.Attributes; kv != null; kv = kv.Next)
+      {
+        if (CIVL_ATTRIBUTES.Contains(kv.Key) || LINEAR_ATTRIBUTES.Contains(kv.Key))
+        {
+          return true;
+        }
+      }
+
+      return false;
+    }
 
     public static List<QKeyValue> FindAllAttributes(this ICarriesAttributes obj, string name)
     {

@@ -1,4 +1,4 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 // ###########################################################################
@@ -16,7 +16,7 @@ const numParticipants : int;
 axiom 0 < numParticipants;
 function participantMid (mid : Mid) : bool { 1 <= mid && mid <= numParticipants }
 
-type {:datatype} Pair;
+type {:datatype} {:linear "pair"} Pair;
 function {:constructor} Pair (xid: Xid, mid: Mid) : Pair;
 
 function {:inline} pair (xid: Xid, mid: Mid, p: Pair) : bool
@@ -231,7 +231,7 @@ Coordinator_TransactionReq () returns (xid: Xid)
   call snapshot := GhostRead_10();
   i := 1;
   while (i <= numParticipants)
-  invariant {:terminates} {:layer 8,9,10} true;
+  invariant {:cooperates} {:layer 8,9,10} true;
   invariant {:layer 8} Inv_8(state, B, votes);
   invariant {:layer 8,10} pairs == (lambda p: Pair :: pair(xid, mid#Pair(p), p) && i <= mid#Pair(p));
   invariant {:layer 8} votes[xid] == -1 || (forall p: Pair :: pairs[p] ==> UndecidedOrCommitted(state[xid][mid#Pair(p)]));
@@ -311,7 +311,7 @@ Coordinator_VoteYes (xid: Xid, mid: Mid, {:linear_in "pair"} pair: Pair)
     assert {:layer 8} xUndecidedOrCommitted(state[xid]);
     i := 1;
     while (i <= numParticipants)
-    invariant {:layer 8} {:terminates} true;
+    invariant {:layer 8} {:cooperates} true;
     invariant {:layer 8} 1 <= i && i <= numParticipants + 1;
     invariant {:layer 8} Inv_8(state, B, votes);
     invariant {:layer 8} ExistsMonotoneExtension(snapshot, state, xid);
@@ -349,7 +349,7 @@ Coordinator_VoteNo (xid: Xid, mid: Mid, {:linear_in "pair"} pair: Pair)
   {
     i := 1;
     while (i <= numParticipants)
-    invariant {:layer 8} {:terminates} true;
+    invariant {:layer 8} {:cooperates} true;
     invariant {:layer 8} 1 <= i && i <= numParticipants + 1;
     invariant {:layer 8} Aborted(state[xid][CoordinatorMid]);
     invariant {:layer 8} xUndecidedOrAborted(state[xid]);
@@ -447,17 +447,6 @@ procedure {:both} {:layer 8,10} atomic_TransferPair (xid: Xid, mid: Mid, {:linea
 // ###########################################################################
 // Collectors for linear domains
 
-function {:builtin "MapConst"} MapConstBool(bool): [Pair]bool;
-function {:builtin "MapOr"} MapOr([Pair]bool, [Pair]bool) : [Pair]bool;
-
-function {:inline} {:linear "pair"} PairCollector(x: Pair) : [Pair]bool
-{
-  MapConstBool(false)[x := true]
-}
-function {:inline} {:linear "pair"} PairSetCollector(x: [Pair]bool) : [Pair]bool
-{
-  x
-}
 function {:inline} {:linear "pair"} XidSetCollector(xids: [Xid]bool) : [Pair]bool
 {
   (lambda p: Pair :: xids[xid#Pair(p)])

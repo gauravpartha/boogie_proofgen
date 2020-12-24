@@ -376,49 +376,7 @@ namespace Microsoft.Boogie
       AssertionChecksums = implementation.AssertionChecksums;
     }
   }
-
-
-  public class PolymorphismChecker : ReadOnlyVisitor
-  {
-    bool isMonomorphic = true;
-
-    public override DeclWithFormals VisitDeclWithFormals(DeclWithFormals node)
-    {
-      if (node.TypeParameters.Count > 0)
-        isMonomorphic = false;
-      return base.VisitDeclWithFormals(node);
-    }
-
-    public override BinderExpr VisitBinderExpr(BinderExpr node)
-    {
-      if (node.TypeParameters.Count > 0)
-        isMonomorphic = false;
-      return base.VisitBinderExpr(node);
-    }
-
-    public override MapType VisitMapType(MapType node)
-    {
-      if (node.TypeParameters.Count > 0)
-        isMonomorphic = false;
-      return base.VisitMapType(node);
-    }
-
-    public override Expr VisitNAryExpr(NAryExpr node)
-    {
-      BinaryOperator op = node.Fun as BinaryOperator;
-      if (op != null && op.Op == BinaryOperator.Opcode.Subtype)
-        isMonomorphic = false;
-      return base.VisitNAryExpr(node);
-    }
-
-    public static bool IsMonomorphic(Program program)
-    {
-      var checker = new PolymorphismChecker();
-      checker.VisitProgram(program);
-      return checker.isMonomorphic;
-    }
-  }
-
+  
   public class ExecutionEngine
   {
     public static OutputPrinter printer;
@@ -482,7 +440,7 @@ namespace Microsoft.Boogie
 
     static TextWriter ModelWriter = null;
 
-    public static void ProcessFiles(List<string> fileNames, bool lookForSnapshots = true, string programId = null)
+    public static void ProcessFiles(IList<string> fileNames, bool lookForSnapshots = true, string programId = null)
     {
       Contract.Requires(cce.NonNullElements(fileNames));
 
@@ -661,12 +619,13 @@ namespace Microsoft.Boogie
     /// Parse the given files into one Boogie program.  If an I/O or parse error occurs, an error will be printed
     /// and null will be returned.  On success, a non-null program is returned.
     /// </summary>
-    public static Program ParseBoogieProgram(List<string> fileNames, bool suppressTraceOutput)
+    public static Program ParseBoogieProgram(IList<string> fileNames, bool suppressTraceOutput)
     {
       Contract.Requires(cce.NonNullElements(fileNames));
 
-      Program program = null;
+      Program program = new Program();
       bool okay = true;
+      
       for (int fileId = 0; fileId < fileNames.Count; fileId++)
       {
         string bplFileName = fileNames[fileId];
@@ -683,18 +642,19 @@ namespace Microsoft.Boogie
           }
         }
 
-        Program programSnippet;
-        int errorCount;
         try
         {
           var defines = new List<string>() {"FILE_" + fileId};
-          errorCount = Parser.Parse(bplFileName, defines, out programSnippet,
+          int errorCount = Parser.Parse(bplFileName, defines, out Program programSnippet,
             CommandLineOptions.Clo.UseBaseNameForFileName);
           if (programSnippet == null || errorCount != 0)
           {
             Console.WriteLine("{0} parse errors detected in {1}", errorCount, GetFileNameForConsole(bplFileName));
             okay = false;
-            continue;
+          }
+          else
+          {
+            program.AddTopLevelDeclarations(programSnippet.TopLevelDeclarations);
           }
         }
         catch (IOException e)
@@ -702,16 +662,6 @@ namespace Microsoft.Boogie
           printer.ErrorWriteLine(Console.Out, "Error opening file \"{0}\": {1}", GetFileNameForConsole(bplFileName),
             e.Message);
           okay = false;
-          continue;
-        }
-
-        if (program == null)
-        {
-          program = programSnippet;
-        }
-        else if (programSnippet != null)
-        {
-          program.AddTopLevelDeclarations(programSnippet.TopLevelDeclarations);
         }
       }
 
@@ -719,12 +669,21 @@ namespace Microsoft.Boogie
       {
         return null;
       }
-      else if (program == null)
-      {
-        return new Program();
-      }
       else
       {
+        if (program.TopLevelDeclarations.Any(d => d.HasCivlAttribute()))
+        {
+          CommandLineOptions.Clo.UseLibrary = true;
+          CommandLineOptions.Clo.UseArrayTheory = true;
+          CommandLineOptions.Clo.Monomorphize = true;
+        }
+
+        if (CommandLineOptions.Clo.UseLibrary)
+        {
+          var library = Parser.ParseLibraryDefinitions();
+          program.AddTopLevelDeclarations(library.TopLevelDeclarations);
+        }
+
         return program;
       }
     }
@@ -786,11 +745,22 @@ namespace Microsoft.Boogie
       {
         CommandLineOptions.Clo.TypeEncodingMethod = CommandLineOptions.TypeEncoding.Monomorphic;
       }
+      else if (CommandLineOptions.Clo.Monomorphize)
+      {
+        if (Monomorphizer.Monomorphize(program))
+        {
+          CommandLineOptions.Clo.TypeEncodingMethod = CommandLineOptions.TypeEncoding.Monomorphic;
+        }
+        else
+        {
+          Console.WriteLine("Unable to monomorphize input program");
+          return PipelineOutcome.FatalError;
+        }
+      }
       else if (CommandLineOptions.Clo.UseArrayTheory)
       {
         Console.WriteLine(
-          "Option /useArrayTheory only supported for monomorphic programs and polymorphism is detected in {0}",
-          GetFileNameForConsole(bplFileName));
+          "Option /useArrayTheory only supported for monomorphic programs and polymorphism is detected in input program");
         return PipelineOutcome.FatalError;
       }
 

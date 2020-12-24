@@ -1,4 +1,4 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 var {:layer 0,3} val_a : int;
@@ -7,10 +7,7 @@ var {:layer 0,3} val_b : int;
 // ###########################################################################
 // Linear permissions
 
-function {:builtin "MapConst"} MapConstBool(bool) : [int]bool;
-
-function {:inline} {:linear "lin"} LinCollector(x : int) : [int]bool
-{ MapConstBool(false)[x := true] }
+type {:linear "lin"} Perm = int;
 
 function {:inline} perm (p : int) : bool
 { p == 0 }
@@ -36,7 +33,7 @@ requires {:layer 2} perm(p);
 // ###########################################################################
 // Event handlers of process B
 
-procedure {:yields} {:layer 2} {:left} {:terminates}  propose_by_a (val : int, {:linear_in "lin"} p : int)
+procedure {:yields} {:layer 2} {:left} {:cooperates}  propose_by_a (val : int, {:linear_in "lin"} p : int)
 requires {:layer 2} perm(p);
 requires {:layer 2} val_a == val;
 ensures {:layer 2} val_a == val_b;
@@ -66,7 +63,7 @@ ensures {:layer 2} val_a == val_b;
 // ###########################################################################
 // Event handlers of process A
 
-procedure {:yields} {:layer 2} {:left} {:terminates} propose_by_b (val : int, {:linear_in "lin"} p : int)
+procedure {:yields} {:layer 2} {:left} {:cooperates} propose_by_b (val : int, {:linear_in "lin"} p : int)
 requires {:layer 2} perm(p);
 requires {:layer 2} val_b == val;
 ensures {:layer 2} val_a == val_b;

@@ -18,8 +18,8 @@ namespace Microsoft.Boogie
     private string namePrefix;
 
     public Dictionary<Block, YieldingLoop> yieldingLoops;
-    public Dictionary<Block, HashSet<int>> terminatingLoopHeaders;
-    public HashSet<Procedure> terminatingProcedures;
+    public Dictionary<Block, HashSet<int>> cooperatingLoopHeaders;
+    public HashSet<Procedure> cooperatingProcedures;
 
     public Dictionary<Procedure, AtomicAction> procToAtomicAction;
     public Dictionary<Procedure, AtomicAction> procToIsInvariant;
@@ -56,8 +56,8 @@ namespace Microsoft.Boogie
       this.globalVarToLayerRange = new Dictionary<Variable, LayerRange>();
       this.localVarToLayerRange = new Dictionary<Variable, LayerRange>();
       this.yieldingLoops = new Dictionary<Block, YieldingLoop>();
-      this.terminatingLoopHeaders = new Dictionary<Block, HashSet<int>>();
-      this.terminatingProcedures = new HashSet<Procedure>();
+      this.cooperatingLoopHeaders = new Dictionary<Block, HashSet<int>>();
+      this.cooperatingProcedures = new HashSet<Procedure>();
       this.absyToLayerNums = new Dictionary<Absy, HashSet<int>>();
       this.procToAtomicAction = new Dictionary<Procedure, AtomicAction>();
       this.procToIsInvariant = new Dictionary<Procedure, AtomicAction>();
@@ -83,24 +83,19 @@ namespace Microsoft.Boogie
         }
       }
 
-      var skipProcedure = new Procedure(
-        Token.NoToken,
+      var skipProcedure = DeclHelper.Procedure(
         AddNamePrefix("Skip"),
-        new List<TypeVariable>(),
         new List<Variable>(),
         new List<Variable>(),
         new List<Requires>(),
         new List<IdentifierExpr>(),
         new List<Ensures>());
-      var skipImplementation = new Implementation(
-          Token.NoToken,
-          skipProcedure.Name,
-          new List<TypeVariable>(),
-          new List<Variable>(),
-          new List<Variable>(),
-          new List<Variable>(),
-          new List<Block> {new Block(Token.NoToken, "init", new List<Cmd>(), new ReturnCmd(Token.NoToken))})
-        {Proc = skipProcedure};
+      var skipImplementation = DeclHelper.Implementation(
+        skipProcedure,
+        new List<Variable>(),
+        new List<Variable>(),
+        new List<Variable>(),
+        new List<Block> {BlockHelper.Block("init", new List<Cmd>())});
       SkipAtomicAction = new AtomicAction(skipProcedure, skipImplementation, LayerRange.MinMax, MoverType.Both);
     }
 
@@ -215,9 +210,9 @@ namespace Microsoft.Boogie
       {
         var layerRange = GlobalVariableLayerRange(g);
         if (allInductiveSequentializationLayers.Contains(layerRange.lowerLayerNum))
-          Error(g, $"Shared variable {g.Name} cannot be introduced at layer with IS");
+          Error(g, $"Global variable {g.Name} cannot be introduced at layer with IS");
         if (allInductiveSequentializationLayers.Contains(layerRange.upperLayerNum))
-          Error(g, $"Shared variable {g.Name} cannot be hidden at layer with IS");
+          Error(g, $"Global variable {g.Name} cannot be hidden at layer with IS");
       }
     }
 
@@ -632,9 +627,9 @@ namespace Microsoft.Boogie
 
         YieldingProcVisitor visitor = new YieldingProcVisitor(this, yieldRequires, yieldEnsures);
         visitor.VisitProcedure(proc);
-        if (proc.HasAttribute(CivlAttributes.TERMINATES))
+        if (proc.HasAttribute(CivlAttributes.COOPERATES))
         {
-          terminatingProcedures.Add(proc);
+          cooperatingProcedures.Add(proc);
         }
       }
 
@@ -669,7 +664,7 @@ namespace Microsoft.Boogie
         foreach (var header in graph.Headers)
         {
           var yieldingLayers = new HashSet<int>();
-          var terminatingLayers = new HashSet<int>();
+          var cooperatingLayers = new HashSet<int>();
           foreach (PredicateCmd predCmd in header.Cmds.TakeWhile(cmd => cmd is PredicateCmd))
           {
             if (predCmd.HasAttribute(CivlAttributes.YIELDS))
@@ -677,15 +672,15 @@ namespace Microsoft.Boogie
               yieldingLayers.UnionWith(absyToLayerNums[predCmd]);
             }
 
-            if (predCmd.HasAttribute(CivlAttributes.TERMINATES))
+            if (predCmd.HasAttribute(CivlAttributes.COOPERATES))
             {
-              terminatingLayers.UnionWith(absyToLayerNums[predCmd]);
+              cooperatingLayers.UnionWith(absyToLayerNums[predCmd]);
             }
           }
 
-          if (yieldingLayers.Intersect(terminatingLayers).Count() != 0)
+          if (yieldingLayers.Intersect(cooperatingLayers).Count() != 0)
           {
-            Error(header, "Loop cannot be both yielding and terminating on the same layer.");
+            Error(header, "Loop cannot be both yielding and cooperating on the same layer.");
             continue;
           }
 
@@ -709,7 +704,7 @@ namespace Microsoft.Boogie
           }
 
           yieldingLoops[header] = new YieldingLoop(yieldingLayers, yieldInvariants);
-          terminatingLoopHeaders[header] = terminatingLayers;
+          cooperatingLoopHeaders[header] = cooperatingLayers;
         }
       }
     }
@@ -871,67 +866,48 @@ namespace Microsoft.Boogie
 
     private void TypeCheckPendingAsyncMachinery()
     {
-      foreach (var typeCtorDecl in program.TopLevelDeclarations.OfType<TypeCtorDecl>())
+      foreach (var datatypeTypeCtorDecl in program.TopLevelDeclarations.OfType<DatatypeTypeCtorDecl>())
       {
-        if (typeCtorDecl.HasAttribute(CivlAttributes.PENDING_ASYNC))
+        if (datatypeTypeCtorDecl.HasAttribute(CivlAttributes.PENDING_ASYNC))
         {
           if (pendingAsyncType == null)
           {
-            pendingAsyncType = new CtorType(typeCtorDecl.tok, typeCtorDecl, new List<Type>());
+            pendingAsyncType = new CtorType(datatypeTypeCtorDecl.tok, datatypeTypeCtorDecl, new List<Type>());
             pendingAsyncMultisetType = new MapType(Token.NoToken, new List<TypeVariable>(),
               new List<Type> {pendingAsyncType}, Type.Int);
           }
           else
           {
-            Error(typeCtorDecl, $"Duplicate pending async type {typeCtorDecl.Name}");
+            Error(datatypeTypeCtorDecl, $"Duplicate pending async type {datatypeTypeCtorDecl.Name}");
           }
         }
       }
 
       if (pendingAsyncType != null)
       {
-        pendingAsyncAdd = new Function(Token.NoToken, "AddPAs",
-          new List<Variable>
-          {
-            VarHelper.Formal("a", pendingAsyncMultisetType, true),
-            VarHelper.Formal("b", pendingAsyncMultisetType, true)
-          },
-          VarHelper.Formal("c", pendingAsyncMultisetType, false));
-        if (CommandLineOptions.Clo.UseArrayTheory)
-        {
-          pendingAsyncAdd.AddAttribute("builtin", "MapAdd");
-        }
-        else
-        {
-          throw new NotSupportedException("Pending asyncs need array theory");
-        }
+        pendingAsyncAdd = program.monomorphizer.Monomorphize("MapAdd",
+          new Dictionary<string, Type>() { {"T", pendingAsyncType} });
 
-        program.AddTopLevelDeclaration(pendingAsyncAdd);
-      }
-
-      foreach (var ctor in program.TopLevelDeclarations.OfType<DatatypeConstructor>())
-      {
-        string actionName = QKeyValue.FindStringAttribute(ctor.Attributes, CivlAttributes.PENDING_ASYNC);
-        if (actionName != null)
+        var pendingAsyncDatatypeTypeCtorDecl = pendingAsyncType.Decl as DatatypeTypeCtorDecl; 
+        foreach (var ctor in pendingAsyncDatatypeTypeCtorDecl.Constructors)
         {
-          AtomicAction action = FindAtomicAction(actionName);
-          if (!ctor.OutParams[0].TypedIdent.Type.Equals(pendingAsyncType))
+          string actionName = QKeyValue.FindStringAttribute(ctor.Attributes, CivlAttributes.PENDING_ASYNC);
+          if (actionName != null)
           {
-            Error(ctor, "Pending async constructor is of incorrect type");
-          }
-
-          if (action == null)
-          {
-            Error(ctor, $"{actionName} is not an atomic action");
-          }
-          else
-          {
-            if (action.pendingAsyncCtor != null)
-              Error(ctor, $"Duplicate pending async constructor for action {actionName}");
-            if (action.proc.HasAttribute(CivlAttributes.IS))
-              Error(ctor, "Actions transformed by IS cannot be pending asyncs");
-            CheckPendingAsyncSignature(action, ctor);
-            action.pendingAsyncCtor = ctor;
+            AtomicAction action = FindAtomicAction(actionName);
+            if (action == null)
+            {
+              Error(ctor, $"{actionName} is not an atomic action");
+            }
+            else
+            {
+              if (action.pendingAsyncCtor != null)
+                Error(ctor, $"Duplicate pending async constructor for action {actionName}");
+              if (action.proc.HasAttribute(CivlAttributes.IS))
+                Error(ctor, "Actions transformed by IS cannot be pending asyncs");
+              CheckPendingAsyncSignature(action, ctor);
+              action.pendingAsyncCtor = ctor;
+            }
           }
         }
       }
@@ -1192,19 +1168,19 @@ namespace Microsoft.Boogie
       return yieldingLoops[block].layers.Contains(layerNum);
     }
 
-    public bool IsTerminatingLoopHeader(Block block, int layerNum)
+    public bool IsCooperatingLoopHeader(Block block, int layerNum)
     {
-      if (!terminatingLoopHeaders.ContainsKey(block))
+      if (!cooperatingLoopHeaders.ContainsKey(block))
       {
         return false;
       }
 
-      return terminatingLoopHeaders[block].Contains(layerNum);
+      return cooperatingLoopHeaders[block].Contains(layerNum);
     }
 
-    public bool IsTerminatingProcedure(Procedure proc)
+    public bool IsCooperatingProcedure(Procedure proc)
     {
-      return terminatingProcedures.Contains(proc);
+      return cooperatingProcedures.Contains(proc);
     }
 
     public LayerRange GlobalVariableLayerRange(Variable g)
@@ -1299,15 +1275,15 @@ namespace Microsoft.Boogie
       {
         if (node.Decl is GlobalVariable)
         {
-          var sharedVarLayerRange = civlTypeChecker.GlobalVariableLayerRange(node.Decl);
-          if (!action.layerRange.Subset(sharedVarLayerRange) ||
-              (sharedVarLayerRange.lowerLayerNum == action.layerRange.lowerLayerNum &&
+          var globalVarLayerRange = civlTypeChecker.GlobalVariableLayerRange(node.Decl);
+          if (!action.layerRange.Subset(globalVarLayerRange) ||
+              (globalVarLayerRange.lowerLayerNum == action.layerRange.lowerLayerNum &&
                action is AtomicAction))
-            // a shared variable introduced at layer n is visible to an atomic action only at layer n+1 or higher
-            // thus, a shared variable with layer range [n,n] is not accessible by an atomic action
-            // however, an introduction action may access the shared variable at layer n
+            // a global variable introduced at layer n is visible to an atomic action only at layer n+1 or higher
+            // thus, a global variable with layer range [n,n] is not accessible by an atomic action
+            // however, an introduction action may access the global variable at layer n
           {
-            civlTypeChecker.checkingContext.Error(node, "Shared variable {0} is not available in action specification",
+            civlTypeChecker.checkingContext.Error(node, "Global variable {0} is not available in action specification",
               node.Decl.Name);
           }
         }
@@ -1654,7 +1630,7 @@ namespace Microsoft.Boogie
           }
           else
           {
-            civlTypeChecker.Error(node, "Shared variables cannot be accessed in this context");
+            civlTypeChecker.Error(node, "Global variables cannot be accessed in this context");
           }
         }
         else if (node.Decl is Formal || node.Decl is LocalVariable)

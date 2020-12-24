@@ -1,6 +1,7 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
+type {:linear "pid"} Pid = int;
 const n:int;      // Number of buyers
 const price:int;  // Item price
 const wallet:int; // Available money for each buyer
@@ -60,7 +61,7 @@ axiom (forall A:[int]int, B:[int]int, i:int, j:int :: i <= j && (forall l:int ::
 function {:inline} Init(pids:[int]bool, ReqCH:int, QuoteCH:[int][int]int,
   RemCH:[int][int]int, DecCH:[bool]int, contribution:[int]int) : bool
 {
-  pids == MapConstBool(true) &&
+  pids == MapConst(true) &&
   ReqCH == 0 &&
   QuoteCH == (lambda i:int :: (lambda q:int :: 0)) &&
   RemCH == (lambda i:int :: (lambda r:int :: 0)) &&
@@ -467,7 +468,7 @@ requires {:layer 1} Init(pids, ReqCH, QuoteCH, RemCH, DecCH, contribution);
   async call lastBuyer(pid);
   i := 2;
   while (i < n)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 2 <= i && i <= n;
   invariant {:layer 1} (forall ii:int :: middleBuyerID(ii) && ii >= i ==> pids'[ii]);
   invariant {:layer 1} PAs == MapAddPA4(SellerInitPA(0), FirstBuyerInitPA(1), LastBuyerPA(n), (lambda pa:PA :: if is#MiddleBuyerPA(pa) && middleBuyerID(pid#MiddleBuyerPA(pa)) && pid#MiddleBuyerPA(pa) < i then 1 else 0));
@@ -489,7 +490,7 @@ requires {:layer 1} sellerID(pid);
   call receive_req();
   i := 1;
   while (i <= n)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} QuoteCH == (lambda ii:int :: (lambda q:int :: if buyerID(ii) && ii < i && q == price then old_QuoteCH[ii][q] + 1 else old_QuoteCH[ii][q]));
   {
@@ -656,18 +657,3 @@ returns ({:linear "pid"} p:int, {:linear "pid"} pids':[int]bool)
 
 procedure {:yields}{:layer 0}{:refines "LINEAR_TRANSFER"} linear_transfer(i:int, {:linear_in "pid"} pids:[int]bool)
 returns ({:linear "pid"} p:int, {:linear "pid"} pids':[int]bool);
-
-////////////////////////////////////////////////////////////////////////////////
-
-function {:builtin "MapConst"} MapConstBool (bool) : [int]bool;
-function {:builtin "MapOr"} MapOr ([int]bool, [int]bool) : [int]bool;
-
-function {:inline}{:linear "pid"} PidCollector (pid:int) : [int]bool
-{
-  MapConstBool(false)[pid := true]
-}
-
-function {:inline}{:linear "pid"} PidSetCollector (pids:[int]bool) : [int]bool
-{
-  pids
-}

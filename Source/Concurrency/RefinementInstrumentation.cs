@@ -27,12 +27,7 @@ namespace Microsoft.Boogie
       return new List<Cmd>();
     }
 
-    public virtual List<Cmd> CreateUnchangedGlobalsAssertCmds()
-    {
-      return new List<Cmd>();
-    }
-
-    public virtual List<Cmd> CreateUnchangedOutputsAssertCmds()
+    public virtual List<Cmd> CreateUnchangedAssertCmds()
     {
       return new List<Cmd>();
     }
@@ -58,6 +53,8 @@ namespace Microsoft.Boogie
     private Variable ok;
     private Expr gate;
     private Expr transitionRelation;
+    private IToken tok;
+    private int layerNum;
 
     private Dictionary<AtomicAction, Expr> transitionRelationCache;
 
@@ -68,9 +65,10 @@ namespace Microsoft.Boogie
       Dictionary<Variable, Variable> oldGlobalMap)
     {
       this.civlTypeChecker = civlTypeChecker;
+      this.tok = impl.tok;
       this.oldGlobalMap = new Dictionary<Variable, Variable>();
       ActionProc actionProc = civlTypeChecker.procToYieldingProc[originalImpl.Proc] as ActionProc;
-      int layerNum = actionProc.upperLayer;
+      this.layerNum = actionProc.upperLayer;
       foreach (Variable v in civlTypeChecker.GlobalVariables)
       {
         var layerRange = civlTypeChecker.GlobalVariableLayerRange(v);
@@ -148,13 +146,9 @@ namespace Microsoft.Boogie
 
     public override List<Cmd> CreateInitCmds()
     {
-      List<AssignLhs> lhss = new List<AssignLhs>
-      {
-        new SimpleAssignLhs(Token.NoToken, Expr.Ident(pc)),
-        new SimpleAssignLhs(Token.NoToken, Expr.Ident(ok))
-      };
-      List<Expr> rhss = new List<Expr> {Expr.False, Expr.False};
-      var cmds = new List<Cmd> {new AssignCmd(Token.NoToken, lhss, rhss)};
+      var lhss = new List<IdentifierExpr> { Expr.Ident(pc), Expr.Ident(ok) };
+      var rhss = new List<Expr> { Expr.False, Expr.False };
+      var cmds = new List<Cmd> { CmdHelper.AssignCmd(lhss, rhss) };
       cmds.AddRange(CreateUpdatesToOldOutputVars());
       // assume spec gate at procedure entry
       cmds.Add(CmdHelper.AssumeCmd(gate));
@@ -166,101 +160,97 @@ namespace Microsoft.Boogie
       // assume pc || gate(i, g);
       Expr assumeExpr = Expr.Or(Expr.Ident(pc), gate);
       assumeExpr.Type = Type.Bool;
-      return new List<Cmd> {new AssumeCmd(Token.NoToken, assumeExpr)};
+      return new List<Cmd> { CmdHelper.AssumeCmd(assumeExpr) };
     }
 
     public override List<Cmd> CreateAssertCmds()
     {
-      Expr assertExpr;
-
       // assert pc || g_old == g || transitionRelation(i, g_old, o, g);
-      assertExpr = Expr.Or(Expr.Ident(pc), Expr.Or(OldEqualityExprForGlobals(), transitionRelation));
-      assertExpr.Typecheck(new TypecheckingContext(null));
-      var skipOrTransitionRelationAssertCmd = new AssertCmd(Token.NoToken, assertExpr);
-      skipOrTransitionRelationAssertCmd.ErrorData = "Transition invariant violated in initial state";
+      var skipOrTransitionRelationAssertCmd = CmdHelper.AssertCmd(
+        tok,
+        Expr.Or(Expr.Ident(pc), Expr.Or(OldEqualityExprForGlobals(), transitionRelation)),
+        $"A yield-to-yield fragment modifies layer-{layerNum + 1} state in a way that does not match the refined atomic action");
+      CivlUtil.ResolveAndTypecheck(skipOrTransitionRelationAssertCmd);
 
       // assert pc ==> g_old == g && o_old == o;
-      assertExpr = Expr.Imp(Expr.Ident(pc), Expr.And(OldEqualityExprForGlobals(), OldEqualityExprForOutputs()));
-      assertExpr.Typecheck(new TypecheckingContext(null));
-      AssertCmd skipAssertCmd = new AssertCmd(Token.NoToken, assertExpr);
-      skipAssertCmd.ErrorData = "Transition invariant violated in final state";
+      AssertCmd skipAssertCmd = CmdHelper.AssertCmd(
+        tok,
+        Expr.Imp(Expr.Ident(pc), Expr.And(OldEqualityExprForGlobals(), OldEqualityExprForOutputs())),
+        $"A yield-to-yield fragment modifies layer-{layerNum + 1} state subsequent to a yield-to-yield fragment that already modified layer-{layerNum + 1} state");
+      CivlUtil.ResolveAndTypecheck(skipAssertCmd);
+      
       return new List<Cmd> {skipOrTransitionRelationAssertCmd, skipAssertCmd};
     }
 
     public override List<Cmd> CreateReturnAssertCmds()
     {
-      AssertCmd assertCmd = new AssertCmd(Token.NoToken, Expr.Ident(ok));
-      assertCmd.ErrorData = "Failed to execute atomic action before procedure return";
+      AssertCmd assertCmd = CmdHelper.AssertCmd(
+        tok,
+        Expr.Ident(ok),
+        "On some path no yield-to-yield fragment matched the refined atomic action");
       return new List<Cmd> {assertCmd};
     }
 
-    public override List<Cmd> CreateUnchangedGlobalsAssertCmds()
+    public override List<Cmd> CreateUnchangedAssertCmds()
     {
-      var assertExpr =
-        Expr.And(this.oldGlobalMap.Select(kvPair => Expr.Eq(Expr.Ident(kvPair.Key), Expr.Ident(kvPair.Value))));
-      assertExpr.Typecheck(new TypecheckingContext(null));
-      AssertCmd skipAssertCmd = new AssertCmd(Token.NoToken, assertExpr);
-      skipAssertCmd.ErrorData = "Globals must not be modified";
-      return new List<Cmd> {skipAssertCmd};
-    }
+      AssertCmd globalsAssertCmd = CmdHelper.AssertCmd(
+        tok,
+        Expr.And(this.oldGlobalMap.Select(kvPair => Expr.Eq(Expr.Ident(kvPair.Key), Expr.Ident(kvPair.Value)))),
+        $"A yield-to-yield fragment illegally modifies layer-{layerNum + 1} globals");
+      CivlUtil.ResolveAndTypecheck(globalsAssertCmd);
 
-    public override List<Cmd> CreateUnchangedOutputsAssertCmds()
-    {
       // assert pc ==> o_old == o;
-      var assertExpr = Expr.Imp(Expr.Ident(pc), OldEqualityExprForOutputs());
-      assertExpr.Typecheck(new TypecheckingContext(null));
-      AssertCmd skipAssertCmd = new AssertCmd(Token.NoToken, assertExpr);
-      skipAssertCmd.ErrorData = "Outputs must not be modified";
-      return new List<Cmd> {skipAssertCmd};
+      AssertCmd outputsAssertCmd = CmdHelper.AssertCmd(
+        tok,
+        Expr.Imp(Expr.Ident(pc), OldEqualityExprForOutputs()),
+        $"A yield-to-yield fragment illegally modifies layer-{layerNum + 1} outputs");
+      CivlUtil.ResolveAndTypecheck(outputsAssertCmd);
+
+      return new List<Cmd> {globalsAssertCmd, outputsAssertCmd};
     }
 
     public override List<Cmd> CreateUpdatesToRefinementVars(bool isMarkedCall)
     {
       var cmds = new List<Cmd>();
-      List<AssignLhs> pcOkUpdateLHS = new List<AssignLhs>
-      {
-        new SimpleAssignLhs(Token.NoToken, Expr.Ident(pc)),
-        new SimpleAssignLhs(Token.NoToken, Expr.Ident(ok))
-      };
+      var pcOkUpdateLHS = new List<IdentifierExpr> { Expr.Ident(pc), Expr.Ident(ok) };
       if (isMarkedCall)
       {
         // assert !pc;
         // pc, ok := true, true;
-        cmds.Add(new AssertCmd(Token.NoToken, Expr.Not(Expr.Ident(pc))));
-        List<Expr> pcOkUpdateRHS = new List<Expr>(new Expr[] {Expr.True, Expr.True});
-        cmds.Add(new AssignCmd(Token.NoToken, pcOkUpdateLHS, pcOkUpdateRHS));
+        cmds.Add(CmdHelper.AssertCmd(tok, Expr.Not(Expr.Ident(pc)), $"Layer-{layerNum + 1} state modified before marked call"));
+        var pcOkUpdateRHS = new List<Expr> {Expr.True, Expr.True};
+        cmds.Add(CmdHelper.AssignCmd(pcOkUpdateLHS, pcOkUpdateRHS));
       }
       else
       {
         // pc, ok := g_old == g ==> pc, transitionRelation(i, g_old, o, g) || (o_old == o && ok);
-        List<Expr> pcOkUpdateRHS = new List<Expr>(
-          new Expr[]
-          {
-            Expr.Imp(OldEqualityExprForGlobals(), Expr.Ident(pc)),
-            Expr.Or(transitionRelation, Expr.And(OldEqualityExprForOutputs(), Expr.Ident(ok))),
-          });
-        cmds.Add(new AssignCmd(Token.NoToken, pcOkUpdateLHS, pcOkUpdateRHS));
+        var pcOkUpdateRHS = new List<Expr> {
+          Expr.Imp(OldEqualityExprForGlobals(), Expr.Ident(pc)),
+          Expr.Or(transitionRelation, Expr.And(OldEqualityExprForOutputs(), Expr.Ident(ok))),
+        };
+        cmds.Add(CmdHelper.AssignCmd(pcOkUpdateLHS, pcOkUpdateRHS));
       }
 
-      foreach (var cmd in cmds)
-      {
-        cmd.Typecheck(new TypecheckingContext(null));
-      }
+      CivlUtil.ResolveAndTypecheck(cmds);
 
       return cmds;
     }
 
     public override List<Cmd> CreateUpdatesToOldOutputVars()
     {
-      List<AssignLhs> lhss = new List<AssignLhs>();
-      List<Expr> rhss = new List<Expr>();
+      var lhss = new List<IdentifierExpr>();
+      var rhss = new List<Expr>();
       foreach (Variable o in oldOutputMap.Keys)
       {
-        lhss.Add(new SimpleAssignLhs(Token.NoToken, Expr.Ident(oldOutputMap[o])));
+        lhss.Add(Expr.Ident(oldOutputMap[o]));
         rhss.Add(Expr.Ident(o));
       }
 
-      return lhss.Count > 0 ? new List<Cmd> {new AssignCmd(Token.NoToken, lhss, rhss)} : new List<Cmd>();
+      if (lhss.Count > 0)
+      {
+        return new List<Cmd> { CmdHelper.AssignCmd(lhss,rhss) };
+      }
+      return new List<Cmd>();
     }
 
     private Expr GetTransitionRelation(AtomicAction atomicAction)

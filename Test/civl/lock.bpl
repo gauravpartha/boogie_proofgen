@@ -1,11 +1,11 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 var {:layer 0,2} b: bool;
 
 procedure {:yields} {:layer 2} main()
 {
     while (*)
-    invariant {:terminates} {:layer 1,2} true;
+    invariant {:cooperates} {:layer 1,2} true;
     {
         async call Customer();
     }

@@ -25,6 +25,21 @@ namespace Microsoft.Boogie
       return tc.ErrorCount;
     }
 
+    public static int ResolveAndTypecheck(Absy absy, ResolutionContext.State state)
+    {
+      var rc = new ResolutionContext(null);
+      rc.StateMode = state;
+      absy.Resolve(rc);
+      if (rc.ErrorCount != 0)
+      {
+        return rc.ErrorCount;
+      }
+
+      var tc = new TypecheckingContext(null);
+      absy.Typecheck(tc);
+      return tc.ErrorCount;
+    }
+
     public static int ResolveAndTypecheck(IEnumerable<Absy> absys)
     {
       int errorCount = 0;
@@ -37,12 +52,17 @@ namespace Microsoft.Boogie
     }
   }
 
-  // Handy syntactic suggar missing in Expr
+  // Handy syntactic sugar missing in Expr
   public static class ExprHelper
   {
     public static NAryExpr FunctionCall(Function f, params Expr[] args)
     {
-      return new NAryExpr(Token.NoToken, new FunctionCall(f), args);
+      var expr = new NAryExpr(Token.NoToken, new FunctionCall(f), args);
+      var rc = new ResolutionContext(null);
+      rc.StateMode = ResolutionContext.State.Two;
+      expr.Resolve(rc);
+      expr.Typecheck(new TypecheckingContext(null));
+      return expr;
     }
 
     public static NAryExpr IfThenElse(Expr ifExpr, Expr thenExpr, Expr elseExpr)
@@ -54,6 +74,21 @@ namespace Microsoft.Boogie
     public static OldExpr Old(Expr expr)
     {
       return new OldExpr(Token.NoToken, expr);
+    }
+
+    public static ExistsExpr ExistsExpr(List<Variable> dummies, Expr body)
+    {
+      return new ExistsExpr(Token.NoToken, dummies, body);
+    }
+
+    public static ExistsExpr ExistsExpr(List<Variable> dummies, Trigger triggers, Expr body)
+    {
+      return new ExistsExpr(Token.NoToken, dummies, triggers, body);
+    }
+
+    public static ForallExpr ForallExpr(List<Variable> dummies, Expr body)
+    {
+      return new ForallExpr(Token.NoToken, dummies, body);
     }
 
     public static void FlattenAnd(Expr x, List<Expr> xs)
@@ -77,7 +112,7 @@ namespace Microsoft.Boogie
     public static CallCmd CallCmd(Procedure callee, List<Expr> ins, List<IdentifierExpr> outs)
     {
       return new CallCmd(Token.NoToken, callee.Name, ins, outs)
-        {Proc = callee};
+        { Proc = callee };
     }
 
     public static CallCmd CallCmd(Procedure callee, List<Variable> ins, List<Variable> outs)
@@ -90,6 +125,12 @@ namespace Microsoft.Boogie
       return new AssumeCmd(Token.NoToken, expr);
     }
 
+    public static AssertCmd AssertCmd(IToken tok, Expr expr, string msg)
+    {
+      return new AssertCmd(tok, expr)
+        { ErrorData = msg };
+    }
+
     public static AssignCmd AssignCmd(Variable v, Expr x)
     {
       var lhs = new SimpleAssignLhs(Token.NoToken, Expr.Ident(v));
@@ -100,6 +141,42 @@ namespace Microsoft.Boogie
     {
       var assignLhss = lhss.Select(lhs => new SimpleAssignLhs(Token.NoToken, lhs)).ToList<AssignLhs>();
       return new AssignCmd(Token.NoToken, assignLhss, rhss);
+    }
+
+    public static HavocCmd HavocCmd(List<IdentifierExpr> vars)
+    {
+      return new HavocCmd(Token.NoToken, vars);
+    }
+  }
+
+  public static class BlockHelper
+  {
+    public static Block Block(string label, List<Cmd> cmds)
+    {
+      return new Block(Token.NoToken, label, cmds, CmdHelper.ReturnCmd);
+    }
+
+    public static Block Block(string label, List<Cmd> cmds, List<Block> gotoTargets)
+    {
+      return new Block(Token.NoToken, label, cmds, new GotoCmd(Token.NoToken, gotoTargets));
+    }
+  }
+
+  public static class DeclHelper
+  {
+    public static Procedure Procedure(string name,
+      List<Variable> inParams, List<Variable> outParams,
+      List<Requires> requires, List<IdentifierExpr> modifies, List<Ensures> ensures,
+      QKeyValue kv = null)
+    {
+      return new Procedure(Token.NoToken, name, new List<TypeVariable>(), inParams, outParams, requires, modifies, ensures, kv);
+    }
+
+    public static Implementation Implementation(Procedure proc,
+      List<Variable> inParams, List<Variable> outParams, List<Variable> localVariables,
+      List<Block> blocks, QKeyValue kv = null)
+    {
+      return new Implementation(Token.NoToken, proc.Name, new List<TypeVariable>(), inParams, outParams, localVariables, blocks, kv) { Proc = proc };
     }
   }
 
@@ -194,11 +271,6 @@ namespace Microsoft.Boogie
           from acc in accumulator
           from item in sequence
           select acc.Concat(new[] {item}));
-    }
-
-    public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<TKey> keys, Func<TKey, TValue> f)
-    {
-      return keys.ToDictionary(k => k, k => f(k));
     }
   }
 }

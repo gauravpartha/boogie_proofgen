@@ -1,5 +1,7 @@
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
+
+type {:linear "pid"} Pid = int;
 
 // A type for vote messages of participants
 type {:datatype} vote;
@@ -49,7 +51,7 @@ function trigger(x:int) : bool { true }
 function {:inline} Init(pids:[int]bool, ReqCH:[int]int, VoteCH:[vote]int,
   DecCH:[int][decision]int, decisions:[int]decision) : bool
 {
-  pids == MapConstBool(true) &&
+  pids == MapConst(true) &&
   ReqCH == (lambda i:int :: 0) &&
   VoteCH == (lambda v:vote :: 0) &&
   DecCH == (lambda i:int :: (lambda d:decision :: 0)) &&
@@ -342,7 +344,7 @@ requires {:layer 1} Init(pids, ReqCH, VoteCH, DecCH, decisions);
   async call coordinator1(pid);
   i := 1;
   while (i <= n)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} (forall ii:int :: pid(ii) && ii >= i ==> pids'[ii]);
   invariant {:layer 1} PAs == MapAddPA(SingletonPA(Coordinator1(0)), (lambda pa:PA :: if is#Participant1(pa) && pid(pid#Participant1(pa)) && pid#Participant1(pa) < i then 1 else 0));
@@ -390,7 +392,7 @@ requires {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
   call old_ReqCH := Snapshot_ReqCH();
   i := 1;
   while (i <= n)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} ReqCH == (lambda ii:int :: if pid(ii) && ii < i then old_ReqCH[ii] + 1 else old_ReqCH[ii]);
   {
@@ -432,7 +434,7 @@ requires {:layer 1} (forall vv:vote :: VoteCH[vv] >= 0);
   call set_decision(pid, d);
   i := 1;
   while (i <= n)
-  invariant {:layer 1}{:terminates} true;
+  invariant {:layer 1}{:cooperates} true;
   invariant {:layer 1} 1 <= i && i <= n+1;
   invariant {:layer 1} DecCH == (lambda ii:int :: (lambda dd:decision :: if pid(ii) && ii < i && dd == d then old_DecCH[ii][dd] + 1 else old_DecCH[ii][dd]));
   {
@@ -529,18 +531,3 @@ returns ({:linear "pid"} p:int, {:linear "pid"} pids':[int]bool)
 
 procedure {:yields}{:layer 0}{:refines "LINEAR_TRANSFER"} linear_transfer(i:int, {:linear_in "pid"} pids:[int]bool)
 returns ({:linear "pid"} p:int, {:linear "pid"} pids':[int]bool);
-
-////////////////////////////////////////////////////////////////////////////////
-
-function {:builtin "MapConst"} MapConstBool (bool) : [int]bool;
-function {:builtin "MapOr"} MapOr ([int]bool, [int]bool) : [int]bool;
-
-function {:inline}{:linear "pid"} PidCollector (pid:int) : [int]bool
-{
-  MapConstBool(false)[pid := true]
-}
-
-function {:inline}{:linear "pid"} PidSetCollector (pids:[int]bool) : [int]bool
-{
-  pids
-}

@@ -10,7 +10,7 @@
 // algorithm has the property that once all processes have finished, at
 // least one y[j] == 1.
 
-// RUN: %boogie -useArrayTheory "%s" > "%t"
+// RUN: %boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 // XFAIL: *
 
@@ -28,8 +28,8 @@ var {:layer 1, 1} p : int;
 const c: int;
 
 function {:inline} Invariant(i: int, p: int, c: int, x: [int]int) : bool {
-  IsProcId(i) && 
-  IsProcId(p) && 
+  IsProcId(i) &&
+  IsProcId(p) &&
   IsProcId(c) &&
   (p == c || x[c] == 1)
 }
@@ -45,7 +45,7 @@ requires {:layer 1} IsProcId(p) && IsProcId(c) && p == c;
   yield;
   assert {:layer 1} Invariant(i, p, c, x);
   while (i < N)
-  invariant {:terminates} {:layer 0,1,2} true;
+  invariant {:cooperates} {:layer 0,1,2} true;
   invariant {:layer 1} (IsProcId(i) || i == N) && IsProcId(p) && IsProcId(c) && (p == c || x[c] == 1);
   invariant {:layer 2} (IsProcId(i) || i == N) && IsProcId(c) && (i <= (c+1) mod N || y[(c+1) mod N] == 1);
   {
@@ -75,7 +75,7 @@ requires {:layer 1} Invariant(i, p, c, x);
 	call update_x(i);
 	call backward_assign_p(i);
   yield;
-	assert {:layer 1} x[c] == 1;	
+	assert {:layer 1} x[c] == 1;
   call update_y(i);
   yield;
 }
@@ -107,7 +107,7 @@ procedure {:layer 1}{:atomic} atomic_update_x(i: int)
 modifies x;
 {
   x[i] := 1;
-} 
+}
 
 procedure {:layer 1}{:atomic} atomic_update_y(i: int)
 modifies y;
