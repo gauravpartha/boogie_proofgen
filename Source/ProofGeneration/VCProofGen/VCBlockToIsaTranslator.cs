@@ -65,9 +65,9 @@ namespace ProofGeneration.VCProofGen
             return blockToDefVC;            
         }
 
-        public static string GetVCDefName(Block block)
+        private string GetVCDefName(Block block)
         {
-            return "vc_" + block.Label;
+            return this.uniqueNamer.GetName(block, "vc_" + block.Label);
         }
 
     }

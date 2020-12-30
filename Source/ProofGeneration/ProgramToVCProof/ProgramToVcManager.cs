@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
+using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
@@ -151,13 +152,13 @@ namespace ProofGeneration.ProgramToVCProof
                     if (vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls))
                     {
                         //FIXME potential val name clash
-                        vcHintsName = b.Label + "_hints";
-                        var code = MLUtil.DefineVal(b.Label + "_hints", MLUtil.MLList(hints));
+                        vcHintsName = GetLemmaName(b, lemmaNamer) + "_hints";
+                        var code = MLUtil.DefineVal(vcHintsName, MLUtil.MLList(hints));
                         //required declarations must be added first
                         result.AddRange(requiredDecls);
                         result.Add(new MLDecl(code));
                     }
-                    result.Add(passiveLemmaManager.GenerateBlockLemma(b, finalCfg.GetSuccessorBlocks(b), lemmaNamer.GetName(b, GetLemmaName(b)), vcHintsName));
+                    result.Add(passiveLemmaManager.GenerateBlockLemma(b, finalCfg.GetSuccessorBlocks(b), GetLemmaName(b, lemmaNamer), vcHintsName));
                     blockToLemmaDecls.Add(b, result);
                 }
                 else if(reachableBlocks.Contains(b))
@@ -171,7 +172,7 @@ namespace ProofGeneration.ProgramToVCProof
                         var decls = new List<OuterDecl>
                         {
                             passiveLemmaManager.GenerateEmptyBlockLemma(b, nonEmptyReachableSuccessors,
-                                lemmaNamer.GetName(b, GetLemmaName(b)))
+                                GetLemmaName(b, lemmaNamer))
                         };
                         blockToLemmaDecls.Add(b, decls);
                     }
@@ -227,9 +228,9 @@ namespace ProofGeneration.ProgramToVCProof
             return blockToLemmaDecls;
         }
         
-        private static string GetLemmaName(Block b)
+        private static string GetLemmaName(Block b, IsaUniqueNamer uniqueNamer)
         {
-            return "block_" + b.Label;
+            return uniqueNamer.GetName(b, "block_" + b.Label);
         }
 
         private static LocaleDecl GenerateLocale(string localeName, PassiveLemmaManager lemmaManager, IList<OuterDecl> coreLemmas)

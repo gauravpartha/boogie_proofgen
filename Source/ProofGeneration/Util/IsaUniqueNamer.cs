@@ -14,6 +14,7 @@ namespace ProofGeneration.Util
         private readonly string spacer;
 
         private readonly HashSet<string> reservedNames;
+        private readonly List<char> illegalChars;
 
         public IsaUniqueNamer(string spacer)
         {
@@ -24,6 +25,9 @@ namespace ProofGeneration.Util
             };
             reservedNames = new HashSet<string>();
             reservedNames.Add("A"); //value to abstract value map
+
+            illegalChars = new List<char>();
+            illegalChars.Add('@');
         }
 
         public IsaUniqueNamer() : this("_") { }
@@ -31,9 +35,14 @@ namespace ProofGeneration.Util
         public string GetName(object obj, string preferredName)
         {
             var preferredNameMod = preferredName;
-            if (reservedNames.Contains(preferredName))
+            foreach (var illegalChar in illegalChars)
             {
-                preferredNameMod = preferredName + "ZZ";
+                preferredNameMod = preferredNameMod.Replace(illegalChar, '_');
+            }
+
+            if (reservedNames.Contains(preferredNameMod))
+            {
+                preferredNameMod = preferredNameMod + "ZZ";
             }
             return uniqueNamer.GetName(obj, GetValidIsaString(preferredNameMod));
         }
