@@ -15,6 +15,7 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent AppendId = TermIdentFromName("append");
         private static readonly TermIdent MapId = TermIdentFromName("map");
         private static readonly TermIdent SetOfListId = TermIdentFromName("set");
+        private static readonly TermIdent ListAllId = TermIdentFromName("list_all");
         private static readonly TermIdent MemberId = TermIdentFromName("Set.member");
         private static readonly TermIdent SetMaxId = TermIdentFromName("Max");
         private static readonly TermIdent SetMinId = TermIdentFromName("Min");
@@ -105,6 +106,11 @@ namespace ProofGeneration.Isa
         public static Term ListLookup(Term list, int idx)
         {
             return new TermApp(Nth, new List<Term> { list, new NatConst(idx) });
+        }
+
+        public static Term ListAll(Term pred, Term list)
+        {
+            return new TermApp(ListAllId, pred, list);
         }
 
         public static Term Elem(Term element, Term set)

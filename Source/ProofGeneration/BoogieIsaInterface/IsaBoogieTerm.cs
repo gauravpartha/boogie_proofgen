@@ -29,6 +29,7 @@ namespace ProofGeneration
         private readonly static TermIdent binderStateId = IsaCommonTerms.TermIdentFromName("binder_state");
 
         private readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
+        private readonly static TermIdent redCfgKStepId = IsaCommonTerms.TermIdentFromName("red_cfg_k_step");
         private readonly static TermIdent redCmdListId = IsaCommonTerms.TermIdentFromName("red_cmd_list");
         private readonly static TermIdent redExprId = IsaCommonTerms.TermIdentFromName("red_expr");
         private readonly static TermIdent normalStateId = IsaCommonTerms.TermIdentFromName("Normal");
@@ -44,6 +45,7 @@ namespace ProofGeneration
         private readonly static TermIdent funInterpSingleWfId = IsaCommonTerms.TermIdentFromName("fun_interp_single_wf");
         private readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
         private readonly static TermIdent axiomsSatId = IsaCommonTerms.TermIdentFromName("axioms_sat");
+        private readonly static TermIdent exprSatId = IsaCommonTerms.TermIdentFromName("expr_sat");
 
         private readonly static TermIdent typeOfValId = IsaCommonTerms.TermIdentFromName("type_of_val");
 
@@ -411,7 +413,7 @@ namespace ProofGeneration
         {
             return
                 new TermApp(redCfgMultiId,
-                new List<Term>()
+                new List<Term>
                 {
                     boogieContext.absValTyMap,
                     boogieContext.methodContext,
@@ -423,6 +425,24 @@ namespace ProofGeneration
                     finalCFGConfig
                 }
                 );
+        }
+        
+        public static Term RedCFGKStep(BoogieContextIsa boogieContext, Term cfg, Term initCFGConfig, Term numSteps, Term finalCFGConfig)
+        {
+            return
+                new TermApp(redCfgKStepId,
+                new List<Term>
+                {
+                    boogieContext.absValTyMap,
+                    boogieContext.methodContext,
+                    boogieContext.varContext,
+                    boogieContext.funContext,
+                    boogieContext.rtypeEnv,
+                    cfg,
+                    initCFGConfig,
+                    numSteps,
+                    finalCFGConfig
+                });
         }
 
         public static Term CFGConfigNode(Term node, Term state)
@@ -525,6 +545,13 @@ namespace ProofGeneration
             return new TermApp(axiomsSatId, new List<Term> { absValTyMap, varContext, funContext, normalState, axioms });
         }
 
+        //partial application without expression argument
+        public static Term ExprSatPartial(BoogieContextIsa boogieContext, Term normalState)
+        {
+            return new TermApp(exprSatId, 
+                new List<Term> { boogieContext.absValTyMap, boogieContext.varContext, boogieContext.funContext, boogieContext.rtypeEnv, normalState });
+        }
+        
         public static Term AxiomAssm(Term absValTyMap, Term funContext, Term consts, Term normalState, Term axioms)
         {
             return new TermApp(axiomAssmId, absValTyMap, funContext, consts, normalState, axioms);

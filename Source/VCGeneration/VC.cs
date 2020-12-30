@@ -10,6 +10,7 @@ using System.Diagnostics.Contracts;
 using Microsoft.BaseTypes;
 using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
+using ProofGeneration;
 using ProofGeneration.VCProofGen;
 
 namespace VC
@@ -2636,6 +2637,7 @@ namespace VC
       {
         throw new VCGenException("Irreducible flow graphs are unsupported.");
       }
+      ProofGenerationLayer.GraphCfgToDag(g);
 
       #endregion
 
@@ -2822,13 +2824,18 @@ namespace VC
         #region Collect all variables that are assigned to in all of the natural loops for which this is the header
 
         List<Variable> varsToHavoc = VarsAssignedInLoop(g, header);
+        List<Variable> varsToHavocUnique = new List<Variable>();
         List<IdentifierExpr> havocExprs = new List<IdentifierExpr>();
         foreach (Variable v in varsToHavoc)
         {
           Contract.Assert(v != null);
           IdentifierExpr ie = new IdentifierExpr(Token.NoToken, v);
           if (!havocExprs.Contains(ie))
-            havocExprs.Add(ie);
+          {
+              havocExprs.Add(ie);
+              varsToHavocUnique.Add(v);
+          }
+          
         }
 
         // pass the token of the enclosing loop header to the HavocCmd so we can reconstruct
@@ -2842,6 +2849,8 @@ namespace VC
         }
 
         header.Cmds = newCmds;
+        
+        ProofGenerationLayer.LoopHeadHint(header, varsToHavocUnique, prefixOfPredicateCmdsInit.Select(cmd => ((PredicateCmd) cmd).Expr));
 
         #endregion
       }

@@ -11,11 +11,13 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
+using Microsoft.Boogie.GraphUtil;
 using Microsoft.Boogie.ProofGen;
 using ProofGeneration.Util;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using Microsoft.Boogie.TypeErasure;
+using ProofGeneration.CfgToDag;
 using ProofGeneration.Passification;
 
 namespace ProofGeneration
@@ -25,11 +27,12 @@ namespace ProofGeneration
         private static Implementation afterPassificationImpl;
 
         private static IDictionary<Block, Block> beforeDagOrigBlock;
+        private static IDictionary<Block, Block> beforeDagAfterDagBlock;
         private static CFGRepr beforeDagCfg;
 
         private static BoogieMethodData beforeDagData;
-
-
+        private static Graph<Block> cfgToDagGraph;
+        
         private static IDictionary<Block, Block> beforePassiveOrigBlock;
         private static CFGRepr beforePassificationCfg;
 
@@ -57,6 +60,8 @@ namespace ProofGeneration
         private static PassiveRelationGen passiveRelationGen;
         private static IDictionary<Variable, int> globalVersionMap;
 
+        private static CfgToDagHintManager cfgToDagHintManager;
+
         public static void Program(Program p)
         {
             boogieGlobalData = new BoogieGlobalData(p.Functions, p.Axioms, p.GlobalVariables, p.Constants);
@@ -73,6 +78,13 @@ namespace ProofGeneration
             beforeDagData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
         }
 
+        /// <param name="g">graph for which all the loop information has been computed</param>
+        public static void GraphCfgToDag(Graph<Block> g)
+        {
+            cfgToDagGraph = g;
+            cfgToDagHintManager = new CfgToDagHintManager(g, beforeDagOrigBlock);
+        }
+
         public static void BeforePassification(Implementation impl)
         {
             beforePassificationCfg = CFGReprTransformer.GetCfgRepresentation(
@@ -84,6 +96,16 @@ namespace ProofGeneration
                 );
             beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
             passificationHintManager = new PassificationHintManager(beforePassiveOrigBlock);
+            
+            // compute mapping between copied blocks (before dag -> after dag)
+            beforeDagAfterDagBlock = new Dictionary<Block, Block>();
+            var origToAfterDag = beforePassiveOrigBlock.ToDictionary(x => x.Value, x => x.Key);
+
+            foreach (var beforeBlock in beforeDagCfg.GetBlocksForwards())
+            {
+                var origBlock = beforeDagOrigBlock[beforeBlock];
+                beforeDagAfterDagBlock.Add(beforeBlock, origToAfterDag[origBlock]);
+            }
         }
 
         private static BoogieMethodData MethodDataFromImpl(
@@ -188,6 +210,11 @@ namespace ProofGeneration
         public static void NextPassificationHint(Block block, Cmd cmd, Variable origVar, Expr passiveExpr)
         {
            passificationHintManager.AddHint(block, cmd, origVar, passiveExpr); 
+        }
+
+        public static void LoopHeadHint(Block block, IEnumerable<Variable> varsToHavoc, IEnumerable<Expr> invariants)
+        {
+            cfgToDagHintManager.AddHint(block, new LoopHeadHint(varsToHavoc, invariants));
         }
 
         public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)
@@ -345,9 +372,36 @@ namespace ProofGeneration
             var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
             StoreTheory(beforeCfgToDagProgTheory);
+            
+            Theory cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
+                afterPassificationImpl.Name+"_cfg_to_dag_proof",
+                beforeDagCfg,
+                beforePassificationCfg,
+                cfgToDagHintManager,
+                beforeDagAfterDagBlock,
+                beforeCfgToDagProgAccess,
+                beforePassiveProgAccess,
+                varTranslationFactory2);
+            StoreTheory(cfgToDagProofTheory);
             #endregion
         }
-        
+
+        private static IDictionary<Block, Block> BeforeToAfterDag()
+        {
+            var result = new Dictionary<Block, Block>();
+            
+            var origToAfterDag = beforePassiveOrigBlock.ToDictionary(x => x.Value, x => x.Key);
+
+            foreach (var beforeBlock in beforeDagCfg.GetBlocksForwards())
+            {
+                var origBlock = beforeDagOrigBlock[beforeBlock];
+                
+                result.Add(beforeBlock, origToAfterDag[origBlock]);
+            }
+
+            return result;
+        }
+
         private static void StoreTheory(Theory theory)
         {
             var sw = new StreamWriter(theory.theoryName + ".thy");
