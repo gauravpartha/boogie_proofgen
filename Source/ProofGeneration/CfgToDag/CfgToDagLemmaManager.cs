@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
+using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
@@ -15,6 +16,8 @@ namespace ProofGeneration.CfgToDag
         private readonly IProgramAccessor beforeDagProgAccess;
         private readonly IProgramAccessor afterDagProgAccess;
         private readonly IVariableTranslation<Variable> variableTranslation;
+
+        private readonly CFGRepr afterDagCfg;
         
         private readonly CfgToDagHintManager hintManager;
         private readonly IDictionary<Block, IList<Block>> blocksToLoops;
@@ -39,6 +42,7 @@ namespace ProofGeneration.CfgToDag
         public CfgToDagLemmaManager(
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
+            CFGRepr afterDagCfg,
             string varContextName,
             CfgToDagHintManager hintManager,
             IDictionary<Block, IList<Block>> blocksToLoops,
@@ -48,6 +52,7 @@ namespace ProofGeneration.CfgToDag
         {
             this.beforeDagProgAccess = beforeDagProgAccess;
             this.afterDagProgAccess = afterDagProgAccess;
+            this.afterDagCfg = afterDagCfg;
             variableTranslation = varFactory.CreateTranslation().VarTranslation;
             this.hintManager = hintManager;
             this.blocksToLoops = blocksToLoops;
@@ -83,6 +88,114 @@ namespace ProofGeneration.CfgToDag
         }
 
         /// <summary>
+        /// CFG Block lemma for a block that was added after the CFG-to-DAG step
+        /// must be a block that has a single successor bSuc, where bSuc has a corresponding node before the CFG-to-DAG step
+        /// </summary>
+        public LemmaDecl NewBlockLemma(
+            string cfgLemmaName,
+            Block afterDag,
+            Block afterDagSuccessor,
+            Block beforeDagSuccessor
+        )
+        {
+            var finalNodeId2 = new SimpleIdentifier("m2'");
+            var finalStateId2 = new SimpleIdentifier("s2'");
+            List<Term> assumptions = new List<Term>();
+            
+            Term dagVerifiesCfgAssm =
+                DagVerifiesCfgAssumption(
+                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDag]),
+                    finalNodeId2,
+                    finalStateId2,
+                    false);
+            
+            assumptions.Add(dagVerifiesCfgAssm);
+            
+            assumptions.Add(new TermApp(
+                IsaCommonTerms.TermIdentFromName("nstate_same_on"), 
+                boogieContext.varContext,
+                normalInitState1,
+                normalInitState2,
+                IsaCommonTerms.EmptySet));
+
+            assumptions.Add(new TermApp(
+                IsaCommonTerms.TermIdentFromName("state_well_typed"),
+                boogieContext.absValTyMap,
+                boogieContext.varContext,
+                boogieContext.rtypeEnv,
+                normalInitState1));
+            
+            Term dagVerifiesCfgAssmSuc=
+                DagVerifiesCfgAssumption(
+                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDagSuccessor]),
+                    finalNodeId2,
+                    finalStateId2); 
+            /*
+             * "list_all (expr_sat A Λ1 Γ Ω ns1) [(BinOp  (Var  3) Ge (Lit  (LInt  0))), (BinOp  (Var  3) Le (Var  0))] ⟹ 
+                 (⋀ m2' s2'. (red_cfg_multi  A M Λ1 Γ Ω goto_multiple_loop_targets_before_passive_prog.G_goto_multiple_loop_targets ((Inl  8), (Normal  ns2)) (m2', s2')) ⟹ (s2' ≠ Failure)) ⟹
+                 R" 
+             */
+            Term conclusion = IsaCommonTerms.TermIdentFromName("R");
+            Term propagationAssm = TermBinary.MetaImplies(dagVerifiesCfgAssmSuc, conclusion);
+            if (hintManager.IsLoopHead(beforeDagSuccessor, out LoopHeadHint hint))
+            {
+                Term invsHold = IsaCommonTerms.ListAll(
+                    IsaBoogieTerm.ExprSatPartial(boogieContext, normalInitState1),
+                    new TermList(hint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)).ToList())
+                );
+
+                propagationAssm = TermBinary.MetaImplies(invsHold, propagationAssm);
+            }
+            
+            assumptions.Add(propagationAssm);
+
+            List<string> proofMethods;
+            if (hint != null)
+            {
+                proofMethods =
+                    new List<string>()
+                    {
+                        "using assms",
+                        ProofUtil.Apply("rule " + "cfg_dag_simple_propagate_helper"),
+                        "apply (assumption, fastforce)",
+                        ProofUtil.Apply(
+                            ProofUtil.Simp(afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterDag))),
+                        ProofUtil.Apply(
+                            ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterDag))),
+                        "unfolding " + afterDagProgAccess.BlockInfo().BlockCmdsDefs[afterDag].name + "_def",
+                        ProofUtil.Apply("cfg_dag_rel_tac_single+"),
+                        "subgoal",
+                        "sorry",
+                        "done"
+                    };
+            }
+            else
+            {
+                proofMethods = new List<string>
+                {
+                    "using assms",
+                    ProofUtil.Apply("rule " + "cfg_dag_empty_propagate_helper"),
+                    "apply (assumption, simp)",
+                    ProofUtil.Apply(
+                        ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterDag))),
+                    ProofUtil.By(
+                        ProofUtil.Simp(
+                            afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterDag),
+                            afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterDag) + "_def"
+                        )
+                    )
+                };
+            }
+
+            return new LemmaDecl(
+                cfgLemmaName, 
+                ContextElem.CreateWithAssumptions(assumptions),
+                conclusion,
+                new Proof(proofMethods)
+                );
+        }
+
+        /// <summary>
         /// first element of returned tuple are the lemmas for the local block proof
         /// second element of returned tuple is the CFG block proof (i.e., depends on the local lemmas)
         /// </summary>
@@ -100,7 +213,6 @@ namespace ProofGeneration.CfgToDag
             Term afterCmds = IsaCommonTerms.TermIdentFromName(afterCmdsDefName);
             
             var finalNodeId2 = new SimpleIdentifier("m2'");
-            Term finalNode2 = new TermIdent(finalNodeId2);
             var finalStateId2 = new SimpleIdentifier("s2'");
             Term finalState2 = new TermIdent(finalStateId2);
 
@@ -116,15 +228,24 @@ namespace ProofGeneration.CfgToDag
                 preInvs = IsaCommonTerms.EmptyList;
                 havocedVars = IsaCommonTerms.EmptyList;
             }
-
+            
+            
+            var loops = blocksToLoops[beforeDag];
             var postInvsList = new List<Term>();
             foreach (var bSuc in successors)
             {
-                if(hintManager.IsLoopHead(bSuc, out LoopHeadHint hint))
+                var bSucAfter = beforeToAfterBlock[bSuc];
+                if(hintManager.IsLoopHead(bSuc, out LoopHeadHint hint) && 
+                   (loops.Contains(bSuc) ||
+                    afterDagCfg.GetSuccessorBlocks(afterDag).Contains(bSucAfter)) )
                 {
+                    /* only add invariants if the current block is a backedge or if there is no new block was added in
+                       the DAG between the loop head and the current block
+                     */
                     postInvsList.AddRange(hint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)));
                 }
             }
+            
             
             var postInvs = new TermList(postInvsList);
 
@@ -206,19 +327,10 @@ namespace ProofGeneration.CfgToDag
             };
 
             Term dagVerifiesCfgAssm =
-                TermQuantifier.MetaAll(
-                    new List<Identifier> {finalNodeId2, finalStateId2},
-                    null,
-                    TermBinary.MetaImplies(
-                        IsaBoogieTerm.RedCFGMulti(boogieContext, afterDagProgAccess.CfgDecl(),
-                            IsaBoogieTerm.CFGConfigNode(
-                                new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDag]),
-                                IsaBoogieTerm.Normal(normalInitState2)
-                            ),
-                            IsaBoogieTerm.CFGConfig(finalNode2, finalState2)
-                        ),
-                        TermBinary.Neq(finalState2, IsaBoogieTerm.Failure()))
-                );
+                DagVerifiesCfgAssumption(
+                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDag]),
+                    finalNodeId2,
+                    finalStateId2);
             
             cfgAssumptions.Add(dagVerifiesCfgAssm);
             
@@ -271,8 +383,6 @@ namespace ProofGeneration.CfgToDag
 
             var localLemmas = new List<LemmaDecl>();
             localLemmas.Add(blockLemma);
-
-            var loops = blocksToLoops[beforeDag];
             
             //TODO: if the loop is within multiple loops, need to find the most inner one
             Block loopMod = null;
@@ -361,6 +471,47 @@ namespace ProofGeneration.CfgToDag
                 }
                 else
                 {
+                    /* we need to check whether the edge to the successor also exists in the DAG
+                       if not, then we an edge was added in-between and we need to apply an additional lemma to
+                       to propagate the execution in the DAG 
+                     */
+                    Block bSucAfter = beforeToAfterBlock[bSuc];
+                    int bSucAfterId;
+                    var afterSuccessors = afterDagCfg.GetSuccessorBlocks(afterBlock);
+                    Block addedBlock = null;
+                    if (afterSuccessors.Contains(bSucAfter))
+                    {
+                        bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[bSucAfter];
+                    }
+                    else
+                    {
+                        //need to find the block that was added in between
+                        foreach (var afterSuc in afterSuccessors)
+                        {
+                            var afterSucSuccessors = afterDagCfg.GetSuccessorBlocks(afterSuc);
+                            if(afterSucSuccessors.Count() == 1 && afterSucSuccessors.First().Equals(bSucAfter))
+                            {
+                                addedBlock = afterSuc;
+                                break;
+                            }
+                        }
+                        if(addedBlock == null)
+                            throw new ProofGenUnexpectedStateException("Could not find block");
+                        
+                        bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[addedBlock];
+                    }
+                    
+                    sb.AppendLine("apply simp");
+                    sb.AppendLine("apply (erule allE[where x=" + bSucAfterId + "])");
+                    sb.AppendLine(ProofUtil.Apply(
+                        ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock))));
+                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
+                    if (addedBlock != null)
+                    {
+                        sb.AppendLine(ProofUtil.Apply("erule " +  cfgLemmaName(addedBlock)));
+                        sb.AppendLine(ProofUtil.Apply("assumption, assumption"));
+                    }
+                    
                     sb.AppendLine(ProofUtil.Apply("rule " + cfgLemmaName(bSuc)));
                     sb.AppendLine("apply simp");
                     sb.AppendLine("unfolding dag_lemma_assms_def");
@@ -369,15 +520,9 @@ namespace ProofGeneration.CfgToDag
                     sb.AppendLine(hintManager.IsLoopHead(bSuc, out _)
                         ? "apply (erule nstate_same_on_empty_subset)"
                         : "apply simp");
-                    sb.AppendLine("apply simp");
-                    Block bSucAfter = beforeToAfterBlock[bSuc];
-                    int bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[bSucAfter];
-                    sb.AppendLine("apply (erule allE[where x=" + bSucAfterId + "])");
-                    sb.AppendLine("apply simp");
-                    sb.AppendLine(ProofUtil.Apply(
-                        ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock))));
-                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
-                    sb.AppendLine(ProofUtil.Apply("fastforce?"));
+                    //removed
+                    sb.AppendLine(ProofUtil.Apply("fastforce"));
+                    sb.AppendLine(ProofUtil.Apply("simp"));
                     //if successor is inside a subset of the loops that we the current block is in, then need to propagate the induction hypotheses
                     var loopsSuc = blocksToLoops[bSuc];
                     // we can be sure that every loop that the successor is in, the current block is in too (since the CFG is reducible)
@@ -394,6 +539,44 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine("by (simp add: member_rec(2))");
 
             return new Proof(new List<string> {sb.ToString()});
+        }
+
+        private Term DagVerifiesCfgAssumption(
+            Term initialStateNode,
+            Identifier finalNodeId2, 
+            Identifier finalStateId2,
+            bool useMetaConnectives = true
+            )
+        {
+            Term finalNode2 = new TermIdent(finalNodeId2);
+            Term finalState2 = new TermIdent(finalStateId2);
+
+            Func<IList<Identifier>, IList<TypeIsa>, Term, TermQuantifier> forallConstructor;
+            Func<Term, Term, TermBinary> impliesConstructor;
+            if (useMetaConnectives)
+            {
+                forallConstructor = TermQuantifier.MetaAll;
+                impliesConstructor = TermBinary.MetaImplies;
+            }
+            else
+            {
+                forallConstructor = TermQuantifier.ForAll;
+                impliesConstructor = TermBinary.Implies;
+            }
+            
+            return
+                forallConstructor(
+                    new List<Identifier> {finalNodeId2, finalStateId2},
+                    null,
+                    impliesConstructor(
+                        IsaBoogieTerm.RedCFGMulti(boogieContext, afterDagProgAccess.CfgDecl(),
+                            IsaBoogieTerm.CFGConfigNode(
+                                    initialStateNode, IsaBoogieTerm.Normal(normalInitState2)
+                            ),
+                            IsaBoogieTerm.CFGConfig(finalNode2, finalState2)
+                        ),
+                        TermBinary.Neq(finalState2, IsaBoogieTerm.Failure()))
+                );
         }
 
         private Term BlockLemmaAssumption(

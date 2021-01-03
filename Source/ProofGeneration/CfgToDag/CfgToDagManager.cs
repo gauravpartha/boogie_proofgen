@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
-using Microsoft.Boogie.GraphUtil;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
@@ -80,6 +79,7 @@ namespace ProofGeneration.CfgToDag
             CfgToDagLemmaManager lemmaManager = new CfgToDagLemmaManager(
                 beforeDagProgAccess, 
                 afterDagProgAccess, 
+                afterDagCfg,
                 varContextName, 
                 hintManager,
                 blocksToLoops,
@@ -115,7 +115,40 @@ namespace ProofGeneration.CfgToDag
                 }
                 else
                 {
-                    //join block
+                   //block was added as part of transformation 
+                   if (afterBlock.Label.Contains("PreconditionGeneratedEntry"))
+                   {
+                       //TODO 
+                       continue;
+                   }
+
+                   var afterBlockSuccessors = afterDagCfg.GetSuccessorBlocks(afterBlock);
+                   if (afterBlockSuccessors.Count() == 0)
+                   {
+                       //must be the generated unified exit block --> TODO handle this
+                       continue;
+                   }
+                   
+                   if (afterBlockSuccessors.Count() != 1)
+                   {
+                      throw new ProofGenUnexpectedStateException("Block added in CFG-to-DAG phase does not have a unique successor"); 
+                   }
+                   
+                   var afterUniqueSuc = afterBlockSuccessors.First();
+                   if (afterToBefore.TryGetValue(afterUniqueSuc, out Block beforeUniqueSuc))
+                   {
+                       var lemma = lemmaManager.NewBlockLemma(
+                           GetCfgLemmaName(afterBlock, lemmaNamer),
+                           afterBlock,
+                           afterUniqueSuc,
+                           beforeUniqueSuc
+                       );
+                       outerDecls.Add(lemma);
+                   }
+                   else
+                   {
+                       throw new ProofGenUnexpectedStateException("CFG-to-DAG: Unique successor of added block cannot be mapped to original block");
+                   }
                 }
             }
             
