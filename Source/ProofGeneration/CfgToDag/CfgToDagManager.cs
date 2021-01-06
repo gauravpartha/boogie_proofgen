@@ -123,25 +123,43 @@ namespace ProofGeneration.CfgToDag
                    }
 
                    var afterBlockSuccessors = afterDagCfg.GetSuccessorBlocks(afterBlock);
-                   if (afterBlockSuccessors.Count() == 0)
+                   var afterBlockSuccessorsList = afterBlockSuccessors.ToList();
+                   if (!afterBlockSuccessorsList.Any())
                    {
                        //must be the generated unified exit block --> TODO handle this
                        continue;
                    }
                    
-                   if (afterBlockSuccessors.Count() != 1)
+                   if (afterBlockSuccessorsList.Count != 1)
                    {
                       throw new ProofGenUnexpectedStateException("Block added in CFG-to-DAG phase does not have a unique successor"); 
                    }
                    
-                   var afterUniqueSuc = afterBlockSuccessors.First();
+                   var afterUniqueSuc = afterBlockSuccessorsList.First();
                    if (afterToBefore.TryGetValue(afterUniqueSuc, out Block beforeUniqueSuc))
                    {
+                       hintManager.IsLoopHead(beforeUniqueSuc, out LoopHeadHint hint);
                        var lemma = lemmaManager.NewBlockLemma(
                            GetCfgLemmaName(afterBlock, lemmaNamer),
                            afterBlock,
                            afterUniqueSuc,
-                           beforeUniqueSuc
+                           hint
+                       );
+                       outerDecls.Add(lemma);
+                   }
+                   else if(hintManager.IsNewBackedgeBlock(afterBlock, out LoopHeadHint loopHeadHint))
+                   {
+                       if (afterDagCfg.GetSuccessorBlocks(afterUniqueSuc).Any())
+                       {
+                           throw new ProofGenUnexpectedStateException("New backedge node has successor that is not the exit node.");
+                       }
+
+                       //afterUniqueSuc is a successor to a backedge node for which all edges were eliminated
+                       var lemma = lemmaManager.NewBlockLemma(
+                           GetCfgLemmaName(afterBlock, lemmaNamer),
+                           afterBlock,
+                           null,
+                           loopHeadHint
                        );
                        outerDecls.Add(lemma);
                    }

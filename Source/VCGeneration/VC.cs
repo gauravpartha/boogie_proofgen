@@ -2747,6 +2747,7 @@ namespace VC
             {
               backEdgeNodes.Remove(pred);
               backEdgeNodes.Add(newBlock, null);
+              ProofGenerationLayer.NewBackedgeBlock(pred, newBlock, header);
             }
 
             pred = newBlock;

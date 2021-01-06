@@ -94,6 +94,7 @@ namespace ProofGeneration
                 out beforePassiveOrigBlock,
                 out List<Variable> newVarsFromDesugaring
                 );
+            cfgToDagHintManager.AfterDagToOrig = beforePassiveOrigBlock;
             beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
             passificationHintManager = new PassificationHintManager(beforePassiveOrigBlock);
             
@@ -215,6 +216,11 @@ namespace ProofGeneration
         public static void LoopHeadHint(Block block, IEnumerable<Variable> varsToHavoc, IEnumerable<Expr> invariants)
         {
             cfgToDagHintManager.AddHint(block, new LoopHeadHint(varsToHavoc, invariants));
+        }
+        
+        public static void NewBackedgeBlock(Block oldBackedgeBlock, Block newBackedgeBlock, Block loopHead)
+        {
+            cfgToDagHintManager.AddNewBackedgeBlock(newBackedgeBlock, loopHead);
         }
 
         public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)

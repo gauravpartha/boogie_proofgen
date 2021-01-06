@@ -17,6 +17,7 @@ namespace ProofGeneration.CfgToDag
         private readonly IProgramAccessor afterDagProgAccess;
         private readonly IVariableTranslation<Variable> variableTranslation;
 
+        private readonly CFGRepr beforeDagCfg;
         private readonly CFGRepr afterDagCfg;
         
         private readonly CfgToDagHintManager hintManager;
@@ -88,16 +89,30 @@ namespace ProofGeneration.CfgToDag
         }
 
         /// <summary>
+        /// 
         /// CFG Block lemma for a block that was added after the CFG-to-DAG step
         /// must be a block that has a single successor bSuc, where bSuc has a corresponding node before the CFG-to-DAG step
         /// </summary>
+        /// <param name="cfgLemmaName"></param>
+        /// <param name="afterDag"></param>
+        /// <param name="afterDagSuccessor">successor of <paramref name="afterDag"/> (potentially null).</param>
+        /// <param name="loopHeadHint">
+        /// non-null if the successor of <paramref name="afterDag"/> before the CFG-to-DAG transformation is a loop head
+        /// if <paramref name="afterDagSuccessor"/> is null, then afterDag must be a newly added backedgeNode for which
+        /// this hint indicates the corresponding loop head.</param>
+        /// <returns></returns>
         public LemmaDecl NewBlockLemma(
             string cfgLemmaName,
             Block afterDag,
             Block afterDagSuccessor,
-            Block beforeDagSuccessor
+            LoopHeadHint loopHeadHint
         )
         {
+            if (afterDagSuccessor == null && loopHeadHint == null)
+            {
+                throw new ArgumentException("afterDagSuccessor and loopHeadHint cannot both be null");
+            }
+            
             var finalNodeId2 = new SimpleIdentifier("m2'");
             var finalStateId2 = new SimpleIdentifier("s2'");
             List<Term> assumptions = new List<Term>();
@@ -111,9 +126,8 @@ namespace ProofGeneration.CfgToDag
             
             assumptions.Add(dagVerifiesCfgAssm);
             
-            assumptions.Add(new TermApp(
-                IsaCommonTerms.TermIdentFromName("nstate_same_on"), 
-                boogieContext.varContext,
+            assumptions.Add(
+                NstateSameOn(
                 normalInitState1,
                 normalInitState2,
                 IsaCommonTerms.EmptySet));
@@ -124,50 +138,57 @@ namespace ProofGeneration.CfgToDag
                 boogieContext.varContext,
                 boogieContext.rtypeEnv,
                 normalInitState1));
-            
-            Term dagVerifiesCfgAssmSuc=
-                DagVerifiesCfgAssumption(
-                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDagSuccessor]),
-                    finalNodeId2,
-                    finalStateId2); 
-            /*
-             * "list_all (expr_sat A Λ1 Γ Ω ns1) [(BinOp  (Var  3) Ge (Lit  (LInt  0))), (BinOp  (Var  3) Le (Var  0))] ⟹ 
-                 (⋀ m2' s2'. (red_cfg_multi  A M Λ1 Γ Ω goto_multiple_loop_targets_before_passive_prog.G_goto_multiple_loop_targets ((Inl  8), (Normal  ns2)) (m2', s2')) ⟹ (s2' ≠ Failure)) ⟹
-                 R" 
-             */
+
             Term conclusion = IsaCommonTerms.TermIdentFromName("R");
-            Term propagationAssm = TermBinary.MetaImplies(dagVerifiesCfgAssmSuc, conclusion);
-            if (hintManager.IsLoopHead(beforeDagSuccessor, out LoopHeadHint hint))
+            Term propagationAssm = conclusion;
+            if (loopHeadHint != null)
             {
                 Term invsHold = IsaCommonTerms.ListAll(
                     IsaBoogieTerm.ExprSatPartial(boogieContext, normalInitState1),
-                    new TermList(hint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)).ToList())
+                    new TermList(loopHeadHint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)).ToList())
                 );
-
                 propagationAssm = TermBinary.MetaImplies(invsHold, propagationAssm);
+            }
+
+            if (afterDagSuccessor != null)
+            {
+                Term dagVerifiesCfgAssmSuc=
+                    DagVerifiesCfgAssumption(
+                        new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDagSuccessor]),
+                        finalNodeId2,
+                        finalStateId2); 
+                
+                propagationAssm = TermBinary.MetaImplies(dagVerifiesCfgAssmSuc, propagationAssm);
             }
             
             assumptions.Add(propagationAssm);
 
             List<string> proofMethods;
-            if (hint != null)
+            if (loopHeadHint != null)
             {
                 proofMethods =
                     new List<string>()
                     {
                         "using assms",
-                        ProofUtil.Apply("rule " + "cfg_dag_simple_propagate_helper"),
+                        ProofUtil.Apply("rule " + (afterDagSuccessor != null ? "cfg_dag_no_cut_propagate_helper" : "cfg_dag_cut_propagate_helper")),
                         "apply (assumption, fastforce)",
                         ProofUtil.Apply(
-                            ProofUtil.Simp(afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterDag))),
-                        ProofUtil.Apply(
-                            ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterDag))),
-                        "unfolding " + afterDagProgAccess.BlockInfo().BlockCmdsDefs[afterDag].name + "_def",
-                        ProofUtil.Apply("cfg_dag_rel_tac_single+"),
-                        "subgoal",
-                        "sorry",
-                        "done"
+                            ProofUtil.Simp(afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterDag)))
                     };
+
+                if (afterDagSuccessor != null)
+                {
+                    proofMethods.Add(
+                        ProofUtil.Apply(
+                            ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterDag)))
+                    );
+                }
+
+                proofMethods.Add("unfolding " + afterDagProgAccess.BlockInfo().BlockCmdsDefs[afterDag].name + "_def");
+                proofMethods.Add(ProofUtil.Apply("cfg_dag_rel_tac_single+"));
+                proofMethods.Add("subgoal");
+                proofMethods.Add("sorry");
+                proofMethods.Add("done");
             }
             else
             {
@@ -193,6 +214,17 @@ namespace ProofGeneration.CfgToDag
                 conclusion,
                 new Proof(proofMethods)
                 );
+        }
+
+        private Term NstateSameOn(Term normalState1, Term normalState2, Term modSet)
+        {
+            return
+                new TermApp(
+                    IsaCommonTerms.TermIdentFromName("nstate_same_on"),
+                    boogieContext.varContext,
+                    normalInitState1,
+                    normalInitState2,
+                    modSet);
         }
 
         /// <summary>
@@ -232,16 +264,14 @@ namespace ProofGeneration.CfgToDag
             
             var loops = blocksToLoops[beforeDag];
             var postInvsList = new List<Term>();
+            int nSuccessors = successors.Count();
             foreach (var bSuc in successors)
             {
                 var bSucAfter = beforeToAfterBlock[bSuc];
-                if(hintManager.IsLoopHead(bSuc, out LoopHeadHint hint) && 
-                   (loops.Contains(bSuc) ||
-                    afterDagCfg.GetSuccessorBlocks(afterDag).Contains(bSucAfter)) )
+                if(hintManager.IsLoopHead(bSuc, out LoopHeadHint hint) && nSuccessors == 1)
                 {
-                    /* only add invariants if the current block is a backedge or if there is no new block was added in
-                       the DAG between the loop head and the current block
-                     */
+                    /* only add invariants if the current block has exactly the loop head as successor, otherwise a block is
+                       added between the two, which then asserts the invariants */
                     postInvsList.AddRange(hint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)));
                 }
             }
@@ -384,11 +414,20 @@ namespace ProofGeneration.CfgToDag
             var localLemmas = new List<LemmaDecl>();
             localLemmas.Add(blockLemma);
             
-            //TODO: if the loop is within multiple loops, need to find the most inner one
             Block loopMod = null;
             if (loops.Any())
             {
-                loopMod = loops.First();
+                /* If the loop is within multiple loops, we need to find the current loop (i.e., the most inner one) to know
+                 * what variables are allowed to be modified.
+                 * Since the CFG after the CFG-to-DAG transformation is acyclic, we can use the unique labels, which ensure that
+                 * if a block occurs before another one, then it has a larger label.
+                 * Hence it is sufficient to pick the active loop with the largest label, because all active loops of a block
+                 * must be related in some way. If this were not the case, then it would be possible to enter some loop
+                 * via two different paths, which cannot happen for reducible CFGs.
+                 */
+                loopMod = loops.OrderByDescending(
+                    beforeLoopHead =>
+                    afterDagCfg.GetUniqueIntLabel(beforeToAfterBlock[beforeLoopHead])).Last();
             }
             if (hintManager.IsLoopHead(beforeDag, out _))
             {
@@ -425,9 +464,9 @@ namespace ProofGeneration.CfgToDag
         }
 
         private Proof GenerateProofNonLoopHead(
-            Block beforeBlock, 
-            Block afterBlock, 
-            Func <Block, string> blockLemmaName,
+            Block beforeBlock,
+            Block afterBlock,
+            Func<Block, string> blockLemmaName,
             Func<Block, string> cfgLemmaName,
             IEnumerable<Block> successors)
         {
@@ -437,7 +476,7 @@ namespace ProofGeneration.CfgToDag
 
             sb.AppendLine(ProofUtil.Apply(
                 ProofUtil.Rule(
-                    ProofUtil.OF(helperThm, redCfgName, "_","_", dagVerifiesName, dagAssmsName))));
+                    ProofUtil.OF(helperThm, redCfgName, "_", "_", dagVerifiesName, dagAssmsName))));
             sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(beforeDagProgAccess.BlockInfo()
                 .BlockCmdsMembershipLemma(beforeBlock))));
             sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(afterDagProgAccess.BlockInfo()
@@ -445,13 +484,13 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine(ProofUtil.Apply("assumption+"));
             sb.AppendLine(ProofUtil.Apply("rule " + blockLemmaName(beforeBlock)));
             sb.AppendLine(ProofUtil.Apply("assumption+"));
-            
+
             if (loops.Any())
                 sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(BlockModVarsLemmaName(beforeBlock))));
 
             sb.AppendLine(
                 ProofUtil.Apply(ProofUtil.Simp(beforeDagProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock))));
-            
+
             /* handle each successor
              * assume that the edge list in embedding coincides with the iteration order of the successors
              */
@@ -461,18 +500,48 @@ namespace ProofGeneration.CfgToDag
                 if (loops.Contains(bSuc))
                 {
                     //backedge --> need to apply IH
+
+                    /* We need to check whether a new backedge block was added, which contains the assertion of the invariant.
+                       If so, then we need to get the invariant satisfiability from that block.
+                    */
+                    foreach (Block afterSuc in afterDagCfg.GetSuccessorBlocks(afterBlock))
+                    {
+                        if (hintManager.IsNewBackedgeBlock(afterSuc, out Block loopHead, out LoopHeadHint _) && loopHead == bSuc)
+                        {
+                            //TODO separate function for this and share code with case below
+                            int afterSucId = afterDagProgAccess.BlockInfo().BlockIds[afterSuc];
+                            sb.AppendLine("(* proof strategy for new backedge block *)");
+                            sb.AppendLine("apply (erule allE[where x=" + afterSucId + "])");
+                            sb.AppendLine(ProofUtil.Apply(
+                                ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock))));
+                            sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
+                            sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(afterSuc)));
+                            sb.AppendLine(ProofUtil.Apply("assumption, assumption"));
+                            sb.AppendLine("(* finish proof strategy for new backedge block *)");
+                            break;
+                        }
+                    }
+
+
                     sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule("loop_ih_apply[where ?j'=\"j-1\"]")));
                     sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(LoopIndHypName(bSuc))));
                     sb.AppendLine(ProofUtil.Apply("simp, simp"));
                     sb.AppendLine("unfolding dag_lemma_assms_def");
                     sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
-                    sb.AppendLine("using nstate_same_on_sym apply fastforce");
+                    sb.AppendLine(ProofUtil.Apply("rule nstate_same_on_sym"));
+                    if (loops.Count > 1)
+                    {
+                        /* if the block is within more than one loop, then the modified variables proved for the block may
+                         be a strict subset of the modified variables of the loop associated with the IH*/
+                        sb.AppendLine(ProofUtil.Apply("erule nstate_same_on_subset_2"));
+                    }
+                    sb.AppendLine(ProofUtil.Apply("simp"));
                     sb.AppendLine(ProofUtil.Apply("simp"));
                 }
                 else
                 {
                     /* we need to check whether the edge to the successor also exists in the DAG
-                       if not, then we an edge was added in-between and we need to apply an additional lemma to
+                       if not, then an edge was added in-between and we need to apply an additional lemma to
                        to propagate the execution in the DAG 
                      */
                     Block bSucAfter = beforeToAfterBlock[bSuc];
@@ -489,18 +558,19 @@ namespace ProofGeneration.CfgToDag
                         foreach (var afterSuc in afterSuccessors)
                         {
                             var afterSucSuccessors = afterDagCfg.GetSuccessorBlocks(afterSuc);
-                            if(afterSucSuccessors.Count() == 1 && afterSucSuccessors.First().Equals(bSucAfter))
+                            if (afterSucSuccessors.Count() == 1 && afterSucSuccessors.First().Equals(bSucAfter))
                             {
                                 addedBlock = afterSuc;
                                 break;
                             }
                         }
-                        if(addedBlock == null)
+
+                        if (addedBlock == null)
                             throw new ProofGenUnexpectedStateException("Could not find block");
-                        
+
                         bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[addedBlock];
                     }
-                    
+
                     sb.AppendLine("apply simp");
                     sb.AppendLine("apply (erule allE[where x=" + bSucAfterId + "])");
                     sb.AppendLine(ProofUtil.Apply(
@@ -508,10 +578,10 @@ namespace ProofGeneration.CfgToDag
                     sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
                     if (addedBlock != null)
                     {
-                        sb.AppendLine(ProofUtil.Apply("erule " +  cfgLemmaName(addedBlock)));
+                        sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(addedBlock)));
                         sb.AppendLine(ProofUtil.Apply("assumption, assumption"));
                     }
-                    
+
                     sb.AppendLine(ProofUtil.Apply("rule " + cfgLemmaName(bSuc)));
                     sb.AppendLine("apply simp");
                     sb.AppendLine("unfolding dag_lemma_assms_def");
@@ -520,7 +590,7 @@ namespace ProofGeneration.CfgToDag
                     sb.AppendLine(hintManager.IsLoopHead(bSuc, out _)
                         ? "apply (erule nstate_same_on_empty_subset)"
                         : "apply simp");
-                    //removed
+                    
                     sb.AppendLine(ProofUtil.Apply("fastforce"));
                     sb.AppendLine(ProofUtil.Apply("simp"));
                     //if successor is inside a subset of the loops that we the current block is in, then need to propagate the induction hypotheses
@@ -528,6 +598,7 @@ namespace ProofGeneration.CfgToDag
                     // we can be sure that every loop that the successor is in, the current block is in too (since the CFG is reducible)
                     foreach (var loopSuc in loopsSuc)
                     {
+                        //TODO: if we are in multiple loops need to take into account that modified vars are a subset of those specified in loop_ih
                         sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert"));
                         sb.AppendLine("using " + LoopIndHypName(loopSuc) + " apply simp");
                         sb.AppendLine("apply simp");
@@ -539,6 +610,31 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine("by (simp add: member_rec(2))");
 
             return new Proof(new List<string> {sb.ToString()});
+        }
+
+
+        private Proof GenerateProofLoopHead(
+            Block beforeBlock,
+            Block afterBlock,
+            Term modVars,
+            Func<Block, string> blockLemmaName,
+            Func<Block, string> cfgLemmaName,
+            IEnumerable<Block> successors)
+        {
+           StringBuilder sb = new StringBuilder();
+           sb.AppendLine("using " + redCfgName + " " + dagAssmsName + " " + dagVerifiesName);
+           sb.AppendLine("proof (induction j arbitrary: ns1 rule: less_induct)");
+           sb.AppendLine("case (less j)");
+           sb.AppendLine("show ?case");
+           sb.AppendLine("case 0 with less.prems(1) show ?thesis by auto");
+           sb.AppendLine("next");
+           sb.AppendLine("Suc j'");
+           string stateRelFact = "StateRel1";
+           sb.AppendLine("from less(3) have " + stateRelFact + ":");
+           sb.Append(NstateSameOn(normalInitState1, normalInitState2, IsaCommonTerms.SetOfList(modVars)));
+           sb.AppendLine("show ?thesis");
+           
+           throw new NotImplementedException();
         }
 
         private Term DagVerifiesCfgAssumption(

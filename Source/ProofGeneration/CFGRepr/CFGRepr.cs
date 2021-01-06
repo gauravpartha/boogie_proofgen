@@ -14,8 +14,13 @@ namespace ProofGeneration.CFGRepresentation
         private readonly Block [] blocks;
         public readonly Block entry;
 
-        //labeling must give topological order from 0 to num_of_blocks-1, if the CFG is acyclic
-        //FIXME: make this more robust
+        //TODO: make this more robust
+
+        /// <param name="outgoingBlocks">successor relationship</param>
+        /// <param name="labeling">labeling must give topological order from 0 to num_of_blocks-1, if the CFG is acyclic:
+        /// label(block1) is larger than label(block2) if there is a path from block1 to block2
+        /// </param>
+        /// <param name="entry">entry block of CFG</param>
         public CFGRepr(IDictionary<Block, IList<Block>> outgoingBlocks, IDictionary<Block, int> labeling, Block entry)
         {
             Contract.Requires(labeling.Count == labeling.Values.Count && labeling.Values.Count == outgoingBlocks.Count);
@@ -44,6 +49,10 @@ namespace ProofGeneration.CFGRepresentation
             return outgoingBlocks[b].Count;
         }
 
+        /// <summary>
+        /// Returns a unique integer identifier for the input block and if the CFG is acylic, ensures that
+        /// label(block1) is larger than label(block2) if there is a path from block1 to block2
+        /// </summary>
         public int GetUniqueIntLabel(Block b)
         {
             return labeling[b];
