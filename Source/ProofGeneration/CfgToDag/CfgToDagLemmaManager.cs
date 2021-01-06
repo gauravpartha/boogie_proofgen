@@ -38,6 +38,8 @@ namespace ProofGeneration.CfgToDag
         private readonly string dagVerifiesName = "DagVerifies";
         private readonly string dagAssmsName = "dagAssmsName";
         
+        string stateRelLoopHeadName = "StateRel1";
+        
         private readonly IsaUniqueNamer namer = new IsaUniqueNamer();
         
         public CfgToDagLemmaManager(
@@ -70,7 +72,7 @@ namespace ProofGeneration.CfgToDag
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(new IsaUniqueNamer(), varFactory);
         }
 
-        private Term HavocedVarsTerm(IEnumerable<Variable> vars)
+        private TermList HavocedVarsTerm(IEnumerable<Variable> vars)
         {
            return new TermList(
                vars.Select(x =>
@@ -276,7 +278,38 @@ namespace ProofGeneration.CfgToDag
                 }
             }
             
-            
+            var localLemmas = new List<LemmaDecl>();
+            #region modified variables
+            Block loopMod = null;
+            TermList loopModTermList = null;
+            if (loops.Any())
+            {
+                /* If the loop is within multiple loops, we need to find the current loop (i.e., the most inner one) to know
+                 * what variables are allowed to be modified.
+                 * Since the CFG after the CFG-to-DAG transformation is acyclic, we can use the unique labels, which ensure that
+                 * if a block occurs before another one, then it has a larger label.
+                 * Hence it is sufficient to pick the active loop with the largest label, because all active loops of a block
+                 * must be related in some way. If this were not the case, then it would be possible to enter some loop
+                 * via two different paths, which cannot happen for reducible CFGs.
+                 */
+                loopMod = loops.OrderByDescending(
+                    beforeLoopHead =>
+                    afterDagCfg.GetUniqueIntLabel(beforeToAfterBlock[beforeLoopHead])).Last();
+            }
+            if (hintManager.IsLoopHead(beforeDag, out _))
+            {
+                loopMod = beforeDag;
+            }
+                
+            if(loopMod != null)
+            {
+                var hint = hintManager.GetLoopHead(loopMod);
+                loopModTermList = HavocedVarsTerm(hint.ModifiedVars);
+                localLemmas.Add(BlockModVarsLemma(BlockModVarsLemmaName(beforeDag), beforeCmds, beforeCmdsDefName, loopModTermList)); 
+            }
+            #endregion
+
+
             var postInvs = new TermList(postInvsList);
 
             #region local block lemma
@@ -389,17 +422,18 @@ namespace ProofGeneration.CfgToDag
             Proof cfgProof;
             if (blockHeadHint == null)
             {
-                cfgProof = GenerateProofNonLoopHead(beforeDag, afterDag, blockLemmaName, cfgLemmaName, successors);
+                var proofData = new NonLoopHeadProofData(
+                    redCfgName,
+                    dagAssmsName,
+                    dagVerifiesName,
+                    LoopIndHypName
+                    );
+                cfgProof = GenerateProofBody(beforeDag, afterDag, proofData, blockLemmaName, cfgLemmaName, successors);
             }
             else
             {
                 cfgProof =
-                    new Proof(
-                    new List<string>
-                    {
-                        "sorry"
-                    }
-                );
+                    GenerateProofLoopHead(beforeDag, afterDag, loopModTermList, blockLemmaName, cfgLemmaName, successors);
             }
             
             LemmaDecl cfgLemma = new LemmaDecl(
@@ -411,35 +445,8 @@ namespace ProofGeneration.CfgToDag
             
             #endregion
 
-            var localLemmas = new List<LemmaDecl>();
             localLemmas.Add(blockLemma);
-            
-            Block loopMod = null;
-            if (loops.Any())
-            {
-                /* If the loop is within multiple loops, we need to find the current loop (i.e., the most inner one) to know
-                 * what variables are allowed to be modified.
-                 * Since the CFG after the CFG-to-DAG transformation is acyclic, we can use the unique labels, which ensure that
-                 * if a block occurs before another one, then it has a larger label.
-                 * Hence it is sufficient to pick the active loop with the largest label, because all active loops of a block
-                 * must be related in some way. If this were not the case, then it would be possible to enter some loop
-                 * via two different paths, which cannot happen for reducible CFGs.
-                 */
-                loopMod = loops.OrderByDescending(
-                    beforeLoopHead =>
-                    afterDagCfg.GetUniqueIntLabel(beforeToAfterBlock[beforeLoopHead])).Last();
-            }
-            if (hintManager.IsLoopHead(beforeDag, out _))
-            {
-                loopMod = beforeDag;
-            }
-                
-            if(loopMod != null)
-            {
-                var hint = hintManager.GetLoopHead(loopMod);
-                localLemmas.Add(BlockModVarsLemma(BlockModVarsLemmaName(beforeDag), beforeCmds, beforeCmdsDefName, HavocedVarsTerm(hint.ModifiedVars))); 
-            }
-
+  
             return new Tuple<IEnumerable<LemmaDecl>, LemmaDecl>(localLemmas, cfgLemma);
         }
 
@@ -463,20 +470,34 @@ namespace ProofGeneration.CfgToDag
             return new LemmaDecl(lemmaName, statement, proof);
         }
 
-        private Proof GenerateProofNonLoopHead(
+        private Proof GenerateProofBody(
             Block beforeBlock,
             Block afterBlock,
+            ICfgToDagProofData proofData,
             Func<Block, string> blockLemmaName,
             Func<Block, string> cfgLemmaName,
             IEnumerable<Block> successors)
         {
-            var sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder();
+            GenerateProofBody(sb, false, beforeBlock, afterBlock, proofData, blockLemmaName, cfgLemmaName, successors);
+            return new Proof(new List<string> {sb.ToString()});
+        }
+        private void GenerateProofBody(
+            StringBuilder sb,
+            bool isLoopHead,
+            Block beforeBlock,
+            Block afterBlock,
+            ICfgToDagProofData proofData,
+            Func<Block, string> blockLemmaName,
+            Func<Block, string> cfgLemmaName,
+            IEnumerable<Block> successors)
+        {
             var loops = blocksToLoops[beforeBlock];
-            var helperThm = loops.Any() ? "cfg_dag_helper_2" : "cfg_dag_helper_1";
+            var helperThm = (loops.Any() || isLoopHead) ? "cfg_dag_helper_2" : "cfg_dag_helper_1";
 
             sb.AppendLine(ProofUtil.Apply(
                 ProofUtil.Rule(
-                    ProofUtil.OF(helperThm, redCfgName, "_", "_", dagVerifiesName, dagAssmsName))));
+                    ProofUtil.OF(helperThm, proofData.RedCfgAssmName(), "_", "_", proofData.DagVerifiesName(), proofData.DagAssmName()))));
             sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(beforeDagProgAccess.BlockInfo()
                 .BlockCmdsMembershipLemma(beforeBlock))));
             sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(afterDagProgAccess.BlockInfo()
@@ -485,7 +506,7 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine(ProofUtil.Apply("rule " + blockLemmaName(beforeBlock)));
             sb.AppendLine(ProofUtil.Apply("assumption+"));
 
-            if (loops.Any())
+            if (loops.Any() || isLoopHead)
                 sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(BlockModVarsLemmaName(beforeBlock))));
 
             sb.AppendLine(
@@ -500,6 +521,8 @@ namespace ProofGeneration.CfgToDag
                 if (loops.Contains(bSuc))
                 {
                     //backedge --> need to apply IH
+                    if(bSuc == beforeBlock)
+                        throw new ProofGenUnexpectedStateException("Do not support edges from a block to itself");
 
                     /* We need to check whether a new backedge block was added, which contains the assertion of the invariant.
                        If so, then we need to get the invariant satisfiability from that block.
@@ -522,9 +545,8 @@ namespace ProofGeneration.CfgToDag
                         }
                     }
 
-
                     sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule("loop_ih_apply[where ?j'=\"j-1\"]")));
-                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(LoopIndHypName(bSuc))));
+                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(proofData.LoopIndHypName(bSuc))));
                     sb.AppendLine(ProofUtil.Apply("simp, simp"));
                     sb.AppendLine("unfolding dag_lemma_assms_def");
                     sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
@@ -593,25 +615,68 @@ namespace ProofGeneration.CfgToDag
                     
                     sb.AppendLine(ProofUtil.Apply("fastforce"));
                     sb.AppendLine(ProofUtil.Apply("simp"));
-                    //if successor is inside a subset of the loops that we the current block is in, then need to propagate the induction hypotheses
+                    /* We need to prove all the induction hypotheses for the loops that the successor is in.
+                     * We can be sure that every loop that the successor is, the current block is in too (since the CFG is reducible).
+                     * Thus, we just need to propagate the induction hypotheses.
+                     * If the current block B is a loop head, then a slightly different proof needs to be used to propagate the induction
+                     * hypothesis of B.
+                     */
                     var loopsSuc = blocksToLoops[bSuc];
-                    // we can be sure that every loop that the successor is in, the current block is in too (since the CFG is reducible)
                     foreach (var loopSuc in loopsSuc)
                     {
-                        //TODO: if we are in multiple loops need to take into account that modified vars are a subset of those specified in loop_ih
-                        sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert"));
-                        sb.AppendLine("using " + LoopIndHypName(loopSuc) + " apply simp");
-                        sb.AppendLine("apply simp");
+                        if (loopSuc != beforeBlock)
+                        {
+                            if (loops.Count == 1 && !isLoopHead)
+                            {
+                                sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_pred"));
+                                sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) + " apply simp");
+                                sb.AppendLine("apply simp");
+                            }
+                            else
+                            {
+                                /* we are in multiple loops, hence need to take into account that modified vars associated
+                                 * with the active loop is subset of those specified in loop_ih
+                                 */
+                                sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_pred"));
+                                sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) + " apply simp");
+                                sb.AppendLine("apply (assumption, simp)");
+                            }
+                        }
+                        else
+                        {
+                            //we need to prove the induction hypothesis of the current loop head block
+                            ProveLoopHeadInductionHyp(sb, beforeBlock, proofData, loopsSuc);
+                        }
                     }
-
                 }
             }
 
             sb.AppendLine("by (simp add: member_rec(2))");
-
-            return new Proof(new List<string> {sb.ToString()});
         }
 
+        private void ProveLoopHeadInductionHyp(StringBuilder sb, Block loopHead, ICfgToDagProofData proofData, IList<Block> loopsSuc)
+        {
+            foreach (Block b in loopsSuc)
+            {
+                if (b == loopHead)
+                {
+                    sb.AppendLine(ProofUtil.Apply("rule loop_ih_prove"));
+                    sb.AppendLine(ProofUtil.Apply("rule less.IH"));
+                    sb.AppendLine(ProofUtil.Apply("erule strictly_smaller_helper, assumption, assumption"));
+                    sb.AppendLine("unfolding dag_lemma_assms_def");
+                    sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
+                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("nstate_same_on_transitive_2", "_",
+                        "_", stateRelLoopHeadName)));
+                    sb.AppendLine(ProofUtil.Apply("(fastforce, simp, simp)"));
+                }
+                else
+                {
+                    sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_smaller_2"));
+                    sb.AppendLine("using " + proofData.LoopIndHypName(b) + " apply simp");
+                    sb.AppendLine(ProofUtil.Apply("simp, fastforce, assumption, simp"));
+                }
+            }
+        }
 
         private Proof GenerateProofLoopHead(
             Block beforeBlock,
@@ -622,19 +687,26 @@ namespace ProofGeneration.CfgToDag
             IEnumerable<Block> successors)
         {
            StringBuilder sb = new StringBuilder();
-           sb.AppendLine("using " + redCfgName + " " + dagAssmsName + " " + dagVerifiesName);
+           var loops = blocksToLoops[beforeBlock];
+           sb.AppendLine("using " + redCfgName + " " + dagAssmsName + (loops.Any() ? " assms(4-)" : ""));
            sb.AppendLine("proof (induction j arbitrary: ns1 rule: less_induct)");
            sb.AppendLine("case (less j)");
            sb.AppendLine("show ?case");
+           sb.AppendLine("proof (cases j)");
            sb.AppendLine("case 0 with less.prems(1) show ?thesis by auto");
            sb.AppendLine("next");
-           sb.AppendLine("Suc j'");
-           string stateRelFact = "StateRel1";
-           sb.AppendLine("from less(3) have " + stateRelFact + ":");
-           sb.Append(NstateSameOn(normalInitState1, normalInitState2, IsaCommonTerms.SetOfList(modVars)));
+           sb.AppendLine("case (Suc j')");
+           sb.Append("from less(3) have " + stateRelLoopHeadName + ":");
+           sb.Append("\"" +NstateSameOn(normalInitState1, normalInitState2, IsaCommonTerms.SetOfList(modVars)) + "\"");
+           sb.AppendLine("by (simp add: dag_lemma_assms_def)");
            sb.AppendLine("show ?thesis");
            
-           throw new NotImplementedException();
+           var proofData = new LoopHeadProofData(dagVerifiesName, loops);
+
+           GenerateProofBody(sb, true, beforeBlock, afterBlock, proofData, blockLemmaName, cfgLemmaName, successors);
+           sb.AppendLine("qed");
+           sb.AppendLine("qed");
+           return new Proof(new List<string> {sb.ToString()});
         }
 
         private Term DagVerifiesCfgAssumption(
@@ -753,6 +825,5 @@ namespace ProofGeneration.CfgToDag
         {
             return "Mods_" + namer.GetName(b, b.Label);
         }
-            
     }
 }
