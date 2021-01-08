@@ -667,6 +667,7 @@ namespace VC
           Block unifiedExit;
           unifiedExit = new Block(new Token(-17, -4), unifiedExitLabel, new List<Cmd>(),
             new ReturnCmd(impl.StructuredStmts != null ? impl.StructuredStmts.EndCurly : Token.NoToken));
+          ProofGenerationLayer.CreateUnifiedExitBlock(unifiedExit);
           Contract.Assert(unifiedExit != null);
           foreach (Block b in impl.Blocks)
           {
@@ -685,6 +686,10 @@ namespace VC
 
           exitBlock = unifiedExit;
           impl.Blocks.Add(unifiedExit);
+        }
+        else
+        {
+          ProofGenerationLayer.CreateUnifiedExitBlock(null);
         }
 
         Contract.Assert(exitBlock != null);

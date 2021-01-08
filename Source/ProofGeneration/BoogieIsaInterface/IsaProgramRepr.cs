@@ -9,9 +9,13 @@
         public readonly string constantsDeclDef;
         public readonly string paramsDeclDef;
         public readonly string localVarsDeclDef;
+        public readonly string preconditionsDeclDef;
+        public readonly string postconditionsDeclDef;
 
         public IsaProgramRepr(string funcsDeclDef, 
             string axiomsDeclDef, 
+            string preconditionsDeclDef,
+            string postconditionsDeclDef,
             string globalsDeclDef, 
             string constantsDeclDef, 
             string paramsDeclDef, 
@@ -25,6 +29,8 @@
             this.cfgDeclDef = cfgDeclDef;
             this.paramsDeclDef = paramsDeclDef;
             this.localVarsDeclDef = localVarsDeclDef;
+            this.preconditionsDeclDef = preconditionsDeclDef;
+            this.postconditionsDeclDef = postconditionsDeclDef;
         }
     }
 }

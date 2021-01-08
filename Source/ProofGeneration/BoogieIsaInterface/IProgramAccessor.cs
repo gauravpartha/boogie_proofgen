@@ -9,6 +9,11 @@ namespace ProofGeneration.BoogieIsaInterface
         
         public Term FunctionsDecl();
         public Term AxiomsDecl();
+        public Term PreconditionsDecl();
+        public string PreconditionsDeclName();
+        public Term PostconditionsDecl();
+        public string PostconditionsDeclName();
+        
         public Term CfgDecl();
 
         //params + local variables

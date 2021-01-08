@@ -78,12 +78,6 @@ namespace ProofGeneration.CfgToDag
                 );
 
             BasicCmdIsaVisitor cmdIsaVisitor = new BasicCmdIsaVisitor(varFactory);
-
-            Term posts = new TermList(beforeDagData.Postcondtions.Select(post => cmdIsaVisitor.Translate(post)).ToList());
-            DefDecl postsDef = new DefDecl(
-                "posts",
-                new Tuple<IList<Term>, Term>(new List<Term>(), posts)
-                );
             
             CfgToDagLemmaManager lemmaManager = new CfgToDagLemmaManager(
                 beforeDagProgAccess, 
@@ -94,16 +88,18 @@ namespace ProofGeneration.CfgToDag
                 blocksToLoops,
                 beforeToAfter,
                 beforeDagData,
-                postsDef,
                 afterUniqueExit,
                 varFactory);
             
             var lemmaNamer = new IsaUniqueNamer();
             var outerDecls = new List<OuterDecl>();
             
-            outerDecls.Add(postsDef);
             outerDecls.Add(varContextAbbrev);
             outerDecls.Add(new DeclareDecl("Nat.One_nat_def[simp del]"));
+            if (afterUniqueExit != null)
+            {
+                outerDecls.Add(lemmaManager.UnifiedExitLemma(GetCfgLemmaName(afterUniqueExit, lemmaNamer)));
+            }
             
             foreach (Block afterBlock in afterDagCfg.GetBlocksBackwards())
             {

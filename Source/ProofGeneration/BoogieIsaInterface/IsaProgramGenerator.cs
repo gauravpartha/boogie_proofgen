@@ -18,13 +18,15 @@ namespace ProofGeneration
         public bool GenerateAxioms;
         public bool GenerateGlobals;
         public bool GenerateConstants;
+        public bool GenerateSpecs;
 
         public IsaProgramGeneratorConfig(
             IProgramAccessor parent,
             bool generateFunctions,
             bool generateAxioms,
             bool generateGlobals,
-            bool generateConstants
+            bool generateConstants,
+            bool generateSpecs
         )
         {
             ParentAccessor = parent;
@@ -32,6 +34,7 @@ namespace ProofGeneration
             GenerateAxioms = generateAxioms;
             GenerateGlobals = generateGlobals;
             GenerateConstants = generateConstants;
+            GenerateSpecs = generateSpecs;
         }
     }
     
@@ -64,8 +67,6 @@ namespace ProofGeneration
             OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, methodData.Locals);
 
             //TermList modifiedVariables = new TermList(new List<Term>()); //TODO
-            //OuterDecl preconditions = GetPreconditionsIsa(procName, methodData.Preconditions);
-            //OuterDecl postconditions = GetPostconditionsIsa(procName, methodData.Postcondtions);
 
             Term methodBodyCFG =
                 IsaBoogieTerm.MethodCFGBody(
@@ -86,8 +87,6 @@ namespace ProofGeneration
                 IsaCommonTerms.TermIdentFromName(methodBodyDecl.name)
                     );
             */
-
-            //TODO: global variables
             /*
             Term program = IsaBoogieTerm.Program(IsaCommonTerms.TermIdentFromName(funcs.name),
                 new TermList(new List<Term>()),
@@ -108,6 +107,8 @@ namespace ProofGeneration
             var isaProgramRepr = new IsaProgramRepr(
                             FunctionDeclarationsName(procName), 
                             AxiomDeclarationsName(procName), 
+                            PreconditionDeclarationName(procName),
+                            PostconditionDeclarationName(procName),
                             VariableDeclarationsName("globals", procName),
                             VariableDeclarationsName("constants", procName),
                             parameters.name,
@@ -130,6 +131,14 @@ namespace ProofGeneration
             {
                 decls.Add(GetFunctionDeclarationsIsa(procName, methodData.Functions));
                 membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions);
+            }
+
+            if (config.GenerateSpecs)
+            {
+                OuterDecl preconditions = GetExprListIsa(PreconditionDeclarationName(procName), methodData.Preconditions);
+                OuterDecl postconditions = GetExprListIsa(PostconditionDeclarationName(procName), methodData.Postconditions);
+                decls.Add(preconditions);
+                decls.Add(postconditions);
             }
             
             // for globals and constants we still generate the type lookup lemmas, but not the membership lemmas,
@@ -292,6 +301,16 @@ namespace ProofGeneration
             return "fdecls_" + methodName;
         }
 
+        private string PreconditionDeclarationName(string methodName)
+        {
+            return "pres";
+        }
+        
+        private string PostconditionDeclarationName(string methodName)
+        {
+            return "post";
+        }
+
         private DefDecl GetVariableDeclarationsIsa(string varKind, string methodName, IEnumerable<Variable> variables)
         {
             var typeIsaVisitor = new TypeIsaVisitor(varTranslation.TypeVarTranslation);
@@ -320,22 +339,12 @@ namespace ProofGeneration
             return varKind + "_vdecls_" + methodName;
         }
 
-        private DefDecl GetPreconditionsIsa(string methodName, IEnumerable<Requires> pres)
-        {
-            return GetExprListIsa("pre_"+methodName, new Func<Requires,Expr>(r => r.Condition), pres);
-        }
-
-        private DefDecl GetPostconditionsIsa(string methodName, IEnumerable<Ensures> post)
-        {
-            return GetExprListIsa("post_"+methodName, new Func<Ensures,Expr>(r => r.Condition), post);
-        }
-
-        private DefDecl GetExprListIsa<T>(string declName, Func<T, Expr> elemToExpr, IEnumerable<T> elems)
+        private DefDecl GetExprListIsa(string declName, IEnumerable<Expr> exprs)
         {
             var result = new List<Term>();
-            foreach (var elem in elems)
+            foreach (var expr in exprs)
             {
-               result.Add(cmdIsaVisitor.Translate(elemToExpr(elem)).First()); 
+               result.Add(cmdIsaVisitor.Translate(expr).First()); 
             }
             return new DefDecl(declName, new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(result)));
         }

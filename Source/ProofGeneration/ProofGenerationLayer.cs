@@ -304,7 +304,7 @@ namespace ProofGeneration
             
             #region before cfg to dag program
             string beforeCfgToDagTheoryName = afterPassificationImpl.Name + "_before_cfg_to_dag_prog";
-            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(null, true,true, true, true);
+            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(null, true,true, true, true, true);
             var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName, 
                 afterPassificationImpl.Name, 
@@ -318,7 +318,7 @@ namespace ProofGeneration
             //Console.WriteLine("**Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             
             string beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
-            var beforePassiveConfig = new IsaProgramGeneratorConfig(null, true,true, true, true);
+            var beforePassiveConfig = new IsaProgramGeneratorConfig(null, true,true, true, true, false);
             var beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName, 
                 afterPassificationImpl.Name, 
                 beforePassiveData, beforePassiveConfig, varTranslationFactory2, 
@@ -355,7 +355,7 @@ namespace ProofGeneration
             varTranslationFactory = new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
             string finalProgTheoryName = afterPassificationImpl.Name + "_passive_prog";
-            var passiveProgConfig = new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, false);
+            var passiveProgConfig = new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, false, false);
             var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName, 
                 afterPassificationImpl.Name, 
                 finalProgData, passiveProgConfig, varTranslationFactory, 
@@ -423,7 +423,11 @@ namespace ProofGeneration
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
             StoreTheory(beforeCfgToDagProgTheory);
 
-            Block uniqueExitBlock = beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key;
+            Block uniqueExitBlock =
+                uniqueExitBlockOrig != null
+                    ? beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key
+                    : null;
+                
 
             Theory cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 afterPassificationImpl.Name+"_cfg_to_dag_proof",

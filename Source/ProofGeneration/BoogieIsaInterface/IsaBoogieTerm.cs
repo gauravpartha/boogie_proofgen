@@ -46,6 +46,7 @@ namespace ProofGeneration
         private readonly static TermIdent stateWfId = IsaCommonTerms.TermIdentFromName("state_typ_wf");
         private readonly static TermIdent axiomsSatId = IsaCommonTerms.TermIdentFromName("axioms_sat");
         private readonly static TermIdent exprSatId = IsaCommonTerms.TermIdentFromName("expr_sat");
+        private readonly static TermIdent exprAllSatId = IsaCommonTerms.TermIdentFromName("expr_all_sat");
 
         private readonly static TermIdent typeOfValId = IsaCommonTerms.TermIdentFromName("type_of_val");
 
@@ -550,6 +551,12 @@ namespace ProofGeneration
         {
             return new TermApp(exprSatId, 
                 new List<Term> { boogieContext.absValTyMap, boogieContext.varContext, boogieContext.funContext, boogieContext.rtypeEnv, normalState });
+        }
+        
+        public static Term ExprAllSat(BoogieContextIsa boogieContext, Term normalState, Term exprs)
+        {
+            return new TermApp(exprAllSatId, 
+                new List<Term> { boogieContext.absValTyMap, boogieContext.varContext, boogieContext.funContext, boogieContext.rtypeEnv, normalState, exprs});
         }
         
         public static Term AxiomAssm(Term absValTyMap, Term funContext, Term consts, Term normalState, Term axioms)

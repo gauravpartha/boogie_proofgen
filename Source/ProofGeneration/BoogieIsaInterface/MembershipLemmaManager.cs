@@ -104,6 +104,38 @@ namespace ProofGeneration.BoogieIsaInterface
             return parent.AxiomsDecl();
         }
 
+        public Term PreconditionsDecl()
+        {
+            if (config.GenerateSpecs)
+                return QualifyAccessTerm(isaProgramRepr.preconditionsDeclDef);
+
+            return parent.PreconditionsDecl();
+        }
+
+        public string PreconditionsDeclName()
+        {
+            if (config.GenerateSpecs)
+                return QualifyAccessName(isaProgramRepr.preconditionsDeclDef);
+
+            return parent.PreconditionsDeclName();
+        }
+
+        public Term PostconditionsDecl()
+        {
+            if (config.GenerateSpecs)
+                return QualifyAccessTerm(isaProgramRepr.postconditionsDeclDef);
+
+            return parent.PostconditionsDecl();
+        }
+
+        public string PostconditionsDeclName()
+        {
+            if (config.GenerateSpecs)
+                return QualifyAccessName(isaProgramRepr.postconditionsDeclDef);
+
+            return parent.PostconditionsDeclName();
+        }
+        
         public Term CfgDecl()
         {
             return QualifyAccessTerm(isaProgramRepr.cfgDeclDef);

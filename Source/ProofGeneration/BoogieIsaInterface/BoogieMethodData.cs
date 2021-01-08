@@ -19,7 +19,7 @@ namespace ProofGeneration.BoogieIsaInterface
         //public IEnumerable<Variable> OutParams { get; }
         public IEnumerable<IdentifierExpr> ModifiedVars { get; }
         public IEnumerable<Expr> Preconditions { get; }
-        public IEnumerable<Expr> Postcondtions { get; }
+        public IEnumerable<Expr> Postconditions { get; }
 
         public BoogieMethodData(
             BoogieGlobalData globalData,
@@ -38,7 +38,7 @@ namespace ProofGeneration.BoogieIsaInterface
             //this.OutParams = outParams;
             this.ModifiedVars = modifies;
             this.Preconditions = pres;
-            this.Postcondtions = posts;
+            this.Postconditions = posts;
         }
 
         public static BoogieMethodData CreateEmpty()

@@ -44,8 +44,6 @@ namespace ProofGeneration.CfgToDag
         private readonly IsaUniqueNamer namer = new IsaUniqueNamer();
 
         private BoogieMethodData beforeDagData;
-        private DefDecl postsDef;
-        private Term postsDefTerm;
         
         //afterExitBlock is non-null iff afterExitBlock is a newly generated unique exit block after the CFG-to-DAG transformation
         public CfgToDagLemmaManager(
@@ -57,7 +55,6 @@ namespace ProofGeneration.CfgToDag
             IDictionary<Block, IList<Block>> blocksToLoops,
             IDictionary<Block, Block> beforeToAfterBlock,
             BoogieMethodData beforeDagData,
-            DefDecl postsDef,
             Block afterExitBlock,
             IVariableTranslationFactory varFactory
         )
@@ -70,8 +67,6 @@ namespace ProofGeneration.CfgToDag
             this.blocksToLoops = blocksToLoops;
             this.beforeToAfterBlock = beforeToAfterBlock;
             this.beforeDagData = beforeDagData;
-            this.postsDef = postsDef;
-            this.postsDefTerm = IsaCommonTerms.TermIdentFromName(postsDef.name);
             this.afterExitBlock = afterExitBlock;
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
@@ -135,6 +130,7 @@ namespace ProofGeneration.CfgToDag
             Term dagVerifiesCfgAssm =
                 DagVerifiesCfgAssumption(
                     new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDag]),
+                    normalInitState2,
                     finalNodeId2,
                     finalStateId2,
                     false);
@@ -147,12 +143,7 @@ namespace ProofGeneration.CfgToDag
                 normalInitState2,
                 IsaCommonTerms.EmptySet));
 
-            assumptions.Add(new TermApp(
-                IsaCommonTerms.TermIdentFromName("state_well_typed"),
-                boogieContext.absValTyMap,
-                boogieContext.varContext,
-                boogieContext.rtypeEnv,
-                normalInitState1));
+            assumptions.Add(StateWellTyped(normalInitState1));
 
             Term conclusion = IsaCommonTerms.TermIdentFromName("R");
             Term propagationAssm = conclusion;
@@ -170,6 +161,7 @@ namespace ProofGeneration.CfgToDag
                 Term dagVerifiesCfgAssmSuc=
                     DagVerifiesCfgAssumption(
                         new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDagSuccessor]),
+                        normalInitState2,
                         finalNodeId2,
                         finalStateId2); 
                 
@@ -242,12 +234,58 @@ namespace ProofGeneration.CfgToDag
                     modSet);
         }
 
-        public Tuple<LemmaDecl, LemmaDecl> UnifiedExitLemma()
+        private Term StateWellTyped(Term normalState)
         {
-            if(afterDagCfg == null)
-                throw new ProofGenUnexpectedStateException("incorrect state: assuming that there is no unified exit");
+            return new TermApp(
+                IsaCommonTerms.TermIdentFromName("state_well_typed"),
+                boogieContext.absValTyMap,
+                boogieContext.varContext,
+                boogieContext.rtypeEnv,
+                normalState);
+        }
 
-            return null;
+        public LemmaDecl UnifiedExitLemma(string lemmaName)
+        {
+            if(afterExitBlock == null)
+                throw new ProofGenUnexpectedStateException("incorrect state: assuming that there is no unified exit");
+            
+            var finalNodeId2 = new SimpleIdentifier("m2'");
+            var finalStateId2 = new SimpleIdentifier("s2'");
+            
+            Term dagVerifiesCfgAssm =
+                DagVerifiesCfgAssumption(
+                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterExitBlock]),
+                    normalInitState2,
+                    finalNodeId2,
+                    finalStateId2);
+            
+            //this assumption is required to prove that the invariants reduce
+            Term stateWt = StateWellTyped(normalInitState2);
+                
+            var cfgAssumptions = new List<Term> { 
+                dagVerifiesCfgAssm,
+                stateWt
+            };
+
+            Term conclusion = IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState2, beforeDagProgAccess.PostconditionsDecl());
+            
+            return 
+                new LemmaDecl(
+                    lemmaName,
+                    ContextElem.CreateWithAssumptions(cfgAssumptions),
+                    conclusion,
+                    new Proof(new List<string>
+                    {
+                        "unfolding expr_all_sat_def",
+                        ProofUtil.Apply("rule cfg_dag_rel_post_invs_3"),
+                        "apply (erule assms(1))",
+                        ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterExitBlock)),
+                        "subgoal",
+                        "sorry",
+                        "unfolding " + beforeDagProgAccess.PostconditionsDeclName()+"_def " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterExitBlock)+"_def",
+                        "by cfg_dag_rel_tac_single+"
+                    })
+                );
         }
 
         /// <summary>
@@ -298,11 +336,11 @@ namespace ProofGeneration.CfgToDag
                 }
             }
 
-            if (!successors.Any())
+            if (!successors.Any() && afterExitBlock == null)
             {
                //postcondition is at the end 
                postInvsList.AddRange(
-                   beforeDagData.Postcondtions.Select(post => basicCmdIsaVisitor.Translate(post))
+                   beforeDagData.Postconditions.Select(post => basicCmdIsaVisitor.Translate(post))
                    );
             }
             
@@ -420,6 +458,7 @@ namespace ProofGeneration.CfgToDag
             Term dagVerifiesCfgAssm =
                 DagVerifiesCfgAssumption(
                     new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterBlock]),
+                    normalInitState2,
                     finalNodeId2,
                     finalStateId2);
             
@@ -452,7 +491,7 @@ namespace ProofGeneration.CfgToDag
             { 
                 //TODO: distinguish scenarios
                //unique exit block that was not generated as part of the transformation
-               cfgProof = GenerateProofExitNode(beforeBlock, afterBlock, blockLemmaName);
+               cfgProof = GenerateProofExitNode(beforeBlock, afterBlock, blockLemmaName, cfgLemmaName);
             } else if (blockHeadHint == null)
             {
                 var proofData = new NonLoopHeadProofData(
@@ -491,7 +530,7 @@ namespace ProofGeneration.CfgToDag
                     boogieContext.varContext,
                     boogieContext.funContext,
                     boogieContext.rtypeEnv,
-                    postsDefTerm,
+                    beforeDagProgAccess.PostconditionsDecl(),
                     finalNode,
                     finalState);
         }
@@ -728,7 +767,8 @@ namespace ProofGeneration.CfgToDag
         private Proof GenerateProofExitNode(
             Block beforeBlock,
             Block afterBlock,
-            Func<Block,string> blockLemmaName
+            Func<Block,string> blockLemmaName,
+            Func<Block, string> cfgLemmaName
         )
         {
             StringBuilder sb = new StringBuilder();
@@ -742,7 +782,7 @@ namespace ProofGeneration.CfgToDag
                                               afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterBlock)));
                 sb.AppendLine(ProofUtil.Apply("erule " + dagVerifiesName));
                 sb.AppendLine(ProofUtil.Apply("rule " + dagAssmsName));
-                sb.AppendLine("unfolding " + postsDef.name + "_def");
+                sb.AppendLine("unfolding " + beforeDagProgAccess.PostconditionsDeclName() + "_def");
                 sb.AppendLine(ProofUtil.Apply("rule " + blockLemmaName(beforeBlock)));
                 sb.AppendLine("apply assumption+");
                 sb.AppendLine(
@@ -750,7 +790,22 @@ namespace ProofGeneration.CfgToDag
             }
             else
             {
-                sb.AppendLine("sorry");
+                sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("cfg_dag_helper_return_2", redCfgName)));
+                sb.AppendLine(ProofUtil.Apply("rule " +
+                                              beforeDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock)));
+                sb.AppendLine(
+                    ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterBlock)));
+                sb.AppendLine(ProofUtil.Apply("erule " + dagVerifiesName));
+                sb.AppendLine(ProofUtil.Apply("rule " + dagAssmsName));
+                sb.AppendLine(ProofUtil.Apply("erule " + blockLemmaName(beforeBlock)));
+                sb.AppendLine("apply assumption+");
+                sb.AppendLine(ProofUtil.Apply("rule " +
+                                              beforeDagProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock)));
+                
+                sb.AppendLine(ProofUtil.Apply("rule " +
+                                              afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock)));
+                sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(afterExitBlock)));
+                sb.AppendLine("by assumption");
             }
 
             return new Proof(new List<string> {sb.ToString()});
@@ -789,6 +844,7 @@ namespace ProofGeneration.CfgToDag
 
         private Term DagVerifiesCfgAssumption(
             Term initialStateNode,
+            Term initialNormalState,
             Identifier finalNodeId2, 
             Identifier finalStateId2,
             bool useMetaConnectives = true
@@ -817,7 +873,7 @@ namespace ProofGeneration.CfgToDag
                     impliesConstructor(
                         IsaBoogieTerm.RedCFGMulti(boogieContext, afterDagProgAccess.CfgDecl(),
                             IsaBoogieTerm.CFGConfigNode(
-                                    initialStateNode, IsaBoogieTerm.Normal(normalInitState2)
+                                    initialStateNode, IsaBoogieTerm.Normal(initialNormalState)
                             ),
                             IsaBoogieTerm.CFGConfig(finalNode2, finalState2)
                         ),
@@ -886,7 +942,7 @@ namespace ProofGeneration.CfgToDag
                 cfg,
                 modVars,
                 invs,
-                postsDefTerm,
+                beforeDagProgAccess.PostconditionsDecl(),
                 normalState,
                 finalState,
                 loopHeadNode,
