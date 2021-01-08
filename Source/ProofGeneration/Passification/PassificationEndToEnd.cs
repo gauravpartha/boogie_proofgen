@@ -362,7 +362,7 @@ namespace ProofGeneration.Passification
                             programAccessor.GlobalsAtMostMax()),
                         "apply simp",
                         ProofUtil.Apply(ProofUtil.Rule(u0NonEmpty.name)),
-                        ProofUtil.By(ProofUtil.SimpAll(stateRelDefName + "_def", stateRelListDefName + "_def")),
+                        ProofUtil.By(ProofUtil.SimpAll(stateRelDefName + "_def", stateRelListDefName + "_def"))+"?",
                         "with A1 obtain u mp' where uElem: " + Inner(IsaCommonTerms.Elem(u, u0Set)) + " and " +
                           "AredPassive:" + 
                         Inner(IsaBoogieTerm.RedCFGMulti(
