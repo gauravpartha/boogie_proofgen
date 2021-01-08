@@ -1976,7 +1976,6 @@ namespace VC
 
       #region proofgen
       ProofGeneration.ProofGenerationLayer.Program(program);
-      ProofGeneration.ProofGenerationLayer.BeforeCFGToDAG(impl);
       #endregion
 
       ConvertCFG2DAG(impl);
@@ -2565,6 +2564,10 @@ namespace VC
       Contract.Requires(impl != null);
       impl.PruneUnreachableBlocks(); // This is needed for VCVariety.BlockNested, and is otherwise just an optimization
 
+      #region proofgen
+      ProofGeneration.ProofGenerationLayer.BeforeCFGToDAG(impl);
+      #endregion proofgen
+      
       CurrentLocalVariables = impl.LocVars;
       variable2SequenceNumber = new Dictionary<Variable, int>();
       incarnationOriginMap = new Dictionary<Incarnation, Absy>();
