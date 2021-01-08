@@ -23,6 +23,7 @@ namespace ProofGeneration.CfgToDag
         private readonly CfgToDagHintManager hintManager;
         private readonly IDictionary<Block, IList<Block>> blocksToLoops;
         private readonly IDictionary<Block, Block> beforeToAfterBlock;
+        private readonly Block afterExitBlock;
         
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
         private readonly BoogieContextIsa boogieContext;
@@ -36,12 +37,17 @@ namespace ProofGeneration.CfgToDag
 
         private readonly string redCfgName = "Red";
         private readonly string dagVerifiesName = "DagVerifies";
-        private readonly string dagAssmsName = "dagAssmsName";
+        private readonly string dagAssmsName = "DagAssms";
         
         string stateRelLoopHeadName = "StateRel1";
         
         private readonly IsaUniqueNamer namer = new IsaUniqueNamer();
+
+        private BoogieMethodData beforeDagData;
+        private DefDecl postsDef;
+        private Term postsDefTerm;
         
+        //afterExitBlock is non-null iff afterExitBlock is a newly generated unique exit block after the CFG-to-DAG transformation
         public CfgToDagLemmaManager(
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
@@ -50,6 +56,9 @@ namespace ProofGeneration.CfgToDag
             CfgToDagHintManager hintManager,
             IDictionary<Block, IList<Block>> blocksToLoops,
             IDictionary<Block, Block> beforeToAfterBlock,
+            BoogieMethodData beforeDagData,
+            DefDecl postsDef,
+            Block afterExitBlock,
             IVariableTranslationFactory varFactory
         )
         {
@@ -60,6 +69,10 @@ namespace ProofGeneration.CfgToDag
             this.hintManager = hintManager;
             this.blocksToLoops = blocksToLoops;
             this.beforeToAfterBlock = beforeToAfterBlock;
+            this.beforeDagData = beforeDagData;
+            this.postsDef = postsDef;
+            this.postsDefTerm = IsaCommonTerms.TermIdentFromName(postsDef.name);
+            this.afterExitBlock = afterExitBlock;
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
                 IsaCommonTerms.TermIdentFromName("M"),
@@ -229,21 +242,29 @@ namespace ProofGeneration.CfgToDag
                     modSet);
         }
 
+        public Tuple<LemmaDecl, LemmaDecl> UnifiedExitLemma()
+        {
+            if(afterDagCfg == null)
+                throw new ProofGenUnexpectedStateException("incorrect state: assuming that there is no unified exit");
+
+            return null;
+        }
+
         /// <summary>
         /// first element of returned tuple are the lemmas for the local block proof
         /// second element of returned tuple is the CFG block proof (i.e., depends on the local lemmas)
         /// </summary>
         public Tuple<IEnumerable<LemmaDecl>,LemmaDecl> BlockLemma(
-            Block beforeDag, 
-            Block afterDag,
+            Block beforeBlock, 
+            Block afterBlock,
             IEnumerable<Block> successors,
             Func<Block, string> blockLemmaName,
             Func<Block, string> cfgLemmaName,
             bool singleEdgeCut)
         {
-            string beforeCmdsDefName = beforeDagProgAccess.BlockInfo().CmdsQualifiedName(beforeDag);
+            string beforeCmdsDefName = beforeDagProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock);
             Term beforeCmds = IsaCommonTerms.TermIdentFromName(beforeCmdsDefName);
-            string afterCmdsDefName = afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterDag);
+            string afterCmdsDefName = afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterBlock);
             Term afterCmds = IsaCommonTerms.TermIdentFromName(afterCmdsDefName);
             
             var finalNodeId2 = new SimpleIdentifier("m2'");
@@ -252,7 +273,7 @@ namespace ProofGeneration.CfgToDag
 
             Term preInvs;
             Term havocedVars;
-            if (hintManager.IsLoopHead(beforeDag, out LoopHeadHint blockHeadHint))
+            if (hintManager.IsLoopHead(beforeBlock, out LoopHeadHint blockHeadHint))
             {
                 preInvs = InvariantsTerm(blockHeadHint.Invariants);
                 havocedVars = HavocedVarsTerm(blockHeadHint.ModifiedVars);
@@ -264,18 +285,25 @@ namespace ProofGeneration.CfgToDag
             }
             
             
-            var loops = blocksToLoops[beforeDag];
+            var loops = blocksToLoops[beforeBlock];
             var postInvsList = new List<Term>();
             int nSuccessors = successors.Count();
             foreach (var bSuc in successors)
             {
-                var bSucAfter = beforeToAfterBlock[bSuc];
                 if(hintManager.IsLoopHead(bSuc, out LoopHeadHint hint) && nSuccessors == 1)
                 {
                     /* only add invariants if the current block has exactly the loop head as successor, otherwise a block is
                        added between the two, which then asserts the invariants */
                     postInvsList.AddRange(hint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)));
                 }
+            }
+
+            if (!successors.Any())
+            {
+               //postcondition is at the end 
+               postInvsList.AddRange(
+                   beforeDagData.Postcondtions.Select(post => basicCmdIsaVisitor.Translate(post))
+                   );
             }
             
             var localLemmas = new List<LemmaDecl>();
@@ -296,16 +324,16 @@ namespace ProofGeneration.CfgToDag
                     beforeLoopHead =>
                     afterDagCfg.GetUniqueIntLabel(beforeToAfterBlock[beforeLoopHead])).Last();
             }
-            if (hintManager.IsLoopHead(beforeDag, out _))
+            if (hintManager.IsLoopHead(beforeBlock, out _))
             {
-                loopMod = beforeDag;
+                loopMod = beforeBlock;
             }
                 
             if(loopMod != null)
             {
                 var hint = hintManager.GetLoopHead(loopMod);
                 loopModTermList = HavocedVarsTerm(hint.ModifiedVars);
-                localLemmas.Add(BlockModVarsLemma(BlockModVarsLemmaName(beforeDag), beforeCmds, beforeCmdsDefName, loopModTermList)); 
+                localLemmas.Add(BlockModVarsLemma(BlockModVarsLemmaName(beforeBlock), beforeCmds, beforeCmdsDefName, loopModTermList)); 
             }
             #endregion
 
@@ -364,7 +392,7 @@ namespace ProofGeneration.CfgToDag
             proofMethods.Add("done");
             
             var blockLemma = new LemmaDecl(
-                    blockLemmaName(beforeDag), 
+                    blockLemmaName(beforeBlock), 
                     ContextElem.CreateWithAssumptions(assumptions), 
                     conclusion,
                     new Proof(proofMethods)
@@ -379,7 +407,7 @@ namespace ProofGeneration.CfgToDag
             Term redCfg = IsaBoogieTerm.RedCFGKStep(
                 boogieContext,
                 beforeDagProgAccess.CfgDecl(),
-                IsaBoogieTerm.CFGConfigNode(new NatConst(beforeDagProgAccess.BlockInfo().BlockIds[beforeDag]),
+                IsaBoogieTerm.CFGConfigNode(new NatConst(beforeDagProgAccess.BlockInfo().BlockIds[beforeBlock]),
                     IsaBoogieTerm.Normal(normalInitState1)),
                 numSteps,
                 IsaBoogieTerm.CFGConfig(finalNode, finalState));
@@ -391,7 +419,7 @@ namespace ProofGeneration.CfgToDag
 
             Term dagVerifiesCfgAssm =
                 DagVerifiesCfgAssumption(
-                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterDag]),
+                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterBlock]),
                     finalNodeId2,
                     finalStateId2);
             
@@ -403,7 +431,7 @@ namespace ProofGeneration.CfgToDag
                 redCfgName, dagAssmsName, dagVerifiesName
             };
             
-            foreach (Block loopBlock in blocksToLoops[beforeDag])
+            foreach (Block loopBlock in blocksToLoops[beforeBlock])
             {
                 var hint = hintManager.GetLoopHead(loopBlock);
                 var inductionHyp = LoopIndHypAssumption(
@@ -420,7 +448,12 @@ namespace ProofGeneration.CfgToDag
             }
 
             Proof cfgProof;
-            if (blockHeadHint == null)
+            if (!successors.Any())
+            { 
+                //TODO: distinguish scenarios
+               //unique exit block that was not generated as part of the transformation
+               cfgProof = GenerateProofExitNode(beforeBlock, afterBlock, blockLemmaName);
+            } else if (blockHeadHint == null)
             {
                 var proofData = new NonLoopHeadProofData(
                     redCfgName,
@@ -428,18 +461,18 @@ namespace ProofGeneration.CfgToDag
                     dagVerifiesName,
                     LoopIndHypName
                     );
-                cfgProof = GenerateProofBody(beforeDag, afterDag, proofData, blockLemmaName, cfgLemmaName, successors);
+                cfgProof = GenerateProofBody(beforeBlock, afterBlock, proofData, blockLemmaName, cfgLemmaName, successors);
             }
             else
             {
                 cfgProof =
-                    GenerateProofLoopHead(beforeDag, afterDag, loopModTermList, blockLemmaName, cfgLemmaName, successors);
+                    GenerateProofLoopHead(beforeBlock, afterBlock, loopModTermList, blockLemmaName, cfgLemmaName, successors);
             }
             
             LemmaDecl cfgLemma = new LemmaDecl(
-                cfgLemmaName(beforeDag),
+                cfgLemmaName(beforeBlock),
                 ContextElem.CreateWithAssumptions(cfgAssumptions, cfgAssumptionNames), 
-                TermBinary.Neq(finalState, IsaBoogieTerm.Failure()),
+                CfgLemmaConclusion(finalNode,finalState),
                 cfgProof
             );
             
@@ -448,6 +481,19 @@ namespace ProofGeneration.CfgToDag
             localLemmas.Add(blockLemma);
   
             return new Tuple<IEnumerable<LemmaDecl>, LemmaDecl>(localLemmas, cfgLemma);
+        }
+
+        private Term CfgLemmaConclusion(Term finalNode, Term finalState)
+        {
+            return new TermApp(
+                    IsaCommonTerms.TermIdentFromName("cfg_dag_lemma_conclusion"),
+                    boogieContext.absValTyMap,
+                    boogieContext.varContext,
+                    boogieContext.funContext,
+                    boogieContext.rtypeEnv,
+                    postsDefTerm,
+                    finalNode,
+                    finalState);
         }
 
         private LemmaDecl BlockModVarsLemma(string lemmaName, Term cmds, string cmdsDef, Term modVarsList)
@@ -509,6 +555,10 @@ namespace ProofGeneration.CfgToDag
             if (loops.Any() || isLoopHead)
                 sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(BlockModVarsLemmaName(beforeBlock))));
 
+            //out edges non-empty
+            sb.AppendLine(
+                ProofUtil.Apply(ProofUtil.Simp(beforeDagProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock))));
+            //out edges in successor
             sb.AppendLine(
                 ProofUtil.Apply(ProofUtil.Simp(beforeDagProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock))));
 
@@ -645,7 +695,7 @@ namespace ProofGeneration.CfgToDag
                         else
                         {
                             //we need to prove the induction hypothesis of the current loop head block
-                            ProveLoopHeadInductionHyp(sb, beforeBlock, proofData, loopsSuc);
+                            ProveLoopHeadInductionHyp(sb, beforeBlock, proofData);
                         }
                     }
                 }
@@ -654,28 +704,56 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine("by (simp add: member_rec(2))");
         }
 
-        private void ProveLoopHeadInductionHyp(StringBuilder sb, Block loopHead, ICfgToDagProofData proofData, IList<Block> loopsSuc)
+        //proves the loop induction hypothesis of the current loop head 
+        private void ProveLoopHeadInductionHyp(StringBuilder sb, Block loopHead, ICfgToDagProofData proofData)
         {
-            foreach (Block b in loopsSuc)
+            sb.AppendLine(ProofUtil.Apply("rule loop_ih_prove"));
+            sb.AppendLine(ProofUtil.Apply("rule less.IH"));
+            sb.AppendLine(ProofUtil.Apply("erule strictly_smaller_helper, assumption, assumption"));
+            sb.AppendLine("unfolding dag_lemma_assms_def");
+            sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
+            sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("nstate_same_on_transitive_2", "_",
+                "_", stateRelLoopHeadName)));
+            sb.AppendLine(ProofUtil.Apply("(fastforce, simp, simp)"));
+
+            var loops = blocksToLoops[loopHead];
+            foreach (Block b in loops)
             {
-                if (b == loopHead)
-                {
-                    sb.AppendLine(ProofUtil.Apply("rule loop_ih_prove"));
-                    sb.AppendLine(ProofUtil.Apply("rule less.IH"));
-                    sb.AppendLine(ProofUtil.Apply("erule strictly_smaller_helper, assumption, assumption"));
-                    sb.AppendLine("unfolding dag_lemma_assms_def");
-                    sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
-                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("nstate_same_on_transitive_2", "_",
-                        "_", stateRelLoopHeadName)));
-                    sb.AppendLine(ProofUtil.Apply("(fastforce, simp, simp)"));
-                }
-                else
-                {
-                    sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_smaller_2"));
-                    sb.AppendLine("using " + proofData.LoopIndHypName(b) + " apply simp");
-                    sb.AppendLine(ProofUtil.Apply("simp, fastforce, assumption, simp"));
-                }
+                sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_smaller_2"));
+                sb.AppendLine("using " + proofData.LoopIndHypName(b) + " apply simp");
+                sb.AppendLine(ProofUtil.Apply("simp, fastforce, assumption, simp"));
             }
+        }
+
+        private Proof GenerateProofExitNode(
+            Block beforeBlock,
+            Block afterBlock,
+            Func<Block,string> blockLemmaName
+        )
+        {
+            StringBuilder sb = new StringBuilder();
+            if (afterExitBlock == null)
+            {
+                //no new unified exit block was created
+                sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("cfg_dag_helper_return_1", "assms(1)")));
+                sb.AppendLine(ProofUtil.Apply("rule " +
+                                              beforeDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock)));
+                sb.AppendLine(ProofUtil.Apply("rule " +
+                                              afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterBlock)));
+                sb.AppendLine(ProofUtil.Apply("erule " + dagVerifiesName));
+                sb.AppendLine(ProofUtil.Apply("rule " + dagAssmsName));
+                sb.AppendLine("unfolding " + postsDef.name + "_def");
+                sb.AppendLine(ProofUtil.Apply("rule " + blockLemmaName(beforeBlock)));
+                sb.AppendLine("apply assumption+");
+                sb.AppendLine(
+                    ProofUtil.By("rule " + beforeDagProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock)));
+            }
+            else
+            {
+                sb.AppendLine("sorry");
+            }
+
+            return new Proof(new List<string> {sb.ToString()});
         }
 
         private Proof GenerateProofLoopHead(
@@ -693,7 +771,7 @@ namespace ProofGeneration.CfgToDag
            sb.AppendLine("case (less j)");
            sb.AppendLine("show ?case");
            sb.AppendLine("proof (cases j)");
-           sb.AppendLine("case 0 with less.prems(1) show ?thesis by auto");
+           sb.AppendLine("case 0 with less.prems(1) show ?thesis unfolding cfg_dag_lemma_conclusion_def by auto");
            sb.AppendLine("next");
            sb.AppendLine("case (Suc j')");
            sb.Append("from less(3) have " + stateRelLoopHeadName + ":");
@@ -808,6 +886,7 @@ namespace ProofGeneration.CfgToDag
                 cfg,
                 modVars,
                 invs,
+                postsDefTerm,
                 normalState,
                 finalState,
                 loopHeadNode,

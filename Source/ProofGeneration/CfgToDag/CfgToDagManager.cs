@@ -25,6 +25,8 @@ namespace ProofGeneration.CfgToDag
             string theoryName,
             CFGRepr beforeDagCfg,
             CFGRepr afterDagCfg,
+            Block afterUniqueExit,
+            BoogieMethodData beforeDagData,
             CfgToDagHintManager hintManager,
             IDictionary<Block,Block> beforeToAfter,
             IProgramAccessor beforeDagProgAccess,
@@ -74,7 +76,14 @@ namespace ProofGeneration.CfgToDag
                 varContextName,
                 new Tuple<IList<Term>, Term>(new List<Term>(), beforeDagProgAccess.VarContext())
                 );
-            
+
+            BasicCmdIsaVisitor cmdIsaVisitor = new BasicCmdIsaVisitor(varFactory);
+
+            Term posts = new TermList(beforeDagData.Postcondtions.Select(post => cmdIsaVisitor.Translate(post)).ToList());
+            DefDecl postsDef = new DefDecl(
+                "posts",
+                new Tuple<IList<Term>, Term>(new List<Term>(), posts)
+                );
             
             CfgToDagLemmaManager lemmaManager = new CfgToDagLemmaManager(
                 beforeDagProgAccess, 
@@ -84,11 +93,15 @@ namespace ProofGeneration.CfgToDag
                 hintManager,
                 blocksToLoops,
                 beforeToAfter,
+                beforeDagData,
+                postsDef,
+                afterUniqueExit,
                 varFactory);
             
             var lemmaNamer = new IsaUniqueNamer();
             var outerDecls = new List<OuterDecl>();
             
+            outerDecls.Add(postsDef);
             outerDecls.Add(varContextAbbrev);
             outerDecls.Add(new DeclareDecl("Nat.One_nat_def[simp del]"));
             
@@ -126,7 +139,12 @@ namespace ProofGeneration.CfgToDag
                    var afterBlockSuccessorsList = afterBlockSuccessors.ToList();
                    if (!afterBlockSuccessorsList.Any())
                    {
-                       //must be the generated unified exit block --> TODO handle this
+                       //this must be the unique node
+                       if (afterUniqueExit == null)
+                       {
+                           throw new ProofGenUnexpectedStateException("unique exit block added, but only exit block existed before cfg-to-dag");
+                       }
+
                        continue;
                    }
                    

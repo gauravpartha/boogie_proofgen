@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Microsoft.Boogie.GraphUtil;
 using Microsoft.Boogie.ProofGen;
 using ProofGeneration.Util;
@@ -62,6 +63,8 @@ namespace ProofGeneration
 
         private static CfgToDagHintManager cfgToDagHintManager;
 
+        private static Block uniqueExitBlockOrig;
+
         public static void Program(Program p)
         {
             boogieGlobalData = new BoogieGlobalData(p.Functions, p.Axioms, p.GlobalVariables, p.Constants);
@@ -76,6 +79,7 @@ namespace ProofGeneration
                 out List<Variable> newVarsFromDesugaring, 
                 false);
             beforeDagData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
+            uniqueExitBlockOrig = null;
         }
 
         /// <param name="g">graph for which all the loop information has been computed</param>
@@ -83,6 +87,11 @@ namespace ProofGeneration
         {
             cfgToDagGraph = g;
             cfgToDagHintManager = new CfgToDagHintManager(g, beforeDagOrigBlock);
+        }
+
+        public static void CreateUnifiedExitBlock(Block generatedExitBlock)
+        {
+            uniqueExitBlockOrig = generatedExitBlock;
         }
 
         public static void BeforePassification(Implementation impl)
@@ -120,6 +129,41 @@ namespace ProofGeneration
             if (extraLocalVariables != null)
                 locals = locals.Union(extraLocalVariables);
             
+            
+            /* procedures and implementations do not use the same objects for the variables in the spec --> need to sync 
+             * for pre- and postcondition
+             */
+            Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+            List<Expr> preconditions = new List<Expr>();
+            foreach (Requires req in impl.Proc.Requires)
+            {
+                if (!req.Free)
+                {
+                    // skip free ensures clauses
+                    Expr e = Substituter.Apply(formalProcImplSubst, req.Condition);
+                    preconditions.Add(e);
+                }
+                else
+                {
+                    throw new ProofGenUnexpectedStateException("Don't support free precondition");
+                }
+            }
+            List<Expr> postconditions = new List<Expr>();
+            foreach (Ensures ens in impl.Proc.Ensures)
+            {
+                if (!ens.Free)
+                {
+                    // skip free ensures clauses
+                    Expr e = Substituter.Apply(formalProcImplSubst, ens.Condition);
+                    postconditions.Add(e);
+                }
+                else
+                {
+                    throw new ProofGenUnexpectedStateException("Don't support free postcondition");
+                }
+            }
+            
+
             return new BoogieMethodData(
                 globalData,
                 new List<TypeVariable>(impl.TypeParameters),
@@ -127,8 +171,8 @@ namespace ProofGeneration
                 locals,
                 null,
                 new List<IdentifierExpr>(impl.Proc.Modifies),
-                new List<Requires>(impl.Proc.Requires),
-                new List<Ensures>(impl.Proc.Ensures));
+                preconditions,
+                postconditions);
         }
 
         public static void RecordInitialVariableMapping(Block b, IDictionary<Variable, Expr> variableToExpr)
@@ -378,11 +422,15 @@ namespace ProofGeneration
             var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
             StoreTheory(beforeCfgToDagProgTheory);
-            
+
+            Block uniqueExitBlock = beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key;
+
             Theory cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 afterPassificationImpl.Name+"_cfg_to_dag_proof",
                 beforeDagCfg,
                 beforePassificationCfg,
+                uniqueExitBlock,
+                beforeDagData,
                 cfgToDagHintManager,
                 beforeDagAfterDagBlock,
                 beforeCfgToDagProgAccess,

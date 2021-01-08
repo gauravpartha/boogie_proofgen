@@ -18,8 +18,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public IEnumerable<Variable> Locals { get; }
         //public IEnumerable<Variable> OutParams { get; }
         public IEnumerable<IdentifierExpr> ModifiedVars { get; }
-        public IEnumerable<Requires> Preconditions { get; }
-        public IEnumerable<Ensures> Postcondtions { get; }
+        public IEnumerable<Expr> Preconditions { get; }
+        public IEnumerable<Expr> Postcondtions { get; }
 
         public BoogieMethodData(
             BoogieGlobalData globalData,
@@ -28,8 +28,8 @@ namespace ProofGeneration.BoogieIsaInterface
             IEnumerable<Variable> locals,
             IEnumerable<Variable> outParams,
             IEnumerable<IdentifierExpr> modifies,
-            IEnumerable<Requires> pres,
-            IEnumerable<Ensures> posts)
+            IEnumerable<Expr> pres,
+            IEnumerable<Expr> posts)
         {
             this.globalData = globalData;
             this.TypeParams = typeParams;
@@ -49,8 +49,8 @@ namespace ProofGeneration.BoogieIsaInterface
                 new List<Variable>(),
                 new List<Variable>(),
                 new List<IdentifierExpr>(),
-                new List<Requires>(),
-                new List<Ensures>());
+                new List<Expr>(),
+                new List<Expr>());
         }
 
         public static BoogieMethodData CreateOnlyGlobal(BoogieGlobalData globalData)
@@ -61,8 +61,8 @@ namespace ProofGeneration.BoogieIsaInterface
                 new List<Variable>(),
                 new List<Variable>(),
                 new List<IdentifierExpr>(),
-                new List<Requires>(),
-                new List<Ensures>());
+                new List<Expr>(),
+                new List<Expr>());
         }
 
         //in the following order: constants then globals then parameters then locals
