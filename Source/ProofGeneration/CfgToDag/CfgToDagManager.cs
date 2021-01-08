@@ -77,8 +77,6 @@ namespace ProofGeneration.CfgToDag
                 new Tuple<IList<Term>, Term>(new List<Term>(), beforeDagProgAccess.VarContext())
                 );
 
-            BasicCmdIsaVisitor cmdIsaVisitor = new BasicCmdIsaVisitor(varFactory);
-            
             CfgToDagLemmaManager lemmaManager = new CfgToDagLemmaManager(
                 beforeDagProgAccess, 
                 afterDagProgAccess, 
@@ -125,9 +123,9 @@ namespace ProofGeneration.CfgToDag
                 else
                 {
                    //block was added as part of transformation 
-                   if (afterBlock.Label.Contains("PreconditionGeneratedEntry"))
+                   if (afterBlock == afterDagCfg.entry)
                    {
-                       //TODO 
+                       //entry lemma handled elsewhere
                        continue;
                    }
 
@@ -183,6 +181,10 @@ namespace ProofGeneration.CfgToDag
                    }
                 }
             }
+
+            LemmaDecl entryLemma = lemmaManager.EntryLemma("entry_lemma", beforeDagCfg.entry, afterDagCfg.entry,
+                b => GetCfgLemmaName(b, lemmaNamer));
+            outerDecls.Add(entryLemma);
             
             return new Theory(
                 theoryName,

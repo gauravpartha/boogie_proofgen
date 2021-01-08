@@ -191,7 +191,7 @@ namespace ProofGeneration.CfgToDag
                     );
                 }
 
-                proofMethods.Add("unfolding " + afterDagProgAccess.BlockInfo().BlockCmdsDefs[afterDag].name + "_def");
+                proofMethods.Add("unfolding " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterDag) + "_def");
                 proofMethods.Add(ProofUtil.Apply("cfg_dag_rel_tac_single+"));
                 proofMethods.Add("subgoal");
                 proofMethods.Add("sorry");
@@ -242,6 +242,71 @@ namespace ProofGeneration.CfgToDag
                 boogieContext.varContext,
                 boogieContext.rtypeEnv,
                 normalState);
+        }
+
+        public LemmaDecl EntryLemma(string lemmaName, Block beforeEntryBlock, Block afterEntryBlock, Func<Block, string> cfgLemmaName)
+        {
+            Term numSteps = IsaCommonTerms.TermIdentFromName("j");
+            Term redCfg = IsaBoogieTerm.RedCFGKStep(
+                boogieContext,
+                beforeDagProgAccess.CfgDecl(),
+                IsaBoogieTerm.CFGConfigNode(new NatConst(beforeDagProgAccess.BlockInfo().BlockIds[beforeEntryBlock]),
+                    IsaBoogieTerm.Normal(normalInitState1)),
+                numSteps,
+                IsaBoogieTerm.CFGConfig(finalNode, finalState));
+
+            List<Term> assumptions = new List<Term> { redCfg };
+            Term dagLemmaAssm = BlockLemmaAssumption(
+                boogieContext,
+                IsaCommonTerms.EmptyList,
+                IsaCommonTerms.EmptyList);
+            assumptions.Add(dagLemmaAssm);
+            
+            var finalNodeId2 = new SimpleIdentifier("m2'");
+            var finalStateId2 = new SimpleIdentifier("s2'");
+
+            Term dagVerifiesCfgAssm =
+                DagVerifiesCfgAssumption(
+                    new NatConst(afterDagProgAccess.BlockInfo().BlockIds[afterEntryBlock]),
+                    normalInitState2,
+                    finalNodeId2,
+                    finalStateId2);
+            assumptions.Add(dagVerifiesCfgAssm);
+            
+            Term preAssm =
+                IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState2, beforeDagProgAccess.PreconditionsDecl());
+            assumptions.Add(preAssm);
+
+            var afterEntrySuccessors = afterDagCfg.GetSuccessorBlocks(afterEntryBlock);
+            if (afterEntrySuccessors.Count() != 1)
+            {
+                throw new ProofGenUnexpectedStateException("CFG-to-DAG: entry block has only one successor");
+            }
+
+            Block afterEntrySuc = afterEntrySuccessors.First();
+            
+            return new LemmaDecl(
+                lemmaName,
+                ContextElem.CreateWithAssumptions(assumptions), 
+                CfgLemmaConclusion(finalNode,finalState),
+                new Proof(new List<string>
+                {
+                    ProofUtil.Apply("rule cfg_dag_helper_entry"),
+                    ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterEntryBlock)),
+                    ProofUtil.Apply("erule assms(3)"),
+                    ProofUtil.Apply("rule assms(2)"),
+                    "unfolding " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterEntryBlock)+"_def",
+                    ProofUtil.Apply("rule assume_pres_normal[where ?es=" + beforeDagProgAccess.PreconditionsDeclName() + "]"),
+                    ProofUtil.Apply("rule assms(4)"),
+                    "unfolding " + beforeDagProgAccess.PreconditionsDeclName()+"_def",
+                    "apply simp",
+                    ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterEntryBlock)),
+                    ProofUtil.Apply(ProofUtil.Simp(afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterEntrySuc),
+                        afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterEntrySuc)+"_def")),
+                    ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterEntrySuc)),
+                    ProofUtil.By("rule " + ProofUtil.OF(cfgLemmaName(beforeEntryBlock), "assms(1-2)")),
+                })
+            );
         }
 
         public LemmaDecl UnifiedExitLemma(string lemmaName)
@@ -321,7 +386,6 @@ namespace ProofGeneration.CfgToDag
                 preInvs = IsaCommonTerms.EmptyList;
                 havocedVars = IsaCommonTerms.EmptyList;
             }
-            
             
             var loops = blocksToLoops[beforeBlock];
             var postInvsList = new List<Term>();
@@ -489,8 +553,6 @@ namespace ProofGeneration.CfgToDag
             Proof cfgProof;
             if (!successors.Any())
             { 
-                //TODO: distinguish scenarios
-               //unique exit block that was not generated as part of the transformation
                cfgProof = GenerateProofExitNode(beforeBlock, afterBlock, blockLemmaName, cfgLemmaName);
             } else if (blockHeadHint == null)
             {
@@ -790,6 +852,7 @@ namespace ProofGeneration.CfgToDag
             }
             else
             {
+                //a new unified exit block was created
                 sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("cfg_dag_helper_return_2", redCfgName)));
                 sb.AppendLine(ProofUtil.Apply("rule " +
                                               beforeDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock)));

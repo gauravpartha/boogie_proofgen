@@ -16,25 +16,22 @@ namespace ProofGeneration
         public IProgramAccessor ParentAccessor;
         public bool GenerateFunctions;
         public bool GenerateAxioms;
-        public bool GenerateGlobals;
-        public bool GenerateConstants;
+        public bool GenerateGlobalsAndConstants;
         public bool GenerateSpecs;
 
         public IsaProgramGeneratorConfig(
             IProgramAccessor parent,
             bool generateFunctions,
             bool generateAxioms,
-            bool generateGlobals,
-            bool generateConstants,
+            bool generateGlobalsAndConstants,
             bool generateSpecs
         )
         {
             ParentAccessor = parent;
             GenerateFunctions = generateFunctions;
             GenerateAxioms = generateAxioms;
-            GenerateGlobals = generateGlobals;
-            GenerateConstants = generateConstants;
             GenerateSpecs = generateSpecs;
+            GenerateGlobalsAndConstants = generateGlobalsAndConstants;
         }
     }
     
@@ -144,10 +141,10 @@ namespace ProofGeneration
             // for globals and constants we still generate the type lookup lemmas, but not the membership lemmas,
             // since the membership lemmas should come from the parent (we assume that the constants and globals are the same for both)
             decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, true, config.GenerateGlobals);
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, true, config.GenerateGlobalsAndConstants);
             
             decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, true, config.GenerateConstants);
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, true, config.GenerateGlobalsAndConstants);
             
             membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams.Union(methodData.Locals), false, true);
             

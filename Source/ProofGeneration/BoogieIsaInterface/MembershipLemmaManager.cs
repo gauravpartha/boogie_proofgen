@@ -72,8 +72,8 @@ namespace ProofGeneration.BoogieIsaInterface
             paramsAndLocalsList =
                 IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(QualifyAccessName(isaProgramRepr.paramsDeclDef)),
                                         IsaCommonTerms.TermIdentFromName(QualifyAccessName(isaProgramRepr.localVarsDeclDef)));
-            consts = config.GenerateConstants ? QualifyAccessName(isaProgramRepr.constantsDeclDef) : parent.ConstsDecl();
-            globals = config.GenerateGlobals ? QualifyAccessName(isaProgramRepr.globalsDeclDef) : parent.GlobalsDecl(); 
+            consts = config.GenerateGlobalsAndConstants ? QualifyAccessName(isaProgramRepr.constantsDeclDef) : parent.ConstsDecl();
+            globals = config.GenerateGlobalsAndConstants ? QualifyAccessName(isaProgramRepr.globalsDeclDef) : parent.GlobalsDecl(); 
             
             constsAndGlobalsDefs =
                 new string[] {consts+ "_def", globals+ "_def"};
@@ -357,7 +357,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public string GlobalsAtMostMax()
         {
-            if (config.GenerateGlobals)
+            if (config.GenerateGlobalsAndConstants)
                 return QualifyAccessName(globalsMaxName);
             return parent.GlobalsAtMostMax();
         }
@@ -415,7 +415,7 @@ namespace ProofGeneration.BoogieIsaInterface
             var globalNames = VariableNames(constsAndGlobalsList);
             var localNames = VariableNames(paramsAndLocalsList);
             
-            if (config.GenerateGlobals)
+            if (config.GenerateGlobalsAndConstants)
             {
                 AddMinOrMaxLemma(true, globalsMax, globalNames);
             }
