@@ -271,15 +271,21 @@ namespace ProofGeneration
         {
             typePremiseEraserFactory = factory;
             IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
-            /* Hack: try to make sure unique namer uses names for Boogie functions that are different from the default name
-             * otherwise it clashes with the functions potentially fixed in the context of a locale
+            /* Hack: try to make sure unique namer uses names for Boogie functions and Boogie variables that are different
+             * from the default name otherwise it clashes with the functions potentially fixed in the context of a locale
              */
             foreach(var fun in boogieGlobalData.Functions)
             {
-                uniqueNamer.GetName(fun.Name, "o_"+fun.Name);
+                uniqueNamer.GetName(fun.Name, "o123_"+fun.Name);
+            }
+            
+            foreach(var variable in finalProgData.AllVariables())
+            {
+                uniqueNamer.GetName(variable.Name, "o123_" + variable.Name);
             }
 
-            var translator = new VCExprToIsaTranslator(uniqueNamer);
+            //Hack: translate vc variable based on name, to ensure that applying erasure multiple times shares the same variables
+            var translator = VCExprToIsaTranslator.CreateNameBasedTranslator(uniqueNamer);
             translator.SetFunctionNamer(uniqueNamer);
             
             vcHintManager = new VCHintManager(factory, translator);

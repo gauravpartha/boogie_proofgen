@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using ProofGeneration.BoogieIsaInterface;
 
 namespace ProofGeneration.VCProofGen
@@ -23,13 +24,25 @@ namespace ProofGeneration.VCProofGen
 
         private readonly IsaUniqueNamer uniqueNamer;
 
+        private bool _tryInstantiatingFunctions;
+
         private readonly PureTyIsaTransformer pureTyIsaTransformer = new PureTyIsaTransformer();
 
-        private bool _tryInstantiatingFunctions = false;
+        private bool useNamesOfVarsForTranslation;
 
-        public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer, IDictionary<Block, DefDecl> successorToVC, IDictionary<Block, IList<VCExprVar>> blockToActiveVars)
+        /// <param name="uniqueNamer">namer to be used for vc variables</param>
+        /// <param name="successorToVC"></param>
+        /// <param name="blockToActiveVars"></param>
+        /// <param name="useNamesOfVarsForTranslation">if set to true, then <paramref name="uniqueNamer"/> will be applied
+        ///  to the name of a vc variable instead of the object, also <see cref="CreateNameBasedTranslator"/></param>
+        public VCExprToIsaTranslator(
+            IsaUniqueNamer uniqueNamer, 
+            IDictionary<Block, DefDecl> successorToVC, 
+            IDictionary<Block, IList<VCExprVar>> blockToActiveVars,
+            bool useNamesOfVarsForTranslation = false)
         {
             this.uniqueNamer = uniqueNamer;
+            this.useNamesOfVarsForTranslation = useNamesOfVarsForTranslation;
             this.successorToVC = successorToVC;
             this.blockToActiveVars = blockToActiveVars;
 
@@ -40,6 +53,21 @@ namespace ProofGeneration.VCProofGen
                 VCExpressionGenerator.AndOp,
                 VCExpressionGenerator.OrOp
             };
+        }
+
+
+        /// <summary>
+        /// Use this constructor if every VC variable with the same name should have the same representation.
+        /// In particular, this means that two different VC variable objects with the same name will be represented the same way.
+        /// Only use this if you are either sure that names uniquely determine a VC variable (abstractly) or if you have some
+        /// other operation that fails if this were not the case.
+        /// </summary>
+        public static VCExprToIsaTranslator CreateNameBasedTranslator(IsaUniqueNamer uniqueNamer)
+        {
+           return new VCExprToIsaTranslator(uniqueNamer, 
+               new Dictionary<Block, DefDecl>(),
+               new Dictionary<Block, IList<VCExprVar>>(),
+               true); 
         }
 
         public VCExprToIsaTranslator(IsaUniqueNamer uniqueNamer) : 
@@ -167,17 +195,27 @@ namespace ProofGeneration.VCProofGen
             {
                 return new TermApp(IsaCommonTerms.TermIdentFromName(def.name), blockToActiveVars[block].Select(v => Translate(v)).ToList());
             }
-            else
-                return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(node, node.Name));
+
+            return IsaCommonTerms.TermIdentFromName(GetVcVarName(node));
         }
 
         public Term Visit(VCExprQuantifier node, bool arg)
         {
             Term body = Translate(node.Body);
 
-            List<Identifier> boundVars = node.BoundVars.Select(v => (Identifier) new SimpleIdentifier(uniqueNamer.GetName(v, v.Name))).ToList();
+            List<Identifier> boundVars = node.BoundVars.Select(v => (Identifier) new SimpleIdentifier(GetVcVarName(v))).ToList();
 
             return new TermQuantifier(ConvertQuantifierKind(node.Quan), boundVars, body);
+        }
+
+        private string GetVcVarName(VCExprVar vcVar)
+        {
+            if (useNamesOfVarsForTranslation)
+            {
+                return uniqueNamer.GetName(vcVar.Name, vcVar.Name);
+            }
+
+            return uniqueNamer.GetName(vcVar, vcVar.Name);
         }
 
         private TermQuantifier.QuantifierKind ConvertQuantifierKind(Quantifier quantifier)
@@ -203,7 +241,7 @@ namespace ProofGeneration.VCProofGen
                 /* don't provide explicit type annotations for simplicity, since in certain cases would have to translate
                  the actual type to something else (such as when it is the type variable 't, but we would want closed_ty)
                  */
-                return IsaCommonTerms.Let(new SimpleIdentifier(uniqueNamer.GetName(elem.V, elem.V.Name)),
+                return IsaCommonTerms.Let(new SimpleIdentifier(GetVcVarName(elem.V)),
                      //pureTyIsaTransformer.Translate(elem.V.Type), 
                     Translate(elem.E),
                     prevBody
