@@ -72,7 +72,7 @@ namespace ProofGeneration.Passification
                 IsaCommonTerms.TermIdentFromName("M"),
                 IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item1),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
-                IsaCommonTerms.TermIdentFromName("\\<Omega>")
+                IsaCommonTerms.EmptyList
                 );
             passiveVarContext = IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item2);
             this.cfg = cfg;

@@ -59,6 +59,16 @@ namespace ProofGeneration.Util
         {
             return "@{thm " + isaThm + "}";
         }
+
+        public static string IsaToMLThms(IEnumerable<string> thms)
+        {
+            if (thms.Any())
+            {
+                return IsaToMLThms(String.Join(" ", thms));
+            }
+
+            return "[]";
+        }
         
         public static string IsaToMLThms(string isaThms)
         {

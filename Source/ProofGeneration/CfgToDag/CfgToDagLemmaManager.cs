@@ -27,6 +27,8 @@ namespace ProofGeneration.CfgToDag
         
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
         private readonly BoogieContextIsa boogieContext;
+        
+        private readonly TypingTacticGenerator typingTacticGenerator;
 
         private readonly Term normalInitState1 = IsaCommonTerms.TermIdentFromName("ns1");
         private readonly Term normalInitState2 = IsaCommonTerms.TermIdentFromName("ns2");
@@ -73,11 +75,12 @@ namespace ProofGeneration.CfgToDag
                 IsaCommonTerms.TermIdentFromName("M"),
                 IsaCommonTerms.TermIdentFromName(varContextName),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
-                IsaCommonTerms.TermIdentFromName("\\<Omega>"));
+                IsaCommonTerms.EmptyList);
 
             initState1 = IsaBoogieTerm.Normal(normalInitState1);
             initState2 = IsaBoogieTerm.Normal(normalInitState2);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(new IsaUniqueNamer(), varFactory);
+            typingTacticGenerator = new TypingTacticGenerator(beforeDagProgAccess, varFactory);
         }
 
         private TermList HavocedVarsTerm(IEnumerable<Variable> vars)
@@ -144,6 +147,7 @@ namespace ProofGeneration.CfgToDag
                 IsaCommonTerms.EmptySet));
 
             assumptions.Add(StateWellTyped(normalInitState1));
+            assumptions.Add(StateWellTyped(normalInitState2));
 
             Term conclusion = IsaCommonTerms.TermIdentFromName("R");
             Term propagationAssm = conclusion;
@@ -389,7 +393,20 @@ namespace ProofGeneration.CfgToDag
             
             var loops = blocksToLoops[beforeBlock];
             var postInvsList = new List<Term>();
+            bool isPost = false;
             int nSuccessors = successors.Count();
+            
+            var localLemmas = new List<LemmaDecl>();
+            
+            //one tactic per post invariant: string is tactic and bool is whether it's the postcondition of the program
+            var typingTactics = new List<Tuple<string, bool>>();
+            Action<Expr, bool> addTypingTactic = (inv, b) =>
+            {
+                var typingTacticTuple = typingTacticGenerator.GenerateTactic(inv);
+                localLemmas.AddRange(typingTacticTuple.Item2);
+                typingTactics.Add(Tuple.Create(typingTacticTuple.Item1, b));
+            };
+            
             foreach (var bSuc in successors)
             {
                 if(hintManager.IsLoopHead(bSuc, out LoopHeadHint hint) && nSuccessors == 1)
@@ -397,6 +414,12 @@ namespace ProofGeneration.CfgToDag
                     /* only add invariants if the current block has exactly the loop head as successor, otherwise a block is
                        added between the two, which then asserts the invariants */
                     postInvsList.AddRange(hint.Invariants.Select(inv => basicCmdIsaVisitor.Translate(inv)));
+
+                    foreach (var inv in hint.Invariants)
+                    {
+                        addTypingTactic(inv, false);
+                    }
+                    
                 }
             }
 
@@ -406,9 +429,12 @@ namespace ProofGeneration.CfgToDag
                postInvsList.AddRange(
                    beforeDagData.Postconditions.Select(post => basicCmdIsaVisitor.Translate(post))
                    );
+               foreach (var inv in beforeDagData.Postconditions)
+               {
+                   addTypingTactic(inv, true);
+               }
             }
             
-            var localLemmas = new List<LemmaDecl>();
             #region modified variables
             Block loopMod = null;
             TermList loopModTermList = null;
@@ -690,7 +716,7 @@ namespace ProofGeneration.CfgToDag
                                 ProofUtil.Simp(afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock))));
                             sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
                             sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(afterSuc)));
-                            sb.AppendLine(ProofUtil.Apply("assumption, assumption"));
+                            sb.AppendLine(ProofUtil.Apply("assumption, assumption, simp"));
                             sb.AppendLine("(* finish proof strategy for new backedge block *)");
                             break;
                         }
@@ -710,6 +736,7 @@ namespace ProofGeneration.CfgToDag
                     }
                     sb.AppendLine(ProofUtil.Apply("simp"));
                     sb.AppendLine(ProofUtil.Apply("simp"));
+                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1", proofData.DagAssmName())));
                 }
                 else
                 {
@@ -752,7 +779,7 @@ namespace ProofGeneration.CfgToDag
                     if (addedBlock != null)
                     {
                         sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(addedBlock)));
-                        sb.AppendLine(ProofUtil.Apply("assumption, assumption"));
+                        sb.AppendLine(ProofUtil.Apply("assumption, assumption, simp"));
                     }
 
                     sb.AppendLine(ProofUtil.Apply("rule " + cfgLemmaName(bSuc)));
@@ -765,6 +792,7 @@ namespace ProofGeneration.CfgToDag
                         : "apply simp");
                     
                     sb.AppendLine(ProofUtil.Apply("fastforce"));
+                    sb.AppendLine(ProofUtil.Apply("simp"));
                     sb.AppendLine(ProofUtil.Apply("simp"));
                     /* We need to prove all the induction hypotheses for the loops that the successor is in.
                      * We can be sure that every loop that the successor is, the current block is in too (since the CFG is reducible).
@@ -782,6 +810,7 @@ namespace ProofGeneration.CfgToDag
                                 sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_pred"));
                                 sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) + " apply simp");
                                 sb.AppendLine("apply simp");
+                                sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1", proofData.DagAssmName())));
                             }
                             else
                             {
@@ -790,7 +819,9 @@ namespace ProofGeneration.CfgToDag
                                  */
                                 sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_pred"));
                                 sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) + " apply simp");
-                                sb.AppendLine("apply (assumption, simp)");
+                                sb.AppendLine("apply assumption");
+                                sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1", proofData.DagAssmName())));
+                                sb.AppendLine("apply simp");
                             }
                         }
                         else
@@ -805,6 +836,14 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine("by (simp add: member_rec(2))");
         }
 
+        private void AppendTypingTacticProofs(IEnumerable<Tuple<string, bool>> typingTactics, StringBuilder sb)
+        {
+            foreach (var typingTac in typingTactics)
+            {
+                
+            } 
+        }
+
         //proves the loop induction hypothesis of the current loop head 
         private void ProveLoopHeadInductionHyp(StringBuilder sb, Block loopHead, ICfgToDagProofData proofData)
         {
@@ -816,13 +855,16 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("nstate_same_on_transitive_2", "_",
                 "_", stateRelLoopHeadName)));
             sb.AppendLine(ProofUtil.Apply("(fastforce, simp, simp)"));
+            sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_2", proofData.DagAssmName())));
 
             var loops = blocksToLoops[loopHead];
             foreach (Block b in loops)
             {
                 sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_smaller_2"));
                 sb.AppendLine("using " + proofData.LoopIndHypName(b) + " apply simp");
-                sb.AppendLine(ProofUtil.Apply("simp, fastforce, assumption, simp"));
+                sb.AppendLine(ProofUtil.Apply("simp, fastforce, assumption"));
+                sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1", proofData.DagAssmName())));
+                sb.AppendLine("apply simp");
             }
         }
 

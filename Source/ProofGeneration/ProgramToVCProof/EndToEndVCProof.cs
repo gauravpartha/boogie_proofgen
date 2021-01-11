@@ -90,7 +90,7 @@ namespace ProofGeneration.ProgramToVCProof
               IsaCommonTerms.TermIdentFromName("M"),
               IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
               IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
-              IsaCommonTerms.TermIdentFromName("\\<Omega>")
+              IsaCommonTerms.EmptyList
               );
         }
 

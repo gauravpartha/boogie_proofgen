@@ -188,7 +188,7 @@ namespace ProofGeneration.CfgToDag
             
             return new Theory(
                 theoryName,
-                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", beforeDagProgAccess.TheoryName(), 
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML", beforeDagProgAccess.TheoryName(), 
                                     afterDagProgAccess.TheoryName() },
                 outerDecls
                 );
