@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 
 namespace ProofGeneration.Isa
 {
@@ -110,6 +111,11 @@ namespace ProofGeneration.Isa
             this.fixedVariables = fixedVariables;
             this.assumptions = assumptions;
             this.assmLabels = assmLabels;
+        }
+
+        public bool IsEmpty()
+        {
+            return !fixedVariables.Any() && !assumptions.Any();
         }
 
         public static ContextElem CreateEmptyContext()

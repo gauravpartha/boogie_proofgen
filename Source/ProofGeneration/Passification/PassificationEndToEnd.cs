@@ -264,7 +264,7 @@ namespace ProofGeneration.Passification
                 IsaBoogieTerm.IsClosedType(IsaBoogieTerm.InstantiateType(boogieContext.rtypeEnv, tauTerm)),
                 new Proof(new List<string>
                 {
-                    "apply (rule lookup_ty_passive_closed[OF assms(1)])",
+                    "apply (rule lookup_ty_pred[OF assms(1)])",
                     "unfolding " + passiveProgramAccessor.ConstsDecl()+"_def " + passiveProgramAccessor.GlobalsDecl()+"_def",
                     "apply simp",
                     "unfolding " + passiveProgramAccessor.ParamsDecl()+"_def " + passiveProgramAccessor.LocalsDecl()+"_def",

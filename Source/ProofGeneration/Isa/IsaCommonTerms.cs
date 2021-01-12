@@ -9,7 +9,7 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent NoneId = TermIdentFromName("None");
         private static readonly TermIdent TheId = TermIdentFromName("the");
         public static TermIdent FstId { get;  } = TermIdentFromName("fst");
-        private static readonly TermIdent SndId = TermIdentFromName("snd");
+        public static TermIdent SndId { get;  }= TermIdentFromName("snd");
         private static readonly TermIdent InlId = TermIdentFromName("Inl");
         private static readonly TermIdent InrId = TermIdentFromName("Inr");
         private static readonly TermIdent AppendId = TermIdentFromName("append");
@@ -22,6 +22,7 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent SetUnionId = TermIdentFromName("Set.union");
         private static readonly TermIdent SetInterId = TermIdentFromName("Set.inter");
         private static readonly TermIdent Nth = TermIdentFromName("nth");
+        private static readonly TermIdent CompositionId = TermIdentFromName("comp");
 
         public static TermIdent EmptyList => TermIdentFromName("[]");
         public static TermIdent EmptySet => TermIdentFromName("{}");
@@ -43,6 +44,11 @@ namespace ProofGeneration.Isa
                 new TermApp(new TermIdent(new SimpleIdentifier("Let")), termSubst),
                 TermQuantifier.Lambda(new List<Identifier>(){boundVar}, null, body) 
                 );
+        }
+
+        public static Term Composition(Term fun1, Term fun2)
+        {
+            return new TermApp(CompositionId, fun1, fun2);
         }
         
         public static Term SomeOption(Term arg)

@@ -97,9 +97,11 @@ namespace ProofGeneration.IsaPrettyPrint
         public override int VisitLemmaDecl(LemmaDecl d)
         {
             _sb.Append("lemma ").Append(d.name).Append(":");
-            _sb.AppendLine();
-            
-            PrintContextElem(d.contextElem);
+            if (!d.contextElem.IsEmpty())
+            {
+                _sb.AppendLine();
+                PrintContextElem(d.contextElem);
+            }
 
             _sb.AppendLine();
 

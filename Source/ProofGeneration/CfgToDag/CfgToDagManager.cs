@@ -6,6 +6,7 @@ using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag
@@ -77,11 +78,19 @@ namespace ProofGeneration.CfgToDag
                 new Tuple<IList<Term>, Term>(new List<Term>(), beforeDagProgAccess.VarContext())
                 );
 
+            var funContextWfName = "Wf_Fun";
+            var boogieContext = new BoogieContextIsa(
+                IsaCommonTerms.TermIdentFromName("A"),
+                IsaCommonTerms.TermIdentFromName("M"),
+                IsaCommonTerms.TermIdentFromName(varContextName),
+                IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
+                IsaCommonTerms.EmptyList);
             CfgToDagLemmaManager lemmaManager = new CfgToDagLemmaManager(
                 beforeDagProgAccess, 
                 afterDagProgAccess, 
+                boogieContext,
                 afterDagCfg,
-                varContextName, 
+                funContextWfName,
                 hintManager,
                 blocksToLoops,
                 beforeToAfter,
@@ -96,7 +105,7 @@ namespace ProofGeneration.CfgToDag
             outerDecls.Add(new DeclareDecl("Nat.One_nat_def[simp del]"));
             if (afterUniqueExit != null)
             {
-                outerDecls.Add(lemmaManager.UnifiedExitLemma(GetCfgLemmaName(afterUniqueExit, lemmaNamer)));
+                outerDecls.AddRange(lemmaManager.UnifiedExitLemma(GetCfgLemmaName(afterUniqueExit, lemmaNamer)));
             }
             
             foreach (Block afterBlock in afterDagCfg.GetBlocksBackwards())
@@ -185,12 +194,30 @@ namespace ProofGeneration.CfgToDag
             LemmaDecl entryLemma = lemmaManager.EntryLemma("entry_lemma", beforeDagCfg.entry, afterDagCfg.entry,
                 b => GetCfgLemmaName(b, lemmaNamer));
             outerDecls.Add(entryLemma);
+
+            var absValType = new VarType("a");
+            LocaleDecl cfgToDagLemmasLocale = new LocaleDecl(
+                "cfg_to_dag_lemmas",
+                new ContextElem( 
+                    new List<Tuple<TermIdent, TypeIsa>>
+                    {
+                        Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),
+                        Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType))
+                    }, 
+                    new List<Term> { IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, beforeDagProgAccess.FunctionsDecl(), boogieContext.funContext) },
+                    new List<string> { funContextWfName }
+                    ),
+                outerDecls
+                );
+
+            List<OuterDecl> theoryOuterDecls = new List<OuterDecl>();
+            theoryOuterDecls.Add(cfgToDagLemmasLocale);
             
             return new Theory(
                 theoryName,
                 new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML", beforeDagProgAccess.TheoryName(), 
                                     afterDagProgAccess.TheoryName() },
-                outerDecls
+                theoryOuterDecls
                 );
         }
         

@@ -36,6 +36,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public string GlobalsLocalsDisjointLemma();
         public string GlobalsAtMostMax();
         public string LocalsAtLeastMin();
+        public string FuncsWfTyLemma();
+        public string VarContextWfTyLemma();
 
         public string LookupVarTyLemma(Variable v);
     }

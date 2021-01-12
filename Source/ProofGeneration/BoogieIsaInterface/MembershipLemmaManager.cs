@@ -18,11 +18,6 @@ namespace ProofGeneration.BoogieIsaInterface
         private readonly IsaProgramRepr isaProgramRepr;
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
 
-        /*
-        private bool containsFunctions = false;
-        private bool containsAxioms = false;
-        */
-
         private readonly string theoryName;
 
         private readonly IDictionary<Declaration, LemmaDecl> membershipLemmas = new Dictionary<Declaration, LemmaDecl>();
@@ -45,6 +40,12 @@ namespace ProofGeneration.BoogieIsaInterface
         private readonly string globalsMaxName = "globals_max";
         
         private readonly string globalsLocalsDisjName = "globals_locals_disj";
+        private readonly string funcsWfName = "funcs_wf";
+        private readonly string constsWfName = "consts_wf";
+        private readonly string globalsWfName = "globals_wf";
+        private readonly string paramsWfName = "params_wf";
+        private readonly string localsWfName = "locals_wf";
+        private readonly string varContextWfName = "var_context_wf";
 
         private readonly IsaProgramGeneratorConfig config;
         private readonly IsaBlockInfo isaBlockInfo;
@@ -81,6 +82,10 @@ namespace ProofGeneration.BoogieIsaInterface
                 IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(consts),
                     IsaCommonTerms.TermIdentFromName(globals));
             AddDisjointnessLemmas(GlobalsMaxLocalsMin.Item1, GlobalsMaxLocalsMin.Item2);
+            if (config.GenerateFunctions)
+            {
+                AddTypingHelperLemmas();
+            }
         }
         
         public string TheoryName()
@@ -448,6 +453,77 @@ namespace ProofGeneration.BoogieIsaInterface
             helperLemmas.Add(
                 new LemmaDecl(globalsLocalsDisjName, statement, new Proof(proofMethods))
             );
+        }
+
+        public string VarContextWfTyLemma()
+        {
+            return QualifyAccessName(varContextWfName);
+        }
+
+        public string FuncsWfTyLemma()
+        {
+            return QualifyAccessName(funcsWfName);
+        }
+
+        private void AddTypingHelperLemmas()
+        {
+            Func<string, string, Term, LemmaDecl> WfLemma = 
+                (lemmaName, list_def, fun) =>
+                {
+                    Term wfStmt = 
+                        new TermApp(IsaCommonTerms.ListAll(
+                            IsaCommonTerms.Composition(fun, IsaCommonTerms.SndId), 
+                            IsaCommonTerms.TermIdentFromName(list_def))
+                        ); 
+                    return 
+                        new LemmaDecl(lemmaName, ContextElem.CreateEmptyContext(), wfStmt,
+                            new Proof(new List<string>
+                            {
+                                "unfolding " + list_def + "_def",
+                                "by simp"
+                            })
+                            );
+                };
+            //TODO: only works if all definitions are defined on the current level (not in a parent)
+            helperLemmas.Add(WfLemma(funcsWfName, isaProgramRepr.funcsDeclDef, IsaCommonTerms.TermIdentFromName("wf_fdecl")));
+            Term wfTy0 = new TermApp(IsaCommonTerms.TermIdentFromName("wf_ty"), new NatConst(0));
+            
+            
+            helperLemmas.Add(WfLemma(constsWfName,  isaProgramRepr.constantsDeclDef, wfTy0));
+            helperLemmas.Add(WfLemma(globalsWfName,  isaProgramRepr.globalsDeclDef, wfTy0));
+            helperLemmas.Add(WfLemma(paramsWfName,  isaProgramRepr.paramsDeclDef, wfTy0));
+            helperLemmas.Add(WfLemma(localsWfName,  isaProgramRepr.localVarsDeclDef, wfTy0));
+            
+            var xId = new SimpleIdentifier("x");
+            var tauId = new SimpleIdentifier("\\<tau>");
+            
+            Term tauTerm = new TermIdent(tauId);
+            Term xTerm = new TermIdent(xId);
+            Term varContextWfStmt = TermQuantifier.ForAll(
+                new List<Identifier> {xId, tauId},
+                null,
+                TermBinary.Implies(
+                    TermBinary.Eq(
+                        new TermApp(
+                            IsaCommonTerms.TermIdentFromName("lookup_var_ty"), 
+                            new TermTuple(new List<Term> {constsAndGlobalsList, paramsAndLocalsList}), xTerm),
+                        IsaCommonTerms.SomeOption(tauTerm)
+                        ),
+                    new TermApp(wfTy0, tauTerm)
+                    ));
+            
+            LemmaDecl varContextWf = 
+                new LemmaDecl(
+                    varContextWfName, 
+                    ContextElem.CreateEmptyContext(), 
+                    varContextWfStmt, 
+                    new Proof(
+                        new List<string>()
+                        {
+                            ProofUtil.Apply("rule lookup_ty_pred_2"),
+                            ProofUtil.By(ProofUtil.SimpAll(constsWfName, globalsWfName, paramsWfName, localsWfName))
+                        } ));
+            helperLemmas.Add(varContextWf);
         }
 
         private Term VariableNames(Term variableDeclarations)

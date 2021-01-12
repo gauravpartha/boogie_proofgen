@@ -426,7 +426,7 @@ namespace ProofGeneration
             
             #region cfg to dag
             var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
-                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
             StoreTheory(beforeCfgToDagProgTheory);
 
             Block uniqueExitBlock =

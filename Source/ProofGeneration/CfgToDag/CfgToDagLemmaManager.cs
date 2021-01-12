@@ -40,6 +40,7 @@ namespace ProofGeneration.CfgToDag
         private readonly string redCfgName = "Red";
         private readonly string dagVerifiesName = "DagVerifies";
         private readonly string dagAssmsName = "DagAssms";
+        private readonly string funContextWfName;
         
         string stateRelLoopHeadName = "StateRel1";
         
@@ -51,8 +52,9 @@ namespace ProofGeneration.CfgToDag
         public CfgToDagLemmaManager(
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
+            BoogieContextIsa boogieContext,
             CFGRepr afterDagCfg,
-            string varContextName,
+            string funContextWfName,
             CfgToDagHintManager hintManager,
             IDictionary<Block, IList<Block>> blocksToLoops,
             IDictionary<Block, Block> beforeToAfterBlock,
@@ -64,19 +66,14 @@ namespace ProofGeneration.CfgToDag
             this.beforeDagProgAccess = beforeDagProgAccess;
             this.afterDagProgAccess = afterDagProgAccess;
             this.afterDagCfg = afterDagCfg;
+            this.funContextWfName = funContextWfName;
             variableTranslation = varFactory.CreateTranslation().VarTranslation;
             this.hintManager = hintManager;
             this.blocksToLoops = blocksToLoops;
             this.beforeToAfterBlock = beforeToAfterBlock;
             this.beforeDagData = beforeDagData;
             this.afterExitBlock = afterExitBlock;
-            boogieContext = new BoogieContextIsa(
-                IsaCommonTerms.TermIdentFromName("A"),
-                IsaCommonTerms.TermIdentFromName("M"),
-                IsaCommonTerms.TermIdentFromName(varContextName),
-                IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
-                IsaCommonTerms.EmptyList);
-
+            this.boogieContext = boogieContext;
             initState1 = IsaBoogieTerm.Normal(normalInitState1);
             initState2 = IsaBoogieTerm.Normal(normalInitState2);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(new IsaUniqueNamer(), varFactory);
@@ -173,6 +170,8 @@ namespace ProofGeneration.CfgToDag
             }
             
             assumptions.Add(propagationAssm);
+            
+            var lemmas = new List<LemmaDecl>();
 
             List<string> proofMethods;
             if (loopHeadHint != null)
@@ -195,10 +194,18 @@ namespace ProofGeneration.CfgToDag
                     );
                 }
 
+                var typingTacs = new List<string>();
+                foreach (var inv in loopHeadHint.Invariants)
+                {
+
+                    var (typing_tac, tac_helper_lemmas) = typingTacticGenerator.GenerateTactic(inv);
+                    lemmas.AddRange(tac_helper_lemmas);
+                    typingTacs.Add(typing_tac);
+                }
+
                 proofMethods.Add("unfolding " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterDag) + "_def");
                 proofMethods.Add(ProofUtil.Apply("cfg_dag_rel_tac_single+"));
-                proofMethods.Add("subgoal");
-                proofMethods.Add("sorry");
+                proofMethods.Add(TypingTactics(typingTacs, null));
                 proofMethods.Add("done");
             }
             else
@@ -313,7 +320,7 @@ namespace ProofGeneration.CfgToDag
             );
         }
 
-        public LemmaDecl UnifiedExitLemma(string lemmaName)
+        public IList<LemmaDecl> UnifiedExitLemma(string lemmaName)
         {
             if(afterExitBlock == null)
                 throw new ProofGenUnexpectedStateException("incorrect state: assuming that there is no unified exit");
@@ -337,24 +344,34 @@ namespace ProofGeneration.CfgToDag
             };
 
             Term conclusion = IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState2, beforeDagProgAccess.PostconditionsDecl());
+
+            var typingTactics = new List<string>();
+            var lemmas = new List<LemmaDecl>();
+            foreach (var post in beforeDagData.Postconditions)
+            {
+                var (typingTac, tacHelperLemmas) = typingTacticGenerator.GenerateTactic(post);
+                typingTactics.Add(typingTac);
+                lemmas.AddRange(tacHelperLemmas);
+            }
             
-            return 
+            var mainLemma = 
                 new LemmaDecl(
                     lemmaName,
                     ContextElem.CreateWithAssumptions(cfgAssumptions),
                     conclusion,
                     new Proof(new List<string>
                     {
-                        "unfolding expr_all_sat_def",
+                        "unfolding expr_all_sat_def " + beforeDagProgAccess.PostconditionsDeclName()+"_def " ,
                         ProofUtil.Apply("rule cfg_dag_rel_post_invs_3"),
                         "apply (erule assms(1))",
                         ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterExitBlock)),
-                        "subgoal",
-                        "sorry",
-                        "unfolding " + beforeDagProgAccess.PostconditionsDeclName()+"_def " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterExitBlock)+"_def",
+                        TypingTactics(typingTactics, "assms(2)"),
+                        "unfolding " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterExitBlock)+"_def",
                         "by cfg_dag_rel_tac_single+"
                     })
                 );
+            lemmas.Add(mainLemma);
+            return lemmas;
         }
 
         /// <summary>
@@ -399,12 +416,12 @@ namespace ProofGeneration.CfgToDag
             var localLemmas = new List<LemmaDecl>();
             
             //one tactic per post invariant: string is tactic and bool is whether it's the postcondition of the program
-            var typingTactics = new List<Tuple<string, bool>>();
-            Action<Expr, bool> addTypingTactic = (inv, b) =>
+            var typingTactics = new List<string>();
+            Action<Expr> addTypingTactic = (inv) =>
             {
                 var typingTacticTuple = typingTacticGenerator.GenerateTactic(inv);
                 localLemmas.AddRange(typingTacticTuple.Item2);
-                typingTactics.Add(Tuple.Create(typingTacticTuple.Item1, b));
+                typingTactics.Add(typingTacticTuple.Item1);
             };
             
             foreach (var bSuc in successors)
@@ -417,7 +434,7 @@ namespace ProofGeneration.CfgToDag
 
                     foreach (var inv in hint.Invariants)
                     {
-                        addTypingTactic(inv, false);
+                        addTypingTactic(inv);
                     }
                     
                 }
@@ -431,7 +448,7 @@ namespace ProofGeneration.CfgToDag
                    );
                foreach (var inv in beforeDagData.Postconditions)
                {
-                   addTypingTactic(inv, true);
+                   addTypingTactic(inv);
                }
             }
             
@@ -515,8 +532,7 @@ namespace ProofGeneration.CfgToDag
             }
             
             //TODO proof that post invariants reduce to booleans
-            proofMethods.Add("subgoal");
-            proofMethods.Add("sorry");
+            proofMethods.Add(TypingTactics(typingTactics, null));
             proofMethods.Add("done");
             
             var blockLemma = new LemmaDecl(
@@ -836,12 +852,44 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine("by (simp add: member_rec(2))");
         }
 
-        private void AppendTypingTacticProofs(IEnumerable<Tuple<string, bool>> typingTactics, StringBuilder sb)
+        /// <summary>
+        /// return tactics to prove expressions reduce using the input tactics for well-typedness
+        /// </summary>
+        /// <param name="typingTactics"></param>
+        /// <param name="stateWtThm">state well-typed assumption if the assumption is not already in the context otherwise null</param>
+        /// <returns></returns>
+        private string TypingTactics(IEnumerable<string> typingTactics, string stateWtThm)
         {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("apply simp");
+            if (!typingTactics.Any())
+                return sb.ToString();
+
+            sb.AppendLine();
+            
+            if (typingTactics.Count() != 1)
+            {
+                sb.AppendLine(ProofUtil.Apply("intro conjI"));
+            }
+            
             foreach (var typingTac in typingTactics)
             {
+                sb.AppendLine(ProofUtil.Apply((stateWtThm == null ? "erule " : "rule ") +
+                                              ProofUtil.OF("" +
+                                                           "type_safety_top_level_inv",
+                                                  funContextWfName,
+                                                  beforeDagProgAccess.FuncsWfTyLemma(),
+                                                  beforeDagProgAccess.VarContextWfTyLemma())));
+                if (stateWtThm != null)
+                    sb.AppendLine(ProofUtil.Apply("rule " + stateWtThm));
                 
-            } 
+                //expression wf
+                sb.AppendLine(ProofUtil.Apply("simp"));
+                //expression well-typed
+                sb.AppendLine(typingTac);
+            }
+            
+            return sb.ToString();
         }
 
         //proves the loop induction hypothesis of the current loop head 

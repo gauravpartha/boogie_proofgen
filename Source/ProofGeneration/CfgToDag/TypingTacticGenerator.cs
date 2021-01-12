@@ -16,8 +16,9 @@ namespace ProofGeneration.CfgToDag
         private readonly IProgramAccessor programAccessor;
 
         public TypingTacticGenerator(IProgramAccessor programAccessor, IVariableTranslationFactory factory)
-        {
-           equalityHintGenerator = new EqualityHintGenerator(factory); 
+        { 
+            this.programAccessor = programAccessor;
+            equalityHintGenerator = new EqualityHintGenerator(factory); 
         }
         
         public Tuple<string, IEnumerable<LemmaDecl>> GenerateTactic(Expr e)
