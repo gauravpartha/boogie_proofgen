@@ -11,6 +11,7 @@ using BoogiePL = Microsoft.Boogie;
 using System.Runtime.Caching;
 using System.Diagnostics;
 using ProofGeneration;
+using ProofGeneration.Util;
 
 namespace Microsoft.Boogie
 {
@@ -480,7 +481,7 @@ namespace Microsoft.Boogie
         {
           PrintBplFile(CommandLineOptions.Clo.PrintFile, program, false, true, CommandLineOptions.Clo.PrettyPrint);
         }
-
+        
         CivlTypeChecker civlTypeChecker;
         PipelineOutcome oc = ResolveAndTypecheck(program, fileNames[fileNames.Count - 1], out civlTypeChecker);
         if (oc != PipelineOutcome.ResolvedAndTypeChecked)
@@ -515,8 +516,33 @@ namespace Microsoft.Boogie
         CoalesceBlocks(program);
 
         Inline(program);
+        
         ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames));
 
+        /*
+        #region check if proof gen supports subset
+        ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
+        if (!proofGenSubsetChecker.ProofGenSupportsSubset(program, out object resultNode))
+        {
+          Console.WriteLine("Failure: " + fileNames[0] + " " + resultNode.GetType());
+        }
+        else
+        {
+          //num commands
+          int totalNumOfCommands = program.Implementations.Sum(i => i.Blocks.Sum(b => b.cmds.Count()));
+          Console.WriteLine("Success: " + fileNames[0] + 
+                            " Commands: " + totalNumOfCommands + 
+                            " Axioms: " + program.Axioms.Count() + 
+                            " Variables: " + program.Variables.Count() + 
+                            " Constants: " + program.Constants.Count() +
+                            " Funcs: " + program.Functions.Count() + 
+                            " Procs: " + program.Procedures.Count() + 
+                            " Impls: " + program.Implementations.Count());
+        }
+        Environment.Exit(0);
+        #endregion
+        */
+        
         var stats = new PipelineStatistics();
         oc = InferAndVerify(program, stats, 1 < CommandLineOptions.Clo.VerifySnapshots ? programId : null);
         switch (oc)
