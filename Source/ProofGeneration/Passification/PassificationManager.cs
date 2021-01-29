@@ -14,6 +14,7 @@ namespace ProofGeneration.Passification
        public static Theory PassificationProof(
            string theoryName,
            string boogieToVcTheoryName,
+           bool generateEndToEndLemma,
            LemmaDecl boogieToVcLemma,
            Term vcAssm,
            CFGRepr beforePassificationCfg,
@@ -29,7 +30,7 @@ namespace ProofGeneration.Passification
             string passiveVarContextName = "\\<Lambda>2";
             var varContextNonPassivePassive = Tuple.Create(varContextName, passiveVarContextName);
             
-            var beforePassiveLemmaManager = new PrePassiveLemmaManager(
+            var beforePassiveLemmaManager = new PassificationLemmaManager(
                 beforePassificationCfg,
                 nonPassiveToPassiveBlock,
                 beforePassiveProgAccess,
@@ -73,25 +74,34 @@ namespace ProofGeneration.Passification
             
             //add cfg lemmas at the end
             passificationProofDecls.AddRange(cfgLemmas);
-            
-            var endToEnd = new PassificationEndToEnd();
 
-            passificationProofDecls.AddRange(endToEnd.EndToEndProof(
-                GetCfgLemmaName(beforePassificationCfg.entry, lemmaNamer),
-                boogieToVcTheoryName+"."+boogieToVcLemma.name,
-                vcAssm,
-                beforePassiveProgAccess,
-                passiveProgAccess,
-                varContextNonPassivePassive,
-                beforePassificationCfg,
-                relationGen.LiveVarsBeforeBlock(beforePassificationCfg.entry),
-                passiveFactory.CreateTranslation().VarTranslation
-            ));
+            if (generateEndToEndLemma)
+            {
+                var endToEnd = new PassificationEndToEnd();
+
+                passificationProofDecls.AddRange(endToEnd.EndToEndProof(
+                    GetCfgLemmaName(beforePassificationCfg.entry, lemmaNamer),
+                    boogieToVcTheoryName+"."+boogieToVcLemma.name,
+                    vcAssm,
+                    beforePassiveProgAccess,
+                    passiveProgAccess,
+                    varContextNonPassivePassive,
+                    beforePassificationCfg,
+                    relationGen.LiveVarsBeforeBlock(beforePassificationCfg.entry),
+                    passiveFactory.CreateTranslation().VarTranslation
+                ));
+            }
+
+            var imports = new List<string>
+            {
+                "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(),
+                passiveProgAccess.TheoryName(), "Boogie_Lang.PassificationML",
+                boogieToVcTheoryName
+            };
+            if(generateEndToEndLemma)
+                imports.Add("Boogie_Lang.PassificationEndToEnd");
             
-            return new Theory(theoryName,
-                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(), 
-                    passiveProgAccess.TheoryName(), "Boogie_Lang.PassificationEndToEnd", "Boogie_Lang.PassificationML", boogieToVcTheoryName},
-                passificationProofDecls);
+            return new Theory(theoryName, imports, passificationProofDecls);
        }
        
        

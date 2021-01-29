@@ -1,17 +1,13 @@
 ﻿using System;
-using System.Collections;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
-using ProofGeneration.IsaPrettyPrint;
 using ProofGeneration.VCProofGen;
 using ProofGeneration.ProgramToVCProof;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Microsoft.Boogie.GraphUtil;
 using Microsoft.Boogie.ProofGen;
 using ProofGeneration.Util;
@@ -32,7 +28,6 @@ namespace ProofGeneration
         private static CFGRepr beforeDagCfg;
 
         private static BoogieMethodData beforeDagData;
-        private static Graph<Block> cfgToDagGraph;
         
         private static IDictionary<Block, Block> beforePassiveOrigBlock;
         private static CFGRepr beforePassificationCfg;
@@ -48,8 +43,7 @@ namespace ProofGeneration
 
         private static BoogieGlobalData boogieGlobalData;
 
-        private static IDictionary<Block, IDictionary<Variable, Expr>> initialVarMapping = new Dictionary<Block, IDictionary<Variable, Expr>>();
-        private static IDictionary<Variable, Variable> passiveToOrigVar = new Dictionary<Variable, Variable>();
+        private static IDictionary<Block, IDictionary<Variable, Expr>> initialVarMapping;
 
         //VC Automation Hints
         private static VCHintManager vcHintManager;
@@ -85,7 +79,6 @@ namespace ProofGeneration
         /// <param name="g">graph for which all the loop information has been computed</param>
         public static void GraphCfgToDag(Graph<Block> g)
         {
-            cfgToDagGraph = g;
             cfgToDagHintManager = new CfgToDagHintManager(g, beforeDagOrigBlock);
         }
 
@@ -106,6 +99,7 @@ namespace ProofGeneration
             cfgToDagHintManager.AfterDagToOrig = beforePassiveOrigBlock;
             beforePassiveData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
             passificationHintManager = new PassificationHintManager(beforePassiveOrigBlock);
+            initialVarMapping = new Dictionary<Block, IDictionary<Variable, Expr>>();
             
             // compute mapping between copied blocks (before dag -> after dag)
             beforeDagAfterDagBlock = new Dictionary<Block, Block>();
@@ -290,6 +284,9 @@ namespace ProofGeneration
             
             vcHintManager = new VCHintManager(factory, translator);
         }
+        
+        private static ProofGenConfig _proofGenConfig = 
+            new ProofGenConfig(false, false, true);
 
         //axiom builder is null iff types are not erased (since no polymorphism in vc)
         public static void VCGenerateAllProofs(
@@ -301,6 +298,7 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
+            var theories = new List<Theory>();
             if(axiomBuilder == null && typeAxioms != null)
                 throw new ArgumentException("type axioms can only be null if axiom builder is null");
             
@@ -369,7 +367,9 @@ namespace ProofGeneration
                 afterPassificationCfg,  
                 out IList<OuterDecl> programDecls);
             
-            StoreTheory(new Theory(finalProgTheoryName, new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName() }, programDecls));
+            Theory finalProgTheory =
+                new Theory(finalProgTheoryName, new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName() }, programDecls);
+            theories.Add(finalProgTheory);
                 
             var vcBoogieInfo = new VcBoogieInfo(vcinst, vcinstAxiom, vcAllAxioms, allAxiomsInfo);
             
@@ -380,8 +380,9 @@ namespace ProofGeneration
                 vcLocale,
                 vcTranslator
                 );
-            Theory theoryPassive = ProgramToVcManager.ProgramToVcProof(
-                afterPassificationImpl.Name + "_passive",
+            Theory theoryPassive = VcPhaseManager.ProgramToVcProof(
+                afterPassificationImpl.Name + "_vcphase_proof",
+                _proofGenConfig.GenerateVcE2E,
                 afterUnreachablePruningCfg,
                 afterPassificationCfg,
                 passiveProgAccess,
@@ -394,21 +395,22 @@ namespace ProofGeneration
                 out Term vcAssm,
                 out LemmaDecl endToEndLemma
             );
-            StoreTheory(theoryPassive);
+            theories.Add(theoryPassive);
             
             #region before passive
             
-            var passificationProgTheory = new Theory(beforePassiveProgTheoryName,
+            Theory passificationProgTheory = new Theory(beforePassiveProgTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", beforeCfgToDagTheoryName}, programDeclsBeforePassive);
-            StoreTheory(passificationProgTheory);
+            theories.Add(passificationProgTheory);
             
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
 
             
-            var passificationProofTheory = PassificationManager.PassificationProof(
+            Theory passificationProofTheory = PassificationManager.PassificationProof(
                 afterPassificationImpl.Name+"_passification_proof",
                 theoryPassive.theoryName,
+                _proofGenConfig.GeneratePassifE2E,
                 endToEndLemma,
                 vcAssm,
                 beforePassificationCfg,
@@ -420,14 +422,13 @@ namespace ProofGeneration
                 varTranslationFactory2,
                 varTranslationFactory
                 );
-
-            StoreTheory(passificationProofTheory);
+            theories.Add(passificationProofTheory);
             #endregion
             
             #region cfg to dag
-            var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
+            Theory beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util"}, programDeclsBeforeCfgToDag);
-            StoreTheory(beforeCfgToDagProgTheory);
+            theories.Add(beforeCfgToDagProgTheory);
 
             Block uniqueExitBlock =
                 uniqueExitBlockOrig != null
@@ -446,34 +447,11 @@ namespace ProofGeneration
                 beforeCfgToDagProgAccess,
                 beforePassiveProgAccess,
                 varTranslationFactory2);
-            StoreTheory(cfgToDagProofTheory);
+            //theories.Add(cfgToDagProofTheory);
             #endregion
-        }
-
-        private static IDictionary<Block, Block> BeforeToAfterDag()
-        {
-            var result = new Dictionary<Block, Block>();
             
-            var origToAfterDag = beforePassiveOrigBlock.ToDictionary(x => x.Value, x => x.Key);
-
-            foreach (var beforeBlock in beforeDagCfg.GetBlocksForwards())
-            {
-                var origBlock = beforeDagOrigBlock[beforeBlock];
-                
-                result.Add(beforeBlock, origToAfterDag[origBlock]);
-            }
-
-            return result;
-        }
-
-        private static void StoreTheory(Theory theory)
-        {
-            var sw = new StreamWriter(theory.theoryName + ".thy");
-
-            string theoryString = IsaPrettyPrinter.PrintTheory(theory);
-
-            sw.WriteLine(theoryString);
-            sw.Close();
+            ProofGenerationOutput.StoreProofs("proofs_"+afterPassificationImpl.Proc.Name, theories);
+            
         }
 
     }

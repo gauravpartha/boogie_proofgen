@@ -59,6 +59,7 @@ namespace ProofGeneration
         private readonly static TermIdent instTypeId = IsaCommonTerms.TermIdentFromName("instantiate");
 
         private readonly static TermIdent axiomAssmId = IsaCommonTerms.TermIdentFromName("axiom_assm");
+        private readonly static TermIdent nstateGlobRestrId = IsaCommonTerms.TermIdentFromName("nstate_global_restriction");
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
@@ -247,6 +248,9 @@ namespace ProofGeneration
                     break;
                 case BinaryOperator.Opcode.Imp:
                     bopIsa = "Imp";
+                    break;
+                case BinaryOperator.Opcode.Iff:
+                    bopIsa = "Iff";
                     break;
                 default:
                     throw new NotImplementedException();
@@ -465,9 +469,10 @@ namespace ProofGeneration
         {
             return
                 new TermApp(redExprId,
-                new List<Term>()
+                new List<Term>
                 {
                     boogieContext.absValTyMap,
+                    boogieContext.varContext,
                     boogieContext.funContext,
                     boogieContext.rtypeEnv,
                     expr,
@@ -564,6 +569,11 @@ namespace ProofGeneration
             return new TermApp(axiomAssmId, absValTyMap, funContext, consts, normalState, axioms);
         }
 
+        public static Term NstateGlobalRestriction(Term normalState, Term vdecls)
+        {
+            return new TermApp(nstateGlobRestrId, normalState, vdecls);
+        }
+        
         public static Term IsClosedType(Term ty)
         {
             return new TermApp(closedTypeId, ty);

@@ -203,17 +203,37 @@ namespace ProofGeneration.ProgramToVCProof
                 new TermList(boogieFunValArgs)
             });
 
-            Term right = IsaCommonTerms.SomeOption(
-                converter.ConvertToBoogieVal(f.OutParams.First().TypedIdent.Type,
-                    new TermApp(declToVCMapping[f],
-                         vcFunTyArgs.Union(
-                            boundParamVars.Select(bv => (Term) new TermIdent(bv)).ToList()
-                        ).ToList())
-                )
-            );
+            Term vcFunApp =
+                new TermApp(declToVCMapping[f],
+                    vcFunTyArgs.Union(
+                        boundParamVars.Select(bv => (Term) new TermIdent(bv)).ToList()
+                    ).ToList());
 
+            var outputType = f.OutParams.First().TypedIdent.Type;
+
+            Term right = IsaCommonTerms.SomeOption(
+                converter.ConvertToBoogieVal(outputType,
+                    vcFunApp)
+            );
+            
             Term equation = TermBinary.Eq(left, right);
 
+            Term conclusion;
+            if (!TypeUtil.IsPrimitive(outputType))
+            {
+                //if type is not primitive, then the type information is not yet included
+
+                conclusion = TermBinary.And(equation, 
+                    TermBinary.Eq(
+                        IsaBoogieTerm.TypeToVal(boogieContext.absValTyMap, vcFunApp), 
+                        typeIsaVisitor.Translate(outputType)
+                        ));
+            }
+            else
+            {
+                conclusion = equation;
+            }
+            
             if (typeArgConstraints.Any())
             {
                 var aggregatedAssms = typeArgConstraints.Aggregate((t1, t2) => TermBinary.And(t2,t1));
@@ -222,15 +242,20 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     var closednessAssms = boogieFunTyArgs.Select(t1 => IsaBoogieTerm.IsClosedType(t1))
                         .Aggregate((t1, t2) => TermBinary.And(t2, t1));
-                    return new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), 
-                        TermBinary.Implies(closednessAssms, TermBinary.Implies(aggregatedAssms, equation)));
+                    return new TermQuantifier(TermQuantifier.QuantifierKind.META_ALL, boundParamVars.Union(boundTypeVars).ToList(), 
+                        TermBinary.MetaImplies(closednessAssms, TermBinary.MetaImplies(aggregatedAssms, conclusion)));
                 }
-                
-                return new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), 
-                        TermBinary.Implies(aggregatedAssms, equation));
+
+                return new TermQuantifier(TermQuantifier.QuantifierKind.META_ALL, boundParamVars.Union(boundTypeVars).ToList(), 
+                    TermBinary.MetaImplies(aggregatedAssms, conclusion));
             }
 
-            return new TermQuantifier(TermQuantifier.QuantifierKind.ALL, boundParamVars.Union(boundTypeVars).ToList(), equation);
+            if (boundParamVars.Any())
+            {
+                return new TermQuantifier(TermQuantifier.QuantifierKind.META_ALL, boundParamVars.Union(boundTypeVars).ToList(), conclusion);
+            }
+
+            return conclusion;
         }
 
         public static IDictionary<NamedDeclaration, Term> DeclToTerm(

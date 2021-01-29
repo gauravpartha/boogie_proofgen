@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
+using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
@@ -36,11 +38,12 @@ namespace ProofGeneration.ProgramToVCProof
     /// <summary>
     /// Responsible for producing theory for the proof of the final Boogie program under the assumption of the VC
     /// </summary>
-    public class ProgramToVcManager
+    public class VcPhaseManager
     {
         
         public static Theory ProgramToVcProof(
             string theoryName,
+            bool generateEndToEndProof,
             CFGRepr finalCfg,
             CFGRepr afterPassificationCfg,
             IProgramAccessor passiveProgAccess,
@@ -54,7 +57,7 @@ namespace ProofGeneration.ProgramToVCProof
             out LemmaDecl endToEndLemma)
         {
             var lemmaNamer = new IsaUniqueNamer();
-            var passiveLemmaManager = new PassiveLemmaManager(
+            var passiveLemmaManager = new VcPhaseLemmaManager(
                 vcProofData.VcBoogieInfo.VcInst, 
                 methodData, 
                 vcProofData.VcFunctions, 
@@ -85,23 +88,56 @@ namespace ProofGeneration.ProgramToVCProof
 
             var passiveOuterDecls = new List<OuterDecl>() { vcProofData.VcLocale };
             passiveOuterDecls.Add(afterPassificationLocale);
+            
+            //generate axiom
+            IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
+            int axId = 0;
+            Dictionary<Axiom, OuterDecl> axiomToLemma = new Dictionary<Axiom, OuterDecl>();
+            var vcAxiomLemmaManager = new VcAxiomLemmaManager(vcProofData.VcBoogieInfo.VcInstAxiom, methodData, vcProofData.VcFunctions, varFactory);
+            foreach(var axiom in vcProofData.VcBoogieInfo.VcAxiomsInfo)
+            {
+                if (axiom is VcBoogieAxiomInfo vcBoogieAxiom)
+                {
+                    axiomToLemma.Add(
+                        vcBoogieAxiom.Axiom,
+                        vcAxiomLemmaManager.AxiomVcLemma(
+                        uniqueNamer.GetName(axiom, "axiom_vc_" + axId),
+                        vcBoogieAxiom.Axiom,
+                        vcBoogieAxiom.Expr));
+                }
+            }
+            LocaleDecl axiomLocale = GenerateLocale("axioms", vcAxiomLemmaManager, axiomToLemma.Values.ToList());
+            passiveOuterDecls.Add(axiomLocale);
+            
+            
 
-            var endToEnd = new EndToEndVCProof(
-                methodData, 
-                passiveProgAccess, 
-                vcProofData.VcFunctions, 
-                vcProofData.VcBoogieInfo,
-                afterPassificationCfg, 
-                afterPassificationLocale.name + "." + cfgProgramLemmas[afterPassificationCfg.entry].name,
-                varFactory,
-                vcProofData.VcTranslator,
-                eraserFactory,
-                gen);
-            passiveOuterDecls.AddRange(endToEnd.GenerateProof(out vcAssm, out endToEndLemma));
+            if (generateEndToEndProof)
+            {
+                var endToEnd = new EndToEndVCProof(
+                    methodData, 
+                    passiveProgAccess, 
+                    vcProofData.VcFunctions, 
+                    vcProofData.VcBoogieInfo,
+                    afterPassificationCfg, 
+                    afterPassificationLocale.name + "." + cfgProgramLemmas[afterPassificationCfg.entry].name,
+                    axiomLocale.name,
+                    ax => axiomLocale.name + "." + axiomToLemma[ax].name,
+                    varFactory,
+                    vcProofData.VcTranslator,
+                    eraserFactory,
+                    gen);
+                passiveOuterDecls.AddRange(endToEnd.GenerateProof(out vcAssm, out endToEndLemma));
 
+            }
+            else
+            {
+                vcAssm = null;
+                endToEndLemma = null;
+            }
+            
             return 
                 new Theory(theoryName,
-                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.ExperimentalML", 
+                new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.VCPhaseML", 
                     passiveProgAccess.TheoryName(), beforePassiveProgAccess.TheoryName() },
                 passiveOuterDecls);
         }
@@ -136,7 +172,7 @@ namespace ProofGeneration.ProgramToVCProof
             CFGRepr afterPassificationCfg,
             CFGRepr finalCfg, 
             HashSet<Block> reachableBlocks,
-            PassiveLemmaManager passiveLemmaManager, 
+            VcPhaseLemmaManager vcPhaseLemmaManager, 
             VCHintManager vcHintManager, 
             IsaUniqueNamer lemmaNamer)
         {
@@ -158,7 +194,7 @@ namespace ProofGeneration.ProgramToVCProof
                         result.AddRange(requiredDecls);
                         result.Add(new MLDecl(code));
                     }
-                    result.Add(passiveLemmaManager.GenerateBlockLemma(b, finalCfg.GetSuccessorBlocks(b), GetLemmaName(b, lemmaNamer), vcHintsName));
+                    result.Add(vcPhaseLemmaManager.GenerateBlockLemma(b, finalCfg.GetSuccessorBlocks(b), GetLemmaName(b, lemmaNamer), vcHintsName));
                     blockToLemmaDecls.Add(b, result);
                 }
                 else if(reachableBlocks.Contains(b))
@@ -171,7 +207,7 @@ namespace ProofGeneration.ProgramToVCProof
                         //add lemma
                         var decls = new List<OuterDecl>
                         {
-                            passiveLemmaManager.GenerateEmptyBlockLemma(b, nonEmptyReachableSuccessors,
+                            vcPhaseLemmaManager.GenerateEmptyBlockLemma(b, nonEmptyReachableSuccessors,
                                 GetLemmaName(b, lemmaNamer))
                         };
                         blockToLemmaDecls.Add(b, decls);
@@ -190,7 +226,7 @@ namespace ProofGeneration.ProgramToVCProof
             CFGRepr finalCfg,
             HashSet<Block> reachableBlocks,
             IDictionary<Block, IList<OuterDecl>> lemmaDecls, 
-            PassiveLemmaManager passiveLemmaManager, 
+            VcPhaseLemmaManager vcPhaseLemmaManager, 
             Term cfgTerm,
             IsaUniqueNamer lemmaNamer)
         {
@@ -214,7 +250,7 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     finalCfgSuccessors = finalCfg.GetSuccessorBlocks(b);
                 }
-                var lemma = passiveLemmaManager.GenerateCfgLemma(
+                var lemma = vcPhaseLemmaManager.GenerateCfgLemma(
                     b, 
                     finalCfg.ContainsBlock(b),
                     afterPassificationCfg.GetSuccessorBlocks(b), 
@@ -233,11 +269,11 @@ namespace ProofGeneration.ProgramToVCProof
             return uniqueNamer.GetName(b, "block_" + b.Label);
         }
 
-        private static LocaleDecl GenerateLocale(string localeName, PassiveLemmaManager lemmaManager, IList<OuterDecl> coreLemmas)
+        private static LocaleDecl GenerateLocale(string localeName, ILocaleContext localeContext, IList<OuterDecl> coreLemmas)
         {
-            IList<OuterDecl> prelude = lemmaManager.Prelude();
+            IList<OuterDecl> prelude = localeContext.Prelude();
             prelude.AddRange(coreLemmas);
-            return new LocaleDecl(localeName, lemmaManager.Context(), prelude);
+            return new LocaleDecl(localeName, localeContext.Context(), prelude);
         }
 
         //return first reachable blocks from block in afterPassificationCfg, which are non-empty and contained in finalCfg

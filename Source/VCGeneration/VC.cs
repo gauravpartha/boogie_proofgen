@@ -1697,15 +1697,15 @@ namespace VC
         switch (CommandLineOptions.Clo.TypeEncodingMethod)
         {
             case CommandLineOptions.TypeEncoding.Predicates:
-                typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet); 
+                typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet, true); 
                 break;
             case CommandLineOptions.TypeEncoding.Monomorphic:
-                typePremiseEraserFactory = null;
+                typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet, false);
                 break;
             default:
                 throw new NotImplementedException();
         } 
-        ProofGeneration.ProofGenerationLayer.SetTypeEraserFactory(typePremiseEraserFactory);
+        ProofGenerationLayer.SetTypeEraserFactory(typePremiseEraserFactory);
         #endregion
         
         VCExpr vc = parent.GenerateVCAux(impl, null, label2absy, checker.TheoremProver.Context);
@@ -1730,7 +1730,7 @@ namespace VC
 
         VCExpr eraseVC (VCExpr vc) 
         {
-          return premiseEraserProvider == null ? vc : premiseEraserProvider.EraseVC(vc);
+          return !premiseEraserProvider.ProgramIsPolymorphic ? vc : premiseEraserProvider.EraseAndSortLet(vc);
         }
 
         VCExpr erasedVC = eraseVC(vc);
@@ -1738,11 +1738,11 @@ namespace VC
 
         VCExpr typeAxioms = null;
         List<VCAxiomInfo> vcAxiomsInfo = null;
-        if (premiseEraserProvider != null) {
+        if (premiseEraserProvider.ProgramIsPolymorphic) {
           typeAxioms = premiseEraserProvider.AxiomBuilder.GetNewAxiomsAndInfo(out vcAxiomsInfo);
         }
 
-        ProofGeneration.ProofGenerationLayer.VCGenerateAllProofs(
+        ProofGenerationLayer.VCGenerateAllProofs(
             erasedVC, 
             erasedAxioms, 
             typeAxioms,

@@ -248,9 +248,9 @@ namespace Microsoft.Boogie.TypeErasure
       VCExpr /*!*/
         bodyWithPremisses;
       if (universal)
-        bodyWithPremisses = simplify ? Gen.ImpliesSimp(typePremisses, body) : Gen.Implies(typePremisses, body);
+        bodyWithPremisses = simplify ? Gen.ImpliesSimp(typePremisses, body) : (typePremisses.Equals(VCExpressionGenerator.True) ? body : Gen.Implies(typePremisses, body));
       else
-        bodyWithPremisses = simplify ? Gen.AndSimp(typePremisses, body) : Gen.And(typePremisses, body);
+        bodyWithPremisses = simplify ? Gen.AndSimp(typePremisses, body) : (typePremisses.Equals(VCExpressionGenerator.True) ? body : Gen.And(typePremisses, body));
 
       return Gen.Let(typeVarBindings, bodyWithPremisses);
     }

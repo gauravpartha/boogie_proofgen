@@ -11,7 +11,7 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
 {
-    class PrePassiveLemmaManager 
+    class PassificationLemmaManager 
     {
         private readonly CFGRepr cfg;
         private readonly IDictionary<Block, Block> origToPassiveBlock;
@@ -46,7 +46,7 @@ namespace ProofGeneration.Passification
         private readonly Dictionary<Block, int> smallestRequiredVersionDict = new Dictionary<Block, int>();
 
 
-        public PrePassiveLemmaManager(
+        public PassificationLemmaManager(
             CFGRepr cfg,
             IDictionary<Block, Block> origToPassiveBlock,
             IProgramAccessor programAccessor,

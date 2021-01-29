@@ -25,12 +25,13 @@ namespace ProofGeneration.Util
             };
             reservedNames = new HashSet<string>();
             reservedNames.Add("A"); //value to abstract value map
+            reservedNames.Add("abs");
 
             illegalChars = new List<char>();
             illegalChars.Add('@');
         }
 
-        public IsaUniqueNamer() : this("_") { }
+        public IsaUniqueNamer() : this("AA") { }
 
         public string GetName(object obj, string preferredName)
         {

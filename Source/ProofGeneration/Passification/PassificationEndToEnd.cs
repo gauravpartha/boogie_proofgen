@@ -328,7 +328,7 @@ namespace ProofGeneration.Passification
                 new PassificationWitness(passiveVarContext, null, null, stateRel, null, u0Set, null);
 
             Term entryBlockId = new NatConst(programAccessor.BlockInfo().BlockIds[cfg.entry]);
-            Term cfgEntryConclusion = PrePassiveLemmaManager.CfgLemmaConclusion(boogieContext, witness,
+            Term cfgEntryConclusion = PassificationLemmaManager.CfgLemmaConclusion(boogieContext, witness,
                 passiveProgramAccessor, IsaCommonTerms.Inl(entryBlockId), finalState);
 
             Term u = IsaCommonTerms.TermIdentFromName("u");
@@ -451,7 +451,6 @@ namespace ProofGeneration.Passification
                 Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),
                 Tuple.Create((TermIdent) boogieContext.methodContext, IsaBoogieType.MethodContextType()),
                 Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType)),
-                Tuple.Create((TermIdent) boogieContext.rtypeEnv, IsaBoogieType.RuntimeTypeEnvType()),
                 Tuple.Create(finalNodeOrReturn, IsaBoogieType.CFGNodeOrReturnType()),
                 Tuple.Create(normalInitState, IsaBoogieType.NormalStateType(absValType)),
                 Tuple.Create(finalState, IsaBoogieType.StateType(absValType))

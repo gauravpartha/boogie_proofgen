@@ -11,7 +11,7 @@ using ProofGeneration.VCProofGen;
 
 namespace ProofGeneration.ProgramToVCProof
 {
-    class PassiveLemmaManager
+    class VcPhaseLemmaManager : ILocaleContext
     {
         private readonly VCInstantiation<Block> vcinst;
 
@@ -38,7 +38,7 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly IsaBlockInfo isaBlockInfo;
 
-        public PassiveLemmaManager(VCInstantiation<Block> vcinst, 
+        public VcPhaseLemmaManager(VCInstantiation<Block> vcinst, 
             BoogieMethodData methodData, 
             IEnumerable<Function> vcFunctions, 
             IsaBlockInfo isaBlockInfo,
@@ -74,14 +74,16 @@ namespace ProofGeneration.ProgramToVCProof
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(isaBlockInfo.CmdsQualifiedName(block)), 
                 initState, finalState);
 
-            List<Term> assumptions = new List<Term> { cmdsReduce };
-            assumptions.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
+            Term vcAssm = vcinst.GetVCObjInstantiation(block, declToVCMapping);
 
+            //do not use separate assumption, leads to issues
             Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst, LemmaHelper.FinalStateIsMagic(block));
+
+            Term statement = TermBinary.MetaImplies(cmdsReduce, TermBinary.MetaImplies(vcAssm, conclusion));
 
             Proof proof = BlockCorrectProof(block, vcHintsName);
 
-            return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
+            return new LemmaDecl(lemmaName, ContextElem.CreateEmptyContext(), statement, proof);
         }
 
         public LemmaDecl GenerateCfgLemma(
@@ -194,48 +196,11 @@ namespace ProofGeneration.ProgramToVCProof
             return new LemmaDecl(lemmaName, ContextElem.CreateWithAssumptions(assumptions), conclusion, proof);
         }
 
-        private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
-        {
-            var absValType = new VarType("a");
-            PureTyIsaTransformer pureTyIsaTransformer = LemmaHelper.ConretePureTyIsaTransformer(absValType);
-            
-            var result = new List<Tuple<TermIdent, TypeIsa>>
-            {
-                Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),
-                Tuple.Create((TermIdent) boogieContext.varContext, IsaBoogieType.VarContextType()),
-                Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType)),
-                Tuple.Create(normalInitState, IsaBoogieType.NormalStateType(absValType))
-            };
-
-            foreach (KeyValuePair<Function, TermIdent> kv in funToInterpMapping)
-            {
-                result.Add(Tuple.Create(kv.Value, IsaBoogieType.BoogieFuncInterpType(absValType)));
-            }
-
-            foreach (Function boogieFun in methodData.Functions)
-            {
-                //get untyped version, maybe should precompute this somewhere and re-use or get the data from the VC
-                TypeUtil.SplitTypeParams(boogieFun.TypeParameters, boogieFun.InParams.Select(v => v.TypedIdent.Type),
-                    out List<TypeVariable> explicitTypeVars, out _);
-
-                TypeIsa typeIsa = pureTyIsaTransformer.Translate(new Function(null, boogieFun.Name,
-                    explicitTypeVars, boogieFun.InParams, boogieFun.OutParams[0]));
-                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(boogieFun, boogieFun.Name)), typeIsa));
-            }
-
-            foreach (Variable v in programVariables)
-            {
-                TypeIsa typeIsa = pureTyIsaTransformer.Translate(v);
-                result.Add(Tuple.Create(IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(v, v.Name)), typeIsa));
-            }
-
-            return result;
-        }
 
         public ContextElem Context()
         {
             return new ContextElem(
-                GlobalFixedVariables(), 
+                ContextHelper.GlobalFixedVariables(boogieContext, methodData.Functions, programVariables, normalInitState, funToInterpMapping, uniqueNamer), 
                 assmManager.AllAssumptions(funToInterpMapping, declToVCMapping, normalInitState, boogieContext, variableFactory.CreateTranslation().VarTranslation), 
                 assmManager.AllAssumptionLabels()
                 );
@@ -250,12 +215,14 @@ namespace ProofGeneration.ProgramToVCProof
 
             LemmasDecl forallPolyThm = 
                 new LemmasDecl("forall_poly_thm", new List<string> {"forall_vc_type[OF " + closedAssm + "]"});
+            LemmasDecl existsPolyThm = 
+                new LemmasDecl("exists_poly_thm", new List<string> {"exists_vc_type[OF " + closedAssm + "]"});
             
             // if One_nat_def is not removed from the simpset, then there is an issue with the assumption "ns 1 = ...",
             // since Isabelle rewrites it to Suc 0 and a subsequent step in the proof may fail
             DeclareDecl decl = new DeclareDecl("Nat.One_nat_def[simp del]");
             
-            return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm, decl };
+            return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm, existsPolyThm, decl };
         }
 
         private Proof BlockCorrectProof(Block b, string vcHintsName)
@@ -265,10 +232,9 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 methods = new List<string>
                 {
-                    "using assms " + globalAssmsName,
-                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def",
-                    "apply cases",
-                    "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
+                    "apply (erule red_cmd_list.cases)",
+                    "using " + globalAssmsName,
+                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def " + vcinst.GetVCObjNameRef(b) + "_def",
                     "apply (handle_cmd_list_full?)",
                     "by (auto?)"
                 };
@@ -276,11 +242,9 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 methods = new List<string>
                 {
-                    "using assms ",
-                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def",
-                    "apply (simp only: " + vcinst.GetVCObjNameRef(b) + "_def)",
+                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def " + vcinst.GetVCObjNameRef(b) + "_def",
                     "apply (tactic \\<open> boogie_vc_tac @{context} @{thms " + globalAssmsName + "} " +
-                    "@{thm forall_poly_thm} " + vcHintsName + " \\<close>)",
+                    "(@{thm forall_poly_thm}, @{thm exists_poly_thm}) " + vcHintsName + " \\<close>)",
                     "by (auto?)"
                 };
             }

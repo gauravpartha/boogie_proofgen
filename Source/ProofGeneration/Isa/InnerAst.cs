@@ -36,7 +36,7 @@ namespace ProofGeneration.Isa
 
         public override string ToString()
         {
-            return (new IsaPrettyPrint.TermPrettyPrinter()).Visit(this);
+            return new IsaPrettyPrint.TermPrettyPrinter().Visit(this);
         }
     }
 

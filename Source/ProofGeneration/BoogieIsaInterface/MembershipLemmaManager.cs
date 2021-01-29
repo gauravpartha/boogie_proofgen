@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
@@ -8,6 +9,11 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
+    public enum VarKind
+    {
+        Constant, Global, ParamOrLocal
+    }
+    
     public class MembershipLemmaManager : IProgramAccessor
     {
         //defer calls to parent, which are not handled here
@@ -21,6 +27,8 @@ namespace ProofGeneration.BoogieIsaInterface
         private readonly string theoryName;
 
         private readonly IDictionary<Declaration, LemmaDecl> membershipLemmas = new Dictionary<Declaration, LemmaDecl>();
+        // constants without globals membership
+        private readonly IDictionary<Declaration, LemmaDecl> constantMembershipLemmas = new Dictionary<Declaration, LemmaDecl>();
         private readonly IDictionary<Variable, LemmaDecl> lookupVarTyLemmas = new Dictionary<Variable, LemmaDecl>();
         private readonly List<LemmaDecl> helperLemmas = new List<LemmaDecl>();
         
@@ -201,6 +209,14 @@ namespace ProofGeneration.BoogieIsaInterface
             return parent.MembershipLemma(d);
         }
 
+        public string ConstantMembershipLemma(Variable c)
+        {
+            if (constantMembershipLemmas.TryGetValue(c, out LemmaDecl result))
+                return QualifyAccessName(result.name);
+
+            return parent.ConstantMembershipLemma(c);
+        }
+
         public IsaBlockInfo BlockInfo()
         {
             return isaBlockInfo;
@@ -218,6 +234,7 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             var result = new List<OuterDecl>();
             result.AddRange(helperLemmas);
+            result.AddRange(constantMembershipLemmas.Values);
             result.AddRange(membershipLemmas.Values);
             result.AddRange(lookupVarTyLemmas.Values);
             return result;
@@ -230,11 +247,12 @@ namespace ProofGeneration.BoogieIsaInterface
                 new[] { isaProgramRepr.funcsDeclDef + "_def" },
                 d => new StringConst(d.Name),
                 d => IsaBoogieTerm.FunDecl((Function)d, factory, false),
-                true 
+                true,
+                false
                 );
         }
 
-        public void AddVariableMembershipLemmas(IEnumerable<Variable> variables, bool global, bool generateMembershipLemmas)
+        public void AddVariableMembershipLemmas(IEnumerable<Variable> variables, VarKind varKind, bool generateMembershipLemmas)
         {
             var varTranslation = factory.CreateTranslation().VarTranslation;
             Func<NamedDeclaration, Term> idOfVar =
@@ -255,12 +273,34 @@ namespace ProofGeneration.BoogieIsaInterface
             Func<Variable, string> membershipLemmaLookup;
             if (generateMembershipLemmas)
             {
+                if (varKind == VarKind.Constant)
+                {
+                    AddNamedDeclsMembershipLemmas(variables,
+                        IsaCommonTerms.TermIdentFromName(consts),
+                        new String[] {consts + "_def"},
+                        idOfVar,
+                        d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
+                        true,
+                        true);
+                }
+
+                string[] defs;
+                if (varKind == VarKind.Constant)
+                {
+                    defs = Array.Empty<string>();
+                }
+                else
+                {
+                    defs = (varKind == VarKind.Global ? constsAndGlobalsDefs : paramsAndLocalsDefs);
+                }
+
                 AddNamedDeclsMembershipLemmas(variables,
-                    global ? constsAndGlobalsList : paramsAndLocalsList,
-                    global ? constsAndGlobalsDefs : paramsAndLocalsDefs,
+                    (varKind == VarKind.Constant || varKind == VarKind.Global) ? constsAndGlobalsList : paramsAndLocalsList,
+                    defs,
                     idOfVar,
                     d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
-                    true);
+                    true,
+                    false);
                 membershipLemmaLookup = v => membershipLemmas[v].name;
             }
             else
@@ -282,7 +322,8 @@ namespace ProofGeneration.BoogieIsaInterface
             string [] definitions,
             Func<NamedDeclaration, Term> nameOf,
             Func<NamedDeclaration, Term> declOf,
-            bool useMapOf)
+            bool useMapOf,
+            bool separateConstantLemmas)
         {
             foreach (var d in decls)
             {
@@ -292,8 +333,21 @@ namespace ProofGeneration.BoogieIsaInterface
                 Term rhs = useMapOf ? IsaCommonTerms.SomeOption(declOf(d)) : declOf(d);
 
                 Term statement = TermBinary.Eq(lhs, rhs);
-                Proof proof = new Proof(new List<string> { "by " + ProofUtil.Simp(definitions) });
-                membershipLemmas.Add(d, new LemmaDecl(MembershipName(d), statement, proof));
+                Proof proof; 
+                //TODO: get rid of hack of checking whether defs are empty to know whether the already existing constant lookup should be used
+                if (definitions.Any())
+                    proof = new Proof(new List<string> { "by " + ProofUtil.Simp(definitions) });
+                else
+                    proof = new Proof(new List<string> { "by " + "(simp add: " + ConstantMembershipName(d) + " del: Nat.One_nat_def)" });
+                
+                if (!separateConstantLemmas)
+                {
+                    membershipLemmas.Add(d, new LemmaDecl(MembershipName(d), statement, proof));
+                }
+                else
+                {
+                    constantMembershipLemmas.Add(d, new LemmaDecl(ConstantMembershipName(d), statement, proof));
+                }
             }
         }
 
@@ -350,6 +404,12 @@ namespace ProofGeneration.BoogieIsaInterface
             }
         }
 
+        private string ConstantMembershipName(NamedDeclaration d)
+        {
+            var name = membershipNamer.GetName(d, d.Name);
+            return "mconst_" + name;
+        }
+
         private string MembershipName(Axiom a, int id)
         {
             return "ma_" + id;
@@ -380,10 +440,9 @@ namespace ProofGeneration.BoogieIsaInterface
                 new LemmaDecl((isGlobal ? globalsMaxName : localsMinName) + "_aux",
                     TermBinary.Implies(
                        TermBinary.Neq(varNames, IsaCommonTerms.EmptyList),  
-                       TermBinary.Eq(isGlobal ? 
-                           IsaCommonTerms.SetMax(IsaCommonTerms.SetOfList(varNames)) : 
-                           IsaCommonTerms.SetMin(IsaCommonTerms.SetOfList(varNames)), 
-                           new NatConst(bound))
+                       isGlobal ?
+                           TermBinary.Le(IsaCommonTerms.SetMax(IsaCommonTerms.SetOfList(varNames)), new NatConst(bound)) :
+                           TermBinary.Ge(IsaCommonTerms.SetMin(IsaCommonTerms.SetOfList(varNames)), new NatConst(bound))
                         ), 
                     new Proof(new List<string>
                     {

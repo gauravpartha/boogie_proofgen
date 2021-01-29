@@ -10,6 +10,7 @@ using VC;
 using BoogiePL = Microsoft.Boogie;
 using System.Runtime.Caching;
 using System.Diagnostics;
+using ProofGeneration;
 
 namespace Microsoft.Boogie
 {
@@ -514,6 +515,7 @@ namespace Microsoft.Boogie
         CoalesceBlocks(program);
 
         Inline(program);
+        ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames));
 
         var stats = new PipelineStatistics();
         oc = InferAndVerify(program, stats, 1 < CommandLineOptions.Clo.VerifySnapshots ? programId : null);

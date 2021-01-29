@@ -141,12 +141,12 @@ namespace ProofGeneration
             // for globals and constants we still generate the type lookup lemmas, but not the membership lemmas,
             // since the membership lemmas should come from the parent (we assume that the constants and globals are the same for both)
             decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, true, config.GenerateGlobalsAndConstants);
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, VarKind.Global, config.GenerateGlobalsAndConstants);
             
             decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, true, config.GenerateGlobalsAndConstants);
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, VarKind.Constant, config.GenerateGlobalsAndConstants);
             
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams.Union(methodData.Locals), false, true);
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams.Union(methodData.Locals), VarKind.ParamOrLocal, true);
             
             decls.AddRange(
         new List<OuterDecl>

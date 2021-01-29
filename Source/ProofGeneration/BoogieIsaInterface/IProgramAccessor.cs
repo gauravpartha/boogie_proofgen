@@ -30,6 +30,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public Term VarContext();
 
         public string MembershipLemma(Declaration d);
+        //does not take global variables into account
+        public string ConstantMembershipLemma(Variable c);
 
         public IsaBlockInfo BlockInfo();
 
