@@ -281,8 +281,8 @@ namespace ProofGeneration
             //Hack: translate vc variable based on name, to ensure that applying erasure multiple times shares the same variables
             var translator = VCExprToIsaTranslator.CreateNameBasedTranslator(uniqueNamer);
             translator.SetFunctionNamer(uniqueNamer);
-            
-            vcHintManager = new VCHintManager(factory, translator);
+            translator.SetTryInstantiatingFunctions(true);
+            vcHintManager = new VCHintManager(new VcRewriteLemmaGen(factory, translator));
         }
         
         private static ProofGenConfig _proofGenConfig = 

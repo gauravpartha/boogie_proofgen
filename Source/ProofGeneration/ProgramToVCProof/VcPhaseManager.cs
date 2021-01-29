@@ -90,26 +90,37 @@ namespace ProofGeneration.ProgramToVCProof
             passiveOuterDecls.Add(afterPassificationLocale);
             
             //generate axiom
-            IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
+            IsaUniqueNamer axiomUniqueNamer = new IsaUniqueNamer();
             int axId = 0;
             Dictionary<Axiom, OuterDecl> axiomToLemma = new Dictionary<Axiom, OuterDecl>();
-            var vcAxiomLemmaManager = new VcAxiomLemmaManager(vcProofData.VcBoogieInfo.VcInstAxiom, methodData, vcProofData.VcFunctions, varFactory);
+            VcRewriteLemmaGen vcRewriteLemmaGen = new VcRewriteLemmaGen(eraserFactory, new VCExprToIsaTranslator(new IsaUniqueNamer()));
+            
+            var vcAxiomLemmaManager = new VcAxiomLemmaManager(
+                vcProofData.VcBoogieInfo.VcInstAxiom, 
+                methodData, 
+                vcProofData.VcFunctions, 
+                vcRewriteLemmaGen, varFactory);
+            
+            var axiomLocaleRequiredDecls = new List<OuterDecl>();
             foreach(var axiom in vcProofData.VcBoogieInfo.VcAxiomsInfo)
             {
                 if (axiom is VcBoogieAxiomInfo vcBoogieAxiom)
                 {
-                    axiomToLemma.Add(
-                        vcBoogieAxiom.Axiom,
+                    var axiomVcLemma = 
                         vcAxiomLemmaManager.AxiomVcLemma(
-                        uniqueNamer.GetName(axiom, "axiom_vc_" + axId),
+                        axiomUniqueNamer.GetName(axiom, "axiom_vc_" + axId),
                         vcBoogieAxiom.Axiom,
-                        vcBoogieAxiom.Expr));
+                        vcBoogieAxiom.Expr,
+                        out IList<OuterDecl> requiredDecls);
+                    axiomToLemma.Add(vcBoogieAxiom.Axiom, axiomVcLemma);
+                    axiomLocaleRequiredDecls.AddRange(requiredDecls);
                 }
             }
+            /* we add the required declarations for the axiom locale to the outer theory, since the axiom locale fixes variables that could clash
+             * with the declarations */
+            passiveOuterDecls.AddRange(axiomLocaleRequiredDecls);
             LocaleDecl axiomLocale = GenerateLocale("axioms", vcAxiomLemmaManager, axiomToLemma.Values.ToList());
             passiveOuterDecls.Add(axiomLocale);
-            
-            
 
             if (generateEndToEndProof)
             {

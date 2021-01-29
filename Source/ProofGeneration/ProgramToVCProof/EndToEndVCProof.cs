@@ -396,7 +396,7 @@ namespace ProofGeneration.ProgramToVCProof
                 "  apply (simp only: fun_interp_single_wf.simps) ",
                 "  apply (erule allE[where ?x=" + IsaPrettyPrinterHelper.Inner(boogieTypeParamsList.ToString()) + "])",
                 "  apply (simp add: " + closedAssmLabels.SpaceAggregate() + ")",
-                "  apply (erule allE[where ?x=" + IsaPrettyPrinterHelper.Inner(boogieValueParamsList.ToString()) + "])",
+                "  apply (erule allE[where ?x=" + IsaPrettyPrinterHelper.Inner(boogieValueParamsList.ToString()) + "])?",
                 (outputType.IsBool ? "using tbool_boolv" : "") + (outputType.IsInt ? "using tint_intv" : "") + " by auto"
             };
             
@@ -755,7 +755,7 @@ namespace ProofGeneration.ProgramToVCProof
         private void AppendFunctionRelAssmProof(Function f, StringBuilder sb)
         {
             sb.AppendLine("apply " + ProofUtil.Simp(InterpMemName(f)));
-            sb.AppendLine("apply ((rule allI | rule impI)+)");
+            sb.AppendLine("apply ((rule allI | rule impI)+)?");
             sb.AppendLine(
                 ProofUtil.Apply(
                 ProofUtil.MLTactic("vc_fun_corres_tac " + MLUtil.ContextAntiquotation() + " " + MLUtil.IsaToMLThm(FunCorresName(f)) + " " +
@@ -836,12 +836,6 @@ namespace ProofGeneration.ProgramToVCProof
                 
                 if (vcAx is VcBoogieAxiomInfo vcBoogieAxInfo)
                 {
-                    //TODO
-                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("expr_to_vc",
-                        ProofUtil.OF("axioms_sat_mem", programAccessor.MembershipLemma(vcBoogieAxInfo.Axiom),
-                            axiomAssmName
-                        ))));
-                    
                     //need to sync lookup in full context with constant only context for all lookups that may appear in the axiom
                     VariableCollector v = new VariableCollector();
                     v.Visit(vcBoogieAxInfo.Axiom.Expr);
@@ -856,7 +850,17 @@ namespace ProofGeneration.ProgramToVCProof
                         }
                     }
 
-                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF(axiomToVcLemmaName(vcBoogieAxInfo.Axiom), axiomLocaleFact)));
+                    string axiomEvalTrue =
+                        ProofUtil.OF("axioms_sat_mem", programAccessor.MembershipLemma(vcBoogieAxInfo.Axiom),
+                            axiomAssmName
+                        );
+
+                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF(
+                        axiomToVcLemmaName(vcBoogieAxInfo.Axiom), 
+                        axiomLocaleFact, 
+                        axiomEvalTrue
+                        )
+                    ));
                 } else if (vcAx is VcFunctionAxiomInfo vcFunAxInfo)
                 {
                     sb.AppendLine(ProofUtil.Apply("fun_output_axiom NonEmptyTypes: " + nonEmptyTypesAssmName));
