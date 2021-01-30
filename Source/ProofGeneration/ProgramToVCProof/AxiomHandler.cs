@@ -64,8 +64,10 @@ namespace ProofGeneration.ProgramToVCProof
                 }
             }
 
-            allAxiomsInfo = GetBoogieAxiomInfo(axioms, consideredVCBoogieAxioms).Union(typeAxiomInfoPruned).ToList();
-            return consideredVCBoogieAxioms.Union(vcTypeAxioms);
+            //TODO: make sure code that relies on axioms being unique still work (maps that take axioms as keys can be problematic)
+            //don't use union, otherwise duplicates will be pruned, but want to keep each one
+            allAxiomsInfo = GetBoogieAxiomInfo(axioms, consideredVCBoogieAxioms).Concat(typeAxiomInfoPruned).ToList();
+            return consideredVCBoogieAxioms.Concat(vcTypeAxioms);
         }
 
         private static IEnumerable<VCExpr> DeconstructAxiomsNoChecks(VCExpr vcAxioms)

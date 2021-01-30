@@ -770,11 +770,12 @@ namespace ProofGeneration.CfgToDag
                     }
                     else
                     {
-                        //need to find the block that was added in between
+                        /* need to find the empty block that was added in between (does not matter which one, if there
+                         * are multiple such empty blocks) */
                         foreach (var afterSuc in afterSuccessors)
                         {
                             var afterSucSuccessors = afterDagCfg.GetSuccessorBlocks(afterSuc);
-                            if (afterSucSuccessors.Count() == 1 && afterSucSuccessors.First().Equals(bSucAfter))
+                            if (!afterSuc.Cmds.Any() && afterSucSuccessors.Count() == 1 && afterSucSuccessors.First().Equals(bSucAfter))
                             {
                                 addedBlock = afterSuc;
                                 break;
