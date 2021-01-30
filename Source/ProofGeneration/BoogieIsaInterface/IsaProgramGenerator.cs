@@ -17,6 +17,7 @@ namespace ProofGeneration
         public bool GenerateFunctions;
         public bool GenerateAxioms;
         public bool GenerateGlobalsAndConstants;
+        public bool GenerateParamsAndLocals;
         public bool GenerateSpecs;
 
         public IsaProgramGeneratorConfig(
@@ -24,6 +25,7 @@ namespace ProofGeneration
             bool generateFunctions,
             bool generateAxioms,
             bool generateGlobalsAndConstants,
+            bool generateParamsAndLocals,
             bool generateSpecs
         )
         {
@@ -32,6 +34,7 @@ namespace ProofGeneration
             GenerateAxioms = generateAxioms;
             GenerateSpecs = generateSpecs;
             GenerateGlobalsAndConstants = generateGlobalsAndConstants;
+            GenerateParamsAndLocals = generateParamsAndLocals;
         }
     }
     
@@ -59,9 +62,6 @@ namespace ProofGeneration
             OuterDecl outEdges = GetOutEdgesIsa(procName, cfg, out Dictionary<Block, LemmaDecl> edgeLemmas);
             IsaBlockInfo blockInfo = BlockToInfo(theoryName, procName, cfg, edgeLemmas);
             OuterDecl nodesToBlocks = GetNodeToBlocksIsa(procName, cfg, blockInfo.BlockCmdsDefs);
-
-            OuterDecl parameters = GetVariableDeclarationsIsa("inParams", procName, methodData.InParams);
-            OuterDecl localVariables = GetVariableDeclarationsIsa("localVars", procName, methodData.Locals);
 
             //TermList modifiedVariables = new TermList(new List<Term>()); //TODO
 
@@ -108,8 +108,8 @@ namespace ProofGeneration
                             PostconditionDeclarationName(procName),
                             VariableDeclarationsName("globals", procName),
                             VariableDeclarationsName("constants", procName),
-                            parameters.name,
-                            localVariables.name,
+                            VariableDeclarationsName("params", procName),
+                            VariableDeclarationsName("locals", procName),
                             methodBodyDecl.name);
             // assume single versioning and order on constants, globals, params, locals
             int globalsMax = methodData.Constants.Count() + methodData.GlobalVars.Count() - 1;
@@ -138,20 +138,22 @@ namespace ProofGeneration
                 decls.Add(postconditions);
             }
             
-            // for globals and constants we still generate the type lookup lemmas, but not the membership lemmas,
-            // since the membership lemmas should come from the parent (we assume that the constants and globals are the same for both)
             decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
             membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, VarKind.Global, config.GenerateGlobalsAndConstants);
             
             decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
             membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, VarKind.Constant, config.GenerateGlobalsAndConstants);
             
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams.Union(methodData.Locals), VarKind.ParamOrLocal, true);
+            decls.Add(GetVariableDeclarationsIsa("params", procName, methodData.InParams));
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams, VarKind.ParamOrLocal, config.GenerateParamsAndLocals);
+            
+            decls.Add(GetVariableDeclarationsIsa("locals",  procName, methodData.Locals));
+            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Locals, VarKind.ParamOrLocal, config.GenerateParamsAndLocals);
             
             decls.AddRange(
         new List<OuterDecl>
                 {
-                    outEdges, nodesToBlocks, parameters, localVariables, methodBodyDecl
+                    outEdges, nodesToBlocks, methodBodyDecl
                 });
             
             decls.AddRange(blockInfo.BlockCmdsLemmas.Values);

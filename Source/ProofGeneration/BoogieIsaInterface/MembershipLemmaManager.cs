@@ -37,6 +37,8 @@ namespace ProofGeneration.BoogieIsaInterface
 
         private readonly string consts;
         private readonly string globals;
+        private readonly string parameters;
+        private readonly string locals;
 
         private readonly Term paramsAndLocalsList;
         private readonly Term constsAndGlobalsList;
@@ -78,9 +80,16 @@ namespace ProofGeneration.BoogieIsaInterface
             paramsAndLocalsDefs =
                 new string[] {isaProgramRepr.paramsDeclDef + "_def", isaProgramRepr.localVarsDeclDef + "_def"};
 
+            parameters = config.GenerateParamsAndLocals
+                ? QualifyAccessName(isaProgramRepr.paramsDeclDef)
+                : parent.ParamsDecl();
+            locals = config.GenerateParamsAndLocals
+                ? QualifyAccessName(isaProgramRepr.localVarsDeclDef)
+                : parent.LocalsDecl();
             paramsAndLocalsList =
-                IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(QualifyAccessName(isaProgramRepr.paramsDeclDef)),
-                                        IsaCommonTerms.TermIdentFromName(QualifyAccessName(isaProgramRepr.localVarsDeclDef)));
+                IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(parameters),
+                                        IsaCommonTerms.TermIdentFromName(locals));
+            
             consts = config.GenerateGlobalsAndConstants ? QualifyAccessName(isaProgramRepr.constantsDeclDef) : parent.ConstsDecl();
             globals = config.GenerateGlobalsAndConstants ? QualifyAccessName(isaProgramRepr.globalsDeclDef) : parent.GlobalsDecl(); 
             
@@ -156,17 +165,17 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public Term ParamsAndLocalsDecl()
         {
-            return IsaCommonTerms.AppendList(QualifyAccessTerm(isaProgramRepr.paramsDeclDef), QualifyAccessTerm(isaProgramRepr.localVarsDeclDef));
+            return paramsAndLocalsList;
         }
 
         public string ParamsDecl()
         {
-            return QualifyAccessName(isaProgramRepr.paramsDeclDef);
+            return parameters;
         }
 
         public string LocalsDecl()
         {
-            return QualifyAccessName(isaProgramRepr.localVarsDeclDef);
+            return locals;
         }
 
         public Term ConstsAndGlobalsDecl()
