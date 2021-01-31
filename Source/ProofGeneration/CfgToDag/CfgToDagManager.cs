@@ -23,7 +23,9 @@ namespace ProofGeneration.CfgToDag
          * any combination is possible
          */
         public static Theory CfgToDagProof(
-            string theoryName,
+            PhasesTheories phasesTheories,
+            bool generateEndToEndLemma,
+            Term vcAssm,
             CFGRepr beforeDagCfg,
             CFGRepr afterDagCfg,
             Block afterUniqueExit,
@@ -212,11 +214,24 @@ namespace ProofGeneration.CfgToDag
 
             List<OuterDecl> theoryOuterDecls = new List<OuterDecl>();
             theoryOuterDecls.Add(cfgToDagLemmasLocale);
+
+            if (generateEndToEndLemma)
+            {
+                var endToEndManager = new CfgToDagEndToEnd();
+                var endToEndDecls = endToEndManager.EndToEndProof(
+                    cfgToDagLemmasLocale.name + "." + entryLemma.name,
+                    phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.Passification, true),
+                    vcAssm,
+                    beforeDagProgAccess,
+                    beforeDagCfg
+                );
+                theoryOuterDecls.AddRange(endToEndDecls);
+            }
             
             return new Theory(
-                theoryName,
+                phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag),
                 new List<string> { "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML", beforeDagProgAccess.TheoryName(), 
-                                    afterDagProgAccess.TheoryName() },
+                                    afterDagProgAccess.TheoryName(), phasesTheories.TheoryName(PhasesTheories.Phase.Passification), phasesTheories.TheoryName(PhasesTheories.Phase.Vc) },
                 theoryOuterDecls
                 );
         }

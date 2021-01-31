@@ -4,6 +4,7 @@ using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
+using ProofGeneration.PhasesUtil;
 
 namespace ProofGeneration.ProgramToVCProof
 {
@@ -121,7 +122,7 @@ namespace ProofGeneration.ProgramToVCProof
                     switch (kind)
                     {
                         case SpecialAssumptionsKind.TypeValClosed:
-                            assumptions.Add(LemmaHelper.ClosednessAssumption(boogieContext.absValTyMap));
+                            assumptions.Add(EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap));
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -130,17 +131,6 @@ namespace ProofGeneration.ProgramToVCProof
             }
 
             return assumptions;
-        }
-        
-        ///<summary>Every type of a value is closed.</summary>
-        private Term ClosednessAssumption()
-        {
-            Identifier boundVar = new SimpleIdentifier("v");
-            Term absValTyMap = IsaCommonTerms.TermIdentFromName("A");
-            return TermQuantifier.MetaAll(new List<Identifier>{boundVar},
-                null,
-                IsaBoogieTerm.IsClosedType(IsaBoogieTerm.TypeToVal(absValTyMap, new TermIdent(boundVar)))
-            );
         }
 
         public IList<string> AllAssumptionLabels()

@@ -628,13 +628,19 @@ namespace ProofGeneration.CfgToDag
 
         private Term CfgLemmaConclusion(Term finalNode, Term finalState)
         {
+            return CfgLemmaConclusion(boogieContext, beforeDagProgAccess.PostconditionsDecl(), 
+                finalNode, finalState);
+        }
+        
+        public static Term CfgLemmaConclusion(BoogieContextIsa boogieContext, Term post, Term finalNode, Term finalState)
+        {
             return new TermApp(
                     IsaCommonTerms.TermIdentFromName("cfg_dag_lemma_conclusion"),
                     boogieContext.absValTyMap,
                     boogieContext.varContext,
                     boogieContext.funContext,
                     boogieContext.rtypeEnv,
-                    beforeDagProgAccess.PostconditionsDecl(),
+                    post,
                     finalNode,
                     finalState);
         }

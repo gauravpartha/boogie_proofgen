@@ -286,7 +286,7 @@ namespace ProofGeneration
         }
         
         private static ProofGenConfig _proofGenConfig = 
-            new ProofGenConfig(false, true, true);
+            new ProofGenConfig(true, true, true);
 
         //axiom builder is null iff types are not erased (since no polymorphism in vc)
         public static void VCGenerateAllProofs(
@@ -378,8 +378,12 @@ namespace ProofGeneration
                 vcLocale,
                 vcTranslator
                 );
+            
+            var phasesTheories = new PhasesTheories(afterPassificationImpl.Name);
+            
+            
             Theory theoryPassive = VcPhaseManager.ProgramToVcProof(
-                afterPassificationImpl.Name + "_vcphase_proof",
+                phasesTheories.TheoryName(PhasesTheories.Phase.Vc),
                 _proofGenConfig.GenerateVcE2E,
                 afterUnreachablePruningCfg,
                 afterPassificationCfg,
@@ -406,7 +410,7 @@ namespace ProofGeneration
 
             
             Theory passificationProofTheory = PassificationManager.PassificationProof(
-                afterPassificationImpl.Name+"_passification_proof",
+                phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
                 theoryPassive.theoryName,
                 _proofGenConfig.GeneratePassifE2E,
                 endToEndLemma,
@@ -435,7 +439,9 @@ namespace ProofGeneration
                 
 
             Theory cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
-                afterPassificationImpl.Name+"_cfg_to_dag_proof",
+                phasesTheories,
+                _proofGenConfig.GenerateCfgDagE2E,
+                vcAssm,
                 beforeDagCfg,
                 beforePassificationCfg,
                 uniqueExitBlock,

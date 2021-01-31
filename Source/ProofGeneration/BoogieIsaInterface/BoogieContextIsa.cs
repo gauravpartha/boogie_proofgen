@@ -18,5 +18,10 @@ namespace ProofGeneration.BoogieIsaInterface
             this.funContext = funContext;
             this.rtypeEnv = rtypeEnv;
         }
+
+        public static BoogieContextIsa CreateWithNewVarContext(BoogieContextIsa boogieContext, Term varContext)
+        {
+            return new BoogieContextIsa(boogieContext.absValTyMap, boogieContext.methodContext, varContext, boogieContext.funContext, boogieContext.rtypeEnv);
+        }
     }
 }

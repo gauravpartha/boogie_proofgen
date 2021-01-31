@@ -26,6 +26,7 @@ namespace ProofGeneration
         private readonly static TermIdent lookupVarTyId = IsaCommonTerms.TermIdentFromName("lookup_var_ty");
         private readonly static TermIdent localStateId = IsaCommonTerms.TermIdentFromName("local_state");
         private readonly static TermIdent globalStateId = IsaCommonTerms.TermIdentFromName("global_state");
+        private readonly static TermIdent oldGlobalStateId = IsaCommonTerms.TermIdentFromName("old_global_state");
         private readonly static TermIdent binderStateId = IsaCommonTerms.TermIdentFromName("binder_state");
 
         private readonly static TermIdent redCfgMultiId = IsaCommonTerms.TermIdentFromName("red_cfg_multi");
@@ -166,6 +167,11 @@ namespace ProofGeneration
         public static Term GlobalState(Term normalState)
         {
             return new TermApp(globalStateId, normalState);
+        }
+        
+        public static Term OldGlobalState(Term normalState)
+        {
+            return new TermApp(oldGlobalStateId, normalState);
         }
         
         public static Term BinderState(Term normalState)

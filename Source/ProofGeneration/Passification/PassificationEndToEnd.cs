@@ -6,6 +6,7 @@ using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
+using ProofGeneration.PhasesUtil;
 using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 
@@ -343,7 +344,7 @@ namespace ProofGeneration.Passification
             );
 
             LemmaDecl finalLemma = new LemmaDecl(
-                "end_to_end",
+                PhasesTheories.LocalEndToEndName(),
                 TermBinary.Neq(finalState, IsaBoogieTerm.Failure()),
                 new Proof(
                     new List<string>
@@ -400,41 +401,23 @@ namespace ProofGeneration.Passification
         private ContextElem Context()
         {
             Term multiRed = IsaBoogieTerm.RedCFGMulti(
-                new BoogieContextIsa(
-                    boogieContext.absValTyMap,                  
-                    boogieContext.methodContext,
-                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl()),
-                    boogieContext.funContext,
-                    boogieContext.rtypeEnv),
+                BoogieContextIsa.CreateWithNewVarContext(
+                    boogieContext,  
+                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())
+                    ),
                 programAccessor.CfgDecl(),
                 IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNodeOrReturn, finalState)
                 );
-            Term closedAssm = LemmaHelper.ClosednessAssumption(boogieContext.absValTyMap);
-            Term nonEmptyTypesAssm = LemmaHelper.NonEmptyTypesAssumption(boogieContext.absValTyMap);
+            Term closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);
+            Term nonEmptyTypesAssm = EndToEndAssumptions.NonEmptyTypesAssumption(boogieContext.absValTyMap);
             Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(), boogieContext.funContext);
             //TODO constants
             //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
-            Term axiomAssm =
-                IsaBoogieTerm.AxiomAssm(
-                    boogieContext.absValTyMap,
-                    boogieContext.funContext,
-                    IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
-                    normalInitState,
-                    programAccessor.AxiomsDecl()
-                );
-            Term localsAssm = IsaBoogieTerm.StateWf(
-                boogieContext.absValTyMap, 
-                boogieContext.rtypeEnv, 
-                IsaCommonTerms.Snd(boogieContext.varContext), 
-                IsaBoogieTerm.LocalState(normalInitState));
-            Term globalsAssm = IsaBoogieTerm.StateWf(
-                boogieContext.absValTyMap, 
-                boogieContext.rtypeEnv, 
-                IsaCommonTerms.Fst(boogieContext.varContext), 
-                IsaBoogieTerm.GlobalState(normalInitState));
-
-            Term binderEmptyAssm = LemmaHelper.BinderStateEmpty(normalInitState);
+            Term axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor, normalInitState);
+            Term localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext, IsaCommonTerms.Snd(boogieContext.varContext), normalInitState);
+            Term globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext, IsaCommonTerms.Fst(boogieContext.varContext), normalInitState);
+            Term binderEmptyAssm = EndToEndAssumptions.BinderStateEmpty(normalInitState);
             
             return
                 new ContextElem(GlobalFixedVariables(),

@@ -13,6 +13,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
+using ProofGeneration.PhasesUtil;
 using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration.ProgramToVCProof
@@ -494,42 +495,29 @@ namespace ProofGeneration.ProgramToVCProof
                 ? TermQuantifier.MetaAll(declIds, declTypes, vcAssmWithoutQuant)
                 : vcAssmWithoutQuant;
 
-            Term closedAssm = LemmaHelper.ClosednessAssumption(boogieContext.absValTyMap);
-            Term nonEmptyTypesAssm = LemmaHelper.NonEmptyTypesAssumption(boogieContext.absValTyMap);
-            Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(), boogieContext.funContext);
-            //TODO constants
-            //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
-            Term axiomAssm =
-                IsaBoogieTerm.AxiomAssm(
-                    boogieContext.absValTyMap,
-                    boogieContext.funContext,
-                    IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
-                    new TermWithExplicitType(normalInitState, IsaBoogieType.NormalStateType(absValType)),
-                    programAccessor.AxiomsDecl()
-                );
-            Term localsAssm = IsaBoogieTerm.StateWf(boogieContext.absValTyMap, boogieContext.rtypeEnv, programAccessor.ParamsAndLocalsDecl(), 
-                IsaBoogieTerm.LocalState(normalInitState));
-            Term globalsAssm = IsaBoogieTerm.StateWf(boogieContext.absValTyMap, boogieContext.rtypeEnv, programAccessor.ConstsAndGlobalsDecl(), 
-                IsaBoogieTerm.GlobalState(normalInitState));
-            
             Term multiRed = IsaBoogieTerm.RedCFGMulti(
-                new BoogieContextIsa(
-                    boogieContext.absValTyMap,                  
-                    boogieContext.methodContext,
-                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl()),
-                    boogieContext.funContext,
-                    boogieContext.rtypeEnv),
+                BoogieContextIsa.CreateWithNewVarContext(boogieContext, 
+                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())), 
                 programAccessor.CfgDecl(),
                 IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNode, finalState)
                 );
-
+            Term closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);
+            Term nonEmptyTypesAssm = EndToEndAssumptions.NonEmptyTypesAssumption(boogieContext.absValTyMap);
+            Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(), boogieContext.funContext);
+            //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
+            Term axiomAssm =
+                EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor,
+                    new TermWithExplicitType(normalInitState, IsaBoogieType.NormalStateType(absValType)));
+            Term localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext, programAccessor.ParamsAndLocalsDecl(), normalInitState);
+            Term globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext, programAccessor.ConstsAndGlobalsDecl(), normalInitState);
+            
             Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
 
             var contextElem = ContextElem.CreateWithAssumptions(
                 new List<Term> { multiRed, vcAssm, closedAssm, nonEmptyTypesAssm, finterpAssm, axiomAssm, localsAssm, globalsAssm},
                 new List<string> { RedAssmName, vcAssmName, closedAssmName, nonEmptyTypesAssmName, finterpAssmName, axiomAssmName, paramsLocalsAssmName, constsGlobalsAssmName});
-            return new LemmaDecl("endToEnd", contextElem, conclusion, FinalProof());
+            return new LemmaDecl(PhasesTheories.LocalEndToEndName(), contextElem, conclusion, FinalProof());
         }
 
         private string ctorLemmaName(Type type)
