@@ -831,10 +831,13 @@ namespace ProofGeneration.ProgramToVCProof
                     {
                         if (usedVar is Constant)
                         {
-                            sb.AppendLine(ProofUtil.Apply("subst " + 
+                            /*we only need to apply the substitution if the constant value is already bound in the axiom
+                             *otherwise we can directly apply the axiom lemma -> hence apply substitution optionally
+                             */
+                            sb.AppendLine(ProofUtil.Apply(ProofUtil.Optional(ProofUtil.Repeat("subst " + 
                                                           ProofUtil.OF("lookup_var_const_restr",
                                 programAccessor.GlobalsLocalsDisjointLemma(),
-                                programAccessor.ConstantMembershipLemma(usedVar)))+"+");
+                                programAccessor.ConstantMembershipLemma(usedVar))))));
                         }
                     }
 

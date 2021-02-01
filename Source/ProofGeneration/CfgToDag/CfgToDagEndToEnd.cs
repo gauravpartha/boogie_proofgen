@@ -129,8 +129,9 @@ namespace ProofGeneration.CfgToDag
             Term closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);
             Term nonEmptyTypesAssm = EndToEndAssumptions.NonEmptyTypesAssumption(boogieContext.absValTyMap);
             Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(), boogieContext.funContext);
+            var absValType = new VarType("a");
             //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
-            Term axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor, normalInitState);
+            Term axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor, new TermWithExplicitType(normalInitState, IsaBoogieType.NormalStateType(absValType)));
             Term presAssm =
                 IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState, programAccessor.PreconditionsDecl());
             Term localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext, IsaCommonTerms.Snd(boogieContext.varContext), normalInitState);

@@ -47,6 +47,16 @@ namespace ProofGeneration.Util
             return "apply (" + s + ")";
         }
 
+        public static string Optional(string s)
+        {
+            return "(" + s + ")?";
+        }
+
+        public static string Repeat(string s)
+        {
+            return "(" + s + ")+";
+        }
+
         public static string Rule(string s)
         {
             return "rule " + s;
