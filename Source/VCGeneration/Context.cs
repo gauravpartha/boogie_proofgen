@@ -261,8 +261,10 @@ namespace Microsoft.Boogie
         }
 
         axioms = gen.AndSimp(gen.Distinct(distinctVars), axioms);
+        /* PROOF GEN: don't consider type encoding axioms
         if (CommandLineOptions.Clo.TypeEncodingMethod != CommandLineOptions.TypeEncoding.Monomorphic)
           axioms = gen.AndSimp(orderingAxiomBuilder.Axioms, axioms);
+          */
         return axioms;
       }
     }
