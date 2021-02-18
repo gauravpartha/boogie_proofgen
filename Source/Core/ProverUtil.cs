@@ -76,7 +76,7 @@ LOG_FILE=<string>         Log input for the theorem prover. The string @PROC@ in
 APPEND_LOG_FILE=<bool>    Append, rather than overwrite the log file.
 MEMORY_LIMIT=<int>        Memory limit of the prover in megabytes.
 VERBOSITY=<int>           The higher, the more verbose.
-TIME_LIMIT=<int>          Time limit per verification condition in miliseconds.
+TIME_LIMIT=<int>          Time limit per verification condition in milliseconds.
 
 The generic options may or may not be used by the prover plugin.
 ";
@@ -181,7 +181,7 @@ The generic options may or may not be used by the prover plugin.
     protected void ReportError(string msg)
     {
       Contract.Requires(msg != null);
-      throw new ProverOptionException(msg + "\n\n" + Help);
+      throw new ProverOptionException(msg);
     }
 
     protected virtual bool ParseString(string opt, string name, ref string field)
@@ -341,7 +341,7 @@ The generic options may or may not be used by the prover plugin.
     }
   }
 
-  public class ProverOptionException : Exception
+  public class ProverOptionException : ProverException
   {
     public ProverOptionException(string msg)
       : base(msg)

@@ -1197,6 +1197,16 @@ namespace Microsoft.Boogie
       }
     }
 
+    public IEnumerable<Block> Exits()
+    {
+      GotoCmd g = TransferCmd as GotoCmd;
+      if (g != null)
+      {
+        return cce.NonNull(g.labelTargets);
+      }
+      return new List<Block>();
+    }
+    
     [Rep] //PM: needed to verify Traverse.Visit
     public TransferCmd
       TransferCmd; // maybe null only because we allow deferred initialization (necessary for cyclic structures)
@@ -1226,7 +1236,7 @@ namespace Microsoft.Boogie
     public List<Block> /*!*/
       Predecessors;
 
-    // This field is used during passification to null-out entries in block2Incartion hashtable early
+    // This field is used during passification to null-out entries in block2Incarnation dictionary early
     public int succCount;
 
     private HashSet<Variable /*!*/> _liveVarsBefore;
@@ -2384,26 +2394,18 @@ namespace Microsoft.Boogie
     public override void AddAssignedVariables(List<Variable> vars)
     {
       //Contract.Requires(vars != null);
-      List<Variable> /*!*/
-        vs = new List<Variable>();
-      foreach (Cmd /*!*/ cmd in this.Cmds)
+      List<Variable> vs = new List<Variable>();
+      foreach (Cmd cmd in this.Cmds)
       {
         Contract.Assert(cmd != null);
         cmd.AddAssignedVariables(vs);
       }
 
-      System.Collections.Hashtable /*!*/
-        localsSet = new System.Collections.Hashtable();
-      foreach (Variable /*!*/ local in this.Locals)
-      {
-        Contract.Assert(local != null);
-        localsSet[local] = bool.TrueString;
-      }
-
-      foreach (Variable /*!*/ v in vs)
+      var localsSet = new HashSet<Variable>(this.Locals);
+      foreach (Variable v in vs)
       {
         Contract.Assert(v != null);
-        if (!localsSet.ContainsKey(v))
+        if (!localsSet.Contains(v))
         {
           vars.Add(v);
         }
@@ -2608,12 +2610,9 @@ namespace Microsoft.Boogie
       }
 
       TypedIdent ti = likeThisOne.TypedIdent;
-      // KLM: uniqueId was messing up FixedPointVC for unknown reason.
-      // I reverted this change for FixedPointVC only.
-      int id = CommandLineOptions.Clo.FixedPointEngine != null ? UniqueId : (uniqueId++);
+      int id = uniqueId++;
       TypedIdent newTi = new TypedIdent(ti.tok, "call" + id + tempNamePrefix + ti.Name, ty);
-      Variable /*!*/
-        v;
+      Variable v;
       if (kind == TempVarKind.Bound)
       {
         v = new BoundVariable(likeThisOne.tok, newTi);
@@ -2623,7 +2622,6 @@ namespace Microsoft.Boogie
         v = new LocalVariable(likeThisOne.tok, newTi);
         tempVars.Add(v);
       }
-
       return v;
     }
   }
@@ -2943,7 +2941,7 @@ namespace Microsoft.Boogie
       }
 
       ResolveAttributes(Attributes, rc);
-      Proc = rc.LookUpProcedure(callee) as Procedure;
+      Proc = rc.LookUpProcedure(callee);
       if (Proc == null)
       {
         rc.Error(this, "call to undeclared procedure: {0}", callee);
@@ -3223,7 +3221,7 @@ namespace Microsoft.Boogie
 
       #region assert (exists wildcardVars :: Pre[ins := cins])
 
-      Substitution s = Substituter.SubstitutionFromHashtable(substMapBound);
+      Substitution s = Substituter.SubstitutionFromDictionary(substMapBound);
       bool hasWildcard = (wildcardVars.Count != 0);
       Expr preConjunction = null;
       for (int i = 0; i < this.Proc.Requires.Count; i++)
@@ -3305,7 +3303,7 @@ namespace Microsoft.Boogie
 
       if (hasWildcard)
       {
-        s = Substituter.SubstitutionFromHashtable(substMap);
+        s = Substituter.SubstitutionFromDictionary(substMap);
         for (int i = 0; i < this.Proc.Requires.Count; i++)
         {
           Requires /*!*/
@@ -3385,7 +3383,7 @@ namespace Microsoft.Boogie
         {
           IdentifierExpr ie = (IdentifierExpr /*!*/) cce.NonNull(substMap[param]);
           Contract.Assert(ie.Decl != null);
-          ie.Decl.TypedIdent.WhereExpr = Substituter.Apply(Substituter.SubstitutionFromHashtable(substMap), w);
+          ie.Decl.TypedIdent.WhereExpr = Substituter.Apply(Substituter.SubstitutionFromDictionary(substMap), w);
         }
       }
 
@@ -3401,8 +3399,8 @@ namespace Microsoft.Boogie
 
       #region assume Post[ins, outs, old(frame) := cins, couts, cframe]
 
-      calleeSubstitution = Substituter.SubstitutionFromHashtable(substMap, true, Proc);
-      calleeSubstitutionOld = Substituter.SubstitutionFromHashtable(substMapOld, true, Proc);
+      calleeSubstitution = Substituter.SubstitutionFromDictionary(substMap, true, Proc);
+      calleeSubstitutionOld = Substituter.SubstitutionFromDictionary(substMapOld, true, Proc);
       foreach (Ensures /*!*/ e in this.Proc.Ensures)
       {
         Contract.Assert(e != null);

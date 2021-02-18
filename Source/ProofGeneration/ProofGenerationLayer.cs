@@ -127,7 +127,7 @@ namespace ProofGeneration
             /* procedures and implementations do not use the same objects for the variables in the spec --> need to sync 
              * for pre- and postcondition
              */
-            Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+            Substitution formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
             List<Expr> preconditions = new List<Expr>();
             foreach (Requires req in impl.Proc.Requires)
             {

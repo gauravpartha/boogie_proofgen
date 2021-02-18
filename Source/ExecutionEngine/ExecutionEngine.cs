@@ -256,7 +256,6 @@ namespace Microsoft.Boogie
     public readonly IToken Tok;
     public string Msg;
     public string Category { get; set; }
-    public string BoogieErrorCode { get; set; }
     public readonly List<AuxErrorInfo> Aux = new List<AuxErrorInfo>();
     public string OriginalRequestId { get; set; }
     public string RequestId { get; set; }
@@ -269,13 +268,7 @@ namespace Microsoft.Boogie
     {
       get
       {
-        var prefix = Category;
-        if (BoogieErrorCode != null)
-        {
-          prefix = prefix == null ? BoogieErrorCode : prefix + " " + BoogieErrorCode;
-        }
-
-        return prefix != null ? string.Format("{0}: {1}", prefix, Msg) : Msg;
+        return Category != null ? string.Format("{0}: {1}", Category, Msg) : Msg;
       }
     }
 
@@ -498,19 +491,16 @@ namespace Microsoft.Boogie
           }
         }
 
-        if (CommandLineOptions.Clo.StratifiedInlining == 0)
+        CivlVCGeneration.Transform(civlTypeChecker);
+        if (CommandLineOptions.Clo.CivlDesugaredFile != null)
         {
-          CivlVCGeneration.Transform(civlTypeChecker);
-          if (CommandLineOptions.Clo.CivlDesugaredFile != null)
-          {
-            int oldPrintUnstructured = CommandLineOptions.Clo.PrintUnstructured;
-            CommandLineOptions.Clo.PrintUnstructured = 1;
-            PrintBplFile(CommandLineOptions.Clo.CivlDesugaredFile, program, false, false,
-              CommandLineOptions.Clo.PrettyPrint);
-            CommandLineOptions.Clo.PrintUnstructured = oldPrintUnstructured;
-          }
+          int oldPrintUnstructured = CommandLineOptions.Clo.PrintUnstructured;
+          CommandLineOptions.Clo.PrintUnstructured = 1;
+          PrintBplFile(CommandLineOptions.Clo.CivlDesugaredFile, program, false, false,
+            CommandLineOptions.Clo.PrettyPrint);
+          CommandLineOptions.Clo.PrintUnstructured = oldPrintUnstructured;
         }
-
+        
         EliminateDeadVariables(program);
 
         CoalesceBlocks(program);
@@ -1055,16 +1045,14 @@ namespace Microsoft.Boogie
       {
         ae.Handle(e =>
         {
-          var pe = e as ProverException;
-          if (pe != null)
+          if (e is ProverException)
           {
-            printer.ErrorWriteLine(Console.Out, "Fatal Error: ProverException: {0}", e);
+            printer.ErrorWriteLine(Console.Out, "Fatal Error: ProverException: {0}", e.Message);
             outcome = PipelineOutcome.FatalError;
             return true;
           }
 
-          var oce = e as OperationCanceledException;
-          if (oce != null)
+          if (e is OperationCanceledException)
           {
             return true;
           }
@@ -1133,9 +1121,6 @@ namespace Microsoft.Boogie
       }
 
       #endregion
-
-      if (SecureVCGen.outfile != null)
-        SecureVCGen.outfile.Close();
 
       return outcome;
     }
@@ -1233,43 +1218,24 @@ namespace Microsoft.Boogie
 
           try
           {
-            if (CommandLineOptions.Clo.inferLeastForUnsat != null)
+            verificationResult.Outcome = vcgen.VerifyImplementation(impl, out verificationResult.Errors, requestId);
+            if (CommandLineOptions.Clo.ExtractLoops && verificationResult.Errors != null)
             {
-              var svcgen = vcgen as VC.StratifiedVCGen;
-              Contract.Assert(svcgen != null);
-              var ss = new HashSet<string>();
-              foreach (var c in program.Constants)
+              var vcg = vcgen as VCGen;
+              if (vcg != null)
               {
-                if (!c.Name.StartsWith(CommandLineOptions.Clo.inferLeastForUnsat)) continue;
-                ss.Add(c.Name);
-              }
-
-              verificationResult.Outcome = svcgen.FindLeastToVerify(impl, ref ss);
-              verificationResult.Errors = new List<Counterexample>();
-              output.WriteLine("Result: {0}", string.Join(" ", ss));
-            }
-            else
-            {
-              verificationResult.Outcome = vcgen.VerifyImplementation(impl, out verificationResult.Errors, requestId);
-              if (CommandLineOptions.Clo.ExtractLoops && verificationResult.Errors != null)
-              {
-                var vcg = vcgen as VCGen;
-                if (vcg != null)
+                for (int i = 0; i < verificationResult.Errors.Count; i++)
                 {
-                  for (int i = 0; i < verificationResult.Errors.Count; i++)
-                  {
-                    verificationResult.Errors[i] = vcg.extractLoopTrace(verificationResult.Errors[i], impl.Name,
-                      program, extractLoopMappingInfo);
-                  }
+                  verificationResult.Errors[i] = vcg.extractLoopTrace(verificationResult.Errors[i], impl.Name,
+                    program, extractLoopMappingInfo);
                 }
               }
-            }
+            }            
           }
           catch (VCGenException e)
           {
             var errorInfo = errorInformationFactory.CreateErrorInformation(impl.tok,
               String.Format("{0} (encountered in implementation {1}).", e.Message, impl.Name), requestId, "Error");
-            errorInfo.BoogieErrorCode = "BP5010";
             errorInfo.ImplementationName = impl.Name;
             printer.WriteErrorInformation(errorInfo, output);
             if (er != null)
@@ -1369,35 +1335,11 @@ namespace Microsoft.Boogie
         }
       }
     }
-
-
+    
     private static ConditionGeneration CreateVCGen(Program program, List<Checker> checkers)
     {
-      ConditionGeneration vcgen = null;
-      if (CommandLineOptions.Clo.FixedPointEngine != null)
-      {
-        vcgen = new FixedpointVC(program, CommandLineOptions.Clo.ProverLogFilePath,
-          CommandLineOptions.Clo.ProverLogFileAppend, checkers);
-      }
-      else if (CommandLineOptions.Clo.StratifiedInlining > 0)
-      {
-        vcgen = new StratifiedVCGen(program, CommandLineOptions.Clo.ProverLogFilePath,
-          CommandLineOptions.Clo.ProverLogFileAppend, checkers);
-      }
-      else if (CommandLineOptions.Clo.SecureVcGen != null)
-      {
-        vcgen = new SecureVCGen(program, CommandLineOptions.Clo.ProverLogFilePath,
-          CommandLineOptions.Clo.ProverLogFileAppend, checkers);
-      }
-      else
-      {
-        vcgen = new VCGen(program, CommandLineOptions.Clo.ProverLogFilePath, CommandLineOptions.Clo.ProverLogFileAppend,
-          checkers);
-      }
-
-      return vcgen;
+      return new VCGen(program, CommandLineOptions.Clo.ProverLogFilePath, CommandLineOptions.Clo.ProverLogFileAppend, checkers);
     }
-
 
     #region Houdini
 
@@ -1603,12 +1545,14 @@ namespace Microsoft.Boogie
                   }
                   else
                   {
-                    msg = assertError.FailingAssert.ErrorData as string;
-                    if (!CommandLineOptions.Clo.ForceBplErrors && assertError.FailingAssert.ErrorMessage != null)
+                    if (assertError.FailingAssert.ErrorMessage == null || CommandLineOptions.Clo.ForceBplErrors)
+                    {
+                      msg = assertError.FailingAssert.ErrorData as string;
+                    }
+                    else
                     {
                       msg = assertError.FailingAssert.ErrorMessage;
                     }
-
                     if (msg == null)
                     {
                       msg = "This assertion might not hold.";
@@ -1823,7 +1767,7 @@ namespace Microsoft.Boogie
 
           if (CommandLineOptions.Clo.ModelViewFile != null)
           {
-            error.PrintModel(errorInfo.Model);
+            error.PrintModel(errorInfo.Model, error);
           }
 
           printer.WriteErrorInformation(errorInfo, tw);
@@ -1842,12 +1786,6 @@ namespace Microsoft.Boogie
 
     private static ErrorInformation CreateErrorInformation(Counterexample error, VC.VCGen.Outcome outcome)
     {
-      // BP1xxx: Parsing errors
-      // BP2xxx: Name resolution errors
-      // BP3xxx: Typechecking errors
-      // BP4xxx: Abstract interpretation errors (Is there such a thing?)
-      // BP5xxx: Verification errors
-
       ErrorInformation errorInfo;
       var cause = "Error";
       if (outcome == VCGen.Outcome.TimedOut)
@@ -1870,7 +1808,6 @@ namespace Microsoft.Boogie
           errorInfo = errorInformationFactory.CreateErrorInformation(callError.FailingCall.tok,
             callError.FailingCall.ErrorData as string ?? "A precondition for this call might not hold.",
             callError.RequestId, callError.OriginalRequestId, cause);
-          errorInfo.BoogieErrorCode = "BP5002";
           errorInfo.Kind = ErrorKind.Precondition;
           errorInfo.AddAuxInfo(callError.FailingRequires.tok,
             callError.FailingRequires.ErrorData as string ?? "This is the precondition that might not hold.",
@@ -1878,9 +1815,9 @@ namespace Microsoft.Boogie
         }
         else
         {
-          errorInfo = errorInformationFactory.CreateErrorInformation(callError.FailingCall.tok,
+          errorInfo = errorInformationFactory.CreateErrorInformation(null,
             callError.FailingRequires.ErrorMessage,
-            callError.RequestId, callError.OriginalRequestId, cause);
+            callError.RequestId, callError.OriginalRequestId);
         }
       }
       else if (error is ReturnCounterexample returnError)
@@ -1890,7 +1827,6 @@ namespace Microsoft.Boogie
           errorInfo = errorInformationFactory.CreateErrorInformation(returnError.FailingReturn.tok,
             "A postcondition might not hold on this return path.",
             returnError.RequestId, returnError.OriginalRequestId, cause);
-          errorInfo.BoogieErrorCode = "BP5003";
           errorInfo.Kind = ErrorKind.Postcondition;
           errorInfo.AddAuxInfo(returnError.FailingEnsures.tok,
             returnError.FailingEnsures.ErrorData as string ?? "This is the postcondition that might not hold.",
@@ -1898,9 +1834,9 @@ namespace Microsoft.Boogie
         }
         else
         {
-          errorInfo = errorInformationFactory.CreateErrorInformation(returnError.FailingReturn.tok,
+          errorInfo = errorInformationFactory.CreateErrorInformation(null,
             returnError.FailingEnsures.ErrorMessage,
-            returnError.RequestId, returnError.OriginalRequestId, cause);
+            returnError.RequestId, returnError.OriginalRequestId);
         }
       }
       else // error is AssertCounterexample
@@ -1912,7 +1848,6 @@ namespace Microsoft.Boogie
           errorInfo = errorInformationFactory.CreateErrorInformation(assertError.FailingAssert.tok,
             "This loop invariant might not hold on entry.",
             assertError.RequestId, assertError.OriginalRequestId, cause);
-          errorInfo.BoogieErrorCode = "BP5004";
           errorInfo.Kind = ErrorKind.InvariantEntry;
           if ((assertError.FailingAssert.ErrorData as string) != null)
           {
@@ -1925,7 +1860,6 @@ namespace Microsoft.Boogie
           errorInfo = errorInformationFactory.CreateErrorInformation(assertError.FailingAssert.tok,
             "This loop invariant might not be maintained by the loop.",
             assertError.RequestId, assertError.OriginalRequestId, cause);
-          errorInfo.BoogieErrorCode = "BP5005";
           errorInfo.Kind = ErrorKind.InvariantMaintainance;
           if ((assertError.FailingAssert.ErrorData as string) != null)
           {
@@ -1935,23 +1869,19 @@ namespace Microsoft.Boogie
         }
         else
         {
-          string msg = null;
-          string bec = null;
-
           if (assertError.FailingAssert.ErrorMessage == null || CommandLineOptions.Clo.ForceBplErrors)
           {
-            msg = assertError.FailingAssert.ErrorData as string ?? "This assertion might not hold.";
-            bec = "BP5001";
+            string msg = assertError.FailingAssert.ErrorData as string ?? "This assertion might not hold.";
+            errorInfo = errorInformationFactory.CreateErrorInformation(assertError.FailingAssert.tok, msg,
+              assertError.RequestId, assertError.OriginalRequestId, cause);
+            errorInfo.Kind = ErrorKind.Assertion;
           }
           else
           {
-            msg = assertError.FailingAssert.ErrorMessage;
+            errorInfo = errorInformationFactory.CreateErrorInformation(null, 
+              assertError.FailingAssert.ErrorMessage,
+              assertError.RequestId, assertError.OriginalRequestId);
           }
-
-          errorInfo = errorInformationFactory.CreateErrorInformation(assertError.FailingAssert.tok, msg,
-            assertError.RequestId, assertError.OriginalRequestId, cause);
-          errorInfo.BoogieErrorCode = bec;
-          errorInfo.Kind = ErrorKind.Assertion;
         }
       }
 

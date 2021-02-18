@@ -737,31 +737,16 @@ namespace Microsoft.Boogie
     public bool PrintInlined = false;
     public bool ExtractLoops = false;
     public bool DeterministicExtractLoops = false;
-    public string SecureVcGen = null;
+
+    // Enables VC generation for Stratified Inlining. 
+    // Set programmatically by Corral.
     public int StratifiedInlining = 0;
-    public string FixedPointEngine = null;
-    public bool StratifiedInliningWithoutModels = false; // disable model generation for SI
-    public int StratifiedInliningVerbose = 0; // verbosity level
+
+    // disable model generation, used by Corral/SI
+    public bool StratifiedInliningWithoutModels = false; 
+
+    // Sets the recursion bound, used for loop extraction, etc.
     public int RecursionBound = 500;
-    public bool NonUniformUnfolding = false;
-    public int StackDepthBound = 0;
-    public string inferLeastForUnsat = null;
-
-    // Inference mode for fixed point engine
-    public enum FixedPointInferenceMode
-    {
-      Corral,
-      OldCorral,
-      Flat,
-      Procedure,
-      Call
-    }
-
-    public FixedPointInferenceMode FixedPointMode = FixedPointInferenceMode.Procedure;
-
-    public string PrintFixedPoint = null;
-
-    public string PrintConjectures = null;
 
     public bool ExtractLoopsUnrollIrreducible = true; // unroll irreducible loops? (set programmatically)
 
@@ -1293,84 +1278,6 @@ namespace Microsoft.Boogie
           }
 
           return true;
-        case "secure":
-          if (ps.ConfirmArgumentCount(1))
-            SecureVcGen = args[ps.i];
-          return true;
-        case "stratifiedInline":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            switch (args[ps.i])
-            {
-              case "0":
-                StratifiedInlining = 0;
-                break;
-              case "1":
-                StratifiedInlining = 1;
-                break;
-              default:
-                StratifiedInlining = Int32.Parse(cce.NonNull(args[ps.i]));
-                //ps.Error("Invalid argument \"{0}\" to option {1}", args[ps.i], ps.s);
-                break;
-            }
-          }
-
-          return true;
-        case "fixedPointEngine":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            FixedPointEngine = args[ps.i];
-          }
-
-          return true;
-        case "fixedPointInfer":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            switch (args[ps.i])
-            {
-              case "corral":
-                FixedPointMode = FixedPointInferenceMode.Corral;
-                break;
-              case "oldCorral":
-                FixedPointMode = FixedPointInferenceMode.OldCorral;
-                break;
-              case "flat":
-                FixedPointMode = FixedPointInferenceMode.Flat;
-                break;
-              case "procedure":
-                FixedPointMode = FixedPointInferenceMode.Procedure;
-                break;
-              case "call":
-                FixedPointMode = FixedPointInferenceMode.Call;
-                break;
-              default:
-                ps.Error("Invalid argument \"{0}\" to option {1}", args[ps.i], ps.s);
-                break;
-            }
-          }
-
-          return true;
-        case "printFixedPoint":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            PrintFixedPoint = args[ps.i];
-          }
-
-          return true;
-        case "printConjectures":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            PrintConjectures = args[ps.i];
-          }
-
-          return true;
-        case "siVerbose":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            StratifiedInliningVerbose = Int32.Parse(cce.NonNull(args[ps.i]));
-          }
-
-          return true;
         case "recursionBound":
           if (ps.ConfirmArgumentCount(1))
           {
@@ -1382,20 +1289,6 @@ namespace Microsoft.Boogie
           if (ps.ConfirmArgumentCount(1))
           {
             EnableUnSatCoreExtract = Int32.Parse(cce.NonNull(args[ps.i]));
-          }
-
-          return true;
-        case "stackDepthBound":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            StackDepthBound = Int32.Parse(cce.NonNull(args[ps.i]));
-          }
-
-          return true;
-        case "inferLeastForUnsat":
-          if (ps.ConfirmArgumentCount(1))
-          {
-            inferLeastForUnsat = args[ps.i];
           }
 
           return true;
@@ -1609,7 +1502,6 @@ namespace Microsoft.Boogie
               ps.CheckBooleanFlag("printAssignment", ref PrintAssignment) ||
               ps.CheckBooleanFlag("printNecessaryAssumes", ref PrintNecessaryAssumes) ||
               ps.CheckBooleanFlag("useProverEvaluate", ref UseProverEvaluate) ||
-              ps.CheckBooleanFlag("nonUniformUnfolding", ref NonUniformUnfolding) ||
               ps.CheckBooleanFlag("deterministicExtractLoops", ref DeterministicExtractLoops) ||
               ps.CheckBooleanFlag("verifySeparately", ref VerifySeparately) ||
               ps.CheckBooleanFlag("trustMoverTypes", ref TrustMoverTypes) ||
@@ -1651,11 +1543,6 @@ namespace Microsoft.Boogie
       {
         ProverDllName = "SMTLib";
         TheProverFactory = ProverFactory.Load(ProverDllName);
-      }
-
-      if (inferLeastForUnsat != null)
-      {
-        StratifiedInlining = 1;
       }
 
       if (StratifiedInlining > 0)
@@ -1873,8 +1760,12 @@ namespace Microsoft.Boogie
        used in conjunction with /enhancedErrorMessages:n command-line option.
 
      {:captureState s}
-       Indicates that state must be captured under the name s.  Must be used
-       together with /mv:<string> command-line option.
+       When this attribute is applied to assume commands, it causes the 
+       /mv:<string> command-line option to group each counterexample model
+       into a sequence of states. In particular, this sequence of states
+       shows the values of variables at each {:captureState ...} point in
+       the counterexample trace. The argument 's' is to be a string, and it
+       will be printed as part of /mv's output.
 
   ---- CIVL ------------------------------------------------------------------
 
@@ -2123,18 +2014,9 @@ namespace Microsoft.Boogie
   /printInlined
                 print the implementation after inlining calls to
                 procedures with the :inline attribute (works with /inline)
-  /stratifiedInline:1
-                Use the stratified inlining algorithm
-  /fixedPointEngine:<engine>
-                Use the specified fixed point engine for inference
   /recursionBound:<n>
                 Set the recursion bound for stratified inlining to
                 be n (default 500)
-  /inferLeastForUnsat:<str>
-                Infer the least number of constants (whose names
-                are prefixed by <str>) that need to be set to
-                true for the program to be correct. This turns
-                on stratified inlining.
   /smoke        Soundness Smoke Test: try to stick assert false; in some
                 places in the BPL and see if we can still prove it
   /smokeTimeout:<n>
