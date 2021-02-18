@@ -21,12 +21,20 @@ namespace ProofGeneration.ProgramToVCProof
             
             if (programIsPolymorphic)
             {
-                if(vcBoogieAxioms.Count != nAxioms)
-                    //+3, since we currently ignore the three type ordering axioms
-                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
-                    "vc axioms not in-sync with Boogie axioms");
+                if (vcBoogieAxioms.Count() == 1 && nAxioms == 0 &&
+                    vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
+                {
+                    consideredVCBoogieAxioms = new List<VCExpr>();
+                }
+                else
+                {
+                    if (vcBoogieAxioms.Count != nAxioms)
+                        //+3, since we currently ignore the three type ordering axioms
+                        throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                            "vc axioms not in-sync with Boogie axioms");
 
-                consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(0, nAxioms);
+                    consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(0, nAxioms);
+                }
             }
             else
             {
