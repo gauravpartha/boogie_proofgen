@@ -1318,11 +1318,23 @@ namespace Microsoft.Boogie.TypeErasure
       // quantify explicitly over these variables
       
       if (typeVarBindings.Count < node.TypeParameters.Count) {
-      // type variables are quantified over first to make proof generation easier (hence Reverse + Insert at beginning)
-        foreach (TypeVariable/*!*/ var in ((IEnumerable<TypeVariable>) node.TypeParameters).Reverse()) {
-          Contract.Assert(var != null);
-          if (!_extractTypeArgs || typeVarBindings.All(b => !b.V.Equals(bindings.TypeVariableBindings[var])))
-            newBoundVars.Insert(0, (VCExprVar)bindings.TypeVariableBindings[var]);
+        if (!_extractTypeArgs)
+        {
+          // type variables are quantified over first to make proof generation easier (hence Reverse + Insert at beginning)
+          foreach (TypeVariable /*!*/ var in ((IEnumerable<TypeVariable>) node.TypeParameters).Reverse())
+          {
+            Contract.Assert(var != null);
+            newBoundVars.Insert(0, (VCExprVar) bindings.TypeVariableBindings[var]);
+          }
+        }
+        else
+        {
+          foreach (TypeVariable/*!*/ var in node.TypeParameters) 
+          {
+            Contract.Assert(var != null);
+            if (typeVarBindings.All(b => !b.V.Equals(bindings.TypeVariableBindings[var])))
+              newBoundVars.Add((VCExprVar)bindings.TypeVariableBindings[var]);
+          }
         }
       }
 
