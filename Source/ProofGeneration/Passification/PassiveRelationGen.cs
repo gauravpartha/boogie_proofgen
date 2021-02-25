@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.Boogie;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
 {
@@ -12,7 +13,8 @@ namespace ProofGeneration.Passification
     {
         private readonly CFGRepr beforePassiveCfg;
         private readonly PassificationHintManager hintManager;
-        private readonly IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping;
+        private readonly IDictionary<Block, IDictionary<Variable,Expr>> _origToInitialVarMapping;
+        private readonly IDictionary<Block, Block> nonPassiveToOrig;
         private readonly IDictionary<Block, Block> nonPassiveToPassive;
         private readonly IDictionary<Block, Block> passiveToNonPassive;
         private readonly IDictionary<Block, IEnumerable<Variable>> liveVarsBefore;
@@ -20,15 +22,17 @@ namespace ProofGeneration.Passification
         public PassiveRelationGen(
             CFGRepr beforePassiveCfg,
             PassificationHintManager hintManager, 
-            IDictionary<Block, IDictionary<Variable,Expr>> initialVarMapping,
+            IDictionary<Block, IDictionary<Variable,Expr>> origToInitialVarMapping,
+            IDictionary<Block, Block> nonPassiveToOrig,
             IDictionary<Block, Block> nonPassiveToPassive,
             IDictionary<Block, IEnumerable<Variable>> liveVarsBefore)
         {
             this.beforePassiveCfg = beforePassiveCfg;
             this.hintManager = hintManager;
-            this.initialVarMapping = initialVarMapping;
+            this._origToInitialVarMapping = origToInitialVarMapping;
+            this.nonPassiveToOrig = nonPassiveToOrig;
             this.nonPassiveToPassive = nonPassiveToPassive;
-            this.passiveToNonPassive = nonPassiveToPassive.ToDictionary(x => x.Value, x => x.Key);
+            this.passiveToNonPassive = nonPassiveToPassive.InverseDict();
             this.liveVarsBefore = liveVarsBefore;
         }
 
@@ -39,7 +43,7 @@ namespace ProofGeneration.Passification
 
         public List<Tuple<Variable, Expr>> GenerateStateRelation(Block nonPassiveBlock)
         { 
-            var initMappingBlock = initialVarMapping[nonPassiveToPassive[nonPassiveBlock]];
+            var initMappingBlock = _origToInitialVarMapping[nonPassiveToOrig[nonPassiveBlock]];
 
             var result = new List<Tuple<Variable, Expr>>();
 
@@ -169,7 +173,7 @@ namespace ProofGeneration.Passification
                             Variable origVar = null;
                             foreach (var succ in nonPassiveSuccessors)
                             {
-                                var succVarMapping = initialVarMapping[nonPassiveToPassive[succ]];
+                                var succVarMapping = _origToInitialVarMapping[nonPassiveToOrig[succ]];
                                 foreach (var varExprPair in succVarMapping)
                                 {
                                     if (varExprPair.Value is IdentifierExpr ie && ie.Decl.Equals(lhs.Decl))

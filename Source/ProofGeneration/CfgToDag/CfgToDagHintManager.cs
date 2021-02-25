@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag
 {
@@ -27,7 +28,7 @@ namespace ProofGeneration.CfgToDag
         public CfgToDagHintManager(Graph<Block> graph, IDictionary<Block,Block> beforeDagToOrig)
         {
             this.beforeDagToOrig = beforeDagToOrig;
-            origToBeforeDag = beforeDagToOrig.ToDictionary(x => x.Value, x => x.Key);
+            origToBeforeDag = beforeDagToOrig.InverseDict();
             
             foreach (var loopHead in graph.Headers)
             {

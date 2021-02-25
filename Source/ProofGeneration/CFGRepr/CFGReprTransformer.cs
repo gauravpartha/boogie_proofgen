@@ -15,47 +15,35 @@ namespace ProofGeneration.CFGRepresentation
 
         private static readonly MethodInfo CloneMethod = typeof(Object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
 
-
-        //blocks are not copied
-        public static CFGRepr getCFGRepresentation(Implementation impl)
-        {
-            return GetCfgRepresentation(impl, false, false, out IDictionary<Block, Block> newToOldMapping, out _);
-        }
-
-        //if "generateCopy", 
         /// <summary>
-        /// 
+        /// Create CFG representation as <see cref="CFGRepr"/> of <paramref name="impl"/>.
         /// </summary>
         /// <param name="impl">Input implementation</param>
-        /// <param name="generateCopy">If set to true, then blocks will be copied and the mapping from the copied blocks to the original blocks is given by "newToOldBlocks"</param>
-        /// <param name="desugarCalls">If set to true, then calls will be desugared (but can only be set to true if <paramref name="generateCopy"/> is set to true</param>
-        /// <param name="newToOldBlocks">Copy mapping if <paramref name="generateCopy"/> is set to true</param>
-        /// <param name="newVarsFromDesugaring">New local variables obtained from desugared commands <paramref name="desugarCalls"/> is set to true</param>
-        /// <param name="isAcyclic">Set to true iff input CFG is acyclic</param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
+        /// <param name="config">Configuration specifying how to create representation</param>
+        /// <param name="newToOldBlocks">Mapping from original to copied blocks if <paramref name="config"/> specifies blocks to be copied</param>
+        /// <param name="newVarsFromDesugaring">New local variables obtained from desugared commands if <paramref name="config"/> specifies calls to be desugared</param>
+        /// <returns>CFG Representation of implementation</returns>
+        /// <exception cref="ArgumentException"> Calls can only be desugared if blocks are specified to be copied.</exception>
         public static CFGRepr GetCfgRepresentation(
             Implementation impl, 
-            bool generateCopy, 
-            bool desugarCalls,
+            CFGReprConfig config,
             out IDictionary<Block, Block> newToOldBlocks,
-            out List<Variable> newVarsFromDesugaring,
-            bool isAcyclic = true)
+            out List<Variable> newVarsFromDesugaring)
         {
             Contract.Requires(impl != null);
-            Contract.Ensures((generateCopy && newToOldBlocks != null) || (!generateCopy && newToOldBlocks == null));
-            if (!generateCopy && desugarCalls)
+            Contract.Ensures((config.GenerateBlockCopy && newToOldBlocks != null) || (!config.GenerateBlockCopy && newToOldBlocks == null));
+            if (!config.GenerateBlockCopy && config.DesugarCalls)
             {
-                throw new ArgumentException("Cannot desugar calls without generating copy");
+                throw new ArgumentException("Cannot desugar calls without generating copy of blocks");
             }
             
             var predecessorMap = ComputePredecessors(impl.Blocks);
             IList<Block> blocksToConvert;
             Func<Block, List<Block>> predecessorFunc;
 
-            if(generateCopy)
+            if(config.GenerateBlockCopy)
             {
-                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap, desugarCalls, out newVarsFromDesugaring);
+                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap, config.GenerateBlockCopy, config.DeepCopyCmdPred, out newVarsFromDesugaring);
 
                 var newToOldInternal = new Dictionary<Block, Block>();
                 blocksToConvert.ZipDo(impl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
@@ -71,7 +59,7 @@ namespace ProofGeneration.CFGRepresentation
 
             AlternateCFGRepr(blocksToConvert, out Block entryBlock, predecessorFunc, out IDictionary<Block, IList<Block >> outgoingBlocks);
             IDictionary<Block, int> labeling;
-            if (isAcyclic)
+            if (config.IsAcyclic)
             {
                 labeling = GetTopologicalLabeling(blocksToConvert);
             } else
@@ -188,15 +176,20 @@ namespace ProofGeneration.CFGRepresentation
             IList<Block> blocks, 
             Dictionary<Block, List<Block>> predecessorMap, 
             bool desugarCalls,
+            Predicate<Cmd> deepCopyCmdPred,
             out List<Variable> newVarsFromDesugaring)
         {
-            //shallow copy of each block + update edges to copied blocks
+            //shallow copy of each block + update edges to copied blocks + deep copy of cmds if specified
             //TODO:  need to make sure this is sufficient
             IDictionary<Block, Block> oldToNewBlock = new Dictionary<Block, Block>();
 
             IList<Block> copyBlocks = new List<Block>();
 
             newVarsFromDesugaring = new List<Variable>();
+
+            //don't copy variables, since proof generation assumes sharing of variable identities
+            Func<Cmd, Cmd> copyCmd = cmd =>
+                deepCopyCmdPred(cmd) ? cmd.Copy(t => t != typeof(IdentifierExpr) && t != typeof(TypeVariable) && t != typeof(QKeyValue)) : (Cmd) CloneMethod.Invoke(cmd, null);
 
             foreach (Block b in blocks)
             {
@@ -209,12 +202,12 @@ namespace ProofGeneration.CFGRepresentation
                         newVarsFromDesugaring.AddRange(stateCmd.Locals);
                         foreach (var desugaredCmd in stateCmd.Cmds)
                         {
-                            copyCmds.Add((Cmd) CloneMethod.Invoke(desugaredCmd,null));
+                            copyCmds.Add(copyCmd(desugaredCmd));
                         }
                     }
                     else
                     {
-                        copyCmds.Add((Cmd) CloneMethod.Invoke(cmd,null));
+                        copyCmds.Add(copyCmd(cmd));
                     }
                 }
 

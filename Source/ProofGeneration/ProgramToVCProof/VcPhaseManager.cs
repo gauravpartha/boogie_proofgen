@@ -35,6 +35,7 @@ namespace ProofGeneration.ProgramToVCProof
             VcTranslator = vcTranslator;
         }
     }
+    
     /// <summary>
     /// Responsible for producing theory for the proof of the final Boogie program under the assumption of the VC
     /// </summary>
@@ -46,6 +47,8 @@ namespace ProofGeneration.ProgramToVCProof
             bool generateEndToEndProof,
             CFGRepr finalCfg,
             CFGRepr afterPassificationCfg,
+            IDictionary<Block, Block> afterPassiveToFinalBlock,
+            IDictionary<Block, Block> afterPassiveToOrigBlock,
             IProgramAccessor passiveProgAccess,
             IProgramAccessor beforePassiveProgAccess,
             BoogieMethodData methodData, 
@@ -64,29 +67,23 @@ namespace ProofGeneration.ProgramToVCProof
                 passiveProgAccess.BlockInfo(), 
                 varFactory);
 
-            var reachableBlocks = ReachableBlocks(afterPassificationCfg);
+            var afterPassiveReachableBlocks = ReachableBlocks(afterPassificationCfg);
             
             IDictionary<Block, IList<OuterDecl>> finalProgramLemmas = 
-                GenerateVCLemmas(afterPassificationCfg, finalCfg, reachableBlocks, passiveLemmaManager, vcProofData.VcHintManager, lemmaNamer);
+                GenerateVCLemmas(afterPassificationCfg, finalCfg, afterPassiveToFinalBlock, afterPassiveToOrigBlock, afterPassiveReachableBlocks, passiveLemmaManager, vcProofData.VcHintManager, lemmaNamer);
             IDictionary<Block, OuterDecl> cfgProgramLemmas = 
-                GenerateCfgLemmas(afterPassificationCfg, finalCfg, reachableBlocks, finalProgramLemmas, passiveLemmaManager, passiveProgAccess.CfgDecl(), lemmaNamer);
+                GenerateCfgLemmas(afterPassificationCfg, finalCfg, afterPassiveToFinalBlock, afterPassiveReachableBlocks, finalProgramLemmas, passiveLemmaManager, passiveProgAccess.CfgDecl(), lemmaNamer);
 
-            
-            List<OuterDecl> afterPassificationDecls = new List<OuterDecl>() { };
+            List<OuterDecl> afterPassificationDecls = new List<OuterDecl>(); 
             foreach(var v in finalProgramLemmas.Values)
             {
                 afterPassificationDecls.AddRange(v);
             }
             afterPassificationDecls.AddRange(cfgProgramLemmas.Values);
-            
-            /*afterPassificationDecls.Add(passiveLemmaManager.MethodVerifiesLemma(
-                finalCfg,
-                passiveProgAccess.CfgDecl(),
-                "method_verifies"));*/
 
             LocaleDecl afterPassificationLocale = GenerateLocale("passification", passiveLemmaManager, afterPassificationDecls);
 
-            var passiveOuterDecls = new List<OuterDecl>() { vcProofData.VcLocale };
+            var passiveOuterDecls = new List<OuterDecl> { vcProofData.VcLocale };
             passiveOuterDecls.Add(afterPassificationLocale);
             
             //generate axiom
@@ -130,6 +127,7 @@ namespace ProofGeneration.ProgramToVCProof
                     vcProofData.VcFunctions, 
                     vcProofData.VcBoogieInfo,
                     afterPassificationCfg, 
+                    finalCfg,
                     afterPassificationLocale.name + "." + cfgProgramLemmas[afterPassificationCfg.entry].name,
                     axiomLocale.name,
                     ax => axiomLocale.name + "." + axiomToLemma[ax].name,
@@ -178,10 +176,12 @@ namespace ProofGeneration.ProgramToVCProof
         }
         
         
-        //assume that block identities in beforePruning and afterPruning are the same (only edges may be different)
+        //assume that block identities in the two CFGs are the same (only edges may be different)
         private static IDictionary<Block, IList<OuterDecl>> GenerateVCLemmas(
             CFGRepr afterPassificationCfg,
             CFGRepr finalCfg, 
+            IDictionary<Block, Block> afterPassiveToFinalBlock,
+            IDictionary<Block, Block> afterPassiveToOrigBlock,
             HashSet<Block> reachableBlocks,
             VcPhaseLemmaManager vcPhaseLemmaManager, 
             VCHintManager vcHintManager, 
@@ -189,39 +189,44 @@ namespace ProofGeneration.ProgramToVCProof
         {
             var blockToLemmaDecls = new Dictionary<Block, IList<OuterDecl>>();
 
-            foreach (Block b in afterPassificationCfg.GetBlocksBackwards())
+            foreach (Block bAfterPassive in afterPassificationCfg.GetBlocksBackwards())
             {
                 var result = new List<OuterDecl>();
                 
-                if(finalCfg.ContainsBlock(b))               
+                if(afterPassiveToFinalBlock.TryGetValue(bAfterPassive, out Block bFinal))               
                 {
                     string vcHintsName = null;
-                    if (vcHintManager.TryGetHints(b, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls))
+                    if (vcHintManager.TryGetHints(afterPassiveToOrigBlock[bAfterPassive], out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls))
                     {
                         //FIXME potential val name clash
-                        vcHintsName = GetLemmaName(b, lemmaNamer) + "_hints";
+                        vcHintsName = GetLemmaName(bAfterPassive, lemmaNamer) + "_hints";
                         var code = MLUtil.DefineVal(vcHintsName, MLUtil.MLList(hints));
                         //required declarations must be added first
                         result.AddRange(requiredDecls);
                         result.Add(new MLDecl(code));
                     }
-                    result.Add(vcPhaseLemmaManager.GenerateBlockLemma(b, finalCfg.GetSuccessorBlocks(b), GetLemmaName(b, lemmaNamer), vcHintsName));
-                    blockToLemmaDecls.Add(b, result);
+                    result.Add(vcPhaseLemmaManager.GenerateBlockLemma(
+                        bAfterPassive, bFinal, finalCfg.GetSuccessorBlocks(bFinal), GetLemmaName(bFinal, lemmaNamer), vcHintsName));
+                    //do not use identity of final CFG block to be consistent with other branches
+                    blockToLemmaDecls.Add(bAfterPassive, result);
                 }
-                else if(reachableBlocks.Contains(b))
+                else if(reachableBlocks.Contains(bAfterPassive))
                 {
                     //block was removed after peephole but is reachable before peephole
-                    if(b.Cmds.Count == 0)
+                    if(bAfterPassive.Cmds.Count == 0)
                     {
                         //find the successors of b in the final cfg (i.e., the first non-empty reachable blocks)
-                        var nonEmptyReachableSuccessors = GetNonEmptyReachableSuccessors(b, afterPassificationCfg, finalCfg); 
+                        var nonEmptyReachableSuccessors = 
+                            GetNonEmptyReachableSuccessors(bAfterPassive, afterPassificationCfg, finalCfg, afterPassiveToFinalBlock); 
                         //add lemma
                         var decls = new List<OuterDecl>
                         {
-                            vcPhaseLemmaManager.GenerateEmptyBlockLemma(b, nonEmptyReachableSuccessors,
-                                GetLemmaName(b, lemmaNamer))
+                            vcPhaseLemmaManager.GenerateEmptyBlockLemma(
+                                bAfterPassive, 
+                                nonEmptyReachableSuccessors.Select(b => afterPassiveToFinalBlock[b]),
+                                GetLemmaName(bAfterPassive, lemmaNamer))
                         };
-                        blockToLemmaDecls.Add(b, decls);
+                        blockToLemmaDecls.Add(bAfterPassive, decls);
                     }
                     else
                     {
@@ -235,6 +240,7 @@ namespace ProofGeneration.ProgramToVCProof
         private static IDictionary<Block, OuterDecl> GenerateCfgLemmas(
             CFGRepr afterPassificationCfg,
             CFGRepr finalCfg,
+            IDictionary<Block, Block> afterPassiveToFinalBlock,
             HashSet<Block> reachableBlocks,
             IDictionary<Block, IList<OuterDecl>> lemmaDecls, 
             VcPhaseLemmaManager vcPhaseLemmaManager, 
@@ -243,14 +249,17 @@ namespace ProofGeneration.ProgramToVCProof
         {
             var blockToLemmaDecls = new Dictionary<Block, OuterDecl>();
 
-            foreach (Block b in afterPassificationCfg.GetBlocksBackwards())
+            foreach (Block bAfterPassive in afterPassificationCfg.GetBlocksBackwards())
             {
                 IEnumerable<Block> finalCfgSuccessors;
-                if (!finalCfg.ContainsBlock(b))
+                bool isContainedInFinalCfg = afterPassiveToFinalBlock.TryGetValue(bAfterPassive, out Block bFinal);
+                if (!isContainedInFinalCfg)
                 {
-                    if (reachableBlocks.Contains(b))
+                    if (reachableBlocks.Contains(bAfterPassive))
                     {
-                        finalCfgSuccessors = GetNonEmptyReachableSuccessors(b, afterPassificationCfg, finalCfg);
+                        finalCfgSuccessors =
+                            GetNonEmptyReachableSuccessors(bAfterPassive, afterPassificationCfg, finalCfg,
+                                afterPassiveToFinalBlock).Select(b => afterPassiveToFinalBlock[b]);
                     }
                     else
                     {
@@ -259,17 +268,18 @@ namespace ProofGeneration.ProgramToVCProof
                 }
                 else
                 {
-                    finalCfgSuccessors = finalCfg.GetSuccessorBlocks(b);
+                    finalCfgSuccessors = finalCfg.GetSuccessorBlocks(bFinal);
                 }
                 var lemma = vcPhaseLemmaManager.GenerateCfgLemma(
-                    b, 
-                    finalCfg.ContainsBlock(b),
-                    afterPassificationCfg.GetSuccessorBlocks(b), 
+                    bAfterPassive, 
+                    bFinal,
+                    isContainedInFinalCfg,
+                    afterPassificationCfg.GetSuccessorBlocks(bAfterPassive), 
                     finalCfgSuccessors,
                     cfgTerm, 
                     b => "cfg_"+lemmaNamer.GetName(b, b.Label), 
-                    (LemmaDecl) lemmaDecls[b].Last());
-                blockToLemmaDecls.Add(b, lemma);
+                    (LemmaDecl) lemmaDecls[bAfterPassive].Last());
+                blockToLemmaDecls.Add(bAfterPassive, lemma);
             }
 
             return blockToLemmaDecls;
@@ -288,21 +298,25 @@ namespace ProofGeneration.ProgramToVCProof
         }
 
         //return first reachable blocks from block in afterPassificationCfg, which are non-empty and contained in finalCfg
-        private static IEnumerable<Block> GetNonEmptyReachableSuccessors(Block block, CFGRepr afterPassificationCfg, CFGRepr finalCfg)
+        private static IEnumerable<Block> GetNonEmptyReachableSuccessors(
+            Block afterPassiveBlock, 
+            CFGRepr afterPassificationCfg, 
+            CFGRepr finalCfg,
+            IDictionary<Block, Block> afterPassiveToFinalBlock)
         {            
             //block is unreachable after peephole
             var nonEmptySuccessors = new HashSet<Block>();
 
-            if (afterPassificationCfg.NumOfSuccessors(block) > 0)
+            if (afterPassificationCfg.NumOfSuccessors(afterPassiveBlock) > 0)
             {
                 //find first reachable blocks that are not empty
                 Queue<Block> toVisit = new Queue<Block>();
-                toVisit.Enqueue(block);
+                toVisit.Enqueue(afterPassiveBlock);
                 while (toVisit.Count > 0)
                 {
                     Block curBlock = toVisit.Dequeue();
 
-                    if (curBlock.Cmds.Count != 0 && finalCfg.ContainsBlock(curBlock))
+                    if (curBlock.Cmds.Count != 0 && finalCfg.ContainsBlock(afterPassiveToFinalBlock[curBlock]))
                     {
                         nonEmptySuccessors.Add(curBlock);
                     }

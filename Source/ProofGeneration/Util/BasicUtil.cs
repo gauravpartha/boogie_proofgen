@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ProofGeneration.Util
 {
@@ -62,6 +63,11 @@ namespace ProofGeneration.Util
                 dict.Add(item, f(item));
             }
             return dict;
+        }
+
+        public static IDictionary<T2, T1> InverseDict<T1, T2>(this IDictionary<T1, T2> dict)
+        {
+            return dict.ToDictionary(d => d.Value, d => d.Key);
         }
 
     }

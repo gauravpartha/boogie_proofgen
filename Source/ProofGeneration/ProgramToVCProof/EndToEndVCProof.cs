@@ -26,7 +26,8 @@ namespace ProofGeneration.ProgramToVCProof
 
         private readonly IEnumerable<Function> vcFunctions;
         private readonly VcBoogieInfo vcBoogieInfo;
-        private readonly CFGRepr cfg;
+        private readonly CFGRepr afterPassificationCfg;
+        private readonly CFGRepr finalCfg;
         private readonly string entryBlockCorrectLemma;
 
         private readonly IVariableTranslationFactory varTranslationFactory;
@@ -79,7 +80,8 @@ namespace ProofGeneration.ProgramToVCProof
             IProgramAccessor programAccessor,
             IEnumerable<Function> vcFunctions, 
             VcBoogieInfo vcBoogieInfo,
-            CFGRepr cfg,
+            CFGRepr afterPassificationCfg,
+            CFGRepr finalCfg,
             string entryBlockCorrectLemma,
             string axiomLocaleName,
             Func<Axiom, string> axiomToVcLemmaName,
@@ -92,7 +94,8 @@ namespace ProofGeneration.ProgramToVCProof
             this.vcFunctions = vcFunctions;
             this.programAccessor = programAccessor;
             this.vcBoogieInfo = vcBoogieInfo;
-            this.cfg = cfg;
+            this.afterPassificationCfg = afterPassificationCfg;
+            this.finalCfg = finalCfg;
             this.entryBlockCorrectLemma = entryBlockCorrectLemma;
             this.axiomLocaleName = axiomLocaleName;
             this.axiomToVcLemmaName = axiomToVcLemmaName;
@@ -484,7 +487,7 @@ namespace ProofGeneration.ProgramToVCProof
                 declTypes.Add(typeIsa);
             }
             
-            Term vcAssmWithoutAxioms = vcBoogieInfo.VcInst.GetVCObjInstantiation(cfg.entry, declToVCMapping);
+            Term vcAssmWithoutAxioms = vcBoogieInfo.VcInst.GetVCObjInstantiation(finalCfg.entry, declToVCMapping);
 
             Term vcAssmWithoutQuant = vcBoogieInfo.VcAxioms.Reverse().Aggregate(vcAssmWithoutAxioms, (current, vcAx) => 
                 new TermBinary(vcBoogieInfo.VcInstAxiom.GetVCObjInstantiation(vcAx, declToVCMapping), current, TermBinary.BinaryOpCode.META_IMP));
@@ -499,7 +502,7 @@ namespace ProofGeneration.ProgramToVCProof
                 BoogieContextIsa.CreateWithNewVarContext(boogieContext, 
                     new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())), 
                 programAccessor.CfgDecl(),
-                IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState)),
+                IsaBoogieTerm.CFGConfigNode(new NatConst(afterPassificationCfg.GetUniqueIntLabel(afterPassificationCfg.entry)), IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNode, finalState)
                 );
             Term closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);

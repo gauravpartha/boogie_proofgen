@@ -69,25 +69,26 @@ namespace ProofGeneration.ProgramToVCProof
             assmManager = new AssumptionManager(methodData.Functions, programVariables, variableFactory);
         }
 
-        public LemmaDecl GenerateBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName, string vcHintsName)
+        public LemmaDecl GenerateBlockLemma(Block block, Block finalCfgBlock, IEnumerable<Block> finalCfgSuccessors, string lemmaName, string vcHintsName)
         {
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, IsaCommonTerms.TermIdentFromName(isaBlockInfo.CmdsQualifiedName(block)), 
                 initState, finalState);
 
-            Term vcAssm = vcinst.GetVCObjInstantiation(block, declToVCMapping);
+            Term vcAssm = vcinst.GetVCObjInstantiation(finalCfgBlock, declToVCMapping);
 
             //do not use separate assumption, leads to issues
-            Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst, LemmaHelper.FinalStateIsMagic(block));
+            Term conclusion = ConclusionBlock(finalCfgSuccessors, normalInitState, finalState, declToVCMapping, vcinst, LemmaHelper.FinalStateIsMagic(block));
 
             Term statement = TermBinary.MetaImplies(cmdsReduce, TermBinary.MetaImplies(vcAssm, conclusion));
 
-            Proof proof = BlockCorrectProof(block, vcHintsName);
+            Proof proof = BlockCorrectProof(block, finalCfgBlock, vcHintsName);
 
             return new LemmaDecl(lemmaName, ContextElem.CreateEmptyContext(), statement, proof);
         }
 
         public LemmaDecl GenerateCfgLemma(
             Block block, 
+            Block finalCfgBlock, 
             bool isContainedInFinalCfg,
             IEnumerable<Block> successors, 
             IEnumerable<Block> finalCfgSuccessors,
@@ -105,7 +106,7 @@ namespace ProofGeneration.ProgramToVCProof
             bool hasVcAssm = false;
             if (isContainedInFinalCfg)
             {
-                assumption.Add(vcinst.GetVCObjInstantiation(block, declToVCMapping));
+                assumption.Add(vcinst.GetVCObjInstantiation(finalCfgBlock, declToVCMapping));
                 hasVcAssm = true;
             }
             else
@@ -171,17 +172,17 @@ namespace ProofGeneration.ProgramToVCProof
                 new Proof(proofMethods));
         }
 
-        public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> successors, string lemmaName)
+        public LemmaDecl GenerateEmptyBlockLemma(Block block, IEnumerable<Block> finalCfgSuccessors, string lemmaName)
         {
             //Term cmds = new TermList(cmdIsaVisitor.Translate(block.Cmds));
             String blockDefName = isaBlockInfo.CmdsQualifiedName(block);
             Term blockDefTerm = IsaCommonTerms.TermIdentFromName(blockDefName);
             Term cmdsReduce = IsaBoogieTerm.RedCmdList(boogieContext, blockDefTerm, initState, finalState);
             List<Term> assumptions = new List<Term> { cmdsReduce };
-            if (successors.Any())
-                assumptions.Add(LemmaHelper.ConjunctionOfSuccessorBlocks(successors, declToVCMapping, vcinst));
+            if (finalCfgSuccessors.Any())
+                assumptions.Add(LemmaHelper.ConjunctionOfSuccessorBlocks(finalCfgSuccessors, declToVCMapping, vcinst));
 
-            Term conclusion = ConclusionBlock(block, successors, normalInitState, finalState, declToVCMapping, vcinst);
+            Term conclusion = ConclusionBlock(finalCfgSuccessors, normalInitState, finalState, declToVCMapping, vcinst);
 
             Proof proof = new Proof(
                 new List<string>()
@@ -225,7 +226,7 @@ namespace ProofGeneration.ProgramToVCProof
             return new List<OuterDecl>() { globalAssmsLemmas, forallPolyThm, existsPolyThm, decl };
         }
 
-        private Proof BlockCorrectProof(Block b, string vcHintsName)
+        private Proof BlockCorrectProof(Block block, Block finalCfgBlock, string vcHintsName)
         {
             List<string> methods;
             if (vcHintsName == null)
@@ -234,7 +235,7 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     "apply (erule red_cmd_list.cases)",
                     "using " + globalAssmsName,
-                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def " + vcinst.GetVCObjNameRef(b) + "_def",
+                    "unfolding " + isaBlockInfo.CmdsQualifiedName(block) + "_def " + vcinst.GetVCObjNameRef(finalCfgBlock) + "_def",
                     "apply (handle_cmd_list_full?)",
                     "by (auto?)"
                 };
@@ -242,7 +243,7 @@ namespace ProofGeneration.ProgramToVCProof
             {
                 methods = new List<string>
                 {
-                    "unfolding " + isaBlockInfo.CmdsQualifiedName(b) + "_def " + vcinst.GetVCObjNameRef(b) + "_def",
+                    "unfolding " + isaBlockInfo.CmdsQualifiedName(block) + "_def " + vcinst.GetVCObjNameRef(finalCfgBlock) + "_def",
                     "apply (tactic \\<open> boogie_vc_tac @{context} @{thms " + globalAssmsName + "} " +
                     "(@{thm forall_poly_thm}, @{thm exists_poly_thm}) " + vcHintsName + " \\<close>)",
                     "by (auto?)"
@@ -252,7 +253,7 @@ namespace ProofGeneration.ProgramToVCProof
             return new Proof(methods);
         }
 
-        private static Term ConclusionBlock(Block b,
+        private static Term ConclusionBlock(
             IEnumerable<Block> b_successors,
             Term normalInitState,
             Term finalState,

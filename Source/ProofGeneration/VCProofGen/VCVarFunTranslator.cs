@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.TypeErasure;
 using Microsoft.Boogie.VCExprAST;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -20,7 +21,7 @@ namespace ProofGeneration.VCProofGen
             TypeAxiomBuilderPremisses axiomBuilder)
         {
             this.origToErasedFun = origToErasedFun;
-            this.erasedToOrigFun = origToErasedFun.ToDictionary((i) => i.Value, (i) => i.Key);
+            this.erasedToOrigFun = origToErasedFun.InverseDict();
 
             boogieToVc = new Dictionary<Variable, VCExprVar>();
             vcToBoogie = new Dictionary<VCExprVar, Variable>();
