@@ -43,6 +43,7 @@ namespace ProofGeneration.CfgToDag
         private readonly string funContextWfName;
         
         string stateRelLoopHeadName = "StateRel1";
+        string state2WellTyLoopHeadName = "StateWt2";
         
         private readonly IsaUniqueNamer namer = new IsaUniqueNamer();
 
@@ -717,11 +718,9 @@ namespace ProofGeneration.CfgToDag
             foreach (Block bSuc in successors)
             {
                 sb.AppendLine(ProofUtil.Apply("erule member_elim"));
-                if (loops.Contains(bSuc))
+                if (loops.Contains(bSuc) || beforeBlock.Equals(bSuc) )
                 {
-                    //backedge --> need to apply IH
-                    if(bSuc == beforeBlock)
-                        throw new ProofGenUnexpectedStateException("Do not support edges from a block to itself");
+                    //Edge is backedge --> need to apply IH
 
                     /* We need to check whether a new backedge block was added, which contains the assertion of the invariant.
                        If so, then we need to get the invariant satisfiability from that block.
@@ -744,21 +743,37 @@ namespace ProofGeneration.CfgToDag
                         }
                     }
 
-                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule("loop_ih_apply[where ?j'=\"j-1\"]")));
-                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(proofData.LoopIndHypName(bSuc))));
-                    sb.AppendLine(ProofUtil.Apply("simp, simp"));
-                    sb.AppendLine("unfolding dag_lemma_assms_def");
-                    sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
-                    sb.AppendLine(ProofUtil.Apply("rule nstate_same_on_sym"));
-                    if (loops.Count > 1)
+                    if (beforeBlock.Equals(bSuc))
                     {
-                        /* if the block is within more than one loop, then the modified variables proved for the block may
-                         be a strict subset of the modified variables of the loop associated with the IH*/
-                        sb.AppendLine(ProofUtil.Apply("erule nstate_same_on_subset_2"));
+                        //the backedge is to the current block (i.e., self-loop): need to use generated induction hypothesis
+                        // ProveLoopHeadInductionHyp(sb, beforeBlock, proofData);
+                        sb.AppendLine(ProofUtil.Apply("erule backedge_loop_head_helper"));
+                        sb.AppendLine("apply (erule less.IH)");
+                        sb.AppendLine("apply assumption+");
+                        sb.AppendLine("using " + state2WellTyLoopHeadName + " apply assumption");
+                        sb.AppendLine("apply (assumption, simp)");
+                        sb.AppendLine(ProofUtil.Apply("rule " + stateRelLoopHeadName));
+                        sb.AppendLine("apply assumption");
                     }
-                    sb.AppendLine(ProofUtil.Apply("simp"));
-                    sb.AppendLine(ProofUtil.Apply("simp"));
-                    sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1", proofData.DagAssmName())));
+                    else
+                    {
+                        //the backedge is not to the current block: can use induction hypothesis in block lemma assumption
+                        sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule("loop_ih_apply[where ?j'=\"j-1\"]")));
+                        sb.AppendLine(ProofUtil.Apply(ProofUtil.Rule(proofData.LoopIndHypName(bSuc))));
+                        sb.AppendLine(ProofUtil.Apply("simp, simp"));
+                        sb.AppendLine("unfolding dag_lemma_assms_def");
+                        sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
+                        sb.AppendLine(ProofUtil.Apply("rule nstate_same_on_sym"));
+                        if (loops.Count > 1)
+                        {
+                            /* if the block is within more than one loop, then the modified variables proved for the block may
+                             be a strict subset of the modified variables of the loop associated with the IH*/
+                            sb.AppendLine(ProofUtil.Apply("erule nstate_same_on_subset_2"));
+                        }
+                        sb.AppendLine(ProofUtil.Apply("simp"));
+                        sb.AppendLine(ProofUtil.Apply("simp"));
+                        sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1", proofData.DagAssmName())));
+                    }
                 }
                 else
                 {
@@ -991,6 +1006,9 @@ namespace ProofGeneration.CfgToDag
            sb.AppendLine("case (Suc j')");
            sb.Append("from less(3) have " + stateRelLoopHeadName + ":");
            sb.Append("\"" +NstateSameOn(normalInitState1, normalInitState2, IsaCommonTerms.SetOfList(modVars)) + "\"");
+           sb.AppendLine("by (simp add: dag_lemma_assms_def)");
+           sb.Append("from less(3) have " + state2WellTyLoopHeadName + ":");
+           sb.Append("\"" + StateWellTyped(normalInitState2) + "\"");
            sb.AppendLine("by (simp add: dag_lemma_assms_def)");
            sb.AppendLine("show ?thesis");
            

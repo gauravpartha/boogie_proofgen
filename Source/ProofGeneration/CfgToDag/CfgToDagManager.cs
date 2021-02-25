@@ -36,9 +36,9 @@ namespace ProofGeneration.CfgToDag
             IProgramAccessor afterDagProgAccess,
             IVariableTranslationFactory varFactory)
         {
-            IDictionary<Block, Block> afterToBefore = beforeToAfter.ToDictionary(x => x.Value, x => x.Key);
+            IDictionary<Block, Block> afterToBefore = beforeToAfter.InverseDict();
             
-            //track mapping from blocks to loops that the block is contained in
+            //track mapping from blocks to loops that the block is contained in and for which it is not the loop head
             IDictionary<Block, IList<Block>> blocksToLoops = new Dictionary<Block, IList<Block>>();
 
             foreach (Block afterBlock in afterDagCfg.GetBlocksBackwards())
@@ -60,12 +60,17 @@ namespace ProofGeneration.CfgToDag
                             }
                         }
                     }
-                    //a node is inside all loops for which it has an out-going backedge 
+                    /* a node is inside all loops for which it has an out-going backedge
+                       if a node has a backedge to itself (i.e., it is also a loop head), then we do not add this loop
+                     */
                     if(hintManager.TryIsBackedgeNode(beforeBlock, out var backedgeLoops))
                     {
                         foreach (var backedgeLoop in backedgeLoops)
                         {
-                            loops.Add(backedgeLoop);
+                            if(beforeBlock != backedgeLoop) 
+                            {
+                                loops.Add(backedgeLoop);
+                            }
                         }
                     }
 
