@@ -473,8 +473,8 @@ namespace ProofGeneration.BoogieIsaInterface
                         ),
                     new Proof(new List<string>
                     {
-                        "using " + boundHelperLemma.name,
-                        "by (metis " + (isGlobal ? " helper_max list.map_disc_iff)" : " helper_min list.map_disc_iff)")
+                        "using " + boundHelperLemma.name + (isGlobal ? " helper_max" : " helper_min"),
+                        "by blast"
                     })
                     );
             

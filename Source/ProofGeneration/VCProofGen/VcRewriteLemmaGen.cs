@@ -22,7 +22,7 @@ namespace ProofGeneration.VCProofGen
         
         /// <summary>
         /// Checks whether the VC for <paramref name="expr"/> is optimized w.r.t. standard translation and if so returns
-        /// true and stores the lemmas in <<paramref name="rewriteLemmas"/>
+        /// true and stores the possible lemmas to rewrite back to a standard form in <paramref name="rewriteLemmas"/>
         /// </summary>
         /// <param name="expr">expression that is translated to vc</param>
         /// <param name="proveVc">true if want to show that vc holds, false if given vc</param>

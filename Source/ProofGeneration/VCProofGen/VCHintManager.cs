@@ -55,6 +55,10 @@ namespace ProofGeneration.VCProofGen
             vcHintBlock.AddHint(cmd, vcHint);
         }
         
+        /// <summary>
+        /// If vc hints for <paramref name="block"/> exist, then return them. <paramref name="block"/> must be a 
+        /// block in the final CFG used by Boogie (otherwise hints will not be found).
+        /// </summary>
         public bool TryGetHints(Block block, out IEnumerable<VCHint> hints, out IEnumerable<OuterDecl> requiredDecls)
         {
             if (_blockTo.TryGetValue(block, out VCHintBlock vcHintBlock))

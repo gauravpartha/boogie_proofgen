@@ -22,7 +22,7 @@ namespace ProofGeneration.ProgramToVCProof
             return
                 block.Cmds.Any(cmd =>
                 {
-                    return cmd != null && cmd is PredicateCmd predCmd && predCmd.Expr is LiteralExpr predCond && predCond != null && predCond.IsFalse;
+                    return cmd != null && cmd is PredicateCmd predCmd && predCmd.Expr is LiteralExpr predCond && predCond.IsFalse;
                 });
         }
 
