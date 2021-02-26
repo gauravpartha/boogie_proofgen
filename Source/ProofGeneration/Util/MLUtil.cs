@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using ProofGeneration.IsaML;
 
 namespace ProofGeneration.Util
@@ -19,10 +18,10 @@ namespace ProofGeneration.Util
         {
             return MLList(e, n => n.GetMLString());
         }
-        
-        public static string MLList(IEnumerable<string> e) 
+
+        public static string MLList(IEnumerable<string> e)
         {
-            return MLList(e, n =>  n);
+            return MLList(e, n => n);
         }
 
         public static string MLList<T>(IEnumerable<T> e, Func<T, string> stringReprFun)
@@ -30,17 +29,14 @@ namespace ProofGeneration.Util
             var sb = new StringBuilder();
             sb.Append("[");
 
-            bool first = true;
+            var first = true;
 
-            foreach(T elem in e)
+            foreach (var elem in e)
             {
-                if(!first)
-                {
+                if (!first)
                     sb.Append(", ");
-                } else
-                {
+                else
                     first = false;
-                }
                 sb.AppendLine();
                 sb.Append(stringReprFun(elem));
             }
@@ -62,14 +58,11 @@ namespace ProofGeneration.Util
 
         public static string IsaToMLThms(IEnumerable<string> thms)
         {
-            if (thms.Any())
-            {
-                return IsaToMLThms(String.Join(" ", thms));
-            }
+            if (thms.Any()) return IsaToMLThms(string.Join(" ", thms));
 
             return "[]";
         }
-        
+
         public static string IsaToMLThms(string isaThms)
         {
             return "@{thms " + isaThms + "}";

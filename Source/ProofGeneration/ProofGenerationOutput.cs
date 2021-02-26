@@ -9,32 +9,27 @@ namespace ProofGeneration
 {
     public class ProofGenerationOutput
     {
-       
-        private static string mainDir = null;
+        private static string mainDir;
 
         public static void CreateMainDirectory(string fileName)
         {
-            if(mainDir != null)
+            if (mainDir != null)
                 throw new ProofGenUnexpectedStateException("main directory already set");
-            mainDir = FreeDirName(Path.GetFileName(fileName) + "_proofs" );
+            mainDir = FreeDirName(Path.GetFileName(fileName) + "_proofs");
             Directory.CreateDirectory(mainDir);
         }
-        
+
         public static void StoreProofs(string name, IEnumerable<Theory> theories)
         {
-            
-            if(mainDir == null)
+            if (mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
-            
+
             //create new directory
-            string dirPath = Path.Join(mainDir, FreeDirName(name+"_proofs"));
+            var dirPath = Path.Join(mainDir, FreeDirName(name + "_proofs"));
             Directory.CreateDirectory(dirPath);
 
-            foreach (var theory in theories)
-            {
-               StoreTheory(dirPath, theory); 
-            }
-            
+            foreach (var theory in theories) StoreTheory(dirPath, theory);
+
             StoreSessionRoot(dirPath, theories);
         }
 
@@ -42,26 +37,22 @@ namespace ProofGeneration
         {
             if (id == 1)
                 return prefix;
-            else
-                return prefix + "_" + id;
-        } 
+            return prefix + "_" + id;
+        }
 
         private static string FreeDirName(string preferredName)
         {
-            int i = 1;
-            while (Directory.Exists(NameWithId(preferredName,i)))
-            {
-                i++;
-            }
+            var i = 1;
+            while (Directory.Exists(NameWithId(preferredName, i))) i++;
 
             return NameWithId(preferredName, i);
         }
 
         private static void StoreTheory(string dirName, Theory theory)
         {
-            string path = Path.Combine(dirName, theory.theoryName +".thy");
+            var path = Path.Combine(dirName, theory.theoryName + ".thy");
             var sw = new StreamWriter(path);
-            string theoryString = IsaPrettyPrinter.PrintTheory(theory);
+            var theoryString = IsaPrettyPrinter.PrintTheory(theory);
 
             sw.WriteLine(theoryString);
             sw.Close();
@@ -69,11 +60,11 @@ namespace ProofGeneration
 
         private static void StoreSessionRoot(string dirPath, IEnumerable<Theory> theories)
         {
-           var sw = new StreamWriter(Path.Combine(dirPath, "ROOT"));
-           sw.WriteLine("session " + Path.GetFileName(dirPath) + " = " + "Boogie_Lang + ");
-           sw.WriteLine("theories");
-           sw.Write(String.Join(Environment.NewLine, theories.Select(thy => thy.theoryName)));
-           sw.Close();
+            var sw = new StreamWriter(Path.Combine(dirPath, "ROOT"));
+            sw.WriteLine("session " + Path.GetFileName(dirPath) + " = " + "Boogie_Lang + ");
+            sw.WriteLine("theories");
+            sw.Write(string.Join(Environment.NewLine, theories.Select(thy => thy.theoryName)));
+            sw.Close();
         }
     }
 }

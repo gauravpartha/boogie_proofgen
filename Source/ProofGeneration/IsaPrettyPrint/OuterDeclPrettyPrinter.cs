@@ -1,46 +1,39 @@
-﻿using ProofGeneration.Isa;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Reflection.Metadata;
 using System.Text;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration.IsaPrettyPrint
 {
     //return value is ignored
     public class OuterDeclPrettyPrinter : OuterDeclVisitor<int>
-    {        
-        StringBuilder _sb
-        {
-            get;
-        }
-
-        TermPrettyPrinter _termPrinter
-        {
-            get;
-        }
-
-        TypeIsaPrettyPrinter _typeIsaPrinter
-        {
-            get;
-        }
-
-        public OuterDeclPrettyPrinter(StringBuilder sb, TermPrettyPrinter termPrinter, TypeIsaPrettyPrinter typeIsaPrinter)
+    {
+        public OuterDeclPrettyPrinter(StringBuilder sb, TermPrettyPrinter termPrinter,
+            TypeIsaPrettyPrinter typeIsaPrinter)
         {
             _sb = sb;
             _termPrinter = termPrinter;
             _typeIsaPrinter = typeIsaPrinter;
         }
 
+        private StringBuilder _sb { get; }
+
+        private TermPrettyPrinter _termPrinter { get; }
+
+        private TypeIsaPrettyPrinter _typeIsaPrinter { get; }
+
         public override int VisitDefDecl(DefDecl d)
         {
             return HandleAbbrevOrDef(d, "definition", d.type, "=", d.equation);
         }
+
         public override int VisitAbbreviationDecl(AbbreviationDecl d)
         {
             return HandleAbbrevOrDef(d, "abbreviation", d.type, "\\<equiv>", d.equation);
         }
 
-        private int HandleAbbrevOrDef(OuterDecl d, string topLevel, TypeIsa type, string equality, Tuple<IList<Term>, Term> equation)
+        private int HandleAbbrevOrDef(OuterDecl d, string topLevel, TypeIsa type, string equality,
+            Tuple<IList<Term>, Term> equation)
         {
             _sb.Append(topLevel + " ").Append(d.name);
             if (type != null)
@@ -48,13 +41,15 @@ namespace ProofGeneration.IsaPrettyPrint
                 _sb.Append(" :: ");
                 AppendInner(_typeIsaPrinter.Visit(type));
             }
+
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(2));
 
-            string args = IsaPrettyPrinterHelper.SpaceAggregate(_termPrinter.VisitList(equation.Item1));
+            var args = _termPrinter.VisitList(equation.Item1).SpaceAggregate();
 
             AppendInner(
-               () => _sb.Append(d.name).Append(" ").Append(args).Append(" " + equality + " ").Append(_termPrinter.Visit(equation.Item2))
+                () => _sb.Append(d.name).Append(" ").Append(args).Append(" " + equality + " ")
+                    .Append(_termPrinter.Visit(equation.Item2))
             );
 
             return 0;
@@ -69,28 +64,26 @@ namespace ProofGeneration.IsaPrettyPrint
                 _sb.Append(" :: ");
                 AppendInner(_typeIsaPrinter.Visit(d.type));
             }
+
             _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(1)).Append("where");
 
-            bool first = true;
+            var first = true;
             foreach (var tuple in d.equations)
             {
                 _sb.AppendLine().Append(IsaPrettyPrinterHelper.Indent(2));
 
                 if (first)
-                {
                     first = !first;
-                }
                 else
-                {
                     _sb.Append("|");
-                }
 
-                string args = IsaPrettyPrinterHelper.SpaceAggregate(_termPrinter.VisitList(tuple.Item1));
+                var args = _termPrinter.VisitList(tuple.Item1).SpaceAggregate();
 
-                AppendInner( () =>
+                AppendInner(() =>
                     _sb.Append(d.name).Append(" ").Append(args).Append(" = ").Append(_termPrinter.Visit(tuple.Item2))
                 );
             }
+
             return 0;
         }
 
@@ -117,7 +110,7 @@ namespace ProofGeneration.IsaPrettyPrint
         public override int VisitLemmasDecl(LemmasDecl d)
         {
             _sb.Append("lemmas ").Append(d.name).Append(" = ");
-            _sb.Append(IsaPrettyPrinterHelper.SpaceAggregate(d.thmNames));
+            _sb.Append(d.thmNames.SpaceAggregate());
 
             return 0;
         }
@@ -125,8 +118,8 @@ namespace ProofGeneration.IsaPrettyPrint
         public override int VisitLocaleDecl(LocaleDecl d)
         {
             _sb.Append("locale ").Append(d.name);
-            
-            if(d.contextElem.fixedVariables.Count > 0 || d.contextElem.assumptions.Count > 0)
+
+            if (d.contextElem.fixedVariables.Count > 0 || d.contextElem.assumptions.Count > 0)
             {
                 _sb.Append(" = ");
                 _sb.AppendLine();
@@ -136,15 +129,16 @@ namespace ProofGeneration.IsaPrettyPrint
 
             _sb.AppendLine();
             _sb.Append("begin");
-            _sb.AppendLine(); _sb.AppendLine();
+            _sb.AppendLine();
+            _sb.AppendLine();
 
-            foreach (OuterDecl decl in d.body)
+            foreach (var decl in d.body)
             {
                 decl.Dispatch(this);
                 _sb.AppendLine();
             }
 
-            _sb.AppendLine();            
+            _sb.AppendLine();
 
             _sb.AppendLine("end");
 
@@ -174,8 +168,8 @@ namespace ProofGeneration.IsaPrettyPrint
             if (c.fixedVariables.Count > 0)
             {
                 _sb.Append("fixes ");
-                bool first = true;
-                foreach (Tuple<TermIdent, TypeIsa> fix in c.fixedVariables)
+                var first = true;
+                foreach (var fix in c.fixedVariables)
                 {
                     if (first)
                         first = false;
@@ -190,23 +184,25 @@ namespace ProofGeneration.IsaPrettyPrint
 
             if (c.assumptions.Count > 0)
             {
-                bool useAssmLabels = c.assmLabels.Count == c.assumptions.Count;
+                var useAssmLabels = c.assmLabels.Count == c.assumptions.Count;
 
                 var assmLabelEnumerator = c.assmLabels.GetEnumerator();
                 assmLabelEnumerator.MoveNext();
 
-                if(c.fixedVariables.Count > 0)
+                if (c.fixedVariables.Count > 0)
                     _sb.AppendLine();
 
                 _sb.AppendLine("assumes ");
-                bool first = true;
+                var first = true;
 
-                foreach (Term t in c.assumptions)
+                foreach (var t in c.assumptions)
                 {
                     if (first)
+                    {
                         first = false;
+                    }
                     else
-                    {                        
+                    {
                         _sb.Append(" and ");
                         _sb.AppendLine();
                     }
@@ -217,7 +213,7 @@ namespace ProofGeneration.IsaPrettyPrint
                         _sb.Append(": ");
                         assmLabelEnumerator.MoveNext();
                     }
-                   
+
                     AppendInner(t.Dispatch(_termPrinter));
                 }
             }
@@ -227,20 +223,17 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public void AppendInner(string s)
         {
-            IsaPrettyPrinterHelper.AppendInner(_sb, s);
+            _sb.AppendInner(s);
         }
 
         public void AppendInner(Action action)
         {
-            IsaPrettyPrinterHelper.AppendInner(_sb, action);
+            _sb.AppendInner(action);
         }
 
         public void PrintProof(Proof p)
         {
-            foreach(var m in p.methods) {
-                _sb.AppendLine(m);
-            }
+            foreach (var m in p.methods) _sb.AppendLine(m);
         }
-
     }
 }

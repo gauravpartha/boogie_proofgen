@@ -1,6 +1,6 @@
-﻿using ProofGeneration.Isa;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
@@ -12,8 +12,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public static TermIdent ClosedToTyId { get; } = IsaCommonTerms.TermIdentFromName("closed_to_ty");
         public static TermIdent ValOfClosedTyId { get; } = IsaCommonTerms.TermIdentFromName("val_of_closed_type");
 
-        private static TermIdent TPrimClosedId { get;  } = IsaCommonTerms.TermIdentFromName("TPrimC");
-        
+        private static TermIdent TPrimClosedId { get; } = IsaCommonTerms.TermIdentFromName("TPrimC");
+
         public static Term VCInv(int idx)
         {
             return new TermApp(VCInvId, new NatConst(idx));
@@ -27,10 +27,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public static Term VCTypeConstructor(string constrName, int nArgs)
         {
             //TODO: do not limit number of arguments
-            if(nArgs > 5)
-            {
+            if (nArgs > 5)
                 throw new NotImplementedException("Do not support more than 5 type constructor arguments currently.");
-            }
 
             var id = IsaCommonTerms.TermIdentFromName("vc_type_constr" + nArgs);
             return new TermApp(id, new StringConst(constrName));
@@ -38,16 +36,16 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public static Term LeftInvLemmaName(int projIdx, int constrArity)
         {
-            if(projIdx > 4 || constrArity > 5)
+            if (projIdx > 4 || constrArity > 5)
                 throw new ArgumentException("only support type constructors with at most 5 arguments");
-            return IsaCommonTerms.TermIdentFromName( "vc_inv_constr_"+constrArity+ projIdx);
+            return IsaCommonTerms.TermIdentFromName("vc_inv_constr_" + constrArity + projIdx);
         }
-        
+
         public static TypeIsa BoogieClosedType()
         {
             return IsaCommonTypes.GetDataTypeNoArg("closed_ty");
         }
-        
+
         public static Term PrimTypeClosed(Term primType)
         {
             return new TermApp(TPrimClosedId, primType);
@@ -65,8 +63,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public static Term ValOfClosedTy(Term absValTyMap, Term ty)
         {
-            return new TermApp(ValOfClosedTyId, new List<Term>{ absValTyMap, ty });
+            return new TermApp(ValOfClosedTyId, new List<Term> {absValTyMap, ty});
         }
-
     }
 }

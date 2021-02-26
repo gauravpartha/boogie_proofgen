@@ -3,6 +3,5 @@
     public interface INodeML
     {
         public string GetMLString();
-
     }
 }

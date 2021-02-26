@@ -1,10 +1,12 @@
-﻿using Microsoft.Boogie;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using Microsoft.Boogie;
 
 namespace ProofGeneration
 {
-    /** visitor where visited nodes uses results from children */
+    /**
+     * visitor where visited nodes uses results from children
+     */
     public abstract class ResultReadOnlyVisitor<T> : ReadOnlyVisitor
     {
         protected Stack<T> Results { get; } = new Stack<T>();
@@ -14,14 +16,11 @@ namespace ProofGeneration
             return Results.Count == 0;
         }
 
-        abstract protected bool TranslatePrecondition(Absy node);
+        protected abstract bool TranslatePrecondition(Absy node);
 
         public T Translate(Absy node)
         {
-            if(!StateIsFresh())
-            {
-                throw new ProofGenUnexpectedStateException(GetType());
-            }
+            if (!StateIsFresh()) throw new ProofGenUnexpectedStateException(GetType());
             Contract.Assert(TranslatePrecondition(node));
             Visit(node);
             return Results.Pop();

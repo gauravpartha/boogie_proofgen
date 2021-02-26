@@ -5,9 +5,10 @@ namespace ProofGeneration.Passification
 {
     public class PassificationHintManager
     {
+        private readonly Dictionary<Block, List<PassificationHint>> blockToHints =
+            new Dictionary<Block, List<PassificationHint>>();
+
         private readonly IDictionary<Block, Block> newToOriginal;
-        private readonly Dictionary<Block, List<PassificationHint>> blockToHints = 
-            new Dictionary<Block, List<PassificationHint>> ();
 
         public PassificationHintManager(IDictionary<Block, Block> newToOriginal)
         {
@@ -18,21 +19,18 @@ namespace ProofGeneration.Passification
         public void AddHint(Block block, Cmd cmd, Variable origVar, Expr passiveExpr)
         {
             if (!blockToHints.TryGetValue(block, out var blockHints))
-            { 
+            {
                 blockHints = new List<PassificationHint>();
                 blockToHints.Add(block, blockHints);
             }
-            
-            blockHints.Add(new PassificationHint(cmd, origVar, passiveExpr)); 
+
+            blockHints.Add(new PassificationHint(cmd, origVar, passiveExpr));
         }
 
         //hints are obtained via copied CFG
         public List<PassificationHint> GetHint(Block block)
         {
-            if (blockToHints.TryGetValue(newToOriginal[block], out var hints))
-            {
-                return hints;
-            }
+            if (blockToHints.TryGetValue(newToOriginal[block], out var hints)) return hints;
 
             return new List<PassificationHint>();
         }

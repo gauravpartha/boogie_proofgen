@@ -1,20 +1,21 @@
-﻿using Microsoft.Boogie.VCExprAST;
-using ProofGeneration.Isa;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
+using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
     public class VCExprOpIsaVisitor : IVCExprOpVisitor<Term, List<Term>>
     {
-        private ConcreteTypeDeclTranslation _concreteTypeTranslation;
+        private readonly ConcreteTypeDeclTranslation _concreteTypeTranslation;
+
+        private bool _tryInstantiatingTypes;
 
         private IsaUniqueNamer _uniqueNamer;
-        
-        private bool _tryInstantiatingTypes = false; 
+
         public VCExprOpIsaVisitor(IsaUniqueNamer functionNamer)
         {
             _uniqueNamer = functionNamer;
@@ -27,28 +28,8 @@ namespace ProofGeneration.VCProofGen
             _concreteTypeTranslation = new ConcreteTypeDeclTranslation(boogieContext);
         }
 
-        public VCExprOpIsaVisitor() : this(new IsaUniqueNamer()) { }
-
-        public void setFunctionNamer(IsaUniqueNamer functionNamer)
+        public VCExprOpIsaVisitor() : this(new IsaUniqueNamer())
         {
-            _uniqueNamer = functionNamer;
-        }
-
-        public void SetTryInstantiatingTypes(bool flag)
-        {
-            _tryInstantiatingTypes = flag;
-        }
-
-        public Term HandleBinaryOp(TermBinary.BinaryOpCode bop, List<Term> arg)
-        {
-            Contract.Assert(arg.Count == 2);
-            return new TermBinary(arg[0], arg[1], bop);
-        }
-
-        public Term HandleUnaryOp(TermUnary.UnaryOpCode up, List<Term> arg)
-        {
-            Contract.Assert(arg.Count == 1);
-            return new TermUnary(arg[0]);
         }
 
         public Term VisitAddOp(VCExprNAry node, List<Term> arg)
@@ -63,17 +44,14 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitBoogieFunctionOp(VCExprNAry node, List<Term> arg)
         {
-            if(node.Op is VCExprBoogieFunctionOp funOp)
+            if (node.Op is VCExprBoogieFunctionOp funOp)
             {
-                string name = funOp.Func.Name;
-                if (_tryInstantiatingTypes && _concreteTypeTranslation.TryTranslateTypeDecl(funOp.Func, out Term funTermResult))
-                {
+                var name = funOp.Func.Name;
+                if (_tryInstantiatingTypes &&
+                    _concreteTypeTranslation.TryTranslateTypeDecl(funOp.Func, out var funTermResult))
                     return new TermApp(funTermResult, arg);
-                }
-                else
-                {
-                    return new TermApp(IsaCommonTerms.TermIdentFromName(_uniqueNamer.GetName(funOp.Func.Name, funOp.Func.Name)), arg);
-                }
+                return new TermApp(
+                    IsaCommonTerms.TermIdentFromName(_uniqueNamer.GetName(funOp.Func.Name, funOp.Func.Name)), arg);
             }
 
             //should never reach this code
@@ -186,11 +164,6 @@ namespace ProofGeneration.VCProofGen
             return HandleBinaryOp(TermBinary.BinaryOpCode.IMPLIES, arg);
         }
 
-        public Term VisitLabelOp(VCExprNAry node, List<Term> arg)
-        {
-            throw new NotImplementedException();
-        }
-
         public Term VisitLeOp(VCExprNAry node, List<Term> arg)
         {
             return HandleBinaryOp(TermBinary.BinaryOpCode.LE, arg);
@@ -267,6 +240,33 @@ namespace ProofGeneration.VCProofGen
         }
 
         public Term VisitToRealOp(VCExprNAry node, List<Term> arg)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void setFunctionNamer(IsaUniqueNamer functionNamer)
+        {
+            _uniqueNamer = functionNamer;
+        }
+
+        public void SetTryInstantiatingTypes(bool flag)
+        {
+            _tryInstantiatingTypes = flag;
+        }
+
+        public Term HandleBinaryOp(TermBinary.BinaryOpCode bop, List<Term> arg)
+        {
+            Contract.Assert(arg.Count == 2);
+            return new TermBinary(arg[0], arg[1], bop);
+        }
+
+        public Term HandleUnaryOp(TermUnary.UnaryOpCode up, List<Term> arg)
+        {
+            Contract.Assert(arg.Count == 1);
+            return new TermUnary(arg[0]);
+        }
+
+        public Term VisitLabelOp(VCExprNAry node, List<Term> arg)
         {
             throw new NotImplementedException();
         }

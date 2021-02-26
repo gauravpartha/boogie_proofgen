@@ -1,12 +1,12 @@
-﻿using Microsoft.Boogie;
+﻿using System.Collections.Generic;
+using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
-using System.Collections.Generic;
 
 namespace ProofGeneration.VCProofGen
 {
-    class VCExprDeclCollector : TraversingVCExprVisitor<bool, bool>
+    internal class VCExprDeclCollector : TraversingVCExprVisitor<bool, bool>
     {
-        private ISet<NamedDeclaration> NamedDeclarations;        
+        private ISet<NamedDeclaration> NamedDeclarations;
 
         private IVCVarFunTranslator translator;
 
@@ -18,29 +18,28 @@ namespace ProofGeneration.VCProofGen
             node.Accept(this, true);
             return NamedDeclarations;
         }
-        
-        public override bool Visit(VCExprQuantifier node, bool arg) {
-            bool res = StandardResult(node, arg);
+
+        public override bool Visit(VCExprQuantifier node, bool arg)
+        {
+            var res = StandardResult(node, arg);
             //ignore triggers, only traverse body
             node.Body.Accept(this, arg);
             return res;
-        } 
+        }
 
         protected override bool StandardResult(VCExpr node, bool arg)
         {
-            if(node is VCExprVar varNode && translator.TranslateVCVar(varNode, out Variable boogieVar))
+            if (node is VCExprVar varNode && translator.TranslateVCVar(varNode, out var boogieVar))
             {
-                 NamedDeclarations.Add(boogieVar);
-            } else if(node is VCExprNAry vcExprNAry && vcExprNAry.Op is VCExprBoogieFunctionOp boogieFunOp)
+                NamedDeclarations.Add(boogieVar);
+            }
+            else if (node is VCExprNAry vcExprNAry && vcExprNAry.Op is VCExprBoogieFunctionOp boogieFunOp)
             {
-                if(translator.TranslateVCFunction(boogieFunOp.Func, out Function boogieFun))
-                {
+                if (translator.TranslateVCFunction(boogieFunOp.Func, out var boogieFun))
                     NamedDeclarations.Add(boogieFun);
-                } else
-                {
+                else
                     //function does not appear in the Boogie program and is some VC specific function
                     NamedDeclarations.Add(boogieFunOp.Func);
-                }
             }
 
             return true;

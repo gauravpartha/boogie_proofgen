@@ -1,8 +1,8 @@
-﻿using ProofGeneration.Isa;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using ProofGeneration.Isa;
 using H = ProofGeneration.IsaPrettyPrint.IsaPrettyPrinterHelper;
 
 namespace ProofGeneration.IsaPrettyPrint
@@ -20,23 +20,16 @@ namespace ProofGeneration.IsaPrettyPrint
         {
             if (t.useConstructorRepr)
             {
-                StringBuilder sb = new StringBuilder("");
-                for (int i = t.n; i > 0; i--)
-                {
-                    sb.Append("Suc(");
-                }
+                var sb = new StringBuilder("");
+                for (var i = t.n; i > 0; i--) sb.Append("Suc(");
 
                 sb.Append(0);
 
-                for (int i = 1; i <= t.n; i++)
-                {
-                    sb.Append(")");
-                }
+                for (var i = 1; i <= t.n; i++) sb.Append(")");
                 return H.Parenthesis(sb.ToString());
             }
-            else {
-                return (t.n).ToString();
-            }
+
+            return t.n.ToString();
         }
 
         public override string VisitIntConst(IntConst t)
@@ -51,16 +44,16 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTermApp(TermApp t)
         {
-            string rFun = Visit(t.fun);
-            IList<string> rArgs = VisitList(t.arg);
+            var rFun = Visit(t.fun);
+            var rArgs = VisitList(t.arg);
 
-            return H.Parenthesis(rFun + " " + H.SpaceAggregate(rArgs));
+            return H.Parenthesis(rFun + " " + rArgs.SpaceAggregate());
         }
 
         public override string VisitTermWithExplicitType(TermWithExplicitType t)
         {
-            string rTerm = Visit(t.term);
-            string rType = typePrettyPrinter.Visit(t.type);
+            var rTerm = Visit(t.term);
+            var rType = typePrettyPrinter.Visit(t.type);
 
             return H.Parenthesis(rTerm + "::" + rType);
         }
@@ -79,7 +72,7 @@ namespace ProofGeneration.IsaPrettyPrint
         public override string VisitTermRecord(TermRecord t)
         {
             var res = t.mapping.Select(tuple => tuple.Item1 + " = " + Visit(tuple.Item2));
-            return "(|" + (H.CommaAggregate(res.ToList())) + "|)";
+            return "(|" + H.CommaAggregate(res.ToList()) + "|)";
         }
 
         public override string VisitTermSet(TermSet t)
@@ -96,25 +89,21 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTermQuantifier(TermQuantifier t)
         {
-            string qIsa = GetStringFromQuantifier(t.quantifier);
-            StringBuilder sb = new StringBuilder();
+            var qIsa = GetStringFromQuantifier(t.quantifier);
+            var sb = new StringBuilder();
             sb.Append("(");
             sb.Append(qIsa);
             sb.Append(" ");
 
             IEnumerable<string> boundVarsTranslated;
             if (t.boundVarTypes != null)
-            {
                 boundVarsTranslated = t.boundVars.Zip(t.boundVarTypes, (id, ty) =>
                     H.Parenthesis(GetStringFromIdentifier(id) + "::" + typePrettyPrinter.Visit(ty))
                 );
-            }
             else
-            {
                 boundVarsTranslated = t.boundVars.Select(GetStringFromIdentifier);
-            }
 
-            sb.Append(H.SpaceAggregate(boundVarsTranslated));
+            sb.Append(boundVarsTranslated.SpaceAggregate());
             sb.Append(".");
 
             sb.Append(" ");
@@ -126,12 +115,12 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTermCaseOf(TermCaseOf t)
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
 
             sb.Append("(case ");
             sb.Append(t.termToMatch.Dispatch(this));
             sb.AppendLine(" of ");
-            bool first = true;
+            var first = true;
             foreach (var (item1, item2) in t.matchCases)
             {
                 if (!first)
@@ -142,6 +131,7 @@ namespace ProofGeneration.IsaPrettyPrint
                 sb.Append(" \\<Rightarrow> ");
                 sb.AppendLine(item2.Dispatch(this));
             }
+
             sb.Append(")");
 
             return sb.ToString();
@@ -149,7 +139,7 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public string GetStringFromQuantifier(TermQuantifier.QuantifierKind q)
         {
-            switch(q)
+            switch (q)
             {
                 case TermQuantifier.QuantifierKind.ALL:
                     return "\\<forall>";
@@ -167,9 +157,9 @@ namespace ProofGeneration.IsaPrettyPrint
         public override string VisitTermBinary(TermBinary t)
         {
             //TODO: for critical operations, use a stack
-            string isaSymbol = GetStringFromBinary(t.op);
-            string leftString = t.argLeft.Dispatch(this);
-            string rightString = t.argRight.Dispatch(this);
+            var isaSymbol = GetStringFromBinary(t.op);
+            var leftString = t.argLeft.Dispatch(this);
+            var rightString = t.argRight.Dispatch(this);
 
             return H.Parenthesis(leftString + " " + isaSymbol + " " + rightString);
         }
@@ -224,16 +214,16 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTermUnary(TermUnary t)
         {
-            string isaSymbol = GetStringFromUnary(t.op);
+            var isaSymbol = GetStringFromUnary(t.op);
 
-            string argString = t.arg.Dispatch(this);
+            var argString = t.arg.Dispatch(this);
 
             return H.Parenthesis(isaSymbol + " " + argString);
         }
 
         public string GetStringFromUnary(TermUnary.UnaryOpCode uop)
         {
-            switch(uop)
+            switch (uop)
             {
                 case TermUnary.UnaryOpCode.NOT:
                     return "\\<not>";

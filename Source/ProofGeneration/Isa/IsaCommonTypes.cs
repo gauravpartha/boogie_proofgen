@@ -2,13 +2,13 @@
 
 namespace ProofGeneration.Isa
 {
-    class IsaCommonTypes
+    internal class IsaCommonTypes
     {
         public static TypeIsa GetUnitType()
         {
             return GetDataTypeNoArg("unit");
         }
-        
+
         public static TypeIsa GetOptionType(TypeIsa elemType)
         {
             return GetDataTypeSingle("option", elemType);
@@ -26,13 +26,13 @@ namespace ProofGeneration.Isa
 
         public static TypeIsa GetDataTypeSingle(string name, TypeIsa arg)
         {
-            var list = new List<TypeIsa>() { arg };
+            var list = new List<TypeIsa> {arg};
             return new DataType(name, list);
         }
 
         public static TypeIsa GetDataTypeNoArg(string name)
         {
-            return new DataType(name, new List<TypeIsa>() { });
+            return new DataType(name, new List<TypeIsa>());
         }
     }
 }

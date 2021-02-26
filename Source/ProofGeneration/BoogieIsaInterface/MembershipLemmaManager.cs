@@ -11,55 +11,62 @@ namespace ProofGeneration.BoogieIsaInterface
 {
     public enum VarKind
     {
-        Constant, Global, ParamOrLocal
+        Constant,
+        Global,
+        ParamOrLocal
     }
-    
+
     public class MembershipLemmaManager : IProgramAccessor
     {
+        private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
+
+        private readonly IsaProgramGeneratorConfig config;
+
+        // constants without globals membership
+        private readonly IDictionary<Declaration, LemmaDecl> constantMembershipLemmas =
+            new Dictionary<Declaration, LemmaDecl>();
+
+        private readonly string consts;
+        private readonly string[] constsAndGlobalsDefs;
+        private readonly Term constsAndGlobalsList;
+        private readonly string constsWfName = "consts_wf";
+
+        private readonly IVariableTranslationFactory factory;
+        private readonly string funcsWfName = "funcs_wf";
+        private readonly string globals;
+
+        private readonly string globalsLocalsDisjName = "globals_locals_disj";
+        private readonly string globalsMaxName = "globals_max";
+        private readonly string globalsWfName = "globals_wf";
+        private readonly List<LemmaDecl> helperLemmas = new List<LemmaDecl>();
+        private readonly IsaBlockInfo isaBlockInfo;
+        private readonly IsaProgramRepr isaProgramRepr;
+        private readonly string locals;
+
+        private readonly string localsMinName = "locals_min";
+        private readonly string localsWfName = "locals_wf";
+        private readonly IDictionary<Variable, LemmaDecl> lookupVarTyLemmas = new Dictionary<Variable, LemmaDecl>();
+        private readonly IsaUniqueNamer lookupVarTyNamer = new IsaUniqueNamer();
+
+        private readonly IDictionary<Declaration, LemmaDecl>
+            membershipLemmas = new Dictionary<Declaration, LemmaDecl>();
+
+        private readonly IsaUniqueNamer membershipNamer = new IsaUniqueNamer();
+        private readonly string parameters;
+
+        private readonly string[] paramsAndLocalsDefs;
+
+        private readonly Term paramsAndLocalsList;
+
+        private readonly string paramsWfName = "params_wf";
+
         //defer calls to parent, which are not handled here
         private readonly IProgramAccessor parent;
 
-        private readonly IVariableTranslationFactory factory;
-        private readonly TypeIsaVisitor typeIsaVisitor;
-        private readonly IsaProgramRepr isaProgramRepr;
-        private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
-
         private readonly string theoryName;
-
-        private readonly IDictionary<Declaration, LemmaDecl> membershipLemmas = new Dictionary<Declaration, LemmaDecl>();
-        // constants without globals membership
-        private readonly IDictionary<Declaration, LemmaDecl> constantMembershipLemmas = new Dictionary<Declaration, LemmaDecl>();
-        private readonly IDictionary<Variable, LemmaDecl> lookupVarTyLemmas = new Dictionary<Variable, LemmaDecl>();
-        private readonly List<LemmaDecl> helperLemmas = new List<LemmaDecl>();
-        
-        private readonly string[] paramsAndLocalsDefs;
-        private readonly string[] constsAndGlobalsDefs;
-
-        private readonly string consts;
-        private readonly string globals;
-        private readonly string parameters;
-        private readonly string locals;
-
-        private readonly Term paramsAndLocalsList;
-        private readonly Term constsAndGlobalsList;
-        
-        private readonly IsaUniqueNamer membershipNamer = new IsaUniqueNamer();
-        private readonly IsaUniqueNamer lookupVarTyNamer = new IsaUniqueNamer();
-
-        private readonly string localsMinName = "locals_min";
-        private readonly string globalsMaxName = "globals_max";
-        
-        private readonly string globalsLocalsDisjName = "globals_locals_disj";
-        private readonly string funcsWfName = "funcs_wf";
-        private readonly string constsWfName = "consts_wf";
-        private readonly string globalsWfName = "globals_wf";
-        private readonly string paramsWfName = "params_wf";
-        private readonly string localsWfName = "locals_wf";
+        private readonly TypeIsaVisitor typeIsaVisitor;
         private readonly string varContextWfName = "var_context_wf";
 
-        private readonly IsaProgramGeneratorConfig config;
-        private readonly IsaBlockInfo isaBlockInfo;
-        
         public MembershipLemmaManager(
             IsaProgramGeneratorConfig config,
             IsaProgramRepr isaProgramRepr,
@@ -69,7 +76,7 @@ namespace ProofGeneration.BoogieIsaInterface
             string theoryName
         )
         {
-            this.parent = config.ParentAccessor;
+            parent = config.ParentAccessor;
             this.isaProgramRepr = isaProgramRepr;
             this.factory = factory;
             this.theoryName = theoryName;
@@ -78,7 +85,7 @@ namespace ProofGeneration.BoogieIsaInterface
             typeIsaVisitor = new TypeIsaVisitor(factory.CreateTranslation().TypeVarTranslation);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(factory);
             paramsAndLocalsDefs =
-                new string[] {isaProgramRepr.paramsDeclDef + "_def", isaProgramRepr.localVarsDeclDef + "_def"};
+                new[] {isaProgramRepr.paramsDeclDef + "_def", isaProgramRepr.localVarsDeclDef + "_def"};
 
             parameters = config.GenerateParamsAndLocals
                 ? QualifyAccessName(isaProgramRepr.paramsDeclDef)
@@ -88,23 +95,24 @@ namespace ProofGeneration.BoogieIsaInterface
                 : parent.LocalsDecl();
             paramsAndLocalsList =
                 IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(parameters),
-                                        IsaCommonTerms.TermIdentFromName(locals));
-            
-            consts = config.GenerateGlobalsAndConstants ? QualifyAccessName(isaProgramRepr.constantsDeclDef) : parent.ConstsDecl();
-            globals = config.GenerateGlobalsAndConstants ? QualifyAccessName(isaProgramRepr.globalsDeclDef) : parent.GlobalsDecl(); 
-            
+                    IsaCommonTerms.TermIdentFromName(locals));
+
+            consts = config.GenerateGlobalsAndConstants
+                ? QualifyAccessName(isaProgramRepr.constantsDeclDef)
+                : parent.ConstsDecl();
+            globals = config.GenerateGlobalsAndConstants
+                ? QualifyAccessName(isaProgramRepr.globalsDeclDef)
+                : parent.GlobalsDecl();
+
             constsAndGlobalsDefs =
-                new string[] {consts+ "_def", globals+ "_def"};
+                new[] {consts + "_def", globals + "_def"};
             constsAndGlobalsList =
                 IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(consts),
                     IsaCommonTerms.TermIdentFromName(globals));
             AddDisjointnessLemmas(GlobalsMaxLocalsMin.Item1, GlobalsMaxLocalsMin.Item2);
-            if (config.GenerateFunctions)
-            {
-                AddTypingHelperLemmas();
-            }
+            if (config.GenerateFunctions) AddTypingHelperLemmas();
         }
-        
+
         public string TheoryName()
         {
             return theoryName;
@@ -114,7 +122,7 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             if (config.GenerateFunctions)
                 return QualifyAccessTerm(isaProgramRepr.funcsDeclDef);
-                
+
             return parent.FunctionsDecl();
         }
 
@@ -122,7 +130,7 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             if (config.GenerateAxioms)
                 return QualifyAccessTerm(isaProgramRepr.axiomsDeclDef);
-                
+
             return parent.AxiomsDecl();
         }
 
@@ -157,7 +165,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
             return parent.PostconditionsDeclName();
         }
-        
+
         public Term CfgDecl()
         {
             return QualifyAccessTerm(isaProgramRepr.cfgDeclDef);
@@ -192,35 +200,26 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             return globals;
         }
-        
-        private Term QualifyAccessTerm(string name)
-        {
-            return IsaCommonTerms.TermIdentFromName(QualifyAccessName(name));
-        }
 
-        private string QualifyAccessName(string name)
-        {
-            return theoryName + "." + name;
-        }
         public string MembershipLemma(Declaration d)
         {
             /* for variables we don't have a fine-grained distinction (which would require knowing whether the variable is
              * global or not) --> TODO use subtype to distinguish */
-            if (d is Variable && membershipLemmas.TryGetValue(d, out LemmaDecl result))
+            if (d is Variable && membershipLemmas.TryGetValue(d, out var result))
                 return QualifyAccessName(result.name);
-            
+
             if (d is Function && config.GenerateFunctions)
                 return QualifyAccessName(membershipLemmas[d].name);
 
             if (d is Axiom && config.GenerateAxioms)
                 return QualifyAccessName(membershipLemmas[d].name);
-                
+
             return parent.MembershipLemma(d);
         }
 
         public string ConstantMembershipLemma(Variable c)
         {
-            if (constantMembershipLemmas.TryGetValue(c, out LemmaDecl result))
+            if (constantMembershipLemmas.TryGetValue(c, out var result))
                 return QualifyAccessName(result.name);
 
             return parent.ConstantMembershipLemma(c);
@@ -233,10 +232,52 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public string LookupVarTyLemma(Variable v)
         {
-            if (lookupVarTyLemmas.TryGetValue(v, out LemmaDecl result))
+            if (lookupVarTyLemmas.TryGetValue(v, out var result))
                 return QualifyAccessName(result.name);
 
             return parent.LookupVarTyLemma(v);
+        }
+
+        public Term VarContext()
+        {
+            return new TermTuple(constsAndGlobalsList, paramsAndLocalsList);
+        }
+
+        public string GlobalsLocalsDisjointLemma()
+        {
+            return QualifyAccessName(globalsLocalsDisjName);
+        }
+
+        public string GlobalsAtMostMax()
+        {
+            if (config.GenerateGlobalsAndConstants)
+                return QualifyAccessName(globalsMaxName);
+            return parent.GlobalsAtMostMax();
+        }
+
+        public string LocalsAtLeastMin()
+        {
+            return QualifyAccessName(localsMinName);
+        }
+
+        public string VarContextWfTyLemma()
+        {
+            return QualifyAccessName(varContextWfName);
+        }
+
+        public string FuncsWfTyLemma()
+        {
+            return QualifyAccessName(funcsWfName);
+        }
+
+        private Term QualifyAccessTerm(string name)
+        {
+            return IsaCommonTerms.TermIdentFromName(QualifyAccessName(name));
+        }
+
+        private string QualifyAccessName(string name)
+        {
+            return theoryName + "." + name;
         }
 
         public IEnumerable<OuterDecl> OuterDecls()
@@ -253,58 +294,50 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             AddNamedDeclsMembershipLemmas(functions,
                 IsaCommonTerms.TermIdentFromName(isaProgramRepr.funcsDeclDef),
-                new[] { isaProgramRepr.funcsDeclDef + "_def" },
+                new[] {isaProgramRepr.funcsDeclDef + "_def"},
                 d => new StringConst(d.Name),
-                d => IsaBoogieTerm.FunDecl((Function)d, factory, false),
+                d => IsaBoogieTerm.FunDecl((Function) d, factory, false),
                 true,
                 false
-                );
+            );
         }
 
-        public void AddVariableMembershipLemmas(IEnumerable<Variable> variables, VarKind varKind, bool generateMembershipLemmas)
+        public void AddVariableMembershipLemmas(IEnumerable<Variable> variables, VarKind varKind,
+            bool generateMembershipLemmas)
         {
             var varTranslation = factory.CreateTranslation().VarTranslation;
             Func<NamedDeclaration, Term> idOfVar =
                 d =>
                 {
-                    if (varTranslation.TryTranslateVariableId((Variable) d, out Term varId, out bool isBoundVar) &&
+                    if (varTranslation.TryTranslateVariableId((Variable) d, out var varId, out var isBoundVar) &&
                         !isBoundVar)
-                    {
                         return varId;
-                    }
-                    else
-                    {
-                        throw new ProofGenUnexpectedStateException(typeof(EndToEndVCProof),
-                            "Could not retrieve variable id");
-                    }
+                    throw new ProofGenUnexpectedStateException(typeof(EndToEndVCProof),
+                        "Could not retrieve variable id");
                 };
 
             Func<Variable, string> membershipLemmaLookup;
             if (generateMembershipLemmas)
             {
                 if (varKind == VarKind.Constant)
-                {
                     AddNamedDeclsMembershipLemmas(variables,
                         IsaCommonTerms.TermIdentFromName(consts),
-                        new String[] {consts + "_def"},
+                        new[] {consts + "_def"},
                         idOfVar,
                         d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
                         true,
                         true);
-                }
 
                 string[] defs;
                 if (varKind == VarKind.Constant)
-                {
                     defs = Array.Empty<string>();
-                }
                 else
-                {
-                    defs = (varKind == VarKind.Global ? constsAndGlobalsDefs : paramsAndLocalsDefs);
-                }
+                    defs = varKind == VarKind.Global ? constsAndGlobalsDefs : paramsAndLocalsDefs;
 
                 AddNamedDeclsMembershipLemmas(variables,
-                    (varKind == VarKind.Constant || varKind == VarKind.Global) ? constsAndGlobalsList : paramsAndLocalsList,
+                    varKind == VarKind.Constant || varKind == VarKind.Global
+                        ? constsAndGlobalsList
+                        : paramsAndLocalsList,
                     defs,
                     idOfVar,
                     d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
@@ -318,17 +351,17 @@ namespace ProofGeneration.BoogieIsaInterface
             }
 
             //must come after adding membership lemmas (lemmas are looked up)
-            AddLookupVarTyLemmas(variables, 
-                idOfVar, 
+            AddLookupVarTyLemmas(variables,
+                idOfVar,
                 d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
                 membershipLemmaLookup
-                );
+            );
         }
 
         private void AddNamedDeclsMembershipLemmas(
             IEnumerable<NamedDeclaration> decls,
             Term sourceList,
-            string [] definitions,
+            string[] definitions,
             Func<NamedDeclaration, Term> nameOf,
             Func<NamedDeclaration, Term> declOf,
             bool useMapOf,
@@ -338,79 +371,67 @@ namespace ProofGeneration.BoogieIsaInterface
             {
                 Term lhs = new TermApp(
                     useMapOf ? IsaCommonTerms.TermIdentFromName("map_of") : IsaCommonTerms.TermIdentFromName("nth"),
-                    new List<Term> { sourceList, nameOf(d) });
-                Term rhs = useMapOf ? IsaCommonTerms.SomeOption(declOf(d)) : declOf(d);
+                    new List<Term> {sourceList, nameOf(d)});
+                var rhs = useMapOf ? IsaCommonTerms.SomeOption(declOf(d)) : declOf(d);
 
                 Term statement = TermBinary.Eq(lhs, rhs);
-                Proof proof; 
+                Proof proof;
                 //TODO: get rid of hack of checking whether defs are empty to know whether the already existing constant lookup should be used
                 if (definitions.Any())
-                    proof = new Proof(new List<string> { "by " + ProofUtil.Simp(definitions) });
+                    proof = new Proof(new List<string> {"by " + ProofUtil.Simp(definitions)});
                 else
-                    proof = new Proof(new List<string> { "by " + "(simp add: " + ConstantMembershipName(d) + " del: Nat.One_nat_def)" });
-                
+                    proof = new Proof(new List<string>
+                        {"by " + "(simp add: " + ConstantMembershipName(d) + " del: Nat.One_nat_def)"});
+
                 if (!separateConstantLemmas)
-                {
                     membershipLemmas.Add(d, new LemmaDecl(MembershipName(d), statement, proof));
-                }
                 else
-                {
                     constantMembershipLemmas.Add(d, new LemmaDecl(ConstantMembershipName(d), statement, proof));
-                }
             }
         }
 
         private void AddLookupVarTyLemmas(
-            IEnumerable<Variable> vars, 
+            IEnumerable<Variable> vars,
             Func<NamedDeclaration, Term> nameOf,
             Func<NamedDeclaration, Term> declOf,
             Func<Variable, string> getMembershipLemma)
         {
             foreach (var v in vars)
             {
-                Term lhs = IsaBoogieTerm.LookupVarTy(VarContext(), nameOf(v));
-                Term rhs = IsaCommonTerms.SomeOption(declOf(v));
+                var lhs = IsaBoogieTerm.LookupVarTy(VarContext(), nameOf(v));
+                var rhs = IsaCommonTerms.SomeOption(declOf(v));
                 Term statement = TermBinary.Eq(lhs, rhs);
-                Proof proof =
+                var proof =
                     new Proof(new List<string>
                     {
                         "using " + globalsLocalsDisjName + " " + getMembershipLemma(v),
                         "by (simp add: lookup_var_ty_global_2 lookup_var_ty_local)"
                     });
-                lookupVarTyLemmas.Add(v, new LemmaDecl(lookupVarTyNamer.GetName(v, "l_"+v.Name), statement, proof));
+                lookupVarTyLemmas.Add(v, new LemmaDecl(lookupVarTyNamer.GetName(v, "l_" + v.Name), statement, proof));
             }
         }
 
-        public Term VarContext()
-        {
-            return new TermTuple(constsAndGlobalsList, paramsAndLocalsList);
-        }
-        
         public void AddAxiomMembershipLemmas(IEnumerable<Axiom> axioms)
         {
-            Term axiomSet = IsaCommonTerms.SetOfList(IsaCommonTerms.TermIdentFromName(isaProgramRepr.axiomsDeclDef));
-            int id = 0;
+            var axiomSet = IsaCommonTerms.SetOfList(IsaCommonTerms.TermIdentFromName(isaProgramRepr.axiomsDeclDef));
+            var id = 0;
             foreach (var axiom in axioms)
             {
-                Term axiomTerm = basicCmdIsaVisitor.Translate(axiom.Expr);
-                Term elemAssm = IsaCommonTerms.Elem(axiomTerm, axiomSet);
+                var axiomTerm = basicCmdIsaVisitor.Translate(axiom.Expr);
+                var elemAssm = IsaCommonTerms.Elem(axiomTerm, axiomSet);
 
-                Proof proof = new Proof(new List<string> { "by (simp add: " + isaProgramRepr.axiomsDeclDef + "_def)" });
+                var proof = new Proof(new List<string> {"by (simp add: " + isaProgramRepr.axiomsDeclDef + "_def)"});
                 membershipLemmas.Add(axiom, new LemmaDecl(MembershipName(axiom, id), elemAssm, proof));
                 id++;
             }
         }
-        
+
         private string MembershipName(NamedDeclaration d)
         {
             var name = membershipNamer.GetName(d, d.Name);
-            if(d is Function)
-            {
+            if (d is Function)
                 return "mfun_" + name;
-            } else
-            {
-                return "m_" + name;
-            }
+            return "m_" + name;
         }
 
         private string ConstantMembershipName(NamedDeclaration d)
@@ -424,75 +445,58 @@ namespace ProofGeneration.BoogieIsaInterface
             return "ma_" + id;
         }
 
-        public string GlobalsLocalsDisjointLemma()
-        {
-            return QualifyAccessName(globalsLocalsDisjName);
-        }
-
-        public string GlobalsAtMostMax()
-        {
-            if (config.GenerateGlobalsAndConstants)
-                return QualifyAccessName(globalsMaxName);
-            return parent.GlobalsAtMostMax();
-        }
-        
-        public string LocalsAtLeastMin()
-        {
-            return QualifyAccessName(localsMinName);
-        }
-
         private void AddMinOrMaxLemma(bool isGlobal, int bound, Term varNames)
         {
             var xId = new SimpleIdentifier("x");
             var x = new TermIdent(xId);
-            var boundHelperLemma = 
+            var boundHelperLemma =
                 new LemmaDecl((isGlobal ? globalsMaxName : localsMinName) + "_aux",
                     TermBinary.Implies(
-                       TermBinary.Neq(varNames, IsaCommonTerms.EmptyList),  
-                       isGlobal ?
-                           TermBinary.Le(IsaCommonTerms.SetMax(IsaCommonTerms.SetOfList(varNames)), new NatConst(bound)) :
-                           TermBinary.Ge(IsaCommonTerms.SetMin(IsaCommonTerms.SetOfList(varNames)), new NatConst(bound))
-                        ), 
+                        TermBinary.Neq(varNames, IsaCommonTerms.EmptyList),
+                        isGlobal
+                            ? TermBinary.Le(IsaCommonTerms.SetMax(IsaCommonTerms.SetOfList(varNames)),
+                                new NatConst(bound))
+                            : TermBinary.Ge(IsaCommonTerms.SetMin(IsaCommonTerms.SetOfList(varNames)),
+                                new NatConst(bound))
+                    ),
                     new Proof(new List<string>
                     {
-                        "unfolding " + (isGlobal ? ConstsDecl() : ParamsDecl())+"_def " + (isGlobal ? GlobalsDecl() : LocalsDecl())+"_def",
+                        "unfolding " + (isGlobal ? ConstsDecl() : ParamsDecl()) + "_def " +
+                        (isGlobal ? GlobalsDecl() : LocalsDecl()) + "_def",
                         "by simp"
                     })
-                    );
+                );
             helperLemmas.Add(boundHelperLemma);
-            
-            var boundLemma = 
+
+            var boundLemma =
                 new LemmaDecl(isGlobal ? globalsMaxName : localsMinName,
                     TermQuantifier.ForAll(
-                        new List<Identifier> { xId },
+                        new List<Identifier> {xId},
                         null,
                         TermBinary.Implies(
                             IsaCommonTerms.Elem(x, IsaCommonTerms.SetOfList(varNames)),
-                            new TermBinary(x, new NatConst(bound), isGlobal ? TermBinary.BinaryOpCode.LE : TermBinary.BinaryOpCode.GE)
-                            )
-                        ),
+                            new TermBinary(x, new NatConst(bound),
+                                isGlobal ? TermBinary.BinaryOpCode.LE : TermBinary.BinaryOpCode.GE)
+                        )
+                    ),
                     new Proof(new List<string>
                     {
                         "using " + boundHelperLemma.name + (isGlobal ? " helper_max" : " helper_min"),
                         "by blast"
                     })
-                    );
-            
+                );
+
             helperLemmas.Add(boundLemma);
-            
         }
-        
+
 
         private void AddDisjointnessLemmas(int globalsMax, int localsMin)
         {
             var globalNames = VariableNames(constsAndGlobalsList);
             var localNames = VariableNames(paramsAndLocalsList);
-            
-            if (config.GenerateGlobalsAndConstants)
-            {
-                AddMinOrMaxLemma(true, globalsMax, globalNames);
-            }
-            
+
+            if (config.GenerateGlobalsAndConstants) AddMinOrMaxLemma(true, globalsMax, globalNames);
+
             AddMinOrMaxLemma(false, localsMin, localNames);
 
             Term statement = TermBinary.Eq(
@@ -502,69 +506,56 @@ namespace ProofGeneration.BoogieIsaInterface
 
             List<string> proofMethods;
             if (globalsMax == localsMin)
-            {
                 //-> global set is empty
                 proofMethods = new List<string>
                 {
-                    "unfolding " + ConstsDecl()+"_def " + GlobalsDecl() +"_def",
+                    "unfolding " + ConstsDecl() + "_def " + GlobalsDecl() + "_def",
                     "by simp"
                 };
-            }
             else
-            {
                 proofMethods = new List<string>
                 {
                     "using " + LocalsAtLeastMin() + " " + GlobalsAtMostMax(),
                     "by fastforce"
                 };
-            }
             helperLemmas.Add(
                 new LemmaDecl(globalsLocalsDisjName, statement, new Proof(proofMethods))
             );
         }
 
-        public string VarContextWfTyLemma()
-        {
-            return QualifyAccessName(varContextWfName);
-        }
-
-        public string FuncsWfTyLemma()
-        {
-            return QualifyAccessName(funcsWfName);
-        }
-
         private void AddTypingHelperLemmas()
         {
-            Func<string, string, Term, LemmaDecl> WfLemma = 
+            Func<string, string, Term, LemmaDecl> WfLemma =
                 (lemmaName, list_def, fun) =>
                 {
-                    Term wfStmt = 
+                    Term wfStmt =
                         new TermApp(IsaCommonTerms.ListAll(
-                            IsaCommonTerms.Composition(fun, IsaCommonTerms.SndId), 
+                            IsaCommonTerms.Composition(fun, IsaCommonTerms.SndId),
                             IsaCommonTerms.TermIdentFromName(list_def))
-                        ); 
-                    return 
+                        );
+                    return
                         new LemmaDecl(lemmaName, ContextElem.CreateEmptyContext(), wfStmt,
                             new Proof(new List<string>
                             {
                                 "unfolding " + list_def + "_def",
                                 "by simp"
                             })
-                            );
+                        );
                 };
             //TODO: only works if all definitions are defined on the current level (not in a parent)
-            helperLemmas.Add(WfLemma(funcsWfName, isaProgramRepr.funcsDeclDef, IsaCommonTerms.TermIdentFromName("wf_fdecl")));
+            helperLemmas.Add(WfLemma(funcsWfName, isaProgramRepr.funcsDeclDef,
+                IsaCommonTerms.TermIdentFromName("wf_fdecl")));
             Term wfTy0 = new TermApp(IsaCommonTerms.TermIdentFromName("wf_ty"), new NatConst(0));
-            
-            
-            helperLemmas.Add(WfLemma(constsWfName,  isaProgramRepr.constantsDeclDef, wfTy0));
-            helperLemmas.Add(WfLemma(globalsWfName,  isaProgramRepr.globalsDeclDef, wfTy0));
-            helperLemmas.Add(WfLemma(paramsWfName,  isaProgramRepr.paramsDeclDef, wfTy0));
-            helperLemmas.Add(WfLemma(localsWfName,  isaProgramRepr.localVarsDeclDef, wfTy0));
-            
+
+
+            helperLemmas.Add(WfLemma(constsWfName, isaProgramRepr.constantsDeclDef, wfTy0));
+            helperLemmas.Add(WfLemma(globalsWfName, isaProgramRepr.globalsDeclDef, wfTy0));
+            helperLemmas.Add(WfLemma(paramsWfName, isaProgramRepr.paramsDeclDef, wfTy0));
+            helperLemmas.Add(WfLemma(localsWfName, isaProgramRepr.localVarsDeclDef, wfTy0));
+
             var xId = new SimpleIdentifier("x");
             var tauId = new SimpleIdentifier("\\<tau>");
-            
+
             Term tauTerm = new TermIdent(tauId);
             Term xTerm = new TermIdent(xId);
             Term varContextWfStmt = TermQuantifier.ForAll(
@@ -573,24 +564,24 @@ namespace ProofGeneration.BoogieIsaInterface
                 TermBinary.Implies(
                     TermBinary.Eq(
                         new TermApp(
-                            IsaCommonTerms.TermIdentFromName("lookup_var_ty"), 
+                            IsaCommonTerms.TermIdentFromName("lookup_var_ty"),
                             new TermTuple(new List<Term> {constsAndGlobalsList, paramsAndLocalsList}), xTerm),
                         IsaCommonTerms.SomeOption(tauTerm)
-                        ),
+                    ),
                     new TermApp(wfTy0, tauTerm)
-                    ));
-            
-            LemmaDecl varContextWf = 
+                ));
+
+            var varContextWf =
                 new LemmaDecl(
-                    varContextWfName, 
-                    ContextElem.CreateEmptyContext(), 
-                    varContextWfStmt, 
+                    varContextWfName,
+                    ContextElem.CreateEmptyContext(),
+                    varContextWfStmt,
                     new Proof(
-                        new List<string>()
+                        new List<string>
                         {
                             ProofUtil.Apply("rule lookup_ty_pred_2"),
                             ProofUtil.By(ProofUtil.SimpAll(constsWfName, globalsWfName, paramsWfName, localsWfName))
-                        } ));
+                        }));
             helperLemmas.Add(varContextWf);
         }
 
@@ -598,6 +589,5 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             return IsaCommonTerms.Map(IsaCommonTerms.FstId, variableDeclarations);
         }
-
     }
 }

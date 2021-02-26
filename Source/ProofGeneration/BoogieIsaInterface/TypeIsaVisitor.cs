@@ -1,40 +1,39 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.Boogie;
-using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
+using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration
 {
     public class TypeIsaVisitor : ResultReadOnlyVisitor<Term>
     {
-
         private readonly IVariableTranslation<TypeVariable> typeVarTranslation;
         private readonly bool usedClosedConstructors;
 
-        [ContractInvariantMethod]
-        void ObjectInvariant()
-        {
-            Contract.Invariant(Results != null);
-            Contract.Invariant(Results.Count <= 1);
-        }
-        
-        public TypeIsaVisitor(IVariableTranslation<TypeVariable> typeVarTranslation, bool usedClosedConstructors = false)
+        public TypeIsaVisitor(IVariableTranslation<TypeVariable> typeVarTranslation,
+            bool usedClosedConstructors = false)
         {
             this.typeVarTranslation = typeVarTranslation;
             this.usedClosedConstructors = usedClosedConstructors;
         }
 
+        [ContractInvariantMethod]
+        private void ObjectInvariant()
+        {
+            Contract.Invariant(Results != null);
+            Contract.Invariant(Results.Count <= 1);
+        }
+
 
         protected override bool TranslatePrecondition(Absy node)
         {
-            return node is Microsoft.Boogie.Type;
+            return node is Type;
         }
 
-        public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
+        public override Type VisitTypeVariable(TypeVariable node)
         {
             ReturnResult(typeVarTranslation.TranslateVariable(node, out _));
             return node;
@@ -42,40 +41,33 @@ namespace ProofGeneration
 
         public override CtorType VisitCtorType(CtorType node)
         {
-            List<Term> argTypes = node.Arguments.Select(t => Translate(t)).ToList();
+            var argTypes = node.Arguments.Select(t => Translate(t)).ToList();
 
             ReturnResult(IsaBoogieType.TConType(node.Decl.Name, argTypes, usedClosedConstructors));
             return node;
         }
 
-        public override Microsoft.Boogie.Type VisitBasicType(BasicType node)
+        public override Type VisitBasicType(BasicType node)
         {
-            if(node.IsBool)
-            {
+            if (node.IsBool)
                 ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.BoolType(), usedClosedConstructors));
-            } else if(node.IsInt)
-            {
+            else if (node.IsInt)
                 ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType(), usedClosedConstructors));
-            } else
-            {
+            else
                 throw new NotImplementedException();
-            }
 
             return node;
         }
 
-        public override Microsoft.Boogie.Type VisitTypeProxy(TypeProxy node)
+        public override Type VisitTypeProxy(TypeProxy node)
         {
-            if(node.ProxyFor == null)
-            {
-                throw new NotImplementedException();
-            }
+            if (node.ProxyFor == null) throw new NotImplementedException();
             ReturnResult(Translate(node.ProxyFor));
             return node;
         }
 
         //not implemented
-        public override Microsoft.Boogie.Type VisitType(Microsoft.Boogie.Type type)
+        public override Type VisitType(Type type)
         {
             throw new NotImplementedException();
         }
@@ -85,12 +77,12 @@ namespace ProofGeneration
             throw new NotImplementedException();
         }
 
-        public override Microsoft.Boogie.Type VisitBvType(BvType node)
+        public override Type VisitBvType(BvType node)
         {
             throw new NotImplementedException();
         }
 
-        public override Microsoft.Boogie.Type VisitFloatType(FloatType node)
+        public override Type VisitFloatType(FloatType node)
         {
             throw new NotImplementedException();
         }

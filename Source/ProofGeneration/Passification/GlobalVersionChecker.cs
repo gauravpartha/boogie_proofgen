@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.CFGRepresentation;
@@ -15,7 +14,8 @@ namespace ProofGeneration.Passification
             IDictionary<Block, Block> beforeToPassiveBlocks
         )
         {
-            return GlobalVersion.CheckIsGlobal(beforeToPassiveBlocks.Values.ToList(), relationGen, versionMap, relationGen.LiveVarsBeforeBlock(beforePassiveBlocks.entry));
+            return GlobalVersion.CheckIsGlobal(beforeToPassiveBlocks.Values.ToList(), relationGen, versionMap,
+                relationGen.LiveVarsBeforeBlock(beforePassiveBlocks.entry));
         }
     }
 }

@@ -1,72 +1,78 @@
-﻿using Microsoft.Boogie;
-using Microsoft.Boogie.GraphUtil;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using ProofGeneration.Util;
 using System.Reflection;
-using System;
-using Type = System.Type;
+using Microsoft.Boogie;
+using ProofGeneration.Util;
 
 namespace ProofGeneration.CFGRepresentation
 {
     public static class CFGReprTransformer
     {
-
-        private static readonly MethodInfo CloneMethod = typeof(Object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly MethodInfo CloneMethod =
+            typeof(object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
 
         /// <summary>
-        /// Create CFG representation as <see cref="CFGRepr"/> of <paramref name="impl"/>.
+        ///     Create CFG representation as <see cref="CFGRepr" /> of <paramref name="impl" />.
         /// </summary>
         /// <param name="impl">Input implementation</param>
         /// <param name="config">Configuration specifying how to create representation</param>
-        /// <param name="newToOldBlocks">Mapping from original to copied blocks if <paramref name="config"/> specifies blocks to be copied</param>
-        /// <param name="newVarsFromDesugaring">New local variables obtained from desugared commands if <paramref name="config"/> specifies calls to be desugared</param>
+        /// <param name="newToOldBlocks">
+        ///     Mapping from original to copied blocks if <paramref name="config" /> specifies blocks to
+        ///     be copied
+        /// </param>
+        /// <param name="newVarsFromDesugaring">
+        ///     New local variables obtained from desugared commands if <paramref name="config" />
+        ///     specifies calls to be desugared
+        /// </param>
         /// <returns>CFG Representation of implementation</returns>
         /// <exception cref="ArgumentException"> Calls can only be desugared if blocks are specified to be copied.</exception>
         public static CFGRepr GetCfgRepresentation(
-            Implementation impl, 
+            Implementation impl,
             CFGReprConfig config,
             out IDictionary<Block, Block> newToOldBlocks,
             out List<Variable> newVarsFromDesugaring)
         {
             Contract.Requires(impl != null);
-            Contract.Ensures((config.GenerateBlockCopy && newToOldBlocks != null) || (!config.GenerateBlockCopy && newToOldBlocks == null));
+            Contract.Ensures(config.GenerateBlockCopy && newToOldBlocks != null ||
+                             !config.GenerateBlockCopy && newToOldBlocks == null);
             if (!config.GenerateBlockCopy && config.DesugarCalls)
-            {
                 throw new ArgumentException("Cannot desugar calls without generating copy of blocks");
-            }
-            
+
             var predecessorMap = ComputePredecessors(impl.Blocks);
             IList<Block> blocksToConvert;
             Func<Block, List<Block>> predecessorFunc;
 
-            if(config.GenerateBlockCopy)
+            if (config.GenerateBlockCopy)
             {
-                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap, config.GenerateBlockCopy, config.DeepCopyCmdPred, out newVarsFromDesugaring);
+                blocksToConvert = CopyBlocks(impl.Blocks, predecessorMap, config.GenerateBlockCopy,
+                    config.DeepCopyCmdPred, out newVarsFromDesugaring);
 
                 var newToOldInternal = new Dictionary<Block, Block>();
                 blocksToConvert.ZipDo(impl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
                 newToOldBlocks = newToOldInternal;
                 predecessorFunc = b => b.Predecessors;
-            } else
+            }
+            else
             {
                 newVarsFromDesugaring = new List<Variable>();
                 blocksToConvert = impl.Blocks;
                 newToOldBlocks = null;
                 predecessorFunc = b => predecessorMap[b];
-            }                
+            }
 
-            AlternateCFGRepr(blocksToConvert, out Block entryBlock, predecessorFunc, out IDictionary<Block, IList<Block >> outgoingBlocks);
+            AlternateCFGRepr(blocksToConvert, out var entryBlock, predecessorFunc, out var outgoingBlocks);
             IDictionary<Block, int> labeling;
             if (config.IsAcyclic)
             {
                 labeling = GetTopologicalLabeling(blocksToConvert);
-            } else
+            }
+            else
             {
                 labeling = new Dictionary<Block, int>();
-                int idx = 0;
-                foreach(Block b in blocksToConvert)
+                var idx = 0;
+                foreach (var b in blocksToConvert)
                 {
                     labeling.Add(b, idx);
                     idx++;
@@ -77,13 +83,13 @@ namespace ProofGeneration.CFGRepresentation
         }
 
         private static void AlternateCFGRepr(
-            IList<Block> blocks, 
-            out Block entryBlock, 
-            Func<Block, List<Block>> predecessorFunc, 
+            IList<Block> blocks,
+            out Block entryBlock,
+            Func<Block, List<Block>> predecessorFunc,
             out IDictionary<Block, IList<Block>> outgoingBlocks)
         {
             entryBlock = null;
-            int blockNum = 0;
+            var blockNum = 0;
             outgoingBlocks = new Dictionary<Block, IList<Block>>();
 
             foreach (var block in blocks)
@@ -91,17 +97,13 @@ namespace ProofGeneration.CFGRepresentation
                 if (predecessorFunc(block).Count == 0)
                 {
                     if (entryBlock != null)
-                    {
                         throw new ProofGenUnexpectedStateException(typeof(CFGReprTransformer), "no unique CFG entry");
-                    }
                     entryBlock = block;
                 }
-                List<Block> curOutgoing = new List<Block>();
 
-                if (block.TransferCmd is GotoCmd gotoCmd)
-                {
-                    curOutgoing.AddRange(gotoCmd.labelTargets);
-                }
+                var curOutgoing = new List<Block>();
+
+                if (block.TransferCmd is GotoCmd gotoCmd) curOutgoing.AddRange(gotoCmd.labelTargets);
 
                 outgoingBlocks.Add(block, curOutgoing);
 
@@ -109,32 +111,27 @@ namespace ProofGeneration.CFGRepresentation
             }
 
             if (entryBlock == null)
-            { 
                 throw new ProofGenUnexpectedStateException(typeof(CFGReprTransformer), "no CFG entry");
-            }
         }
 
 
         /// <summary>
-        /// Copy from <see cref="Implementation"/>. We compute predecessors ourselves, since at certain points the
-        /// predecessors property for blocks is not in-sync with the CFG (and we do not want to adjust the Boogie
-        /// objects)
+        ///     Copy from <see cref="Implementation" />. We compute predecessors ourselves, since at certain points the
+        ///     predecessors property for blocks is not in-sync with the CFG (and we do not want to adjust the Boogie
+        ///     objects)
         /// </summary>
-        private static Dictionary<Block, List<Block>>  ComputePredecessors(IEnumerable<Block> blocks)
-        { 
+        private static Dictionary<Block, List<Block>> ComputePredecessors(IEnumerable<Block> blocks)
+        {
             var predecessors = new Dictionary<Block, List<Block>>();
-            foreach (Block b in blocks)
-            {
-                predecessors.Add(b, new List<Block>());
-            }
+            foreach (var b in blocks) predecessors.Add(b, new List<Block>());
 
-            foreach (Block b in blocks)
+            foreach (var b in blocks)
             {
-                GotoCmd gtc = b.TransferCmd as GotoCmd;
+                var gtc = b.TransferCmd as GotoCmd;
                 if (gtc != null)
                 {
                     Contract.Assert(gtc.labelTargets != null);
-                    foreach (Block /*!*/ dest in gtc.labelTargets)
+                    foreach (var /*!*/ dest in gtc.labelTargets)
                     {
                         Contract.Assert(dest != null);
                         predecessors[dest].Add(b);
@@ -149,18 +146,19 @@ namespace ProofGeneration.CFGRepresentation
         {
             Contract.Requires(blocks != null);
             Contract.Ensures(blocks.Count == Contract.Result<IDictionary<Block, int>>().Count);
-            Contract.Ensures(Contract.Result<IDictionary<Block, int>>().Values.Min() == 0 && 
-                             Contract.Result<IDictionary<Block, int>>().Values.Max() == blocks.Count-1);
+            Contract.Ensures(Contract.Result<IDictionary<Block, int>>().Values.Min() == 0 &&
+                             Contract.Result<IDictionary<Block, int>>().Values.Max() == blocks.Count - 1);
 
             //adusted code from VC.cs
-            Graph<Block> dag = GraphUtil.GraphFromBlocks(blocks, true);
-            IEnumerable<Block> sortedNodes = dag.TopologicalSort();
+            var dag = GraphUtil.GraphFromBlocks(blocks, true);
+            var sortedNodes = dag.TopologicalSort();
             Contract.Assert(sortedNodes != null);
 
             var retLabels = new Dictionary<Block, int>();
 
-            int curLabel = 0;
-            foreach(Block block in sortedNodes) {
+            var curLabel = 0;
+            foreach (var block in sortedNodes)
+            {
                 retLabels.Add(block, curLabel);
                 curLabel++;
             }
@@ -169,12 +167,12 @@ namespace ProofGeneration.CFGRepresentation
         }
 
         /// <summary>
-        /// Makes a shallow copy of <paramref name="blocks"/>. The predecessors of <paramref name="blocks"/> is set
-        /// correctly.
+        ///     Makes a shallow copy of <paramref name="blocks" />. The predecessors of <paramref name="blocks" /> is set
+        ///     correctly.
         /// </summary>
         private static IList<Block> CopyBlocks(
-            IList<Block> blocks, 
-            Dictionary<Block, List<Block>> predecessorMap, 
+            IList<Block> blocks,
+            Dictionary<Block, List<Block>> predecessorMap,
             bool desugarCalls,
             Predicate<Cmd> deepCopyCmdPred,
             out List<Variable> newVarsFromDesugaring)
@@ -189,29 +187,26 @@ namespace ProofGeneration.CFGRepresentation
 
             //don't copy variables, since proof generation assumes sharing of variable identities
             Func<Cmd, Cmd> copyCmd = cmd =>
-                deepCopyCmdPred(cmd) ? cmd.Copy(t => t != typeof(IdentifierExpr) && t != typeof(TypeVariable) && t != typeof(QKeyValue)) : (Cmd) CloneMethod.Invoke(cmd, null);
+                deepCopyCmdPred(cmd)
+                    ? cmd.Copy(t => t != typeof(IdentifierExpr) && t != typeof(TypeVariable) && t != typeof(QKeyValue))
+                    : (Cmd) CloneMethod.Invoke(cmd, null);
 
-            foreach (Block b in blocks)
+            foreach (var b in blocks)
             {
-                List<Cmd> copyCmds = new List<Cmd>();
-                foreach(var cmd in b.Cmds)
-                {
+                var copyCmds = new List<Cmd>();
+                foreach (var cmd in b.Cmds)
                     if (cmd is SugaredCmd sugaredCmd && desugarCalls)
                     {
-                        StateCmd stateCmd = sugaredCmd.Desugaring as StateCmd;
+                        var stateCmd = sugaredCmd.Desugaring as StateCmd;
                         newVarsFromDesugaring.AddRange(stateCmd.Locals);
-                        foreach (var desugaredCmd in stateCmd.Cmds)
-                        {
-                            copyCmds.Add(copyCmd(desugaredCmd));
-                        }
+                        foreach (var desugaredCmd in stateCmd.Cmds) copyCmds.Add(copyCmd(desugaredCmd));
                     }
                     else
                     {
                         copyCmds.Add(copyCmd(cmd));
                     }
-                }
 
-                Block copyBlock = (Block)CloneMethod.Invoke(b, null);
+                var copyBlock = (Block) CloneMethod.Invoke(b, null);
                 copyBlock.Cmds = copyCmds;
                 copyBlock.Predecessors = predecessorMap[b];
 
@@ -220,27 +215,25 @@ namespace ProofGeneration.CFGRepresentation
             }
 
             //make sure block references are updated accordingly
-            foreach (Block copyBlock in copyBlocks)
+            foreach (var copyBlock in copyBlocks)
             {
                 if (copyBlock.TransferCmd is GotoCmd gtc)
                 {
                     var newSuccessors = gtc.labelTargets.Select(succ => oldToNewBlock[succ]).ToList();
-                    GotoCmd gotoCmdCopy = (GotoCmd)CloneMethod.Invoke(gtc, null);
+                    var gotoCmdCopy = (GotoCmd) CloneMethod.Invoke(gtc, null);
                     gotoCmdCopy.labelTargets = newSuccessors;
                     copyBlock.TransferCmd = gotoCmdCopy;
-                } else
+                }
+                else
                 {
-                    copyBlock.TransferCmd = (TransferCmd)CloneMethod.Invoke(copyBlock.TransferCmd, null);                    
+                    copyBlock.TransferCmd = (TransferCmd) CloneMethod.Invoke(copyBlock.TransferCmd, null);
                 }
 
                 if (copyBlock.Predecessors != null)
-                {
-                    copyBlock.Predecessors = copyBlock.Predecessors.Select(succ => oldToNewBlock[succ]).ToList();                    
-                }
+                    copyBlock.Predecessors = copyBlock.Predecessors.Select(succ => oldToNewBlock[succ]).ToList();
             }
 
             return copyBlocks;
-        }      
-
+        }
     }
 }

@@ -1,43 +1,34 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
-using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
 {
     public class GlobalVersion
     {
+        private int _nextVersion;
+
+        private PassiveRelationGen _relationGen;
 
         private HashSet<Block> _versionedBlocks;
         private IDictionary<Variable, int> _versionMap;
 
-        private PassiveRelationGen _relationGen;
-
-        private int _nextVersion = 0;
-
-        private enum CaseType {
-            Undefined, Case1 ,Case2
-        }
-        
-        public IDictionary<Variable, int> GlobalVersionMap(PassiveRelationGen relationGen, IEnumerable<Variable> entryVariables, Block entry, IList<Block> blocks)
+        public IDictionary<Variable, int> GlobalVersionMap(PassiveRelationGen relationGen,
+            IEnumerable<Variable> entryVariables, Block entry, IList<Block> blocks)
         {
             _relationGen = relationGen;
             _versionedBlocks = new HashSet<Block>();
-            _versionMap = new Dictionary<Variable , int>();
+            _versionMap = new Dictionary<Variable, int>();
             _nextVersion = 0;
-            foreach (var entryVar in entryVariables)
-            {
-                VersionVariable(entryVar);
-            }
+            foreach (var entryVar in entryVariables) VersionVariable(entryVar);
 
             var queue = new List<Block>();
-            
-            Graph<Block> graph = GraphUtil.GraphFromBlocks(blocks);
-            
+
+            var graph = GraphUtil.GraphFromBlocks(blocks);
+
             //TODO: make the currently inefficient computation more efficient
             queue.Add(entry);
 
@@ -50,42 +41,35 @@ namespace ProofGeneration.Passification
                  */
 
                 Block blockToHandle = null;
-                CaseType caseId = CaseType.Undefined;
-                
+                var caseId = CaseType.Undefined;
+
                 foreach (var block in queue)
-                {
                     if (IsUniquePredecessor(block, graph))
                     {
                         blockToHandle = block;
                         caseId = CaseType.Case1;
                         break;
-                    } else if (ReadySynchronization(block, graph))
+                    }
+                    else if (ReadySynchronization(block, graph))
                     {
                         blockToHandle = block;
                         caseId = CaseType.Case2;
                         break;
                     }
-                }
-                
-                if(blockToHandle == null || caseId == CaseType.Undefined)
+
+                if (blockToHandle == null || caseId == CaseType.Undefined)
                     throw new ProofGenUnexpectedStateException(GetType(), "Could not compute global version map.");
 
                 List<Block> nextNodes = null;
                 if (caseId == CaseType.Case1)
-                {
-                    nextNodes = HandleCase1(blockToHandle, graph).ToList(); 
-                }
+                    nextNodes = HandleCase1(blockToHandle, graph).ToList();
                 else
-                {
                     nextNodes = HandleCase2(blockToHandle, graph).ToList();
-                }
 
                 queue.RemoveAll(b => _versionedBlocks.Contains(b));
                 queue.AddRange(nextNodes);
                 if (nextNodes.Any(b => _versionedBlocks.Contains(b)))
-                {
-                   throw new ProofGenUnexpectedStateException(GetType(), "Added already versioned block to queue"); 
-                }
+                    throw new ProofGenUnexpectedStateException(GetType(), "Added already versioned block to queue");
             }
 
             return _versionMap;
@@ -103,21 +87,17 @@ namespace ProofGeneration.Passification
             var sortedNodes = graph.TopologicalSort();
 
             var maxVersionInitVars = entryVars.Any() ? entryVars.Select(v => versionMap[v]).Max() : -1;
-            
-            foreach (Block b in sortedNodes)
+
+            foreach (var b in sortedNodes)
             {
                 var predecessors = graph.Predecessors(b).ToList();
                 int maxVersionPred;
                 if (predecessors.Any())
-                {
                     maxVersionPred = graph.Predecessors(b).Select(b => largestVersion[b]).Max();
-                }
                 else
-                {
                     maxVersionPred = maxVersionInitVars;
-                }
 
-                bool correct = findLargestVersion(b, relationGen, versionMap, maxVersionPred, out int maxVersionBlock);
+                var correct = findLargestVersion(b, relationGen, versionMap, maxVersionPred, out var maxVersionBlock);
                 if (!correct)
                     return false;
                 largestVersion.Add(b, maxVersionBlock);
@@ -127,33 +107,28 @@ namespace ProofGeneration.Passification
         }
 
         public static bool findLargestVersion(
-            Block b, 
+            Block b,
             PassiveRelationGen relationGen,
-            IDictionary<Variable, int> versionMap, 
-            int maxVersionPred, 
+            IDictionary<Variable, int> versionMap,
+            int maxVersionPred,
             out int maxVersion)
         {
             maxVersion = maxVersionPred;
             var updates = relationGen.GenerateVariableRelUpdatesFromPassive(b, out _);
 
             foreach (var update in updates)
-            {
                 if (!update.Item3)
                 {
                     //not constant propagation
-                    Variable constrainedVariable = (update.Item2 as IdentifierExpr).Decl;
-                    if (versionMap[constrainedVariable] <= maxVersionPred)
-                    {
-                        return false;
-                    }
-                     
+                    var constrainedVariable = (update.Item2 as IdentifierExpr).Decl;
+                    if (versionMap[constrainedVariable] <= maxVersionPred) return false;
+
                     maxVersion = Math.Max(versionMap[constrainedVariable], maxVersion);
                 }
-            }
 
             return true;
         }
-        
+
         private IEnumerable<Block> HandleCase1(Block b, Graph<Block> graph)
         {
             VersionBlock(b);
@@ -163,42 +138,37 @@ namespace ProofGeneration.Passification
         private IEnumerable<Block> HandleCase2(Block b, Graph<Block> graph)
         {
             var uniqueSuc = graph.Successors(b).First();
-            foreach (var preSuc in uniqueSuc.Predecessors)
-            {
-                VersionBlock(preSuc);
-            }
+            foreach (var preSuc in uniqueSuc.Predecessors) VersionBlock(preSuc);
 
             return new List<Block> {uniqueSuc};
         }
-        
+
 
         private void VersionBlock(Block b)
         {
             var updates = _relationGen.GenerateVariableRelUpdatesFromPassive(b, out _);
 
             foreach (var update in updates)
-            {
                 if (!update.Item3)
                 {
                     //not constant propagation
-                    Variable constrainedVariable = (update.Item2 as IdentifierExpr).Decl;
+                    var constrainedVariable = (update.Item2 as IdentifierExpr).Decl;
                     VersionVariable(constrainedVariable);
                 }
-            }
-            
+
             _versionedBlocks.Add(b);
         }
 
         private void VersionVariable(Variable v)
         {
-             if (!_versionMap.ContainsKey(v))
-             {
-                 //lhs is a new variable
-                 _versionMap.Add(v, _nextVersion);
-                 _nextVersion++;
-             }
+            if (!_versionMap.ContainsKey(v))
+            {
+                //lhs is a new variable
+                _versionMap.Add(v, _nextVersion);
+                _nextVersion++;
+            }
         }
-        
+
         private bool IsUniquePredecessor(Block b, Graph<Block> graph)
         {
             var successors = graph.Successors(b);
@@ -209,17 +179,20 @@ namespace ProofGeneration.Passification
         private bool ReadySynchronization(Block b, Graph<Block> graph)
         {
             var successors = graph.Successors(b).ToList();
-            if (successors.Count != 1)
-            {
-                return false;
-            }
+            if (successors.Count != 1) return false;
 
             var uniqueSuc = successors.First();
             var preSuc = graph.Predecessors(uniqueSuc);
 
-            return 
-                preSuc.All(pre => graph.Predecessors(pre).
-                All(prepre => _versionedBlocks.Contains(prepre) ));
+            return
+                preSuc.All(pre => graph.Predecessors(pre).All(prepre => _versionedBlocks.Contains(prepre)));
+        }
+
+        private enum CaseType
+        {
+            Undefined,
+            Case1,
+            Case2
         }
     }
 }

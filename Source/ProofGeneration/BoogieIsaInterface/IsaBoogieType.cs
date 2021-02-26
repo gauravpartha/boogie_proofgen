@@ -1,9 +1,9 @@
-﻿using ProofGeneration.Isa;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration
 {
-    class IsaBoogieType
+    internal class IsaBoogieType
     {
         private static readonly TermIdent tprimId = IsaCommonTerms.TermIdentFromName("TPrim");
         private static readonly TermIdent tprimClosedId = IsaCommonTerms.TermIdentFromName("TPrimC");
@@ -41,16 +41,16 @@ namespace ProofGeneration
             return tintId;
         }
 
-        public static Term TConType(string constructorName, List<Term> constructorArgs, bool useClosedConstructor=false)
+        public static Term TConType(string constructorName, List<Term> constructorArgs,
+            bool useClosedConstructor = false)
         {
-
             var id = useClosedConstructor ? tconClosedId : tconId;
             return new TermApp(new TermApp(id, new StringConst(constructorName)), new TermList(constructorArgs));
         }
 
         public static TypeIsa ValType(TypeIsa absValType)
         {
-            return new DataType("val", new List<TypeIsa>() { absValType });
+            return new DataType("val", new List<TypeIsa> {absValType});
         }
 
         public static TypeIsa LitType()
@@ -60,12 +60,12 @@ namespace ProofGeneration
 
         public static TypeIsa AbstractValueTyFunType(TypeIsa absValType)
         {
-            return new DataType("absval_ty_fun", new List<TypeIsa> { absValType });
+            return new DataType("absval_ty_fun", new List<TypeIsa> {absValType});
         }
 
         public static TypeIsa NormalStateType(TypeIsa absValType)
         {
-            return new DataType("nstate", new List<TypeIsa> { absValType });
+            return new DataType("nstate", new List<TypeIsa> {absValType});
         }
 
         public static TypeIsa StateType(TypeIsa absValType)
@@ -77,10 +77,10 @@ namespace ProofGeneration
         {
             return new DataType("node", new List<TypeIsa>());
         }
-        
+
         public static TypeIsa CFGNodeOrReturnType()
         {
-            return new SumType(GetCFGNodeType(), IsaCommonTypes.GetUnitType()); 
+            return new SumType(GetCFGNodeType(), IsaCommonTypes.GetUnitType());
         }
 
         public static TypeIsa GetBlockType()
@@ -90,10 +90,10 @@ namespace ProofGeneration
 
         public static TypeIsa BoogieFuncInterpType(TypeIsa absValType)
         {
-            return new ArrowType(IsaCommonTypes.GetListType(BoogieType()), 
+            return new ArrowType(IsaCommonTypes.GetListType(BoogieType()),
                 new ArrowType(IsaCommonTypes.GetListType(ValType(absValType)),
                     IsaCommonTypes.GetOptionType(ValType(absValType)))
-                    );
+            );
         }
 
         public static TypeIsa VnameType()
@@ -108,12 +108,12 @@ namespace ProofGeneration
 
         public static TypeIsa VarContextType()
         {
-            return new DataType("var_context", new List<TypeIsa>() { });
+            return new DataType("var_context", new List<TypeIsa>());
         }
 
         public static TypeIsa MethodContextType()
         {
-            return new DataType("method_context", new List<TypeIsa>() { });
+            return new DataType("method_context", new List<TypeIsa>());
         }
 
         /*
@@ -125,12 +125,12 @@ namespace ProofGeneration
 
         public static TypeIsa FunInterpType(TypeIsa absValType)
         {
-            return new DataType("fun_interp", new List<TypeIsa>() { absValType } );
+            return new DataType("fun_interp", new List<TypeIsa> {absValType});
         }
-        
+
         public static TypeIsa RuntimeTypeEnvType()
         {
-            return new DataType("rtype_env", new List<TypeIsa>() { });
+            return new DataType("rtype_env", new List<TypeIsa>());
         }
     }
 }

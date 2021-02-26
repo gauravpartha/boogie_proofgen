@@ -7,53 +7,52 @@ using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Isa;
 using ProofGeneration.PhasesUtil;
-using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
 {
     public class PassificationEndToEnd
     {
-        private IProgramAccessor programAccessor;
-        private IProgramAccessor passiveProgramAccessor;
-        private Term vcAssm;
-        private string entryCfgLemma;
-        private string boogieToVcLemma;
-        private BoogieContextIsa boogieContext;
-
-        private TermIdent finalNodeOrReturn = IsaCommonTerms.TermIdentFromName("m'");
-        private TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
-        private TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("ns");
-
-        private TermIdent passiveVarContext;
-        private CFGRepr cfg;
+        private readonly string axiomAssmName = "Axioms";
+        private readonly string binderEmptyAssmName = "BinderNs";
+        private readonly string closedAssmName = "Closed";
+        private readonly string constsGlobalsAssmName = "ConstsGlobal";
+        private readonly string finterpAssmName = "FInterp";
+        private readonly string nonEmptyTypesAssmName = "NonEmptyTypes";
+        private readonly string oldGlobalEqualAssmName = "OldGlobal";
+        private readonly string paramsLocalsAssmName = "ParamsLocal";
 
         private readonly string redAssmName = "Red";
-        private readonly string vcAssmName = "VC";
-        private readonly string closedAssmName = "Closed";
-        private readonly string nonEmptyTypesAssmName = "NonEmptyTypes";
-        private readonly string finterpAssmName = "FInterp";
-        private readonly string axiomAssmName = "Axioms";
-        private readonly string paramsLocalsAssmName = "ParamsLocal";
-        private readonly string constsGlobalsAssmName = "ConstsGlobal";
-        private readonly string binderEmptyAssmName = "BinderNs";
-        private readonly string oldGlobalEqualAssmName = "OldGlobal";
+        private readonly Term stateRel;
+        private readonly string stateRelDefName = "R_rel";
+        private readonly Term stateRelList;
 
         private readonly string stateRelListDefName = "R_list";
-        private readonly Term stateRelList;
-        private readonly string stateRelDefName = "R_rel";
-        private readonly Term stateRel;
-        private StateRelationData oldRelationData;
+        private readonly string vcAssmName = "VC";
+        private BoogieContextIsa boogieContext;
+        private string boogieToVcLemma;
+        private CFGRepr cfg;
+        private string entryCfgLemma;
+
+        private readonly TermIdent finalNodeOrReturn = IsaCommonTerms.TermIdentFromName("m'");
+        private readonly TermIdent finalState = IsaCommonTerms.TermIdentFromName("s'");
 
         private IEnumerable<Variable> liveEntryVars;
+        private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("ns");
+        private StateRelationData oldRelationData;
+        private IProgramAccessor passiveProgramAccessor;
+
+        private TermIdent passiveVarContext;
+        private IProgramAccessor programAccessor;
         private IVariableTranslation<Variable> varTranslation;
+        private Term vcAssm;
 
         public PassificationEndToEnd()
         {
             stateRelList = IsaCommonTerms.TermIdentFromName(stateRelListDefName);
             stateRel = IsaCommonTerms.TermIdentFromName(stateRelDefName);
         }
-        
+
         public IEnumerable<OuterDecl> EndToEndProof(
             string entryCfgLemma,
             string boogieToVcLemma,
@@ -77,7 +76,7 @@ namespace ProofGeneration.Passification
                 IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item1),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
                 IsaCommonTerms.EmptyList
-                );
+            );
             passiveVarContext = IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item2);
             this.oldRelationData = oldRelationData;
             this.cfg = cfg;
@@ -96,52 +95,51 @@ namespace ProofGeneration.Passification
         }
 
         private List<OuterDecl> GenerateLemma()
-        { 
+        {
             var varIds = new List<Tuple<int, Variable>>();
-            foreach(Variable v in liveEntryVars)
-            {
-                if (varTranslation.TryTranslateVariableId(v, out Term termId, out _))
-                {
-                   varIds.Add(Tuple.Create((termId as NatConst).n, v)); 
-                }
+            foreach (var v in liveEntryVars)
+                if (varTranslation.TryTranslateVariableId(v, out var termId, out _))
+                    varIds.Add(Tuple.Create((termId as NatConst).n, v));
                 else
-                {
                     throw new ProofGenUnexpectedStateException("cannot extract variable id");
-                }
-            }
-            
-            varIds.Sort((x,y) => x.Item1.CompareTo(y.Item1));
+
+            varIds.Sort((x, y) => x.Item1.CompareTo(y.Item1));
 
             Term stateRelationList = new TermList(varIds
-                .Select(t=> (Term) new TermTuple(new NatConst(t.Item1), IsaCommonTerms.Inl(new NatConst(t.Item1)))).ToList());
+                .Select(t => (Term) new TermTuple(new NatConst(t.Item1), IsaCommonTerms.Inl(new NatConst(t.Item1))))
+                .ToList());
 
-            DefDecl stateRelListDef = new DefDecl(stateRelListDefName, PassificationManager.StateRelType,
-                Tuple.Create((IList<Term>)new List<Term>(), stateRelationList));
-            
-            DefDecl stateRelDef = DefDecl.CreateWithoutArg(stateRelDefName, 
+            var stateRelListDef = new DefDecl(stateRelListDefName, PassificationManager.StateRelType,
+                Tuple.Create((IList<Term>) new List<Term>(), stateRelationList));
+
+            var stateRelDef = DefDecl.CreateWithoutArg(stateRelDefName,
                 new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), stateRelList));
-            
+
             var result = new List<OuterDecl> {stateRelListDef, stateRelDef};
-            
-            LemmaDecl injectiveLemma = new LemmaDecl(
+
+            var injectiveLemma = new LemmaDecl(
                 "inj_R_rel",
                 new TermApp(IsaCommonTerms.TermIdentFromName("inj_on_defined"), stateRel),
-                new Proof(new List<string> {
-                    ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("injective_fun_to_list_2", stateRelDefName+"_def"))),
-                    ProofUtil.By(ProofUtil.SimpAddDel(new List<string> {"distinct.simps"}, stateRelListDefName+"_def"))
+                new Proof(new List<string>
+                    {
+                        ProofUtil.Apply(
+                            ProofUtil.Rule(ProofUtil.OF("injective_fun_to_list_2", stateRelDefName + "_def"))),
+                        ProofUtil.By(ProofUtil.SimpAddDel(new List<string> {"distinct.simps"},
+                            stateRelListDefName + "_def"))
                     }
                 ));
             result.Add(injectiveLemma);
-            
+
             Identifier xId = new SimpleIdentifier("x");
-            TermIdent x = new TermIdent(xId);
+            var x = new TermIdent(xId);
             Identifier tau = new SimpleIdentifier("\\<tau>");
-            TermIdent tauTerm = new TermIdent(tau);
+            var tauTerm = new TermIdent(tau);
             /*
              * lemma R_well_formed: "R_rel x = Some z ⟶ (∃τ. z = Inl x ∧ lookup_var_ty Λ1 x = Some τ ∧ lookup_var_ty Λ2 x = Some τ)"
              */
-            
+
             #region relation well-formed
+
             Term z = IsaCommonTerms.TermIdentFromName("z");
             Term lhs = TermBinary.Eq(new TermApp(stateRel, x), IsaCommonTerms.SomeOption(z));
 
@@ -162,68 +160,73 @@ namespace ProofGeneration.Passification
             var relWfProofMethods = new List<string>
             {
                 ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("convert_fun_to_list", stateRelDefName + "_def"))),
-                ProofUtil.Apply(ProofUtil.Simp(stateRelListDefName+"_def")),
+                ProofUtil.Apply(ProofUtil.Simp(stateRelListDefName + "_def")),
                 ProofUtil.Apply("(intro conjI)?")
             };
-            
+
             foreach (var idVar in varIds)
-            {
                 relWfProofMethods.Add(
-                    ProofUtil.Apply(ProofUtil.Simp(programAccessor.LookupVarTyLemma(idVar.Item2), passiveProgramAccessor.LookupVarTyLemma(idVar.Item2)))
-                    );
-            }
-            
+                    ProofUtil.Apply(ProofUtil.Simp(programAccessor.LookupVarTyLemma(idVar.Item2),
+                        passiveProgramAccessor.LookupVarTyLemma(idVar.Item2)))
+                );
+
             relWfProofMethods.Add("done");
-            
-            LemmaDecl relWellFormed = new LemmaDecl("R_well_formed",
+
+            var relWellFormed = new LemmaDecl("R_well_formed",
                 TermBinary.Implies(lhs, rhs),
                 new Proof(
                     relWfProofMethods
                 ));
             result.Add(relWellFormed);
+
             #endregion
 
             /*
              * lemma R_wt:"rel_well_typed A Λ1 Ω R_rel ns"
              */
+
             #region relation well typed
+
             var relWellTypedLemma = new LemmaDecl(
                 "R_wt",
-                new TermApp(IsaCommonTerms.TermIdentFromName("rel_well_typed"), 
-                    boogieContext.absValTyMap, 
-                    boogieContext.varContext, 
+                new TermApp(IsaCommonTerms.TermIdentFromName("rel_well_typed"),
+                    boogieContext.absValTyMap,
+                    boogieContext.varContext,
                     boogieContext.rtypeEnv,
                     stateRel,
                     normalInitState
-                    ), 
+                ),
                 new Proof(new List<string>
                 {
-                    ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("rel_well_typed_state_typ_wf", paramsLocalsAssmName, constsGlobalsAssmName))),
+                    ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("rel_well_typed_state_typ_wf", paramsLocalsAssmName,
+                        constsGlobalsAssmName))),
                     "using " + relWellFormed.name + " by auto"
                 })
-                );
-            
+            );
+
             result.Add(relWellTypedLemma);
+
             #endregion
-            
+
             #region initial set U0
-            AbbreviationDecl u0SetDecl = new AbbreviationDecl(
+
+            var u0SetDecl = new AbbreviationDecl(
                 "U0",
                 new Tuple<IList<Term>, Term>(
                     new List<Term>(),
-                    new TermApp(IsaCommonTerms.TermIdentFromName("initial_set"), 
-                        boogieContext.absValTyMap, 
+                    new TermApp(IsaCommonTerms.TermIdentFromName("initial_set"),
+                        boogieContext.absValTyMap,
                         stateRel,
                         boogieContext.varContext,
-                        passiveVarContext, 
-                        boogieContext.rtypeEnv, 
+                        passiveVarContext,
+                        boogieContext.rtypeEnv,
                         normalInitState))
             );
             result.Add(u0SetDecl);
 
             Term u0Set = IsaCommonTerms.TermIdentFromName(u0SetDecl.name);
 
-            LemmaDecl nstateRelU0 = new LemmaDecl(
+            var nstateRelU0 = new LemmaDecl(
                 "U0_ns_rel",
                 new TermApp(IsaCommonTerms.TermIdentFromName("nstate_rel_states"),
                     boogieContext.varContext,
@@ -243,51 +246,52 @@ namespace ProofGeneration.Passification
 
             var proofMethods = new List<string>
             {
-                ProofUtil.Apply("rule " + ProofUtil.OF("nstate_old_rel_states_helper", constsGlobalsAssmName, oldGlobalEqualAssmName)),
+                ProofUtil.Apply("rule " + ProofUtil.OF("nstate_old_rel_states_helper", constsGlobalsAssmName,
+                    oldGlobalEqualAssmName)),
                 ProofUtil.Apply("simp only: fst_conv snd_conv " + programAccessor.GlobalsLocalsDisjointLemma())
             };
 
             void ConvertRelPropertyToListElems()
             {
-                proofMethods.Add(ProofUtil.Apply("rule " + ProofUtil.OF("convert_fun_to_list", oldRelationData.StateRel + "_def")));
+                proofMethods.Add(ProofUtil.Apply("rule " +
+                                                 ProofUtil.OF("convert_fun_to_list",
+                                                     oldRelationData.StateRel + "_def")));
                 proofMethods.Add("unfolding " + oldRelationData.StateRelList + "_def ");
-                if(oldRelationData.VarsMapped.Any())
+                if (oldRelationData.VarsMapped.Any())
                     proofMethods.Add("apply (simp only: list.pred_inject)");
             }
 
             //prove old relation only has constants/globals in its domain
             ConvertRelPropertyToListElems();
-            if(oldRelationData.VarsMapped.Any())
+            if (oldRelationData.VarsMapped.Any())
                 proofMethods.Add("apply (intro conjI)");
             foreach (var v in oldRelationData.VarsMapped)
-            {
                 proofMethods.Add("using " + programAccessor.MembershipLemma(v) + " apply simp");
-            }
             //trivial obligation 
             proofMethods.Add("apply simp");
-            
+
             //prove old relation respects the "standard" state relation
             //TODO: here we are looking up values in the state relation for a second time, could make sense to prove it once separately and to then re-use this
             ConvertRelPropertyToListElems();
-            if(oldRelationData.VarsMapped.Any())
+            if (oldRelationData.VarsMapped.Any())
                 proofMethods.Add("unfolding " + stateRelDefName + "_def " + stateRelListDefName + "_def");
             proofMethods.Add("by simp");
-            
-            LemmaDecl nstateOldRelU0 = new LemmaDecl(
-            "U0_ns_old_rel",
-            new TermApp(IsaCommonTerms.TermIdentFromName("nstate_old_rel_states"),
-                boogieContext.varContext,
-                passiveVarContext,
-                oldRelationData.StateRel,
-                normalInitState,
-                u0Set),
-            new Proof(
+
+            var nstateOldRelU0 = new LemmaDecl(
+                "U0_ns_old_rel",
+                new TermApp(IsaCommonTerms.TermIdentFromName("nstate_old_rel_states"),
+                    boogieContext.varContext,
+                    passiveVarContext,
+                    oldRelationData.StateRel,
+                    normalInitState,
+                    u0Set),
+                new Proof(
                     proofMethods
                 )
             );
             result.Add(nstateOldRelU0);
 
-            LemmaDecl variableClosedTypes = new LemmaDecl(
+            var variableClosedTypes = new LemmaDecl(
                 "closed_ty_passive_vars",
                 ContextElem.CreateWithAssumptions(TermBinary.Eq(IsaBoogieTerm.LookupVarTy(passiveVarContext, x),
                     IsaCommonTerms.SomeOption(tauTerm))),
@@ -295,15 +299,17 @@ namespace ProofGeneration.Passification
                 new Proof(new List<string>
                 {
                     "apply (rule lookup_ty_pred[OF assms(1)])",
-                    "unfolding " + passiveProgramAccessor.ConstsDecl()+"_def " + passiveProgramAccessor.GlobalsDecl()+"_def",
+                    "unfolding " + passiveProgramAccessor.ConstsDecl() + "_def " +
+                    passiveProgramAccessor.GlobalsDecl() + "_def",
                     "apply simp",
-                    "unfolding " + passiveProgramAccessor.ParamsDecl()+"_def " + passiveProgramAccessor.LocalsDecl()+"_def",
+                    "unfolding " + passiveProgramAccessor.ParamsDecl() + "_def " + passiveProgramAccessor.LocalsDecl() +
+                    "_def",
                     "by simp"
                 })
             );
             result.Add(variableClosedTypes);
 
-            LemmaDecl u0NonEmpty = new LemmaDecl(
+            var u0NonEmpty = new LemmaDecl(
                 "U0_non_empty",
                 TermBinary.Neq(u0Set, IsaCommonTerms.EmptySet),
                 new Proof(
@@ -322,43 +328,43 @@ namespace ProofGeneration.Passification
                         "using " + passiveProgramAccessor.GlobalsLocalsDisjointLemma() + " apply auto[1]",
                         "done"
                     })
-                );
+            );
             result.Add(u0NonEmpty);
-            
+
             #endregion
 
             #region max relation
 
-            LemmaDecl maxRelRangeLemma = new LemmaDecl(
+            var maxRelRangeLemma = new LemmaDecl(
                 "max_rel_range",
                 TermQuantifier.ForAll(
-                    new List<Identifier> { xId }, 
+                    new List<Identifier> {xId},
                     null,
                     TermBinary.Implies(
-                    IsaCommonTerms.Elem(x, new TermApp(IsaCommonTerms.TermIdentFromName("rel_range"), stateRel)),
-                    TermBinary.Le(x, new NatConst(varIds.Any() ? varIds.Last().Item1 : 0 )))
-                    ),
+                        IsaCommonTerms.Elem(x, new TermApp(IsaCommonTerms.TermIdentFromName("rel_range"), stateRel)),
+                        TermBinary.Le(x, new NatConst(varIds.Any() ? varIds.Last().Item1 : 0)))
+                ),
                 new Proof(
                     new List<string>
                     {
                         " apply (rule rel_range_fun_to_list)",
-                        ProofUtil.Apply(ProofUtil.Simp(stateRelDefName+"_def")),
-                        ProofUtil.By(ProofUtil.Simp(stateRelListDefName+"_def"))
+                        ProofUtil.Apply(ProofUtil.Simp(stateRelDefName + "_def")),
+                        ProofUtil.By(ProofUtil.Simp(stateRelListDefName + "_def"))
                     }
-                    )
+                )
             );
-            
+
             result.Add(maxRelRangeLemma);
-            
+
             #endregion
-            
+
             #region final lemma
 
-            PassificationWitness witness =
+            var witness =
                 new PassificationWitness(passiveVarContext, null, null, stateRel, null, u0Set, null);
 
             Term entryBlockId = new NatConst(programAccessor.BlockInfo().BlockIds[cfg.entry]);
-            Term cfgEntryConclusion = PassificationLemmaManager.CfgLemmaConclusion(boogieContext, witness,
+            var cfgEntryConclusion = PassificationLemmaManager.CfgLemmaConclusion(boogieContext, witness,
                 passiveProgramAccessor, IsaCommonTerms.Inl(entryBlockId), finalState);
 
             Term u = IsaCommonTerms.TermIdentFromName("u");
@@ -372,14 +378,14 @@ namespace ProofGeneration.Passification
                 boogieContext.rtypeEnv
             );
 
-            LemmaDecl finalLemma = new LemmaDecl(
+            var finalLemma = new LemmaDecl(
                 PhasesTheories.LocalEndToEndName(),
                 TermBinary.Neq(finalState, IsaBoogieTerm.Failure()),
                 new Proof(
                     new List<string>
                     {
                         "proof",
-                        "assume A1: " + Inner(TermBinary.Eq(finalState, IsaBoogieTerm.Failure())), 
+                        "assume A1: " + Inner(TermBinary.Eq(finalState, IsaBoogieTerm.Failure())),
                         "have " + Inner(cfgEntryConclusion),
                         ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF(entryCfgLemma, redAssmName))),
                         "unfolding passive_lemma_assms_2_def",
@@ -392,17 +398,18 @@ namespace ProofGeneration.Passification
                             programAccessor.GlobalsAtMostMax()),
                         "apply simp",
                         ProofUtil.Apply(ProofUtil.Rule(u0NonEmpty.name)),
-                        ProofUtil.By(ProofUtil.SimpAll(stateRelDefName + "_def", stateRelListDefName + "_def"))+"?",
+                        ProofUtil.By(ProofUtil.SimpAll(stateRelDefName + "_def", stateRelListDefName + "_def")) + "?",
                         "with A1 obtain u mp' where uElem: " + Inner(IsaCommonTerms.Elem(u, u0Set)) + " and " +
-                          "AredPassive:" + 
+                        "AredPassive:" +
                         Inner(IsaBoogieTerm.RedCFGMulti(
-                            passiveBoogieContext, 
+                            passiveBoogieContext,
                             passiveProgramAccessor.CfgDecl(),
                             IsaBoogieTerm.CFGConfigNode(entryBlockId, IsaBoogieTerm.Normal(u)),
                             IsaBoogieTerm.CFGConfig(mpPrime, IsaBoogieTerm.Failure())
-                            )),
+                        )),
                         "by (auto simp add: passive_sim_cfg_fail_def)",
-                        "from " + ProofUtil.OF(boogieToVcLemma, "AredPassive") + " have " + Inner(TermBinary.Neq(IsaBoogieTerm.Failure(), IsaBoogieTerm.Failure())),
+                        "from " + ProofUtil.OF(boogieToVcLemma, "AredPassive") + " have " +
+                        Inner(TermBinary.Neq(IsaBoogieTerm.Failure(), IsaBoogieTerm.Failure())),
                         " apply rule",
                         "using " + vcAssmName + " apply assumption",
                         ProofUtil.Apply(ProofUtil.Rule(closedAssmName)),
@@ -414,11 +421,11 @@ namespace ProofGeneration.Passification
                         "qed"
                     }
                 ));
-            
+
             result.Add(finalLemma);
-            
+
             #endregion
-            
+
             return result;
         }
 
@@ -429,36 +436,48 @@ namespace ProofGeneration.Passification
 
         private ContextElem Context()
         {
-            Term multiRed = IsaBoogieTerm.RedCFGMulti(
+            var multiRed = IsaBoogieTerm.RedCFGMulti(
                 BoogieContextIsa.CreateWithNewVarContext(
-                    boogieContext,  
+                    boogieContext,
                     new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())
-                    ),
+                ),
                 programAccessor.CfgDecl(),
-                IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)), IsaBoogieTerm.Normal(normalInitState)),
+                IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)),
+                    IsaBoogieTerm.Normal(normalInitState)),
                 IsaBoogieTerm.CFGConfig(finalNodeOrReturn, finalState)
-                );
-            Term closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);
-            Term nonEmptyTypesAssm = EndToEndAssumptions.NonEmptyTypesAssumption(boogieContext.absValTyMap);
-            Term finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(), boogieContext.funContext);
+            );
+            var closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);
+            var nonEmptyTypesAssm = EndToEndAssumptions.NonEmptyTypesAssumption(boogieContext.absValTyMap);
+            var finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(),
+                boogieContext.funContext);
             //TODO constants
             //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
-            Term axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor, normalInitState);
-            Term localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext, IsaCommonTerms.Snd(boogieContext.varContext), normalInitState);
-            Term globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext, IsaCommonTerms.Fst(boogieContext.varContext), normalInitState);
-            Term binderEmptyAssm = EndToEndAssumptions.BinderStateEmpty(normalInitState);
-            Term oldGlobalEqualAssm = EndToEndAssumptions.OldGlobalStateAssumption(normalInitState);
-            
+            var axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor, normalInitState);
+            var localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext,
+                IsaCommonTerms.Snd(boogieContext.varContext), normalInitState);
+            var globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext,
+                IsaCommonTerms.Fst(boogieContext.varContext), normalInitState);
+            var binderEmptyAssm = EndToEndAssumptions.BinderStateEmpty(normalInitState);
+            var oldGlobalEqualAssm = EndToEndAssumptions.OldGlobalStateAssumption(normalInitState);
+
             return
                 new ContextElem(GlobalFixedVariables(),
-                new List<Term> { multiRed, vcAssm, closedAssm, nonEmptyTypesAssm, finterpAssm, axiomAssm, localsAssm, globalsAssm, binderEmptyAssm, oldGlobalEqualAssm},
-                new List<string> { redAssmName, vcAssmName, closedAssmName, nonEmptyTypesAssmName, finterpAssmName, axiomAssmName, paramsLocalsAssmName, constsGlobalsAssmName, binderEmptyAssmName, oldGlobalEqualAssmName});
+                    new List<Term>
+                    {
+                        multiRed, vcAssm, closedAssm, nonEmptyTypesAssm, finterpAssm, axiomAssm, localsAssm,
+                        globalsAssm, binderEmptyAssm, oldGlobalEqualAssm
+                    },
+                    new List<string>
+                    {
+                        redAssmName, vcAssmName, closedAssmName, nonEmptyTypesAssmName, finterpAssmName, axiomAssmName,
+                        paramsLocalsAssmName, constsGlobalsAssmName, binderEmptyAssmName, oldGlobalEqualAssmName
+                    });
         }
-        
+
         private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()
         {
             var absValType = new VarType("a");
-            
+
             var result = new List<Tuple<TermIdent, TypeIsa>>
             {
                 Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),

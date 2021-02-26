@@ -6,6 +6,7 @@ namespace ProofGeneration.Util
     public class FunctionCollector : ResultReadOnlyVisitor<bool>
     {
         private List<Function> _functions;
+
         protected override bool TranslatePrecondition(Absy node)
         {
             return node is Expr;
@@ -17,13 +18,11 @@ namespace ProofGeneration.Util
             Visit(e);
             return _functions;
         }
+
         public override Expr VisitNAryExpr(NAryExpr node)
         {
-            if (node.Fun is FunctionCall fc)
-            {
-                _functions.Add(fc.Func);
-            }
-            
+            if (node.Fun is FunctionCall fc) _functions.Add(fc.Func);
+
             return base.VisitNAryExpr(node);
         }
     }

@@ -1,13 +1,11 @@
-﻿using ProofGeneration.Isa;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
+using ProofGeneration.Isa;
 
 namespace ProofGeneration.IsaPrettyPrint
 {
     public class TypeIsaPrettyPrinter : TypeIsaVisitor<string>
     {
-
         public override string VisitVarType(VarType t)
         {
             return IsaPrettyPrinterHelper.Parenthesis("\'" + t.name);
@@ -15,19 +13,18 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitArrowType(ArrowType t)
         {
-            string rArg = Visit(t.argType);
-            string rRes = Visit(t.resType);
+            var rArg = Visit(t.argType);
+            var rRes = Visit(t.resType);
 
             return IsaPrettyPrinterHelper.Parenthesis(rArg + " => " + rRes);
         }
 
         public override string VisitDataType(DataType t)
         {
-            IList<string> rArgs = VisitList(t.args);
+            var rArgs = VisitList(t.args);
             if (t.args.Count == 0)
                 return IsaPrettyPrinterHelper.Parenthesis(t.name);
-            else
-                return IsaPrettyPrinterHelper.Parenthesis(IsaPrettyPrinterHelper.SpaceAggregate(rArgs) + t.name);
+            return IsaPrettyPrinterHelper.Parenthesis(rArgs.SpaceAggregate() + t.name);
         }
 
         public override string VisitPrimitiveType(PrimitiveType t)
@@ -49,15 +46,15 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTupleType(TupleType t)
         {
-            IList<string> rArgs = VisitList(t.args);
-            string aggr = rArgs.Aggregate((s1, s2) => s1 + " " + IsaPrettyPrinterHelper.TIMES + " " + s2);
+            var rArgs = VisitList(t.args);
+            var aggr = rArgs.Aggregate((s1, s2) => s1 + " " + IsaPrettyPrinterHelper.TIMES + " " + s2);
             return IsaPrettyPrinterHelper.Parenthesis(aggr);
         }
 
         public override string VisitSumType(SumType t)
         {
-            IList<string> rArgs = VisitList(t.args);
-            string aggr = rArgs.Aggregate((s1, s2) => s1 + " + " + s2);
+            var rArgs = VisitList(t.args);
+            var aggr = rArgs.Aggregate((s1, s2) => s1 + " + " + s2);
             return IsaPrettyPrinterHelper.Parenthesis(aggr);
         }
     }

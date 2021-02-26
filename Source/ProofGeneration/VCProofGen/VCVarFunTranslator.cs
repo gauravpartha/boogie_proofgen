@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.TypeErasure;
 using Microsoft.Boogie.VCExprAST;
@@ -7,34 +6,35 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
-    class VCVarFunTranslator : IVCVarFunTranslator
+    internal class VCVarFunTranslator : IVCVarFunTranslator
     {
-        private readonly IDictionary<VCExprVar, Variable> vcToBoogie;
         private readonly IDictionary<Variable, VCExprVar> boogieToVc;
-
-        private readonly IDictionary<Function, Function> origToErasedFun;
         private readonly IDictionary<Function, Function> erasedToOrigFun;
 
-        public VCVarFunTranslator(IEnumerable<Variable> vars, 
+        private readonly IDictionary<Function, Function> origToErasedFun;
+        private readonly IDictionary<VCExprVar, Variable> vcToBoogie;
+
+        public VCVarFunTranslator(IEnumerable<Variable> vars,
             IDictionary<Function, Function> origToErasedFun,
-            Boogie2VCExprTranslator translator, 
+            Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
             this.origToErasedFun = origToErasedFun;
-            this.erasedToOrigFun = origToErasedFun.InverseDict();
+            erasedToOrigFun = origToErasedFun.InverseDict();
 
             boogieToVc = new Dictionary<Variable, VCExprVar>();
             vcToBoogie = new Dictionary<VCExprVar, Variable>();
             foreach (var v in vars)
             {
-                VCExprVar result = translator.TryLookupVariable(v);
+                var result = translator.TryLookupVariable(v);
                 if (result != null)
                 {
                     if (axiomBuilder != null)
                     {
                         result = axiomBuilder.TryTyped2Untyped(result);
                         if (result == null)
-                            throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface), "Cannot retrieve untyped VCExprVar");
+                            throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface),
+                                "Cannot retrieve untyped VCExprVar");
                     }
 
                     vcToBoogie.Add(result, v);
@@ -45,55 +45,50 @@ namespace ProofGeneration.VCProofGen
 
         public bool TranslateBoogieVar(Variable v, out VCExprVar result)
         {
-            if(boogieToVc.TryGetValue(v, out VCExprVar resultInternal))
+            if (boogieToVc.TryGetValue(v, out var resultInternal))
             {
                 result = resultInternal;
-                return true; 
-            } else
-            {
-                result = null;
-                return false;
+                return true;
             }
+
+            result = null;
+            return false;
         }
 
         public bool TranslateVCVar(VCExprVar v, out Variable result)
         {
-            if(vcToBoogie.TryGetValue(v, out Variable resultInternal)) {
+            if (vcToBoogie.TryGetValue(v, out var resultInternal))
+            {
                 result = resultInternal;
                 return true;
-            } else
-            {
-                result = null;
-                return false;
             }
+
+            result = null;
+            return false;
         }
 
         public bool TranslateBoogieFunction(Function v, out Function result)
         {
-            if (origToErasedFun.TryGetValue(v, out Function internalResult))
+            if (origToErasedFun.TryGetValue(v, out var internalResult))
             {
                 result = internalResult;
                 return true;
             }
-            else
-            {
-                result = null;
-                return false;
-            }
+
+            result = null;
+            return false;
         }
 
         public bool TranslateVCFunction(Function vcFun, out Function result)
         {
-            if (erasedToOrigFun.TryGetValue(vcFun, out Function internalResult))
+            if (erasedToOrigFun.TryGetValue(vcFun, out var internalResult))
             {
                 result = internalResult;
                 return true;
             }
-            else
-            {
-                result = null;
-                return false;
-            }
+
+            result = null;
+            return false;
         }
     }
 }

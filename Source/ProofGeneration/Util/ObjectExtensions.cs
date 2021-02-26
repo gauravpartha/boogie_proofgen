@@ -13,6 +13,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -22,22 +23,26 @@ namespace ProofGeneration.Util
 {
     public static class ObjectExtensions
     {
-        private static readonly MethodInfo CloneMethod = typeof(Object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly MethodInfo CloneMethod =
+            typeof(object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
 
         public static bool IsPrimitive(this Type type)
         {
-            if (type == typeof(String)) return true;
-            return (type.IsValueType & type.IsPrimitive);
+            if (type == typeof(string)) return true;
+            return type.IsValueType & type.IsPrimitive;
         }
 
         /// <summary>
-        /// Do not deeply copy objects for which <paramref name="deepCopyPred"/> evaluates to false
+        ///     Do not deeply copy objects for which <paramref name="deepCopyPred" /> evaluates to false
         /// </summary>
-        public static Object Copy(this Object originalObject, Predicate<Type> deepCopyPred)
+        public static object Copy(this object originalObject, Predicate<Type> deepCopyPred)
         {
-            return InternalCopy(originalObject, new Dictionary<Object, Object>(new ReferenceEqualityComparer()), deepCopyPred);
+            return InternalCopy(originalObject, new Dictionary<object, object>(new ReferenceEqualityComparer()),
+                deepCopyPred);
         }
-        private static Object InternalCopy(Object originalObject, IDictionary<Object, Object> visited, Predicate<Type> deepCopyPred)
+
+        private static object InternalCopy(object originalObject, IDictionary<object, object> visited,
+            Predicate<Type> deepCopyPred)
         {
             if (originalObject == null) return null;
             var typeToReflect = originalObject.GetType();
@@ -50,29 +55,36 @@ namespace ProofGeneration.Util
                 var arrayType = typeToReflect.GetElementType();
                 if (IsPrimitive(arrayType) == false && deepCopyPred(arrayType))
                 {
-                    Array clonedArray = (Array)cloneObject;
-                    clonedArray.ForEach((array, indices) => array.SetValue(InternalCopy(clonedArray.GetValue(indices), visited, deepCopyPred), indices));
+                    var clonedArray = (Array) cloneObject;
+                    clonedArray.ForEach((array, indices) =>
+                        array.SetValue(InternalCopy(clonedArray.GetValue(indices), visited, deepCopyPred), indices));
                 }
-
             }
+
             visited.Add(originalObject, cloneObject);
             CopyFields(originalObject, visited, cloneObject, typeToReflect, deepCopyPred);
             RecursiveCopyBaseTypePrivateFields(originalObject, visited, cloneObject, typeToReflect, deepCopyPred);
             return cloneObject;
         }
 
-        private static void RecursiveCopyBaseTypePrivateFields(object originalObject, IDictionary<object, object> visited, object cloneObject, Type typeToReflect, Predicate<Type> deepCopyPred)
+        private static void RecursiveCopyBaseTypePrivateFields(object originalObject,
+            IDictionary<object, object> visited, object cloneObject, Type typeToReflect, Predicate<Type> deepCopyPred)
         {
             if (typeToReflect.BaseType != null)
             {
-                RecursiveCopyBaseTypePrivateFields(originalObject, visited, cloneObject, typeToReflect.BaseType, deepCopyPred);
-                CopyFields(originalObject, visited, cloneObject, typeToReflect.BaseType, deepCopyPred, BindingFlags.Instance | BindingFlags.NonPublic, info => info.IsPrivate);
+                RecursiveCopyBaseTypePrivateFields(originalObject, visited, cloneObject, typeToReflect.BaseType,
+                    deepCopyPred);
+                CopyFields(originalObject, visited, cloneObject, typeToReflect.BaseType, deepCopyPred,
+                    BindingFlags.Instance | BindingFlags.NonPublic, info => info.IsPrivate);
             }
         }
 
-        private static void CopyFields(object originalObject, IDictionary<object, object> visited, object cloneObject, Type typeToReflect, Predicate<Type> deepCopyPred, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy, Func<FieldInfo, bool> filter = null)
+        private static void CopyFields(object originalObject, IDictionary<object, object> visited, object cloneObject,
+            Type typeToReflect, Predicate<Type> deepCopyPred,
+            BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public |
+                                        BindingFlags.FlattenHierarchy, Func<FieldInfo, bool> filter = null)
         {
-            foreach (FieldInfo fieldInfo in typeToReflect.GetFields(bindingFlags))
+            foreach (var fieldInfo in typeToReflect.GetFields(bindingFlags))
             {
                 if (filter != null && filter(fieldInfo) == false) continue;
                 if (IsPrimitive(fieldInfo.FieldType) || !deepCopyPred(fieldInfo.FieldType)) continue;
@@ -81,18 +93,20 @@ namespace ProofGeneration.Util
                 fieldInfo.SetValue(cloneObject, clonedFieldValue);
             }
         }
+
         public static T Copy<T>(this T original, Predicate<Type> deepCopyPred)
         {
-            return (T)Copy((Object)original, deepCopyPred);
+            return (T) Copy((object) original, deepCopyPred);
         }
     }
 
-    public class ReferenceEqualityComparer : EqualityComparer<Object>
+    public class ReferenceEqualityComparer : EqualityComparer<object>
     {
         public override bool Equals(object x, object y)
         {
             return ReferenceEquals(x, y);
         }
+
         public override int GetHashCode(object obj)
         {
             if (obj == null) return 0;
@@ -107,41 +121,36 @@ namespace ProofGeneration.Util
             public static void ForEach(this Array array, Action<Array, int[]> action)
             {
                 if (array.LongLength == 0) return;
-                ArrayTraverse walker = new ArrayTraverse(array);
-                do action(array, walker.Position);
-                while (walker.Step());
+                var walker = new ArrayTraverse(array);
+                do
+                {
+                    action(array, walker.Position);
+                } while (walker.Step());
             }
         }
 
         internal class ArrayTraverse
         {
+            private readonly int[] maxLengths;
             public int[] Position;
-            private int[] maxLengths;
 
             public ArrayTraverse(Array array)
             {
                 maxLengths = new int[array.Rank];
-                for (int i = 0; i < array.Rank; ++i)
-                {
-                    maxLengths[i] = array.GetLength(i) - 1;
-                }
+                for (var i = 0; i < array.Rank; ++i) maxLengths[i] = array.GetLength(i) - 1;
                 Position = new int[array.Rank];
             }
 
             public bool Step()
             {
-                for (int i = 0; i < Position.Length; ++i)
-                {
+                for (var i = 0; i < Position.Length; ++i)
                     if (Position[i] < maxLengths[i])
                     {
                         Position[i]++;
-                        for (int j = 0; j < i; j++)
-                        {
-                            Position[j] = 0;
-                        }
+                        for (var j = 0; j < i; j++) Position[j] = 0;
                         return true;
                     }
-                }
+
                 return false;
             }
         }

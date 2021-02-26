@@ -2,21 +2,22 @@
 
 namespace ProofGeneration
 {
-    class ProofGenUnexpectedStateException : Exception
+    internal class ProofGenUnexpectedStateException : Exception
     {
-        Type TriggeringClass
-        { get; }
-
         public ProofGenUnexpectedStateException(Type triggeringClass, string message) : base(message)
         {
-            this.TriggeringClass = triggeringClass;
+            TriggeringClass = triggeringClass;
         }
 
         public ProofGenUnexpectedStateException(string message) : base(message)
-        { }
+        {
+        }
+
         public ProofGenUnexpectedStateException(Type triggeringClass)
         {
-            this.TriggeringClass = triggeringClass;
+            TriggeringClass = triggeringClass;
         }
+
+        private Type TriggeringClass { get; }
     }
 }

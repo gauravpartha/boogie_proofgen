@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using Microsoft.Boogie;
+﻿using System;
+using System.Collections.Generic;
 using ProofGeneration.Isa;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
@@ -8,6 +8,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
     public class SimpleVarSubstitution<T> : IVariableTranslation<T>
     {
         private readonly IDictionary<T, Term> substitution;
+
         public SimpleVarSubstitution(IDictionary<T, Term> substitution)
         {
             this.substitution = substitution;
@@ -16,19 +17,19 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         public void AddBoundVariable(T boundVar)
         {
             //TODO
-            throw new System.NotImplementedException();
+            throw new NotImplementedException();
         }
 
         public void DropLastBoundVariable()
         {
             //TODO
-            throw new System.NotImplementedException();
+            throw new NotImplementedException();
         }
 
         public int NumBoundVariables()
         {
             //TODO
-            throw new System.NotImplementedException();
+            throw new NotImplementedException();
         }
 
         public Term TranslateVariable(T variable, out bool isBoundVar)
@@ -40,7 +41,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
         {
             isBoundVar = false;
-            throw new System.NotSupportedException();
+            throw new NotSupportedException();
         }
     }
 }

@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
-    
     public class SimpleFixedVarTranslation : IFixedVariableTranslation<Variable>
     {
         private readonly IDictionary<Variable, int> mapping;
@@ -14,7 +12,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         {
             this.mapping = mapping;
         }
-        
+
         public int VariableId(Variable varName)
         {
             return mapping[varName];

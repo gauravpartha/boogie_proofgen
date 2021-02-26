@@ -11,26 +11,25 @@ namespace ProofGeneration.CfgToDag
 {
     public class TypingTacticGenerator
     {
-        private readonly FunctionCollector functionCollector = new FunctionCollector();
         private readonly EqualityHintGenerator equalityHintGenerator;
+        private readonly FunctionCollector functionCollector = new FunctionCollector();
         private readonly IProgramAccessor programAccessor;
 
         public TypingTacticGenerator(IProgramAccessor programAccessor, IVariableTranslationFactory factory)
-        { 
+        {
             this.programAccessor = programAccessor;
-            equalityHintGenerator = new EqualityHintGenerator(factory); 
+            equalityHintGenerator = new EqualityHintGenerator(factory);
         }
-        
+
         public Tuple<string, IEnumerable<LemmaDecl>> GenerateTactic(Expr e)
         {
-            VariableCollector varCollector = new VariableCollector();
+            var varCollector = new VariableCollector();
             varCollector.Visit(e);
-            
+
             var lookupTyThms = new List<string>();
             var funMemThms = new List<string>();
 
-            foreach (Variable v in varCollector.usedVars)
-            {
+            foreach (var v in varCollector.usedVars)
                 try
                 {
                     lookupTyThms.Add(programAccessor.LookupVarTyLemma(v));
@@ -39,13 +38,9 @@ namespace ProofGeneration.CfgToDag
                 {
                     //variable not found, possible if, for example, v is bound
                 }
-            }
 
             var usedFuncs = functionCollector.UsedFunctions(e);
-            foreach (Function f in usedFuncs)
-            {
-                funMemThms.Add(programAccessor.MembershipLemma(f));
-            }
+            foreach (var f in usedFuncs) funMemThms.Add(programAccessor.MembershipLemma(f));
 
             var hintLemmas = equalityHintGenerator.GetHints(e);
 
@@ -61,7 +56,7 @@ namespace ProofGeneration.CfgToDag
                 funMemML
             };
 
-            string tactic = ProofUtil.Apply(ProofUtil.MLTactic("typing_tac " + String.Join(" ", args), 1));
+            var tactic = ProofUtil.Apply(ProofUtil.MLTactic("typing_tac " + string.Join(" ", args), 1));
 
             return Tuple.Create(tactic, hintLemmas);
         }

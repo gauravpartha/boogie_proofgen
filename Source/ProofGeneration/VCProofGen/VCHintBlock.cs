@@ -1,33 +1,14 @@
-﻿using Microsoft.Boogie;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Microsoft.Boogie;
 using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
-    class VCHintBlock
+    internal class VCHintBlock
     {
-        private readonly Cmd[] cmds;
         private readonly VCHint[] _hints;
-        //declarations required for proof
-        public IList<OuterDecl> OuterDecls { get; }
-
-        public IEnumerable<VCHint> Hints()
-        {
-            List<VCHint> result = new List<VCHint>();
-            //ignore hints after a hint that solves the complete goal
-            foreach (VCHint hint in _hints)
-            {
-                result.Add(hint);
-
-                if (hint.IsFinal())
-                {
-                    break;
-                }
-            }
-
-            return result;
-        }             
+        private readonly Cmd[] cmds;
 
         private int nextCmd;
 
@@ -39,11 +20,31 @@ namespace ProofGeneration.VCProofGen
             OuterDecls = new List<OuterDecl>();
         }
 
+        //declarations required for proof
+        public IList<OuterDecl> OuterDecls { get; }
+
+        public IEnumerable<VCHint> Hints()
+        {
+            var result = new List<VCHint>();
+            //ignore hints after a hint that solves the complete goal
+            foreach (var hint in _hints)
+            {
+                result.Add(hint);
+
+                if (hint.IsFinal())
+                {
+                    break;
+                }
+            }
+
+            return result;
+        }
+
         public void AddHint(Cmd cmd, VCHint hint)
         {
             if (nextCmd < 0 || cmd != cmds[nextCmd])
             {
-                throw new ProofGenUnexpectedStateException(this.GetType(), "current hint database does not match cmd");
+                throw new ProofGenUnexpectedStateException(GetType(), "current hint database does not match cmd");
             }
 
             _hints[nextCmd] = hint;
@@ -55,7 +56,7 @@ namespace ProofGeneration.VCProofGen
         {
             OuterDecls.AddRange(decls);
         }
-        
+
         public void AddRequiredDecl(OuterDecl decl)
         {
             OuterDecls.Add(decl);
@@ -63,14 +64,12 @@ namespace ProofGeneration.VCProofGen
 
         private int NumOfCommands(VCHint hint)
         {
-            if(hint is AssumeConjHint assumeConjHint)
+            if (hint is AssumeConjHint assumeConjHint)
             {
                 return assumeConjHint.NumCommands;
-            } else
-            {
-                throw new ProofGenUnexpectedStateException(GetType(), "unexpected hint");
             }
-        }
 
+            throw new ProofGenUnexpectedStateException(GetType(), "unexpected hint");
+        }
     }
 }

@@ -1,60 +1,54 @@
 ﻿using System;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
+using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
-    class PureValueIsaTransformer : ResultReadOnlyVisitor<Term>
+    internal class PureValueIsaTransformer : ResultReadOnlyVisitor<Term>
     {
-
         private Term arg;
         private bool constructVal;
 
         protected override bool TranslatePrecondition(Absy node)
         {
-            return node is Microsoft.Boogie.Type;
+            return node is Type;
         }
 
-        public Term ConstructValue(Term pureArg, Microsoft.Boogie.Type boogieType)
+        public Term ConstructValue(Term pureArg, Type boogieType)
         {
             arg = pureArg;
             constructVal = true;
             return Translate(boogieType);
         }
 
-        public Term DestructValue(Term boogieValue, Microsoft.Boogie.Type boogieType)
+        public Term DestructValue(Term boogieValue, Type boogieType)
         {
             arg = boogieValue;
             constructVal = false;
             return Translate(boogieType);
         }
 
-        public override Microsoft.Boogie.Type VisitType(Microsoft.Boogie.Type type)
+        public override Type VisitType(Type type)
         {
             throw new NotImplementedException();
         }
 
-        public override Microsoft.Boogie.Type VisitBasicType(BasicType node)
+        public override Type VisitBasicType(BasicType node)
         {
             if (node.IsBool)
             {
-                if(constructVal)
-                {
+                if (constructVal)
                     ReturnResult(IsaBoogieTerm.BoolVal(arg));
-                } else
-                {
+                else
                     ReturnResult(IsaBoogieTerm.ConvertValToBool(arg));
-                }
             }
             else if (node.IsInt)
             {
-                if(constructVal)
-                {
+                if (constructVal)
                     ReturnResult(IsaBoogieTerm.IntVal(arg));
-                } else
-                {
+                else
                     ReturnResult(IsaBoogieTerm.ConvertValToInt(arg));
-                }
             }
             else
             {
@@ -63,7 +57,8 @@ namespace ProofGeneration.BoogieIsaInterface
 
             return node;
         }
-        public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
+
+        public override Type VisitTypeVariable(TypeVariable node)
         {
             ReturnResult(arg);
             return node;

@@ -2,7 +2,6 @@
 
 namespace ProofGeneration.Isa
 {
-
     public abstract class OuterDeclVisitor<R>
     {
         public R Visit(OuterDecl d)
@@ -11,7 +10,7 @@ namespace ProofGeneration.Isa
         }
 
         public abstract R VisitFunDecl(FunDecl d);
-          
+
         public abstract R VisitDefDecl(DefDecl d);
 
         public abstract R VisitAbbreviationDecl(AbbreviationDecl d);
@@ -37,10 +36,7 @@ namespace ProofGeneration.Isa
         public IList<R> VisitList(IList<Term> list)
         {
             var result = new List<R>();
-            foreach (var t in list)
-            {
-                result.Add(Visit(t));
-            }
+            foreach (var t in list) result.Add(Visit(t));
             return result;
         }
 
@@ -85,16 +81,14 @@ namespace ProofGeneration.Isa
         public IList<R> VisitList(IList<TypeIsa> list)
         {
             var result = new List<R>();
-            foreach(var t in list) {
-                result.Add(Visit(t));
-            }
+            foreach (var t in list) result.Add(Visit(t));
             return result;
         }
 
         public abstract R VisitVarType(VarType t);
 
         public abstract R VisitTupleType(TupleType t);
-        
+
         public abstract R VisitSumType(SumType t);
 
         public abstract R VisitArrowType(ArrowType t);
@@ -103,5 +97,4 @@ namespace ProofGeneration.Isa
 
         public abstract R VisitPrimitiveType(PrimitiveType t);
     }
-        
- }
+}

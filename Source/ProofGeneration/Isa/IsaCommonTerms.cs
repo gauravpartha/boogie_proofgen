@@ -2,14 +2,11 @@
 
 namespace ProofGeneration.Isa
 {
-    class IsaCommonTerms
+    internal class IsaCommonTerms
     {
-
         private static readonly TermIdent SomeId = TermIdentFromName("Some");
         private static readonly TermIdent NoneId = TermIdentFromName("None");
         private static readonly TermIdent TheId = TermIdentFromName("the");
-        public static TermIdent FstId { get;  } = TermIdentFromName("fst");
-        public static TermIdent SndId { get;  }= TermIdentFromName("snd");
         private static readonly TermIdent InlId = TermIdentFromName("Inl");
         private static readonly TermIdent InrId = TermIdentFromName("Inr");
         private static readonly TermIdent AppendId = TermIdentFromName("append");
@@ -23,37 +20,39 @@ namespace ProofGeneration.Isa
         private static readonly TermIdent SetInterId = TermIdentFromName("Set.inter");
         private static readonly TermIdent Nth = TermIdentFromName("nth");
         private static readonly TermIdent CompositionId = TermIdentFromName("comp");
+        public static TermIdent FstId { get; } = TermIdentFromName("fst");
+        public static TermIdent SndId { get; } = TermIdentFromName("snd");
 
         public static TermIdent EmptyList => TermIdentFromName("[]");
         public static TermIdent EmptySet => TermIdentFromName("{}");
 
         public static Term EmptyMap => TermIdentFromName("Map.empty");
-        
+
         public static Term Let(Identifier boundVar, TypeIsa boundVarType, Term termSubst, Term body)
         {
             return new TermApp(
                 new TermApp(new TermIdent(new SimpleIdentifier("Let")), termSubst),
-                TermQuantifier.Lambda(new List<Identifier>(){boundVar}, 
-                    new List<TypeIsa>() {boundVarType}, body) 
-                );
+                TermQuantifier.Lambda(new List<Identifier> {boundVar},
+                    new List<TypeIsa> {boundVarType}, body)
+            );
         }
-        
+
         public static Term Let(Identifier boundVar, Term termSubst, Term body)
         {
             return new TermApp(
                 new TermApp(new TermIdent(new SimpleIdentifier("Let")), termSubst),
-                TermQuantifier.Lambda(new List<Identifier>(){boundVar}, null, body) 
-                );
+                TermQuantifier.Lambda(new List<Identifier> {boundVar}, null, body)
+            );
         }
 
         public static Term Composition(Term fun1, Term fun2)
         {
             return new TermApp(CompositionId, fun1, fun2);
         }
-        
+
         public static Term SomeOption(Term arg)
         {
-            return new TermApp(SomeId, new List<Term>() { arg });
+            return new TermApp(SomeId, new List<Term> {arg});
         }
 
         public static Term NoneOption()
@@ -84,7 +83,7 @@ namespace ProofGeneration.Isa
         public static Term Inr(Term arg)
         {
             return new TermApp(InrId, arg);
-        } 
+        }
 
         public static Term Unit()
         {
@@ -93,25 +92,25 @@ namespace ProofGeneration.Isa
 
         public static Term AppendList(Term list1, Term list2)
         {
-            return new TermApp(AppendId, new List<Term> { list1, list2 });
+            return new TermApp(AppendId, new List<Term> {list1, list2});
         }
 
         public static Term Map(Term fun, Term list)
         {
             return new TermApp(MapId, fun, list);
         }
-        
+
         public static Term SetOfList(Term list)
         {
             return new TermApp(SetOfListId, list);
         }
 
         /// <summary>
-        /// Lookup element at index <paramref name="idx"/>
+        ///     Lookup element at index <paramref name="idx" />
         /// </summary>
         public static Term ListLookup(Term list, int idx)
         {
-            return new TermApp(Nth, new List<Term> { list, new NatConst(idx) });
+            return new TermApp(Nth, new List<Term> {list, new NatConst(idx)});
         }
 
         public static Term ListAll(Term pred, Term list)
@@ -121,29 +120,29 @@ namespace ProofGeneration.Isa
 
         public static Term Elem(Term element, Term set)
         {
-            return new TermApp(MemberId, new List<Term> { element, set });
+            return new TermApp(MemberId, new List<Term> {element, set});
         }
 
         public static Term SetUnion(Term set1, Term set2)
         {
-            return new TermApp(SetUnionId, new List<Term> { set1, set2 });
+            return new TermApp(SetUnionId, new List<Term> {set1, set2});
         }
 
         public static Term SetInter(Term set1, Term set2)
         {
-            return new TermApp(SetInterId, new List<Term> { set1, set2 });
+            return new TermApp(SetInterId, new List<Term> {set1, set2});
         }
-        
+
         public static Term SetMax(Term set)
         {
             return new TermApp(SetMaxId, set);
         }
-        
+
         public static Term SetMin(Term set)
         {
             return new TermApp(SetMinId, set);
         }
-        
+
         public static TermIdent TermIdentFromName(string name)
         {
             return new TermIdent(new SimpleIdentifier(name));

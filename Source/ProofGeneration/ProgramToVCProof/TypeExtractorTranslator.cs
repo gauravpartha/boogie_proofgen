@@ -17,59 +17,53 @@ namespace ProofGeneration.ProgramToVCProof
             this.varToTerm = varToTerm;
         }
 
-        public Term TranslateExtractor(VCExpr extractor)
-        {
-            return extractor.Accept(this, true);
-        }
-        
         public Term Visit(VCExprLiteral node, bool arg)
         {
-            throw new ProofGenUnexpectedStateException(GetType(), "only expect variables and function operations in extractors");
+            throw new ProofGenUnexpectedStateException(GetType(),
+                "only expect variables and function operations in extractors");
         }
 
         public Term Visit(VCExprNAry node, bool arg)
         {
             if (node.Op is VCExprBoogieFunctionOp vcFunOp)
             {
-                if (typeTranslation.TryTranslateTypeDecl(vcFunOp.Func, out Term isaFun))
+                if (typeTranslation.TryTranslateTypeDecl(vcFunOp.Func, out var isaFun))
                 {
-                    List<Term> isaArgs = new List<Term>();
-                    foreach(var nodeArg in node)
-                    {
-                        isaArgs.Add(nodeArg.Accept(this, arg));
-                    }
+                    var isaArgs = new List<Term>();
+                    foreach (var nodeArg in node) isaArgs.Add(nodeArg.Accept(this, arg));
 
                     return new TermApp(isaFun, isaArgs);
                 }
-                else
-                {
-                    throw new ProofGenUnexpectedStateException(GetType(), "unknown function operation in extractor");
-                }
+
+                throw new ProofGenUnexpectedStateException(GetType(), "unknown function operation in extractor");
             }
 
-            throw new ProofGenUnexpectedStateException(GetType(), "only expect variables and function operations in extractors");
+            throw new ProofGenUnexpectedStateException(GetType(),
+                "only expect variables and function operations in extractors");
         }
 
         public Term Visit(VCExprVar node, bool arg)
         {
-            if (varToTerm.TryGetValue(node, out Term res))
-            {
+            if (varToTerm.TryGetValue(node, out var res))
                 return res;
-            }
-            else
-            {
-                throw new ProofGenUnexpectedStateException(GetType(), "unknown variable in extractor");
-            }
+            throw new ProofGenUnexpectedStateException(GetType(), "unknown variable in extractor");
         }
 
         public Term Visit(VCExprQuantifier node, bool arg)
         {
-            throw new ProofGenUnexpectedStateException(GetType(), "only expect variables and function operations in extractors");
+            throw new ProofGenUnexpectedStateException(GetType(),
+                "only expect variables and function operations in extractors");
         }
 
         public Term Visit(VCExprLet node, bool arg)
         {
-            throw new ProofGenUnexpectedStateException(GetType(), "only expect variables and function operations in extractors");
+            throw new ProofGenUnexpectedStateException(GetType(),
+                "only expect variables and function operations in extractors");
+        }
+
+        public Term TranslateExtractor(VCExpr extractor)
+        {
+            return extractor.Accept(this, true);
         }
     }
 }

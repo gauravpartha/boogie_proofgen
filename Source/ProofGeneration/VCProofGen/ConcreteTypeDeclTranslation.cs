@@ -1,21 +1,19 @@
-﻿using System;
-using Microsoft.Boogie;
+﻿using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.Isa;
 
 namespace ProofGeneration.VCProofGen
 {
-    class ConcreteTypeDeclTranslation : VCTypeDeclTranslation
+    internal class ConcreteTypeDeclTranslation : VCTypeDeclTranslation
     {
-
         private readonly BoogieContextIsa _boogieContextIsa;
-        
+
         public ConcreteTypeDeclTranslation(BoogieContextIsa boogieContextIsa)
         {
             _boogieContextIsa = boogieContextIsa;
         }
-        
-        
+
+
         public override Term Ctor(Function func)
         {
             //TODO just returning something here

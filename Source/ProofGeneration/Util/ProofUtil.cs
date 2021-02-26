@@ -5,7 +5,6 @@ namespace ProofGeneration.Util
 {
     public static class ProofUtil
     {
-
         public static string DefLemma(string defName)
         {
             return defName + "_def";
@@ -15,28 +14,24 @@ namespace ProofGeneration.Util
         {
             return Simp(false, theorems);
         }
-        
+
         public static string SimpAll(params string[] theorems)
         {
             return Simp(true, theorems);
         }
-        
-        public static string Simp(bool allGoals, string [] theorems)
+
+        public static string Simp(bool allGoals, string[] theorems)
         {
-            string simpTac = "simp" + (allGoals ? "_all" : "");
-            if(theorems.Length == 0)
-            {
+            var simpTac = "simp" + (allGoals ? "_all" : "");
+            if (theorems.Length == 0)
                 return simpTac;
-            } else
-            {
-                return "(" + simpTac + " add:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
-            }
+            return "(" + simpTac + " add:" + theorems.SpaceAggregate() + ")";
         }
 
         public static string SimpAddDel(IEnumerable<string> deleteTheorems, params string[] addTheorems)
         {
-            var addString = addTheorems.Length == 0 ? "" : " add: " + IsaPrettyPrinterHelper.SpaceAggregate(addTheorems);
-            var delString = addTheorems.Length == 0 ? "" : " del: " + IsaPrettyPrinterHelper.SpaceAggregate(deleteTheorems);
+            var addString = addTheorems.Length == 0 ? "" : " add: " + addTheorems.SpaceAggregate();
+            var delString = addTheorems.Length == 0 ? "" : " del: " + deleteTheorems.SpaceAggregate();
 
             return "(simp" + addString + delString + ")";
         }
@@ -61,12 +56,12 @@ namespace ProofGeneration.Util
         {
             return "rule " + s;
         }
-        
+
         public static string Erule(string s)
         {
             return "erule " + s;
         }
-        
+
         public static string By(string s)
         {
             return "by (" + s + ")";
@@ -75,18 +70,13 @@ namespace ProofGeneration.Util
         public static string SimpOnly(params string[] theorems)
         {
             if (theorems.Length == 0)
-            {
                 return "simp";
-            }
-            else
-            {
-                return "(simp only:" + IsaPrettyPrinterHelper.SpaceAggregate(theorems) + ")";
-            }
+            return "(simp only:" + theorems.SpaceAggregate() + ")";
         }
 
         public static string OF(string baseTheorem, params string[] inputTheorems)
         {
-            return baseTheorem + "[OF " + IsaPrettyPrinterHelper.SpaceAggregate(inputTheorems) + "]";
+            return baseTheorem + "[OF " + inputTheorems.SpaceAggregate() + "]";
         }
 
         public static string MLTactic(string tactic, int subgoal)

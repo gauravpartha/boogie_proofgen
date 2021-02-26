@@ -2,17 +2,17 @@
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
-    class BoogieFixedVarTranslation
+    internal class BoogieFixedVarTranslation
     {
-        public IFixedVariableTranslation<Variable> VariableTranslation { get; }
-        public IFixedVariableTranslation<TypeVariable> TyVariableTranslation { get; }
-
         public BoogieFixedVarTranslation(
             IFixedVariableTranslation<Variable> variableTranslation,
             IFixedVariableTranslation<TypeVariable> tyVariableTranslation)
         {
-            this.VariableTranslation = variableTranslation;
-            this.TyVariableTranslation = tyVariableTranslation;
+            VariableTranslation = variableTranslation;
+            TyVariableTranslation = tyVariableTranslation;
         }
+
+        public IFixedVariableTranslation<Variable> VariableTranslation { get; }
+        public IFixedVariableTranslation<TypeVariable> TyVariableTranslation { get; }
     }
 }

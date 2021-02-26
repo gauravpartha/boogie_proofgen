@@ -1,25 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using Microsoft.Boogie.VCExprAST;
 
 namespace ProofGeneration.Util
 {
     public class IsaUniqueNamer
     {
-        private readonly Microsoft.Boogie.VCExprAST.UniqueNamer uniqueNamer;
-
-        private readonly string spacer;
+        private readonly List<char> illegalChars;
 
         private readonly HashSet<string> reservedNames;
-        private readonly List<char> illegalChars;
+
+        private readonly string spacer;
+        private readonly UniqueNamer uniqueNamer;
 
         public IsaUniqueNamer(string spacer)
         {
             this.spacer = spacer;
-            uniqueNamer = new Microsoft.Boogie.VCExprAST.UniqueNamer()
+            uniqueNamer = new UniqueNamer
             {
                 Spacer = spacer
             };
@@ -31,20 +28,16 @@ namespace ProofGeneration.Util
             illegalChars.Add('@');
         }
 
-        public IsaUniqueNamer() : this("AA") { }
+        public IsaUniqueNamer() : this("AA")
+        {
+        }
 
         public string GetName(object obj, string preferredName)
         {
             var preferredNameMod = preferredName;
-            foreach (var illegalChar in illegalChars)
-            {
-                preferredNameMod = preferredNameMod.Replace(illegalChar, '_');
-            }
+            foreach (var illegalChar in illegalChars) preferredNameMod = preferredNameMod.Replace(illegalChar, '_');
 
-            if (reservedNames.Contains(preferredNameMod))
-            {
-                preferredNameMod = preferredNameMod + "ZZ";
-            }
+            if (reservedNames.Contains(preferredNameMod)) preferredNameMod = preferredNameMod + "ZZ";
             return uniqueNamer.GetName(obj, GetValidIsaString(preferredNameMod));
         }
 
@@ -62,20 +55,19 @@ namespace ProofGeneration.Util
         {
             uniqueNamer.PopScope();
         }
-        
+
         private string GetValidIsaString(string s)
         {
-            Regex firstChar = new Regex("^[A-Za-z]");
+            var firstChar = new Regex("^[A-Za-z]");
 
-            string sMod = s;
+            var sMod = s;
 
             if (!firstChar.IsMatch(s))
                 sMod = "isa" + spacer + s;
 
-            Regex illegalCharacters = new Regex("[@#^*!&]");            
+            var illegalCharacters = new Regex("[@#^*!&]");
 
             return illegalCharacters.Replace(sMod, spacer);
         }
-
     }
 }

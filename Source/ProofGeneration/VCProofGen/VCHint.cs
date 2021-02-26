@@ -5,23 +5,23 @@ namespace ProofGeneration.VCProofGen
 {
     public abstract class VCHint : INodeML
     {
-        //hint used to prove relationship between vc expression and Boogie expression in Assume/Assert statement
-        public VCExprHint ExprHint { get;  }
-
         public VCHint(VCExprHint exprHint)
         {
             ExprHint = exprHint;
         }
 
+        //hint used to prove relationship between vc expression and Boogie expression in Assume/Assert statement
+        public VCExprHint ExprHint { get; }
+
         public string GetMLString()
         {
             return "(" + VCHintMLRepr() + "," + ExprHint.GetMLString() + ")";
         }
-        
+
         public abstract string VCHintMLRepr();
 
         /// <summary>
-        /// returns whether the hint is supposed to be enough to solve the vc block lemma completely
+        ///     returns whether the hint is supposed to be enough to solve the vc block lemma completely
         /// </summary>
         public virtual bool IsFinal()
         {
@@ -36,9 +36,14 @@ namespace ProofGeneration.VCProofGen
 
     public class AssumeSimpleHint : VCHint
     {
-        public readonly AssumeSimpleType hintType;
+        public enum AssumeSimpleType
+        {
+            ASSUME_TRUE,
+            ASSUME_FALSE,
+            ASSUME_NOT
+        }
 
-        public enum AssumeSimpleType { ASSUME_TRUE, ASSUME_FALSE, ASSUME_NOT }
+        public readonly AssumeSimpleType hintType;
 
         public AssumeSimpleHint(AssumeSimpleType hintType, VCExprHint exprHint) : base(exprHint)
         {
@@ -46,8 +51,9 @@ namespace ProofGeneration.VCProofGen
         }
 
         public AssumeSimpleHint(AssumeSimpleType hintType) : this(hintType, VCExprHint.EmptyExprHint())
-        { }
-        
+        {
+        }
+
         public override string VCHintMLRepr()
         {
             switch (hintType)
@@ -72,15 +78,8 @@ namespace ProofGeneration.VCProofGen
 
     public class AssumeConjHint : VCHint
     {
-        public int NestLevel { get; set; }        
-
-        //top level conjunctions
-        public int NumConjunctions { get; }
-        
-        //total number of commands in this conjunct, -1 is unknown
-        public int NumCommands { get; set; }
-
-        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands, VCExprHint vcExprHint) : base(vcExprHint)
+        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands, VCExprHint vcExprHint) : base(
+            vcExprHint)
         {
             Contract.Requires(nestLevel > 0);
             NestLevel = nestLevel;
@@ -88,10 +87,19 @@ namespace ProofGeneration.VCProofGen
             NumCommands = numCommands;
         }
 
-        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands) : 
-            this(nestLevel, numConjunctions, numCommands,VCExprHint.EmptyExprHint())
-        { }
-        
+        public AssumeConjHint(int nestLevel, int numConjunctions, int numCommands) :
+            this(nestLevel, numConjunctions, numCommands, VCExprHint.EmptyExprHint())
+        {
+        }
+
+        public int NestLevel { get; set; }
+
+        //top level conjunctions
+        public int NumConjunctions { get; }
+
+        //total number of commands in this conjunct, -1 is unknown
+        public int NumCommands { get; set; }
+
         public override string VCHintMLRepr()
         {
             return "AssumeConjR " + NestLevel;
@@ -100,17 +108,25 @@ namespace ProofGeneration.VCProofGen
 
     public class AssertSimpleHint : VCHint
     {
-        public readonly AssertSimpleType hintType;
+        public enum AssertSimpleType
+        {
+            CONJ,
+            NO_CONJ,
+            SUBSUMPTION,
+            ASSERT_TRUE,
+            ASSERT_FALSE
+        }
 
-        public enum AssertSimpleType { CONJ, NO_CONJ, SUBSUMPTION, ASSERT_TRUE, ASSERT_FALSE }
+        public readonly AssertSimpleType hintType;
 
         public AssertSimpleHint(AssertSimpleType hintType, VCExprHint vcExprHint) : base(vcExprHint)
         {
             this.hintType = hintType;
         }
-        
+
         public AssertSimpleHint(AssertSimpleType hintType) : this(hintType, VCExprHint.EmptyExprHint())
-        { }
+        {
+        }
 
         public override bool IsFinal()
         {

@@ -6,14 +6,14 @@ namespace ProofGeneration.BoogieIsaInterface
     public interface IProgramAccessor
     {
         public string TheoryName();
-        
+
         public Term FunctionsDecl();
         public Term AxiomsDecl();
         public Term PreconditionsDecl();
         public string PreconditionsDeclName();
         public Term PostconditionsDecl();
         public string PostconditionsDeclName();
-        
+
         public Term CfgDecl();
 
         //params + local variables
@@ -30,6 +30,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public Term VarContext();
 
         public string MembershipLemma(Declaration d);
+
         //does not take global variables into account
         public string ConstantMembershipLemma(Variable c);
 

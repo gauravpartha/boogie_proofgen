@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.BaseTypes;
+using ProofGeneration.IsaPrettyPrint;
 
 namespace ProofGeneration.Isa
 {
-
     public abstract class Identifier
     {
-
     }
 
     public class SimpleIdentifier : Identifier
@@ -23,20 +22,23 @@ namespace ProofGeneration.Isa
 
         public override string ToString()
         {
-            return this.name;
+            return name;
         }
     }
 
-    class Wildcard : Identifier { }
+    internal class Wildcard : Identifier
+    {
+    }
 
     #region Term
-    public abstract class Term {
 
+    public abstract class Term
+    {
         public abstract T Dispatch<T>(TermVisitor<T> visitor);
 
         public override string ToString()
         {
-            return new IsaPrettyPrint.TermPrettyPrinter().Visit(this);
+            return new TermPrettyPrinter().Visit(this);
         }
     }
 
@@ -57,8 +59,8 @@ namespace ProofGeneration.Isa
 
     public class TermApp : Term
     {
-        public readonly Term fun;
         public readonly IList<Term> arg; //technically don't require lists, but allows one to keep structure
+        public readonly Term fun;
 
         public TermApp(Term fun, IList<Term> arg)
         {
@@ -66,9 +68,8 @@ namespace ProofGeneration.Isa
             this.arg = arg;
         }
 
-        public TermApp(Term fun, params Term [] args) : this(fun, args.ToList())
+        public TermApp(Term fun, params Term[] args) : this(fun, args.ToList())
         {
-            
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
@@ -133,8 +134,9 @@ namespace ProofGeneration.Isa
             this.terms = terms;
         }
 
-        public TermTuple(Term t1, Term t2) : this(new List<Term> (){t1, t2})
-        { }
+        public TermTuple(Term t1, Term t2) : this(new List<Term> {t1, t2})
+        {
+        }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -159,19 +161,37 @@ namespace ProofGeneration.Isa
 
     public class TermQuantifier : Term
     {
-        public readonly IList<Identifier> boundVars;
-        //if boundVarTypes is null, then types must be inferred, otherwise a type is provided for each bound variable
-        public readonly IList<TypeIsa> boundVarTypes;
-        public readonly Term term;
-
-        public readonly QuantifierKind quantifier;
-
         public enum QuantifierKind
         {
             ALL,
             EX,
             META_ALL, //\<And>
             LAMBDA
+        }
+
+        public readonly IList<Identifier> boundVars;
+
+        //if boundVarTypes is null, then types must be inferred, otherwise a type is provided for each bound variable
+        public readonly IList<TypeIsa> boundVarTypes;
+
+        public readonly QuantifierKind quantifier;
+        public readonly Term term;
+
+        //if boundVarTypes is null, then this represents not providing explicit types
+        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarTypes,
+            Term term)
+        {
+            if (boundVars == null || boundVarTypes != null && boundVars.Count != boundVarTypes.Count)
+                throw new ArgumentException();
+            this.quantifier = quantifier;
+            this.boundVars = boundVars;
+            this.boundVarTypes = boundVarTypes;
+            this.term = term;
+        }
+
+        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, Term term) : this(quantifier,
+            boundVars, null, term)
+        {
         }
 
         public static TermQuantifier ForAll(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
@@ -188,27 +208,10 @@ namespace ProofGeneration.Isa
         {
             return new TermQuantifier(QuantifierKind.META_ALL, boundVars, boundVarsTypes, term);
         }
+
         public static TermQuantifier Lambda(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
         {
             return new TermQuantifier(QuantifierKind.LAMBDA, boundVars, boundVarsTypes, term);
-        }
-
-        //if boundVarTypes is null, then this represents not providing explicit types
-        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarTypes, Term term)
-        {
-            if (boundVars == null || (boundVarTypes != null && boundVars.Count != boundVarTypes.Count))
-            {
-                throw new ArgumentException();
-            }
-            this.quantifier = quantifier;
-            this.boundVars = boundVars;
-            this.boundVarTypes = boundVarTypes;
-            this.term = term;
-        }
-
-        public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, Term term) : this(quantifier, boundVars, null, term)
-        {
-
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
@@ -219,8 +222,8 @@ namespace ProofGeneration.Isa
 
     public class TermCaseOf : Term
     {
-        public readonly Term termToMatch;
         public readonly IEnumerable<Tuple<Term, Term>> matchCases;
+        public readonly Term termToMatch;
 
         public TermCaseOf(Term termToMatch, IEnumerable<Tuple<Term, Term>> matchCases)
         {
@@ -236,19 +239,27 @@ namespace ProofGeneration.Isa
 
     public class TermBinary : Term
     {
+        public enum BinaryOpCode
+        {
+            META_IMP, //\<Longrightarrow>
+            EQ,
+            NEQ,
+            LT,
+            LE,
+            GT,
+            GE,
+            AND,
+            OR,
+            IMPLIES,
+            ADD,
+            SUB,
+            MUL
+        }
+
         public readonly Term argLeft;
         public readonly Term argRight;
 
         public readonly BinaryOpCode op;
-
-        public enum BinaryOpCode
-        {
-            META_IMP, //\<Longrightarrow>
-            EQ, NEQ,
-            LT, LE, GT, GE,
-            AND, OR, IMPLIES,
-            ADD, SUB, MUL
-        }
 
         public TermBinary(Term argLeft, Term argRight, BinaryOpCode op)
         {
@@ -256,36 +267,37 @@ namespace ProofGeneration.Isa
             this.argRight = argRight;
             this.op = op;
         }
+
         public static TermBinary Eq(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.EQ);
         }
-        
+
         public static TermBinary Neq(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.NEQ);
         }
-        
+
         public static TermBinary Le(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.LE);
         }
-        
+
         public static TermBinary Ge(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.GE);
         }
-        
+
         public static TermBinary And(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.AND);
         }
-        
+
         public static TermBinary Implies(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.IMPLIES);
         }
-        
+
         public static TermBinary MetaImplies(Term argLeft, Term argRight)
         {
             return new TermBinary(argLeft, argRight, BinaryOpCode.META_IMP);
@@ -299,14 +311,14 @@ namespace ProofGeneration.Isa
 
     public class TermUnary : Term
     {
-        public readonly Term arg;
-
-        public readonly UnaryOpCode op;
-
         public enum UnaryOpCode
         {
             NOT
         }
+
+        public readonly Term arg;
+
+        public readonly UnaryOpCode op;
 
         public TermUnary(Term arg)
         {
@@ -360,7 +372,7 @@ namespace ProofGeneration.Isa
         [ContractInvariantMethod]
         protected void ObjectInvariant()
         {
-            Contract.Invariant(this.n >= 0);
+            Contract.Invariant(n >= 0);
         }
     }
 
@@ -402,6 +414,7 @@ namespace ProofGeneration.Isa
     #endregion
 
     #region Type
+
     public abstract class TypeIsa
     {
         public abstract T Dispatch<T>(TypeIsaVisitor<T> visitor);
@@ -415,7 +428,7 @@ namespace ProofGeneration.Isa
         {
             this.name = name;
         }
-        
+
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
             return visitor.VisitVarType(this);
@@ -441,8 +454,8 @@ namespace ProofGeneration.Isa
 
     public class DataType : TypeIsa
     {
-        public readonly string name;
         public readonly IList<TypeIsa> args;
+        public readonly string name;
 
         public DataType(string name, IList<TypeIsa> args)
         {
@@ -450,11 +463,10 @@ namespace ProofGeneration.Isa
             this.args = args;
         }
 
-        public DataType(string name, params TypeIsa [] args) : this(name, new List<TypeIsa> (args))
+        public DataType(string name, params TypeIsa[] args) : this(name, new List<TypeIsa>(args))
         {
-            
         }
-        
+
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
             return visitor.VisitDataType(this);
@@ -472,14 +484,14 @@ namespace ProofGeneration.Isa
 
         public TupleType(params TypeIsa[] args) : this(new List<TypeIsa>(args))
         {
-            
         }
+
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
             return visitor.VisitTupleType(this);
         }
     }
-    
+
     public class SumType : TypeIsa
     {
         public readonly IList<TypeIsa> args;
@@ -491,7 +503,6 @@ namespace ProofGeneration.Isa
 
         public SumType(params TypeIsa[] args) : this(new List<TypeIsa>(args))
         {
-            
         }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
@@ -502,7 +513,10 @@ namespace ProofGeneration.Isa
 
     public enum SimpleType
     {
-        Bool, Nat, Int, String
+        Bool,
+        Nat,
+        Int,
+        String
     }
 
     public class PrimitiveType : TypeIsa
@@ -520,5 +534,5 @@ namespace ProofGeneration.Isa
         }
     }
 
-    #endregion 
+    #endregion
 }

@@ -5,12 +5,12 @@ namespace ProofGeneration.CfgToDag
 {
     public class NonLoopHeadProofData : ICfgToDagProofData
     {
-        private readonly string _redCfgAssmName;
         private readonly string _dagAssmName;
         private readonly string _dagVerifiesName;
 
         private readonly Func<Block, string> _indHypNameFunc;
-        
+        private readonly string _redCfgAssmName;
+
         public NonLoopHeadProofData(
             string redCfgAssmName,
             string dagAssmName,
@@ -23,7 +23,7 @@ namespace ProofGeneration.CfgToDag
             _dagVerifiesName = dagVerifiesName;
             _indHypNameFunc = indHypNameFunc;
         }
-        
+
         public string RedCfgAssmName()
         {
             return _redCfgAssmName;

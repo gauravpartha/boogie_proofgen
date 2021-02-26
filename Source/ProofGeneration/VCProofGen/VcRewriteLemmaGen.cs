@@ -1,47 +1,48 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
-using System.Collections.Generic;
 using ProofGeneration.Isa;
 
 namespace ProofGeneration.VCProofGen
 {
     public class VcRewriteLemmaGen
     {
-    
-        private int _lemmaId = 0;
         private readonly ErasureOptimizationChecker _erasureOptimizationChecker = new ErasureOptimizationChecker();
         private readonly TypePremiseEraserFactory _typeEraserFactory;
         private readonly VCExprToIsaTranslator _vcToIsaTranslator;
-        
+
+        private int _lemmaId;
+
         public VcRewriteLemmaGen(TypePremiseEraserFactory factory, VCExprToIsaTranslator vcToIsaTranslator)
         {
             _typeEraserFactory = factory;
             _vcToIsaTranslator = vcToIsaTranslator;
         }
-        
+
         /// <summary>
-        /// Checks whether the VC for <paramref name="expr"/> is optimized w.r.t. standard translation and if so returns
-        /// true and stores the possible lemmas to rewrite back to a standard form in <paramref name="rewriteLemmas"/>
+        ///     Checks whether the VC for <paramref name="expr" /> is optimized w.r.t. standard translation and if so returns
+        ///     true and stores the possible lemmas to rewrite back to a standard form in <paramref name="rewriteLemmas" />
         /// </summary>
         /// <param name="expr">expression that is translated to vc</param>
         /// <param name="proveVc">true if want to show that vc holds, false if given vc</param>
         /// <param name="rewriteLemmas"></param>
         /// <returns></returns>
         public bool RequiredVcRewrite(Expr expr, bool proveVc, out List<LemmaDecl> rewriteLemmas)
-        { 
+        {
             //TODO: make check more precise
-            if (_erasureOptimizationChecker.ErasureSimplifiesExpression(expr, out bool hasTypeQuantification))
+            if (_erasureOptimizationChecker.ErasureSimplifiesExpression(expr, out var hasTypeQuantification))
             {
-                rewriteLemmas =  RewriteVcLemmas(expr, proveVc, hasTypeQuantification);
+                rewriteLemmas = RewriteVcLemmas(expr, proveVc, hasTypeQuantification);
                 return true;
             }
+
             rewriteLemmas = null;
             return false;
         }
-        
+
         /// <summary>
-        /// return declarations to rewrite vc expression
+        ///     return declarations to rewrite vc expression
         /// </summary>
         private List<LemmaDecl> RewriteVcLemmas(Expr expr, bool proveVc, bool hasTypeQuantification)
         {
@@ -78,14 +79,14 @@ namespace ProofGeneration.VCProofGen
             }
 
             var lemmaNameNeg = "expr_equiv_" + _lemmaId + "_neg";
-            var lemmaNamePos= "expr_equiv_" + _lemmaId + "_pos";
+            var lemmaNamePos = "expr_equiv_" + _lemmaId + "_pos";
             _lemmaId++;
 
-            Term lhsNeg = _vcToIsaTranslator.Translate(eraseToVc(lhsExtractArgs, -1));
-            Term lhsPos = _vcToIsaTranslator.Translate(eraseToVc(lhsExtractArgs, 1));
-            
-            Term rhsNeg = _vcToIsaTranslator.Translate(eraseToVc(!lhsExtractArgs, -1));
-            Term rhsPos = _vcToIsaTranslator.Translate(eraseToVc(!lhsExtractArgs, 1));
+            var lhsNeg = _vcToIsaTranslator.Translate(eraseToVc(lhsExtractArgs, -1));
+            var lhsPos = _vcToIsaTranslator.Translate(eraseToVc(lhsExtractArgs, 1));
+
+            var rhsNeg = _vcToIsaTranslator.Translate(eraseToVc(!lhsExtractArgs, -1));
+            var rhsPos = _vcToIsaTranslator.Translate(eraseToVc(!lhsExtractArgs, 1));
 
             var result = new List<LemmaDecl>
             {

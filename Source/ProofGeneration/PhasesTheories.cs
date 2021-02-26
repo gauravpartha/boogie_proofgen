@@ -1,18 +1,18 @@
-﻿using Microsoft.Boogie;
-
-namespace ProofGeneration
+﻿namespace ProofGeneration
 {
     public class PhasesTheories
     {
-
         public enum Phase
         {
-            Vc, Passification, CfgToDag
+            Vc,
+            Passification,
+            CfgToDag
         }
 
-        private readonly string vcPhaseTheoryName;
-        private readonly string passificationTheoryName;
         private readonly string cfgToDagTheoryName;
+        private readonly string passificationTheoryName;
+
+        private readonly string vcPhaseTheoryName;
 
 
         public PhasesTheories(string prefix)
@@ -51,8 +51,7 @@ namespace ProofGeneration
 
         private string MaybeQualifiedName(string theory, string name, bool qualify)
         {
-            return (qualify ? theory + "." + name : name);
+            return qualify ? theory + "." + name : name;
         }
-
     }
 }

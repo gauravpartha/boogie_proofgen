@@ -12,7 +12,6 @@ namespace ProofGeneration.CfgToDag
             IEnumerable<Function> requiredFuncs
         )
         {
-            
         }
     }
 }

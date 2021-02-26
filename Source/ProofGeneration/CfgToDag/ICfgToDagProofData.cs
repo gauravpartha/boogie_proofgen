@@ -2,7 +2,7 @@
 
 namespace ProofGeneration.CfgToDag
 {
-    interface ICfgToDagProofData
+    internal interface ICfgToDagProofData
     {
         public string RedCfgAssmName();
         public string DagAssmName();

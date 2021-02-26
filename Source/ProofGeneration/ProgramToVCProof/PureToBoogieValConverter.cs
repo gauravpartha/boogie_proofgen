@@ -1,27 +1,23 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Boogie;
 using ProofGeneration.Isa;
+using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration.ProgramToVCProof
 {
-    class PureToBoogieValConverter : ResultReadOnlyVisitor<Func<Term, Term>>
+    internal class PureToBoogieValConverter : ResultReadOnlyVisitor<Func<Term, Term>>
     {
-
-        public Term ConvertToBoogieVal(Microsoft.Boogie.Type ty, Term pureVal)
+        public Term ConvertToBoogieVal(Type ty, Term pureVal)
         {
-            return this.Translate(ty)(pureVal);
+            return Translate(ty)(pureVal);
         }
 
         protected override bool TranslatePrecondition(Absy node)
         {
-            return node is Microsoft.Boogie.Type;
+            return node is Type;
         }
 
-        public override Microsoft.Boogie.Type VisitTypeVariable(TypeVariable node)
+        public override Type VisitTypeVariable(TypeVariable node)
         {
             //instantiate T@U with the Boogie values means we do not need to transform the value
             ReturnResult(v => v);
@@ -35,36 +31,27 @@ namespace ProofGeneration.ProgramToVCProof
             return node;
         }
 
-        public override Microsoft.Boogie.Type VisitBasicType(BasicType node)
+        public override Type VisitBasicType(BasicType node)
         {
             if (node.IsBool)
-            {
                 ReturnResult(v => IsaBoogieTerm.BoolVal(v));
-            }
             else if (node.IsInt)
-            {
                 ReturnResult(v => IsaBoogieTerm.IntVal(v));
-            }
             else
-            {
                 throw new NotImplementedException();
-            }
 
             return node;
         }
 
-        public override Microsoft.Boogie.Type VisitTypeProxy(TypeProxy node)
+        public override Type VisitTypeProxy(TypeProxy node)
         {
-            if (node.ProxyFor == null)
-            {
-                throw new NotImplementedException();
-            }
+            if (node.ProxyFor == null) throw new NotImplementedException();
             ReturnResult(Translate(node.ProxyFor));
             return node;
         }
 
         //not implemented
-        public override Microsoft.Boogie.Type VisitType(Microsoft.Boogie.Type type)
+        public override Type VisitType(Type type)
         {
             throw new NotImplementedException();
         }
@@ -74,15 +61,14 @@ namespace ProofGeneration.ProgramToVCProof
             throw new NotImplementedException();
         }
 
-        public override Microsoft.Boogie.Type VisitBvType(BvType node)
+        public override Type VisitBvType(BvType node)
         {
             throw new NotImplementedException();
         }
 
-        public override Microsoft.Boogie.Type VisitFloatType(FloatType node)
+        public override Type VisitFloatType(FloatType node)
         {
             throw new NotImplementedException();
         }
-
     }
 }

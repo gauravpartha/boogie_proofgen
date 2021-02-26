@@ -4,20 +4,23 @@ using ProofGeneration.Isa;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
-    class DeBruijnTranslation<T> : IVariableTranslation<T>
+    internal class DeBruijnTranslation<T> : IVariableTranslation<T>
     {
-        private readonly IFixedVariableTranslation<T> variableTranslation;
-
         private readonly LinkedList<T> boundVariables = new LinkedList<T>();
 
-        private readonly Func<int,bool, Term> variableConstructor;
+        private readonly bool shiftFixedVar;
 
-        private readonly bool shiftFixedVar = false;
+        private readonly Func<int, bool, Term> variableConstructor;
+        private readonly IFixedVariableTranslation<T> variableTranslation;
 
 
         /// <param name="variableTranslation">Translation of non-bound variables in the context</param>
-        /// <param name="variableConstructor">Function that constructs a Variable term given the integer id and whether it is bound or not</param>
-        public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation, Func<int, bool, Term> variableConstructor, bool shiftFixedVar)
+        /// <param name="variableConstructor">
+        ///     Function that constructs a Variable term given the integer id and whether it is bound
+        ///     or not
+        /// </param>
+        public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation,
+            Func<int, bool, Term> variableConstructor, bool shiftFixedVar)
         {
             this.variableTranslation = variableTranslation;
             this.variableConstructor = variableConstructor;
@@ -38,10 +41,22 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         {
             return boundVariables.Count;
         }
-        
+
+        public Term TranslateVariable(T variable, out bool isBoundVar)
+        {
+            var idResult = TranslateVariableIdx(variable, out isBoundVar);
+            return variableConstructor(idResult, isBoundVar);
+        }
+
+        public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
+        {
+            id = new NatConst(TranslateVariableIdx(variable, out isBoundVar));
+            return true;
+        }
+
         private int TranslateVariableIdx(T variable, out bool isBoundVar)
         {
-            int i = 0;
+            var i = 0;
             isBoundVar = false;
             for (var curNode = boundVariables.Last; curNode != null; curNode = curNode.Previous)
             {
@@ -50,28 +65,16 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
                     isBoundVar = true;
                     break;
                 }
+
                 i++;
             }
 
-            if (isBoundVar)
-            {
-                return i;
-            }
-            
+            if (isBoundVar) return i;
+
             //variable is not bound
-            return (shiftFixedVar ? i + variableTranslation.VariableId(variable) : variableTranslation.VariableId(variable));
-        }
-
-        public Term TranslateVariable(T variable, out bool isBoundVar)
-        {
-            int idResult = TranslateVariableIdx(variable, out isBoundVar);
-            return variableConstructor(idResult, isBoundVar);
-        }
-
-        public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
-        {
-            id = new NatConst(TranslateVariableIdx(variable, out isBoundVar));
-            return true;
+            return shiftFixedVar
+                ? i + variableTranslation.VariableId(variable)
+                : variableTranslation.VariableId(variable);
         }
     }
 }

@@ -4,14 +4,15 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
 {
-    class GenericTypeDeclTranslation : VCTypeDeclTranslation
+    internal class GenericTypeDeclTranslation : VCTypeDeclTranslation
     {
         private readonly IsaUniqueNamer uniqueNamer;
+
         public GenericTypeDeclTranslation(IsaUniqueNamer uniqueNamer)
         {
             this.uniqueNamer = uniqueNamer;
         }
-        
+
         public override Term Type(Function func)
         {
             return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(func, func.Name));

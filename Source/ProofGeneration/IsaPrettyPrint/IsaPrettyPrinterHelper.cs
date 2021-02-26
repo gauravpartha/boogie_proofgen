@@ -7,7 +7,6 @@ namespace ProofGeneration.IsaPrettyPrint
 {
     public static class IsaPrettyPrinterHelper
     {
-
         public static readonly string TIMES = "\\<times>";
 
         public static string Indent(int n)
@@ -39,37 +38,22 @@ namespace ProofGeneration.IsaPrettyPrint
         public static string CommaAggregate(IEnumerable<string> list)
         {
             if (!list.Any())
-            {
                 return "";
-            }
-            else
-            {
-                return list.Aggregate((s1, s2) => s1 + ", " + s2);
-            }
+            return list.Aggregate((s1, s2) => s1 + ", " + s2);
         }
 
         public static string CommaNewLineAggregate(IEnumerable<string> list)
         {
             if (!list.Any())
-            {
                 return "";
-            }
-            else
-            {
-                return list.Aggregate((s1, s2) => s1 + ", " + Environment.NewLine + s2);
-            }
+            return list.Aggregate((s1, s2) => s1 + ", " + Environment.NewLine + s2);
         }
 
         public static string SpaceAggregate<T>(this IEnumerable<T> list)
         {
             if (!list.Any())
-            {
                 return "";
-            }
-            else
-            {
-                return list.Aggregate("",(s1, s2) => s1 + " " + s2);
-            }
+            return list.Aggregate("", (s1, s2) => s1 + " " + s2);
         }
 
         public static string Inner(string innerTerm)

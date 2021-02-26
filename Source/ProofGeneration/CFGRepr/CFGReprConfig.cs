@@ -5,11 +5,6 @@ namespace ProofGeneration.CFGRepresentation
 {
     public class CFGReprConfig
     {
-        public bool GenerateBlockCopy { get; }
-        public bool IsAcyclic { get; }
-        public bool DesugarCalls { get; } 
-        public Predicate<Cmd> DeepCopyCmdPred { get; }
-
         public CFGReprConfig(bool generateBlockCopy, bool isAcyclic, bool desugarCalls,
             Predicate<Cmd> deepCopyCmdPred)
         {
@@ -18,18 +13,23 @@ namespace ProofGeneration.CFGRepresentation
             DesugarCalls = desugarCalls;
             DeepCopyCmdPred = deepCopyCmdPred;
         }
+
+        public bool GenerateBlockCopy { get; }
+        public bool IsAcyclic { get; }
+        public bool DesugarCalls { get; }
+        public Predicate<Cmd> DeepCopyCmdPred { get; }
     }
-    
+
     /// <summary>
-    /// Builder for <see cref="CFGReprConfig"/>.
-    /// Defaults: no block copy, not acyclic, no desugaring of calls, no copying of commands
+    ///     Builder for <see cref="CFGReprConfig" />.
+    ///     Defaults: no block copy, not acyclic, no desugaring of calls, no copying of commands
     /// </summary>
     public class CFGReprConfigBuilder
     {
-        private bool _generateBlockCopy = false;
-        private bool _isAcyclic = false;
-        private bool _desugarCalls = false;
         private Predicate<Cmd> _deepCopyCmdPred = cmd => false;
+        private bool _desugarCalls;
+        private bool _generateBlockCopy;
+        private bool _isAcyclic;
 
         public CFGReprConfig Build()
         {
@@ -53,7 +53,7 @@ namespace ProofGeneration.CFGRepresentation
             _desugarCalls = desugarCalls;
             return this;
         }
-        
+
         public CFGReprConfigBuilder SetDeepCopyPredCmd(Predicate<Cmd> deepCopyCmdPred)
         {
             _deepCopyCmdPred = deepCopyCmdPred;

@@ -5,12 +5,11 @@ using System.Linq;
 
 namespace ProofGeneration.Isa
 {
-
     public class Theory
     {
-        public readonly string theoryName;
-        public readonly IList<string> importTheories;
         public readonly IList<OuterDecl> decls;
+        public readonly IList<string> importTheories;
+        public readonly string theoryName;
 
         public Theory(string theoryName, IList<string> importTheories, IList<OuterDecl> decls)
         {
@@ -34,9 +33,10 @@ namespace ProofGeneration.Isa
 
     public class FunDecl : OuterDecl
     {
+        public readonly IList<Tuple<IList<Term>, Term>> equations;
+
         //if type is null, then it must be inferred
         public readonly TypeIsa type;
-        public readonly IList<Tuple<IList<Term>, Term>> equations;
 
         public FunDecl(string name, TypeIsa type, IList<Tuple<IList<Term>, Term>> equations) : base(name)
         {
@@ -52,66 +52,69 @@ namespace ProofGeneration.Isa
 
     public class DefDecl : OuterDecl
     {
-        // if type is null, then type is inferred
-        public readonly TypeIsa type;
-        
         // arguments and right hand side 
         public readonly Tuple<IList<Term>, Term> equation;
+
+        // if type is null, then type is inferred
+        public readonly TypeIsa type;
 
         public DefDecl(string name, TypeIsa type, Tuple<IList<Term>, Term> equation) : base(name)
         {
             this.type = type;
             this.equation = equation;
         }
-        
-        
+
+
         public DefDecl(string name, Tuple<IList<Term>, Term> equation) : this(name, null, equation)
-        { }
+        {
+        }
 
         public static DefDecl CreateWithoutArg(string name, Term rhs)
         {
             return new DefDecl(name, new Tuple<IList<Term>, Term>(new List<Term>(), rhs));
-        } 
-        
+        }
+
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitDefDecl(this);
         }
     }
-    
+
     public class AbbreviationDecl : OuterDecl
     {
-        // if type is null, then type is inferred
-        public readonly TypeIsa type;
-        
         // arguments and right hand side 
         public readonly Tuple<IList<Term>, Term> equation;
+
+        // if type is null, then type is inferred
+        public readonly TypeIsa type;
 
         public AbbreviationDecl(string name, TypeIsa type, Tuple<IList<Term>, Term> equation) : base(name)
         {
             this.type = type;
             this.equation = equation;
         }
-        
-        
+
+
         public AbbreviationDecl(string name, Tuple<IList<Term>, Term> equation) : this(name, null, equation)
-        { }
+        {
+        }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitAbbreviationDecl(this);
         }
     }
-    
+
 
     public class ContextElem
     {
-        public readonly IList<Tuple<TermIdent, TypeIsa>> fixedVariables;
-        public readonly IList<Term> assumptions;
         public readonly IList<string> assmLabels; //empty list is interpreted as having no assumption labels
+        public readonly IList<Term> assumptions;
+        public readonly IList<Tuple<TermIdent, TypeIsa>> fixedVariables;
 
-        public ContextElem(IList<Tuple<TermIdent, TypeIsa>> fixedVariables, IList<Term> assumptions, IList<string> assmLabels)
+        public ContextElem(IList<Tuple<TermIdent, TypeIsa>> fixedVariables, IList<Term> assumptions,
+            IList<string> assmLabels)
         {
             Contract.Requires(assmLabels.Count == 0 || assumptions.Count == assmLabels.Count);
             this.fixedVariables = fixedVariables;
@@ -136,7 +139,8 @@ namespace ProofGeneration.Isa
 
         public static ContextElem CreateWithAssumptions(Term assumption)
         {
-            return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), new List<Term> { assumption }, new List<string>());
+            return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), new List<Term> {assumption},
+                new List<string>());
         }
 
         public static ContextElem CreateWithAssumptions(IList<Term> assumptions)
@@ -148,14 +152,12 @@ namespace ProofGeneration.Isa
         {
             return new ContextElem(new List<Tuple<TermIdent, TypeIsa>>(), assumptions, assmLabels);
         }
-
     }
 
     public class LocaleDecl : OuterDecl
     {
-        public readonly ContextElem contextElem;
-
         public readonly IList<OuterDecl> body;
+        public readonly ContextElem contextElem;
 
         public LocaleDecl(string name, ContextElem contextElem, IList<OuterDecl> body) : base(name)
         {
@@ -172,8 +174,8 @@ namespace ProofGeneration.Isa
     public class LemmaDecl : OuterDecl
     {
         public readonly ContextElem contextElem;
-        public readonly Term statement;
         public readonly Proof proof;
+        public readonly Term statement;
 
         public LemmaDecl(string name, ContextElem contextElem, Term statement, Proof proof) : base(name)
         {
@@ -185,7 +187,6 @@ namespace ProofGeneration.Isa
         public LemmaDecl(string name, Term statement, Proof proof) :
             this(name, ContextElem.CreateEmptyContext(), statement, proof)
         {
-
         }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
@@ -223,16 +224,19 @@ namespace ProofGeneration.Isa
             return visitor.VisitDeclareDecl(this);
         }
     }
-        
+
 
     public class MLDecl : OuterDecl
     {
+        public enum MLKind
+        {
+            NORMAL,
+            PROOF,
+            VAL
+        }
+
         public readonly string code;
         public readonly MLKind kind;
-
-        public enum MLKind {
-            NORMAL, PROOF, VAL
-        }
 
         public MLDecl(string code, MLKind kind = MLKind.NORMAL) : base("ML")
         {
@@ -259,6 +263,5 @@ namespace ProofGeneration.Isa
                     throw new ProofGenUnexpectedStateException(typeof(MLDecl), "no type");
             }
         }
-
     }
 }

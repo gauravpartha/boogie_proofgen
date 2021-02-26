@@ -1,43 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using Microsoft.Boogie;
-using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.Isa;
-using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
-    class BasicCmdIsaVisitor : ResultReadOnlyVisitor<Term>
+    internal class BasicCmdIsaVisitor : ResultReadOnlyVisitor<Term>
     {
-
-        //It's possible that the AST has two different variables which have the same name. Therefore we use an IsaUniqueNamer to 
-        //avoid name clashes between different variables.
-        //UPDATE (20.07.2020): do not support shadowing, so for now we don't rename
-        private readonly IsaUniqueNamer uniqueNamer;
-
         private readonly BoogieVariableTranslation boogieVarTranslation;
         private readonly TypeIsaVisitor typeIsaVisitor;
 
         private readonly IVariableTranslationFactory variableFactory;
 
 
-        public BasicCmdIsaVisitor(IsaUniqueNamer uniqueNamer, IVariableTranslationFactory variableFactory)
+        public BasicCmdIsaVisitor(IVariableTranslationFactory variableFactory)
         {
             this.variableFactory = variableFactory;
             boogieVarTranslation = variableFactory.CreateTranslation();
             //by sharing TypeVarTranslation, changes in the bound variables will be visible in the type visitor
-            this.typeIsaVisitor = new TypeIsaVisitor(boogieVarTranslation.TypeVarTranslation);
-            this.uniqueNamer = uniqueNamer;
+            typeIsaVisitor = new TypeIsaVisitor(boogieVarTranslation.TypeVarTranslation);
         }
 
-        public BasicCmdIsaVisitor(IVariableTranslationFactory variableFactory) : this(new IsaUniqueNamer(), variableFactory)
-        { }
-   
         [ContractInvariantMethod]
-        void ObjectInvariant()
+        private void ObjectInvariant()
         {
             Contract.Invariant(Results != null);
             Contract.Invariant(Results.Count <= 1);
@@ -47,13 +34,10 @@ namespace ProofGeneration
         {
             IList<Term> cmdsIsa = new List<Term>();
 
-            foreach (Cmd cmd in cmds)
+            foreach (var cmd in cmds)
             {
                 cmdsIsa.Add(Translate(cmd));
-                if (!StateIsFresh())
-                {
-                    throw new ProofGenUnexpectedStateException(GetType(), "Visitor not fresh");
-                }
+                if (!StateIsFresh()) throw new ProofGenUnexpectedStateException(GetType(), "Visitor not fresh");
             }
 
             return cmdsIsa;
@@ -66,7 +50,7 @@ namespace ProofGeneration
 
         public override Cmd VisitAssertCmd(AssertCmd node)
         {
-            Term result = Translate(node.Expr);
+            var result = Translate(node.Expr);
             ReturnResult(IsaBoogieTerm.Assert(result));
 
             return node;
@@ -87,7 +71,7 @@ namespace ProofGeneration
 
         public override Cmd VisitAssumeCmd(AssumeCmd node)
         {
-            Term result = Translate(node.Expr);
+            var result = Translate(node.Expr);
             ReturnResult(IsaBoogieTerm.Assume(result));
 
             return node;
@@ -96,14 +80,10 @@ namespace ProofGeneration
         public override Cmd VisitAssignCmd(AssignCmd node)
         {
             if (node.Lhss.Count != node.Rhss.Count)
-            {
-                throw new ProofGenUnexpectedStateException(typeof(BasicCmdIsaVisitor), "different number of lhs and rhs");
-            }
+                throw new ProofGenUnexpectedStateException(typeof(BasicCmdIsaVisitor),
+                    "different number of lhs and rhs");
 
-            if (node.Lhss.Count != 1)
-            {
-                throw new NotImplementedException("Parallel assignments are not supported.");
-            }
+            if (node.Lhss.Count != 1) throw new NotImplementedException("Parallel assignments are not supported.");
 
             /*
             var lhsResults = node.Lhss.Select(lhs => Translate(lhs)).ToList();
@@ -112,21 +92,23 @@ namespace ProofGeneration
             lhsResults.ZipDo(rhsResults, (lhs, rhs) => results.Add(new TermTuple(new List<Term>() { lhs, rhs })));
             */
 
-            Term lhs = Translate(node.Lhss[0]);
-            Term rhs = Translate(node.Rhss[0]);
+            var lhs = Translate(node.Lhss[0]);
+            var rhs = Translate(node.Rhss[0]);
             ReturnResult(IsaBoogieTerm.Assign(lhs, rhs));
-            
+
             return node;
         }
 
         public override AssignLhs VisitSimpleAssignLhs(SimpleAssignLhs node)
         {
-            if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(node.AssignedVariable.Decl, out Term varId, out _))
+            if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(node.AssignedVariable.Decl, out var varId,
+                out _))
             {
                 ReturnResult(varId);
                 return node;
             }
-            throw new ProofGenUnexpectedStateException(GetType(), 
+
+            throw new ProofGenUnexpectedStateException(GetType(),
                 "Cannot extract id from variable " + node.AssignedVariable.Name);
         }
 
@@ -134,14 +116,11 @@ namespace ProofGeneration
         {
             IList<Term> args = new List<Term>();
 
-            foreach(Expr expr in node.Args)
-            {
-                args.Add(Translate(expr));
-            }
+            foreach (var expr in node.Args) args.Add(Translate(expr));
 
-            IAppliableVisitor<Term> applicableIsaVisitor = 
+            IAppliableVisitor<Term> applicableIsaVisitor =
                 new ApplicableIsaVisitor(node.TypeParameters, args, boogieVarTranslation.TypeVarTranslation);
-            Term res = node.Fun.Dispatch(applicableIsaVisitor);
+            var res = node.Fun.Dispatch(applicableIsaVisitor);
 
             ReturnResult(res);
             return node;
@@ -150,9 +129,9 @@ namespace ProofGeneration
         //potential side effect
         public Term GetIdFromIdentifierExpr(IdentifierExpr node)
         {
-            if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(node.Decl, out Term varId, out _))
+            if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(node.Decl, out var varId, out _))
                 return varId;
-            
+
             throw new ProofGenUnexpectedStateException(GetType(), "Could not get id for variable " + node.Decl.Name);
             //TODO: check whether need unique name or not (under assumption that there are no variable name clashes, i.e., no shadowing)
             //return uniqueNamer.GetName(node.Decl, node.Name);
@@ -160,7 +139,7 @@ namespace ProofGeneration
 
         public override Expr VisitIdentifierExpr(IdentifierExpr node)
         {
-            ReturnResult(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl, out _));            
+            ReturnResult(boogieVarTranslation.VarTranslation.TranslateVariable(node.Decl, out _));
             return node;
         }
 
@@ -172,46 +151,38 @@ namespace ProofGeneration
 
         public override QuantifierExpr VisitQuantifierExpr(QuantifierExpr node)
         {
-            if(!(node is ForallExpr || node is ExistsExpr))
-            {
+            if (!(node is ForallExpr || node is ExistsExpr))
                 throw new ProofGenUnexpectedStateException(GetType(), "can only handle forall and exists quantifiers");
-            }
 
-            bool isForall = IsForall(node);
+            var isForall = IsForall(node);
 
             //Quantifers with multiple bound variables are desugared into multiple quantifiers expressions with single variables
-            foreach(Variable boundVar in node.Dummies)
-            {
-                boogieVarTranslation.VarTranslation.AddBoundVariable(boundVar);
-            }
-            foreach(TypeVariable boundTyVar in node.TypeParameters)
-            {
+            foreach (var boundVar in node.Dummies) boogieVarTranslation.VarTranslation.AddBoundVariable(boundVar);
+            foreach (var boundTyVar in node.TypeParameters)
                 boogieVarTranslation.TypeVarTranslation.AddBoundVariable(boundTyVar);
-            }
 
-            int numValVarBefore = boogieVarTranslation.VarTranslation.NumBoundVariables();
-            int numTyVarBefore = boogieVarTranslation.TypeVarTranslation.NumBoundVariables();
+            var numValVarBefore = boogieVarTranslation.VarTranslation.NumBoundVariables();
+            var numTyVarBefore = boogieVarTranslation.TypeVarTranslation.NumBoundVariables();
 
-            Term result = Translate(node.Body);
+            var result = Translate(node.Body);
 
-            if (numValVarBefore != boogieVarTranslation.VarTranslation.NumBoundVariables() || 
+            if (numValVarBefore != boogieVarTranslation.VarTranslation.NumBoundVariables() ||
                 numTyVarBefore != boogieVarTranslation.TypeVarTranslation.NumBoundVariables())
-            {
-                throw new ProofGenUnexpectedStateException(GetType(), "quantifier levels not the same before and after");
-            }
+                throw new ProofGenUnexpectedStateException(GetType(),
+                    "quantifier levels not the same before and after");
 
-            for(int i = node.Dummies.Count-1; i >= 0; i--)
+            for (var i = node.Dummies.Count - 1; i >= 0; i--)
             {
                 boogieVarTranslation.VarTranslation.DropLastBoundVariable();
-                Variable boundVar = node.Dummies[i];
-                Term boundVarType = typeIsaVisitor.Translate(boundVar.TypedIdent.Type);
+                var boundVar = node.Dummies[i];
+                var boundVarType = typeIsaVisitor.Translate(boundVar.TypedIdent.Type);
                 result = IsaBoogieTerm.Quantifier(isForall, boundVarType, result);
             }
 
-            for(int i = node.TypeParameters.Count-1; i >= 0; i--)
+            for (var i = node.TypeParameters.Count - 1; i >= 0; i--)
             {
                 boogieVarTranslation.TypeVarTranslation.DropLastBoundVariable();
-                TypeVariable boundTyVar = node.TypeParameters[i];
+                var boundTyVar = node.TypeParameters[i];
                 result = IsaBoogieTerm.TypeQuantifier(isForall, result);
             }
 
@@ -221,16 +192,19 @@ namespace ProofGeneration
 
         private bool IsForall(QuantifierExpr quantifierExpr)
         {
-            if(quantifierExpr is ForallExpr)
-            {
+            if (quantifierExpr is ForallExpr)
                 return true;
-            } else if(quantifierExpr is ExistsExpr)
-            {
+            if (quantifierExpr is ExistsExpr)
                 return false;
-            } else
-            {
-                throw new ProofGenUnexpectedStateException(GetType(), "Unexpected quantifier");
-            }
+            throw new ProofGenUnexpectedStateException(GetType(), "Unexpected quantifier");
+        }
+
+        public override Expr VisitOldExpr(OldExpr node)
+        {
+            var body = Translate(node.Expr);
+            ReturnResult(IsaBoogieTerm.Old(body));
+
+            return node;
         }
 
         //not implemented cmds
@@ -239,34 +213,42 @@ namespace ProofGeneration
             //handled elsewhere, since havoc of multiple variables is desugared into multiple basic havoc commands
             throw new NotImplementedException();
         }
+
         public override Cmd VisitCallCmd(CallCmd node)
         {
             throw new NotImplementedException();
         }
+
         public override Cmd VisitParCallCmd(ParCallCmd node)
         {
             throw new NotImplementedException();
         }
+
         public override List<Cmd> VisitCmdSeq(List<Cmd> cmdSeq)
         {
             throw new NotImplementedException();
         }
+
         public override Choice VisitChoice(Choice node)
         {
             throw new NotImplementedException();
         }
+
         public override Cmd VisitCommentCmd(CommentCmd node)
         {
             throw new NotImplementedException();
         }
+
         public override Cmd VisitRE(RE node)
         {
             throw new NotImplementedException();
         }
+
         public override List<RE> VisitRESeq(List<RE> reSeq)
         {
             throw new NotImplementedException();
         }
+
         public override YieldCmd VisitYieldCmd(YieldCmd node)
         {
             throw new NotImplementedException();
@@ -278,38 +260,40 @@ namespace ProofGeneration
         {
             throw new NotImplementedException();
         }
+
         public override Expr VisitCodeExpr(CodeExpr node)
         {
             throw new NotImplementedException();
         }
+
         public override Expr VisitBvExtractExpr(BvExtractExpr node)
         {
             throw new NotImplementedException();
         }
+
         public override Expr VisitExpr(Expr node)
         {
             throw new NotImplementedException();
         }
+
         public override IList<Expr> VisitExprSeq(IList<Expr> exprSeq)
         {
             throw new NotImplementedException();
         }
+
         public override Expr VisitLambdaExpr(LambdaExpr node)
         {
             throw new NotImplementedException();
         }
+
         public override Expr VisitLetExpr(LetExpr node)
         {
             throw new NotImplementedException();
         }
-        public override Expr VisitOldExpr(OldExpr node)
-        {
-            throw new NotImplementedException();
-        }
+
         public override BinderExpr VisitBinderExpr(BinderExpr node)
         {
             throw new NotImplementedException();
         }
-
     }
 }

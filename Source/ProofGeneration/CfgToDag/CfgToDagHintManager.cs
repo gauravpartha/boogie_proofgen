@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
 using ProofGeneration.Util;
@@ -8,42 +7,34 @@ namespace ProofGeneration.CfgToDag
 {
     public class CfgToDagHintManager
     {
+        private readonly IDictionary<Block, List<Block>> backedgeNodeToLoopHead = new Dictionary<Block, List<Block>>();
+
+        private readonly IDictionary<Block, Block> beforeDagToOrig;
 
         private readonly IDictionary<Block, LoopHeadHint> loopHeadHints = new Dictionary<Block, LoopHeadHint>();
 
-        private readonly IDictionary<Block, List<Block>> backedgeNodeToLoopHead = new Dictionary<Block, List<Block>>();
-        
         //maps backedge nodes which are not present before the CFG-to-DAG to the corresponding loop head
         private readonly IDictionary<Block, Block> newBackedgeNodesToLoopHead = new Dictionary<Block, Block>();
-
-        private readonly IDictionary<Block, Block> beforeDagToOrig;
         private readonly IDictionary<Block, Block> origToBeforeDag;
 
         private IDictionary<Block, Block> _afterDagToOrig;
-        public IDictionary<Block, Block> AfterDagToOrig
-        {
-            set => _afterDagToOrig = value;
-        }
-        
-        public CfgToDagHintManager(Graph<Block> graph, IDictionary<Block,Block> beforeDagToOrig)
+
+        public CfgToDagHintManager(Graph<Block> graph, IDictionary<Block, Block> beforeDagToOrig)
         {
             this.beforeDagToOrig = beforeDagToOrig;
             origToBeforeDag = beforeDagToOrig.InverseDict();
-            
+
             foreach (var loopHead in graph.Headers)
-            {
-                foreach (var block in graph.BackEdgeNodes(loopHead))
-                {
-                    if (backedgeNodeToLoopHead.TryGetValue(origToBeforeDag[block], out List<Block> loopHeads))
-                    {
-                       loopHeads.Add(origToBeforeDag[loopHead]); 
-                    }
-                    else
-                    {
-                        backedgeNodeToLoopHead.Add(origToBeforeDag[block], new List<Block> { origToBeforeDag[loopHead] });
-                    }
-                }
-            }
+            foreach (var block in graph.BackEdgeNodes(loopHead))
+                if (backedgeNodeToLoopHead.TryGetValue(origToBeforeDag[block], out var loopHeads))
+                    loopHeads.Add(origToBeforeDag[loopHead]);
+                else
+                    backedgeNodeToLoopHead.Add(origToBeforeDag[block], new List<Block> {origToBeforeDag[loopHead]});
+        }
+
+        public IDictionary<Block, Block> AfterDagToOrig
+        {
+            set => _afterDagToOrig = value;
         }
 
         public bool TryIsBackedgeNode(Block block, out List<Block> loopHeadBlock)
@@ -71,7 +62,7 @@ namespace ProofGeneration.CfgToDag
 
         public bool IsNewBackedgeBlock(Block afterDagBlock, out Block beforeDagLoopHead, out LoopHeadHint loopHeadHint)
         {
-            if (newBackedgeNodesToLoopHead.TryGetValue(_afterDagToOrig[afterDagBlock], out Block loopHeadOrig))
+            if (newBackedgeNodesToLoopHead.TryGetValue(_afterDagToOrig[afterDagBlock], out var loopHeadOrig))
             {
                 if (loopHeadHints.TryGetValue(loopHeadOrig, out loopHeadHint))
                 {
@@ -79,6 +70,7 @@ namespace ProofGeneration.CfgToDag
                     beforeDagLoopHead = origToBeforeDag[loopHeadOrig];
                     return true;
                 }
+
                 throw new ProofGenUnexpectedStateException("Cannot find loop head for new backedge node.");
             }
 
@@ -91,7 +83,7 @@ namespace ProofGeneration.CfgToDag
         {
             return loopHeadHints.TryGetValue(beforeDagToOrig[block], out hint);
         }
-        
+
         public LoopHeadHint GetLoopHead(Block block)
         {
             return loopHeadHints[beforeDagToOrig[block]];

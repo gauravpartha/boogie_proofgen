@@ -4,7 +4,7 @@ using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
-    class DeBruijnFixedTVarTranslation : IFixedVariableTranslation<TypeVariable>
+    internal class DeBruijnFixedTVarTranslation : IFixedVariableTranslation<TypeVariable>
     {
         private readonly IDictionary<TypeVariable, int> methodTyVarMapping;
 
@@ -12,16 +12,14 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         {
             methodTyVarMapping = new Dictionary<TypeVariable, int>();
 
-            int id = 0;
+            var id = 0;
 
             void AddVarsToMapping(IEnumerable<TypeVariable> vars, IDictionary<TypeVariable, int> dict)
             {
                 foreach (var v in vars)
                 {
-                    if(dict.ContainsKey(v))
-                    {
+                    if (dict.ContainsKey(v))
                         throw new ProofGenUnexpectedStateException(GetType(), "duplicate variables");
-                    }
                     dict.Add(v, id);
                     id++;
                 }
@@ -33,16 +31,12 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 
         public int VariableId(TypeVariable tyVariable)
         {
-            if(methodTyVarMapping.TryGetValue(tyVariable, out int localResult))
-            {
+            if (methodTyVarMapping.TryGetValue(tyVariable, out var localResult))
                 return localResult;
-            } else
-            {
-                throw new ProofGenUnexpectedStateException(GetType(), "cannot find variable " + tyVariable);
-            }
+            throw new ProofGenUnexpectedStateException(GetType(), "cannot find variable " + tyVariable);
         }
-        
-        
+
+
         public string OutputMapping()
         {
             return string.Join(Environment.NewLine, methodTyVarMapping);

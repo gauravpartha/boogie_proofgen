@@ -1,46 +1,56 @@
-﻿using Microsoft.Boogie;
+﻿using System;
+using Microsoft.Boogie;
 using ProofGeneration.Isa;
-using System;
 
 namespace ProofGeneration.VCProofGen
 {
-    abstract class VCTypeDeclTranslation
+    internal abstract class VCTypeDeclTranslation
     {
         public bool TryTranslateTypeDecl(Function func, out Term result)
         {
-            string name = func.Name;
+            var name = func.Name;
 
-            if(name.Equals("type"))
+            if (name.Equals("type"))
             {
                 result = Type(func);
-            } else if(name.Equals("Ctor"))
+            }
+            else if (name.Equals("Ctor"))
             {
                 result = Ctor(func);
-            } else if(name.Equals("intType"))
+            }
+            else if (name.Equals("intType"))
             {
                 result = IntType(func);
-            } else if(name.Equals("boolType"))
+            }
+            else if (name.Equals("boolType"))
             {
                 result = BoolType(func);
-            } else if(name.Equals("U_2_int"))
+            }
+            else if (name.Equals("U_2_int"))
             {
                 result = U2Int(func);
-            } else if(name.Equals("U_2_bool"))
+            }
+            else if (name.Equals("U_2_bool"))
             {
                 result = U2Bool(func);
-            } else if(name.Equals("int_2_U"))
+            }
+            else if (name.Equals("int_2_U"))
             {
                 result = Int2U(func);
-            } else if(name.Equals("bool_2_U"))
+            }
+            else if (name.Equals("bool_2_U"))
             {
                 result = Bool2U(func);
-            } else if(IsTypeConstr(name, out string constrName))
+            }
+            else if (IsTypeConstr(name, out var constrName))
             {
                 result = TypeConstructor(constrName, func);
-            } else if(IsTypeConstrInverse(name, out string invConstrName, out int index))
+            }
+            else if (IsTypeConstrInverse(name, out var invConstrName, out var index))
             {
                 result = TypeConstructorInverse(invConstrName, index, func);
-            } else
+            }
+            else
             {
                 result = null;
                 return false;
@@ -64,34 +74,32 @@ namespace ProofGeneration.VCProofGen
         {
             if (name.EndsWith("Type"))
             {
-                string s = name.Substring(0, name.Length - 4);
+                var s = name.Substring(0, name.Length - 4);
                 if (s.Length > 0)
                 {
                     constrName = s;
                     return true;
                 }
             }
+
             constrName = null;
             return false;
         }
 
         private bool IsTypeConstrInverse(string name, out string constrName, out int index)
         {
-            string [] split = name.Split(new string[] { "Inv" }, StringSplitOptions.None);
-            if(split.Length == 2)
-            {
-                if(Int32.TryParse(split[1], out int resIndex) && IsTypeConstr(split[0], out string resConstrName))
+            var split = name.Split(new[] {"Inv"}, StringSplitOptions.None);
+            if (split.Length == 2)
+                if (int.TryParse(split[1], out var resIndex) && IsTypeConstr(split[0], out var resConstrName))
                 {
                     constrName = resConstrName;
                     index = resIndex;
                     return true;
                 }
-            }
 
             constrName = null;
             index = -1;
             return false;
         }
-
     }
 }
