@@ -199,9 +199,8 @@ namespace ProofGeneration
                 //left side of equation is block number expressed using constructors
                 //right side of equation is command
                 var translatedBlocks = cmdIsaVisitor.Translate(b.Cmds);
-                DefDecl blockDecl = new DefDecl("block_" + cfg.GetUniqueIntLabel(b),
-                    Tuple.Create((IList<Term>)new List<Term>(), (Term) new TermList(translatedBlocks))
-                );
+                DefDecl blockDecl = DefDecl.CreateWithoutArg("block_" + cfg.GetUniqueIntLabel(b),
+                    new TermList(translatedBlocks));
                 blockToDecl.Add(b, blockDecl);
                 
                 int blockLabel = cfg.GetUniqueIntLabel(b);
@@ -250,8 +249,7 @@ namespace ProofGeneration
             }
 
             //empty set for remaining cases
-            return new DefDecl("outEdges_" + methodName,
-                new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(edgeList)));
+            return DefDecl.CreateWithoutArg("outEdges_" + methodName, new TermList(edgeList));
         }
         
         private string OutEdgesLemmaName(int blockId)
@@ -275,8 +273,7 @@ namespace ProofGeneration
                 nodeList.Add(IsaCommonTerms.TermIdentFromName(blockToDecl[b].name));
             }
 
-            return new DefDecl("nodeToBlocks_"+methodName, new Tuple<IList<Term>, Term>(new List<Term>(), 
-                new TermList(nodeList)) );
+            return DefDecl.CreateWithoutArg("nodeToBlocks_"+methodName, new TermList(nodeList));
         }
 
         private DefDecl GetFunctionDeclarationsIsa(string methodName, IEnumerable<Function> functions)
@@ -290,9 +287,7 @@ namespace ProofGeneration
                 fdecls.Add(IsaBoogieTerm.FunDecl(f, varTranslationFactory));
             }
 
-            var  equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(fdecls));
-
-            return new DefDecl(FunctionDeclarationsName(methodName), equation);
+            return DefDecl.CreateWithoutArg(FunctionDeclarationsName(methodName), new TermList(fdecls));
         }
 
         private string FunctionDeclarationsName(string methodName)
@@ -345,14 +340,15 @@ namespace ProofGeneration
             {
                result.Add(cmdIsaVisitor.Translate(expr).First()); 
             }
-            return new DefDecl(declName, new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(result)));
+            
+            return DefDecl.CreateWithoutArg(declName, new TermList(result));
         }
         
         private DefDecl GetMethodBodyCFGDecl(string methodName, Term methodBodyCFG)
         {
-            var equation = new Tuple<IList<Term>, Term>(new List<Term>(), methodBodyCFG);
-            return new DefDecl(CfgName(methodName), equation);
+            return DefDecl.CreateWithoutArg(CfgName(methodName), methodBodyCFG);
         }
+        
         private string CfgName(string methodName) {
             return "G_" + methodName;
         }

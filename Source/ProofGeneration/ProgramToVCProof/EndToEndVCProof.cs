@@ -589,8 +589,7 @@ namespace ProofGeneration.ProgramToVCProof
                 }
             }
 
-            var def = new DefDecl(ctorDeclListName,
-                new Tuple<IList<Term>, Term>(new List<Term> { }, new TermList(typeConstrCtorList)));
+            var def = DefDecl.CreateWithoutArg(ctorDeclListName,new TermList(typeConstrCtorList));
             
             funEquations.Add(new Tuple<IList<Term>, Term>(
                 new List<Term>{IsaCommonTerms.TermIdentFromName("(TConC s _)")},

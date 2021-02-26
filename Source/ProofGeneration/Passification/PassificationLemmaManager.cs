@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
+using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
@@ -24,7 +26,7 @@ namespace ProofGeneration.Passification
         private readonly TermIdent passiveStates = IsaCommonTerms.TermIdentFromName("U0");
         private readonly TermIdent constrainedVars = IsaCommonTerms.TermIdentFromName("D0");
         private readonly TermIdent stateRel = IsaCommonTerms.TermIdentFromName("R");
-        private readonly TermIdent oldStateRel = IsaCommonTerms.TermIdentFromName("R_old");
+        private readonly StateRelationData _oldStateRelationData;
 
         private readonly TermIdent normalInitState = IsaCommonTerms.TermIdentFromName("n_s");
         private readonly Term initState;
@@ -33,15 +35,14 @@ namespace ProofGeneration.Passification
 
         private readonly IVariableTranslation<Variable> varTranslation; 
         private readonly IVariableTranslation<Variable> passiveVarTranslation; 
-
-        private readonly IsaUniqueNamer boogieVarUniqueNamer = new IsaUniqueNamer();
-        //use this for concrete Boogie variable names (i.e., ns ''someVariableName'' = ...)
     
         private readonly string funAssmsName = "fun_assms";
         private readonly string varAssmsName = "var_assms";
 
         private readonly IProgramAccessor programAccessor;
         private readonly IProgramAccessor passiveProgramAccessor;
+        
+        private readonly OldVarFinder oldVarFinder = new OldVarFinder();
 
         private readonly Dictionary<Block, int> smallestRequiredVersionDict = new Dictionary<Block, int>();
 
@@ -52,6 +53,7 @@ namespace ProofGeneration.Passification
             IProgramAccessor programAccessor,
             IProgramAccessor passiveProgramAccessor,
             Tuple<string, string> varContextNonPassivePassive,
+            StateRelationData oldStateRelationData,
             PassiveRelationGen relationGen,
             IVariableTranslationFactory varTranslationFactory,
             IVariableTranslationFactory passiveTranslationFactory)
@@ -60,7 +62,8 @@ namespace ProofGeneration.Passification
             this.origToPassiveBlock = origToPassiveBlock;
             this.programAccessor = programAccessor;
             this.passiveProgramAccessor = passiveProgramAccessor;
-            this._relationGen = relationGen;
+            _oldStateRelationData= oldStateRelationData;
+            _relationGen = relationGen;
             initState = IsaBoogieTerm.Normal(normalInitState);
             varTranslation = varTranslationFactory.CreateTranslation().VarTranslation;
             passiveVarTranslation = passiveTranslationFactory.CreateTranslation().VarTranslation;
@@ -157,7 +160,7 @@ namespace ProofGeneration.Passification
                 new TermList(constrainedPassiveVars),
                 new TermList(modifiedVarRelTerm),
                 stateRel,
-                oldStateRel,
+                _oldStateRelationData.StateRel,
                 passiveStates,
                 constrainedVars);
             
@@ -184,12 +187,17 @@ namespace ProofGeneration.Passification
             Term conclusion =
                 BlockLemmaConclusion(boogieContext, passiveWitness, passiveCmds, finalState);
 
+            var oldLocalVarLemmas = OldLocalVariableLemmas(block);
+
             var proofMethods =
                 new List<string>
                 {
                     ProofUtil.Apply("rule passification_block_lemma_compact[OF assms(1-2)]"),
                     "unfolding " + ProofUtil.DefLemma(cmdsDefName) + " " + ProofUtil.DefLemma(passiveCmdsDefName),
-                    ProofUtil.Apply("passive_rel_tac " + (stateRelation.Any() ? "R_def: assms(3-)" : "")),
+                    ProofUtil.Apply("passive_rel_tac" + (stateRelation.Any() ? " R_def: assms(3-)" : "") +
+                                    (_oldStateRelationData.VarToLookupLemma.Any() ? " R_old_def: " + _oldStateRelationData.AllLemmasName : "") +
+                                    (oldLocalVarLemmas.Any() ? " LocVar_assms:" + String.Join(" ", oldLocalVarLemmas) : "")
+                                    )
                 };
             
             proofMethods.Add("apply (unfold type_rel_def, simp, (intro conjI)?)");
@@ -241,6 +249,15 @@ namespace ProofGeneration.Passification
             #endregion
 
             return Tuple.Create(localLemma, cfgLemma);
+        }
+
+        /// <summary>
+        /// return all lookup lemmas for locals or parameters that appear within old expressions in <paramref name="block"/>
+        /// </summary>
+        private IEnumerable<string> OldLocalVariableLemmas(Block block)
+        {
+            var oldLocalVars = oldVarFinder.FindOldVariables(block, v => v is Formal || v is LocalVariable);
+            return oldLocalVars.Select(v => programAccessor.MembershipLemma(v));
         }
 
         private Term StateRelAssm(Term stateRelation, Variable origVar, Expr passiveExpr)

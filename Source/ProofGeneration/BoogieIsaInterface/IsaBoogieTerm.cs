@@ -21,6 +21,7 @@ namespace ProofGeneration
         
         private readonly static TermIdent varId = IsaCommonTerms.TermIdentFromName("Var");
         private readonly static TermIdent bvarId = IsaCommonTerms.TermIdentFromName("BVar");
+        private readonly static TermIdent oldVarId = IsaCommonTerms.TermIdentFromName("Old");
         
         private readonly static TermIdent lookupVarId = IsaCommonTerms.TermIdentFromName("lookup_var");
         private readonly static TermIdent lookupVarTyId = IsaCommonTerms.TermIdentFromName("lookup_var_ty");
@@ -89,7 +90,12 @@ namespace ProofGeneration
         {
             Contract.Requires(i >= 0);
             Term natConst = new NatConst(i);
-            return new TermApp(IsaCommonTerms.TermIdentFromName("BVar"), new List<Term>() { natConst });
+            return new TermApp(bvarId, natConst);
+        }
+
+        public static Term Old(Term body)
+        {
+            return new TermApp(oldVarId, body);
         }
 
         public static Term Literal(LiteralExpr node)

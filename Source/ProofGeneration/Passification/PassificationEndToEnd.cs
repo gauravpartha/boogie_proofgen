@@ -37,11 +37,13 @@ namespace ProofGeneration.Passification
         private readonly string paramsLocalsAssmName = "ParamsLocal";
         private readonly string constsGlobalsAssmName = "ConstsGlobal";
         private readonly string binderEmptyAssmName = "BinderNs";
+        private readonly string oldGlobalEqualAssmName = "OldGlobal";
 
         private readonly string stateRelListDefName = "R_list";
         private readonly Term stateRelList;
         private readonly string stateRelDefName = "R_rel";
         private readonly Term stateRel;
+        private StateRelationData oldRelationData;
 
         private IEnumerable<Variable> liveEntryVars;
         private IVariableTranslation<Variable> varTranslation;
@@ -59,6 +61,7 @@ namespace ProofGeneration.Passification
             IProgramAccessor programAccessor,
             IProgramAccessor passiveProgramAccessor,
             Tuple<string, string> varContextNonPassivePassive,
+            StateRelationData oldRelationData,
             CFGRepr cfg,
             IEnumerable<Variable> liveEntryVars,
             IVariableTranslation<Variable> varTranslation)
@@ -76,6 +79,7 @@ namespace ProofGeneration.Passification
                 IsaCommonTerms.EmptyList
                 );
             passiveVarContext = IsaCommonTerms.TermIdentFromName(varContextNonPassivePassive.Item2);
+            this.oldRelationData = oldRelationData;
             this.cfg = cfg;
             this.liveEntryVars = liveEntryVars;
             this.varTranslation = varTranslation;
@@ -111,14 +115,11 @@ namespace ProofGeneration.Passification
             Term stateRelationList = new TermList(varIds
                 .Select(t=> (Term) new TermTuple(new NatConst(t.Item1), IsaCommonTerms.Inl(new NatConst(t.Item1)))).ToList());
 
-            DefDecl stateRelListDef = new DefDecl(stateRelListDefName,
-                IsaCommonTypes.GetListType(new TupleType(
-                    IsaBoogieType.VnameType(), 
-                    new SumType(IsaBoogieType.VnameType(), IsaBoogieType.LitType()))),
+            DefDecl stateRelListDef = new DefDecl(stateRelListDefName, PassificationManager.StateRelType,
                 Tuple.Create((IList<Term>)new List<Term>(), stateRelationList));
             
-            DefDecl stateRelDef = new DefDecl(stateRelDefName,
-                new Tuple<IList<Term>, Term>(new List<Term>(), new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), stateRelList)));
+            DefDecl stateRelDef = DefDecl.CreateWithoutArg(stateRelDefName, 
+                new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), stateRelList));
             
             var result = new List<OuterDecl> {stateRelListDef, stateRelDef};
             
@@ -239,21 +240,49 @@ namespace ProofGeneration.Passification
                 )
             );
             result.Add(nstateRelU0);
+
+            var proofMethods = new List<string>
+            {
+                ProofUtil.Apply("rule " + ProofUtil.OF("nstate_old_rel_states_helper", constsGlobalsAssmName, oldGlobalEqualAssmName)),
+                ProofUtil.Apply("simp only: fst_conv snd_conv " + programAccessor.GlobalsLocalsDisjointLemma())
+            };
+
+            void ConvertRelPropertyToListElems()
+            {
+                proofMethods.Add(ProofUtil.Apply("rule " + ProofUtil.OF("convert_fun_to_list", oldRelationData.StateRel + "_def")));
+                proofMethods.Add("unfolding " + oldRelationData.StateRelList + "_def ");
+                if(oldRelationData.VarsMapped.Any())
+                    proofMethods.Add("apply (simp only: list.pred_inject)");
+            }
+
+            //prove old relation only has constants/globals in its domain
+            ConvertRelPropertyToListElems();
+            if(oldRelationData.VarsMapped.Any())
+                proofMethods.Add("apply (intro conjI)");
+            foreach (var v in oldRelationData.VarsMapped)
+            {
+                proofMethods.Add("using " + programAccessor.MembershipLemma(v) + " apply simp");
+            }
+            //trivial obligation 
+            proofMethods.Add("apply simp");
+            
+            //prove old relation respects the "standard" state relation
+            //TODO: here we are looking up values in the state relation for a second time, could make sense to prove it once separately and to then re-use this
+            ConvertRelPropertyToListElems();
+            if(oldRelationData.VarsMapped.Any())
+                proofMethods.Add("unfolding " + stateRelDefName + "_def " + stateRelListDefName + "_def");
+            proofMethods.Add("by simp");
             
             LemmaDecl nstateOldRelU0 = new LemmaDecl(
-                "U0_ns_old_rel",
-                new TermApp(IsaCommonTerms.TermIdentFromName("nstate_old_rel_states"),
-                    boogieContext.varContext,
-                    passiveVarContext,
-                    TermQuantifier.Lambda(new List<Identifier> { new Wildcard() }, null, IsaCommonTerms.NoneOption()),
-                    normalInitState,
-                    u0Set),
-                new Proof(
-                    new List<string>
-                    {
-                        "unfolding nstate_old_rel_states_def nstate_old_rel_def",
-                        ProofUtil.By("simp")
-                    }
+            "U0_ns_old_rel",
+            new TermApp(IsaCommonTerms.TermIdentFromName("nstate_old_rel_states"),
+                boogieContext.varContext,
+                passiveVarContext,
+                oldRelationData.StateRel,
+                normalInitState,
+                u0Set),
+            new Proof(
+                    proofMethods
                 )
             );
             result.Add(nstateOldRelU0);
@@ -418,11 +447,12 @@ namespace ProofGeneration.Passification
             Term localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext, IsaCommonTerms.Snd(boogieContext.varContext), normalInitState);
             Term globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext, IsaCommonTerms.Fst(boogieContext.varContext), normalInitState);
             Term binderEmptyAssm = EndToEndAssumptions.BinderStateEmpty(normalInitState);
+            Term oldGlobalEqualAssm = EndToEndAssumptions.OldGlobalStateAssumption(normalInitState);
             
             return
                 new ContextElem(GlobalFixedVariables(),
-                new List<Term> { multiRed, vcAssm, closedAssm, nonEmptyTypesAssm, finterpAssm, axiomAssm, localsAssm, globalsAssm, binderEmptyAssm},
-                new List<string> { redAssmName, vcAssmName, closedAssmName, nonEmptyTypesAssmName, finterpAssmName, axiomAssmName, paramsLocalsAssmName, constsGlobalsAssmName, binderEmptyAssmName});
+                new List<Term> { multiRed, vcAssm, closedAssm, nonEmptyTypesAssm, finterpAssm, axiomAssm, localsAssm, globalsAssm, binderEmptyAssm, oldGlobalEqualAssm},
+                new List<string> { redAssmName, vcAssmName, closedAssmName, nonEmptyTypesAssmName, finterpAssmName, axiomAssmName, paramsLocalsAssmName, constsGlobalsAssmName, binderEmptyAssmName, oldGlobalEqualAssmName});
         }
         
         private IList<Tuple<TermIdent, TypeIsa>> GlobalFixedVariables()

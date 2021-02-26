@@ -68,6 +68,12 @@ namespace ProofGeneration.Isa
         public DefDecl(string name, Tuple<IList<Term>, Term> equation) : this(name, null, equation)
         { }
 
+        public static DefDecl CreateWithoutArg(string name, Term rhs)
+        {
+            return new DefDecl(name, new Tuple<IList<Term>, Term>(new List<Term>(), rhs));
+        } 
+        
+
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitDefDecl(this);

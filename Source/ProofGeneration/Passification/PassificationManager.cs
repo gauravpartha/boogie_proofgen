@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
@@ -11,7 +12,19 @@ namespace ProofGeneration.Passification
 {
     public class PassificationManager
     {
-       public static Theory PassificationProof(
+        private static string oldRelListName = "R_old_list";
+        private static TermIdent oldRelList = IsaCommonTerms.TermIdentFromName("R_old_list");
+        private static string oldRelName = "R_old";
+        private static TermIdent oldRel = IsaCommonTerms.TermIdentFromName("R_old");
+        private static string allOldLookupLemmasName = "R_old_lemmas";
+
+        public static TypeIsa StateRelType =
+            IsaCommonTypes.GetListType(new TupleType(
+                IsaBoogieType.VnameType(),
+                new SumType(IsaBoogieType.VnameType(), IsaBoogieType.LitType())));
+        
+        
+        public static Theory PassificationProof(
            string theoryName,
            string boogieToVcTheoryName,
            bool generateEndToEndLemma,
@@ -25,10 +38,24 @@ namespace ProofGeneration.Passification
            BoogieMethodData beforePassiveData,
            IVariableTranslationFactory beforePassiveFactory,
            IVariableTranslationFactory passiveFactory)
-       {
+        {
             string varContextName = "\\<Lambda>1";
             string passiveVarContextName = "\\<Lambda>2";
             var varContextNonPassivePassive = Tuple.Create(varContextName, passiveVarContextName);
+
+            var oldGlobalVars = GetOldGlobalVariables(beforePassificationCfg);
+            var oldRelationData =
+                OldRelation(
+                    oldGlobalVars,
+                    beforePassiveFactory.CreateTranslation().VarTranslation,
+                    out IList<OuterDecl> oldRelListDecl); 
+            
+            var passificationProofDecls = new List<OuterDecl>();
+            passificationProofDecls.AddRange(oldRelListDecl);
+            passificationProofDecls.AddRange(oldRelationData.VarToLookupLemma.Values);
+            if(oldRelationData.VarToLookupLemma.Any())
+                passificationProofDecls.Add(new LemmasDecl( allOldLookupLemmasName, 
+                    oldRelationData.VarToLookupLemma.Values.Select(lemma => lemma.name).ToList()));
             
             var beforePassiveLemmaManager = new PassificationLemmaManager(
                 beforePassificationCfg,
@@ -36,13 +63,13 @@ namespace ProofGeneration.Passification
                 beforePassiveProgAccess,
                 passiveProgAccess,
                 varContextNonPassivePassive,
+                oldRelationData,
                 relationGen,
                 beforePassiveFactory, 
                 passiveFactory 
                 );
             
             var lemmaNamer = new IsaUniqueNamer();
-            var passificationProofDecls = new List<OuterDecl>();
             
             var varContextAbbrev = new AbbreviationDecl(
                 varContextName,
@@ -86,6 +113,7 @@ namespace ProofGeneration.Passification
                     beforePassiveProgAccess,
                     passiveProgAccess,
                     varContextNonPassivePassive,
+                    oldRelationData,
                     beforePassificationCfg,
                     relationGen.LiveVarsBeforeBlock(beforePassificationCfg.entry),
                     passiveFactory.CreateTranslation().VarTranslation
@@ -102,17 +130,86 @@ namespace ProofGeneration.Passification
                 imports.Add("Boogie_Lang.PassificationEndToEnd");
             
             return new Theory(theoryName, imports, passificationProofDecls);
-       }
-       
-       
-       private static string GetLemmaName(Block b, IsaUniqueNamer namer)
-       {
-           return namer.GetName(b, "block_" + b.Label);
-       }
+        }
 
-       private static string GetCfgLemmaName(Block b, IsaUniqueNamer namer)
+       /// <summary>
+       /// Return lookup lemmas for each element in the old relation as well as the definition of the old relation, which
+       /// is defined via an association list
+       /// </summary>
+        private static StateRelationData OldRelation(
+           ISet<Variable> oldGlobalVars, 
+           IVariableTranslation<Variable> variableTranslation,
+           out IList<OuterDecl> oldRelDecls)
        {
+           //assume that passive version representing old variable of "g" is "g" itself
+           var oldRelTuples = new List<Term>();
+           var varList = new List<Variable>();
+           var varToLookupLemma = new Dictionary<Variable, LemmaDecl>();
+           IsaUniqueNamer uniqueNamer = new IsaUniqueNamer();
+           foreach (var v in oldGlobalVars)
+           {
+               if (variableTranslation.TryTranslateVariableId(v, out Term varTermId, out _))
+               {
+                   oldRelTuples.Add(new TermTuple(varTermId, IsaCommonTerms.Inl(varTermId)));
+                   var lemma = new LemmaDecl(
+                       "lookup_old_rel" + uniqueNamer.GetName(v, v.Name),
+                       TermBinary.Eq(new TermApp(oldRel, varTermId), IsaCommonTerms.SomeOption(IsaCommonTerms.Inl(varTermId))),
+                       new Proof(new List<string>
+                       {
+                           "unfolding " + oldRelListName+"_def " + oldRelName +"_def",
+                           "by simp"
+                       } )
+                       );
+                   varToLookupLemma.Add(v, lemma);
+                   varList.Add(v);
+               }
+               else
+               {
+                   throw new ProofGenUnexpectedStateException("Could not translate variable");
+               }
+           }
+           
+           //TODO: ensure no name clashes
+           oldRelDecls = new List<OuterDecl>
+           {
+               DefDecl.CreateWithoutArg(oldRelListName, new TermList(oldRelTuples)),
+               DefDecl.CreateWithoutArg(oldRelName, new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), oldRelList))
+           };
+           
+           return new StateRelationData(
+               varToLookupLemma,
+               varList,
+               oldRel,
+               oldRelList,
+               allOldLookupLemmasName
+           );
+        }
+
+       /// <summary>
+       /// return all global and constant variables that occur within an old expression in <paramref name="beforePassiveCfg"/>
+       /// </summary>
+        private static ISet<Variable> GetOldGlobalVariables(CFGRepr beforePassiveCfg)
+        {
+           var oldVarFinder = new OldVarFinder();
+           var oldVars = new HashSet<Variable>();
+           Predicate<Variable> pred = v => v is Constant || v is GlobalVariable;
+           foreach (Block b in beforePassiveCfg.GetBlocksForwards())
+           {
+               var result = oldVarFinder.FindOldVariables(b, pred);
+               oldVars.UnionWith(result);
+           }
+
+           return oldVars;
+        }
+       
+        private static string GetLemmaName(Block b, IsaUniqueNamer namer)
+        {
+           return namer.GetName(b, "block_" + b.Label);
+        }
+
+        private static string GetCfgLemmaName(Block b, IsaUniqueNamer namer)
+        {
            return "cfg_"+namer.GetName(b, b.Label);
-       }
+        }
     }
 }
