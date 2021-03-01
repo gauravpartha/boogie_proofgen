@@ -14,11 +14,12 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         private readonly IFixedVariableTranslation<T> variableTranslation;
 
 
-        /// <param name="variableTranslation">Translation of non-bound variables in the context</param>
+        /// <param name="variableTranslation">Translation of non-bound variables in the context.</param>
         /// <param name="variableConstructor">
         ///     Function that constructs a Variable term given the integer id and whether it is bound
-        ///     or not
+        ///     or not.
         /// </param>
+        /// <param name="shiftFixedVar">Indicate whether non-bound variables should be shifted.</param>
         public DeBruijnTranslation(IFixedVariableTranslation<T> variableTranslation,
             Func<int, bool, Term> variableConstructor, bool shiftFixedVar)
         {

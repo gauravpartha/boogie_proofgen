@@ -19,7 +19,6 @@ namespace ProofGeneration.CfgToDag
 
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
 
-        private readonly CFGRepr beforeDagCfg;
         private readonly IProgramAccessor beforeDagProgAccess;
         private readonly IDictionary<Block, Block> beforeToAfterBlock;
         private readonly IDictionary<Block, IList<Block>> blocksToLoops;
@@ -98,7 +97,7 @@ namespace ProofGeneration.CfgToDag
 
         /// <summary>
         ///     CFG Block lemma for a block that was added after the CFG-to-DAG step
-        ///     must be a block that has a single successor bSuc, where bSuc has a corresponding node before the CFG-to-DAG step
+        ///     must be a block that has a single successor bSuc, where bSuc has a corresponding node before the CFG-to-DAG step.
         /// </summary>
         /// <param name="cfgLemmaName"></param>
         /// <param name="afterDag"></param>
@@ -375,7 +374,7 @@ namespace ProofGeneration.CfgToDag
 
         /// <summary>
         ///     first element of returned tuple are the lemmas for the local block proof
-        ///     second element of returned tuple is the CFG block proof (i.e., depends on the local lemmas)
+        ///     second element of returned tuple is the CFG block proof (i.e., depends on the local lemmas).
         /// </summary>
         public Tuple<IEnumerable<LemmaDecl>, LemmaDecl> BlockLemma(
             Block beforeBlock,
@@ -760,119 +759,121 @@ namespace ProofGeneration.CfgToDag
                         sb.AppendLine(ProofUtil.Apply("intro conjI, simp"));
                         sb.AppendLine(ProofUtil.Apply("rule nstate_same_on_sym"));
                         if (loops.Count > 1)
+                        {
                             /* if the block is within more than one loop, then the modified variables proved for the block may
                                  be a strict subset of the modified variables of the loop associated with the IH*/
                                 sb.AppendLine(ProofUtil.Apply("erule nstate_same_on_subset_2"));
-                            sb.AppendLine(ProofUtil.Apply("simp"));
-                            sb.AppendLine(ProofUtil.Apply("simp"));
-                            sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1",
-                                proofData.DagAssmName())));
+                        }
+                        sb.AppendLine(ProofUtil.Apply("simp"));
+                        sb.AppendLine(ProofUtil.Apply("simp"));
+                        sb.AppendLine(ProofUtil.Apply("rule " + ProofUtil.OF("dag_lemma_assms_state_wt_1",
+                            proofData.DagAssmName())));
+                    }
+                }
+                else
+                {
+                    /* we need to check whether the edge to the successor also exists in the DAG
+                       if not, then an edge was added in-between and we need to apply an additional lemma to
+                       to propagate the execution in the DAG 
+                     */
+                    var bSucAfter = beforeToAfterBlock[bSuc];
+                    int bSucAfterId;
+                    var afterSuccessors = afterDagCfg.GetSuccessorBlocks(afterBlock);
+                    Block addedBlock = null;
+                    if (afterSuccessors.Contains(bSucAfter))
+                    {
+                        bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[bSucAfter];
+                    }
+                    else
+                    {
+                        /* need to find the empty block that was added in between (does not matter which one, if there
+                         * are multiple such empty blocks) */
+                        foreach (var afterSuc in afterSuccessors)
+                        {
+                            var afterSucSuccessors = afterDagCfg.GetSuccessorBlocks(afterSuc);
+                            if (!afterSuc.Cmds.Any() && afterSucSuccessors.Count() == 1 &&
+                                afterSucSuccessors.First().Equals(bSucAfter))
+                            {
+                                addedBlock = afterSuc;
+                                break;
                             }
+                        }
+
+                        if (addedBlock == null)
+                            throw new ProofGenUnexpectedStateException("Could not find block");
+
+                        bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[addedBlock];
+                    }
+
+                    sb.AppendLine("apply simp");
+                    sb.AppendLine("apply (erule allE[where x=" + bSucAfterId + "])");
+                    sb.AppendLine(ProofUtil.Apply(
+                        ProofUtil.Simp(afterDagProgAccess.BlockInfo()
+                            .OutEdgesMembershipLemma(afterBlock))));
+                    sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
+                    if (addedBlock != null)
+                    {
+                        sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(addedBlock)));
+                        sb.AppendLine(ProofUtil.Apply("assumption, assumption, simp"));
+                    }
+
+                    sb.AppendLine(ProofUtil.Apply("rule " + cfgLemmaName(bSuc)));
+                    sb.AppendLine("apply simp");
+                    sb.AppendLine("unfolding dag_lemma_assms_def");
+                    sb.AppendLine("apply (intro conjI)");
+                    sb.AppendLine("apply simp");
+                    sb.AppendLine(hintManager.IsLoopHead(bSuc, out _)
+                        ? "apply (erule nstate_same_on_empty_subset)"
+                        : "apply simp");
+
+                    sb.AppendLine(ProofUtil.Apply("fastforce"));
+                    sb.AppendLine(ProofUtil.Apply("simp"));
+                    sb.AppendLine(ProofUtil.Apply("simp"));
+                    /* We need to prove all the induction hypotheses for the loops that the successor is in.
+                     * We can be sure that every loop that the successor is, the current block is in too (since the CFG is reducible).
+                     * Thus, we just need to propagate the induction hypotheses.
+                     * If the current block B is a loop head, then a slightly different proof needs to be used to propagate the induction
+                     * hypothesis of B.
+                     */
+                    var loopsSuc = blocksToLoops[bSuc];
+                    foreach (var loopSuc in loopsSuc)
+                        if (loopSuc != beforeBlock)
+                        {
+                            if (loops.Count == 1 && !isLoopHead)
+                            {
+                                sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_pred"));
+                                sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) +
+                                              " apply simp");
+                                sb.AppendLine("apply simp");
+                                sb.AppendLine(ProofUtil.Apply("rule " +
+                                                              ProofUtil.OF("dag_lemma_assms_state_wt_1",
+                                                                  proofData.DagAssmName())));
                             }
                             else
                             {
-                                /* we need to check whether the edge to the successor also exists in the DAG
-                                   if not, then an edge was added in-between and we need to apply an additional lemma to
-                                   to propagate the execution in the DAG 
+                                /* we are in multiple loops, hence need to take into account that modified vars associated
+                                 * with the active loop is subset of those specified in loop_ih
                                  */
-                                var bSucAfter = beforeToAfterBlock[bSuc];
-                                int bSucAfterId;
-                                var afterSuccessors = afterDagCfg.GetSuccessorBlocks(afterBlock);
-                                Block addedBlock = null;
-                                if (afterSuccessors.Contains(bSucAfter))
-                                {
-                                    bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[bSucAfter];
-                                }
-                                else
-                                {
-                                    /* need to find the empty block that was added in between (does not matter which one, if there
-                                     * are multiple such empty blocks) */
-                                    foreach (var afterSuc in afterSuccessors)
-                                    {
-                                        var afterSucSuccessors = afterDagCfg.GetSuccessorBlocks(afterSuc);
-                                        if (!afterSuc.Cmds.Any() && afterSucSuccessors.Count() == 1 &&
-                                            afterSucSuccessors.First().Equals(bSucAfter))
-                                        {
-                                            addedBlock = afterSuc;
-                                            break;
-                                        }
-                                    }
-
-                                    if (addedBlock == null)
-                                        throw new ProofGenUnexpectedStateException("Could not find block");
-
-                                    bSucAfterId = afterDagProgAccess.BlockInfo().BlockIds[addedBlock];
-                                }
-
+                                sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_pred"));
+                                sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) +
+                                              " apply simp");
+                                sb.AppendLine("apply assumption");
+                                sb.AppendLine(ProofUtil.Apply("rule " +
+                                                              ProofUtil.OF("dag_lemma_assms_state_wt_1",
+                                                                  proofData.DagAssmName())));
                                 sb.AppendLine("apply simp");
-                                sb.AppendLine("apply (erule allE[where x=" + bSucAfterId + "])");
-                                sb.AppendLine(ProofUtil.Apply(
-                                    ProofUtil.Simp(afterDagProgAccess.BlockInfo()
-                                        .OutEdgesMembershipLemma(afterBlock))));
-                                sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
-                                if (addedBlock != null)
-                                {
-                                    sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(addedBlock)));
-                                    sb.AppendLine(ProofUtil.Apply("assumption, assumption, simp"));
-                                }
-
-                                sb.AppendLine(ProofUtil.Apply("rule " + cfgLemmaName(bSuc)));
-                                sb.AppendLine("apply simp");
-                                sb.AppendLine("unfolding dag_lemma_assms_def");
-                                sb.AppendLine("apply (intro conjI)");
-                                sb.AppendLine("apply simp");
-                                sb.AppendLine(hintManager.IsLoopHead(bSuc, out _)
-                                    ? "apply (erule nstate_same_on_empty_subset)"
-                                    : "apply simp");
-
-                                sb.AppendLine(ProofUtil.Apply("fastforce"));
-                                sb.AppendLine(ProofUtil.Apply("simp"));
-                                sb.AppendLine(ProofUtil.Apply("simp"));
-                                /* We need to prove all the induction hypotheses for the loops that the successor is in.
-                                 * We can be sure that every loop that the successor is, the current block is in too (since the CFG is reducible).
-                                 * Thus, we just need to propagate the induction hypotheses.
-                                 * If the current block B is a loop head, then a slightly different proof needs to be used to propagate the induction
-                                 * hypothesis of B.
-                                 */
-                                var loopsSuc = blocksToLoops[bSuc];
-                                foreach (var loopSuc in loopsSuc)
-                                    if (loopSuc != beforeBlock)
-                                    {
-                                        if (loops.Count == 1 && !isLoopHead)
-                                        {
-                                            sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_pred"));
-                                            sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) +
-                                                          " apply simp");
-                                            sb.AppendLine("apply simp");
-                                            sb.AppendLine(ProofUtil.Apply("rule " +
-                                                                          ProofUtil.OF("dag_lemma_assms_state_wt_1",
-                                                                              proofData.DagAssmName())));
-                                        }
-                                        else
-                                        {
-                                            /* we are in multiple loops, hence need to take into account that modified vars associated
-                                             * with the active loop is subset of those specified in loop_ih
-                                             */
-                                            sb.AppendLine(ProofUtil.Apply("rule loop_ih_convert_subset_pred"));
-                                            sb.AppendLine("using " + proofData.LoopIndHypName(loopSuc) +
-                                                          " apply simp");
-                                            sb.AppendLine("apply assumption");
-                                            sb.AppendLine(ProofUtil.Apply("rule " +
-                                                                          ProofUtil.OF("dag_lemma_assms_state_wt_1",
-                                                                              proofData.DagAssmName())));
-                                            sb.AppendLine("apply simp");
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //we need to prove the induction hypothesis of the current loop head block
-                                        ProveLoopHeadInductionHyp(sb, beforeBlock, proofData);
-                                    }
                             }
-                            }
+                        }
+                        else
+                        {
+                            //we need to prove the induction hypothesis of the current loop head block
+                            ProveLoopHeadInductionHyp(sb, beforeBlock, proofData);
+                        }
+                }
+            }
 
-                            sb.AppendLine("by (simp add: member_rec(2))");
-                            }
+            sb.AppendLine("by (simp add: member_rec(2))");
+        }
 
         /// <summary>
         ///     return tactics to prove expressions reduce using the input tactics for well-typedness

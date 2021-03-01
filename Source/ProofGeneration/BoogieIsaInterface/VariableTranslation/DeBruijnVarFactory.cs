@@ -5,8 +5,8 @@ using ProofGeneration.Isa;
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
     /// <summary>
-    ///     fixed value variables are assumed not to be in the same domain as de-bruijn variables (so they need not be shifted)
-    ///     fixed type variables are shifted
+    ///     Fixed value variables are assumed not to be in the same domain as de-bruijn variables (so they need not be shifted)
+    ///     fixed type variables are shifted.
     /// </summary>
     internal class DeBruijnVarFactory : IVariableTranslationFactory
     {

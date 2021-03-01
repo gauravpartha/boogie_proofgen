@@ -526,18 +526,18 @@ namespace ProofGeneration.BoogieIsaInterface
         private void AddTypingHelperLemmas()
         {
             Func<string, string, Term, LemmaDecl> WfLemma =
-                (lemmaName, list_def, fun) =>
+                (lemmaName, listDef, fun) =>
                 {
                     Term wfStmt =
                         new TermApp(IsaCommonTerms.ListAll(
                             IsaCommonTerms.Composition(fun, IsaCommonTerms.SndId),
-                            IsaCommonTerms.TermIdentFromName(list_def))
+                            IsaCommonTerms.TermIdentFromName(listDef))
                         );
                     return
                         new LemmaDecl(lemmaName, ContextElem.CreateEmptyContext(), wfStmt,
                             new Proof(new List<string>
                             {
-                                "unfolding " + list_def + "_def",
+                                "unfolding " + listDef + "_def",
                                 "by simp"
                             })
                         );

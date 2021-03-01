@@ -16,17 +16,17 @@ namespace ProofGeneration.CFGRepresentation
         /// <summary>
         ///     Create CFG representation as <see cref="CFGRepr" /> of <paramref name="impl" />.
         /// </summary>
-        /// <param name="impl">Input implementation</param>
-        /// <param name="config">Configuration specifying how to create representation</param>
+        /// <param name="impl">Input implementation.</param>
+        /// <param name="config">Configuration specifying how to create representation.</param>
         /// <param name="newToOldBlocks">
         ///     Mapping from original to copied blocks if <paramref name="config" /> specifies blocks to
-        ///     be copied
+        ///     be copied.
         /// </param>
         /// <param name="newVarsFromDesugaring">
         ///     New local variables obtained from desugared commands if <paramref name="config" />
-        ///     specifies calls to be desugared
+        ///     specifies calls to be desugared.
         /// </param>
-        /// <returns>CFG Representation of implementation</returns>
+        /// <returns>CFG Representation of implementation.</returns>
         /// <exception cref="ArgumentException"> Calls can only be desugared if blocks are specified to be copied.</exception>
         public static CFGRepr GetCfgRepresentation(
             Implementation impl,
@@ -89,7 +89,6 @@ namespace ProofGeneration.CFGRepresentation
             out IDictionary<Block, IList<Block>> outgoingBlocks)
         {
             entryBlock = null;
-            var blockNum = 0;
             outgoingBlocks = new Dictionary<Block, IList<Block>>();
 
             foreach (var block in blocks)
@@ -106,8 +105,6 @@ namespace ProofGeneration.CFGRepresentation
                 if (block.TransferCmd is GotoCmd gotoCmd) curOutgoing.AddRange(gotoCmd.labelTargets);
 
                 outgoingBlocks.Add(block, curOutgoing);
-
-                blockNum++;
             }
 
             if (entryBlock == null)
@@ -118,7 +115,7 @@ namespace ProofGeneration.CFGRepresentation
         /// <summary>
         ///     Copy from <see cref="Implementation" />. We compute predecessors ourselves, since at certain points the
         ///     predecessors property for blocks is not in-sync with the CFG (and we do not want to adjust the Boogie
-        ///     objects)
+        ///     objects).
         /// </summary>
         private static Dictionary<Block, List<Block>> ComputePredecessors(IEnumerable<Block> blocks)
         {

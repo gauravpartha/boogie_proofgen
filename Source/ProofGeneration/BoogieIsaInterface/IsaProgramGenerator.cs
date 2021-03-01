@@ -319,7 +319,7 @@ namespace ProofGeneration
             var vdecls = new List<Term>();
 
             foreach (var v in variables)
-                if (varTranslation.VarTranslation.TryTranslateVariableId(v, out var resId, out var isBoundVar))
+                if (varTranslation.VarTranslation.TryTranslateVariableId(v, out var resId, out _))
                 {
                     var vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
                     vdecls.Add(new TermTuple(new List<Term> {resId, vType}));

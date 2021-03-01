@@ -5,7 +5,7 @@ using Microsoft.Boogie;
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {
     /// <summary>
-    ///     Gives unique names to variables (identified by the corresponding object, not the name)
+    ///     Gives unique names to variables (identified by the corresponding object, not the name).
     /// </summary>
     public class CounterFixedVarTranslation : IFixedVariableTranslation<Variable>
     {

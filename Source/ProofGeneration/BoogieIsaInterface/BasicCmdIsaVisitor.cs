@@ -182,7 +182,6 @@ namespace ProofGeneration
             for (var i = node.TypeParameters.Count - 1; i >= 0; i--)
             {
                 boogieVarTranslation.TypeVarTranslation.DropLastBoundVariable();
-                var boundTyVar = node.TypeParameters[i];
                 result = IsaBoogieTerm.TypeQuantifier(isForall, result);
             }
 

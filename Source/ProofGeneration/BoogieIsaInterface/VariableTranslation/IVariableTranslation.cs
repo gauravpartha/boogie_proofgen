@@ -27,6 +27,7 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         /// </summary>
         /// <param name="variable"></param>
         /// <param name="id"></param>
+        /// <param name="isBoundVar"></param>
         /// <returns></returns>
         bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar);
     }

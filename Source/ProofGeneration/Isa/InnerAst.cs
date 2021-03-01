@@ -351,12 +351,12 @@ namespace ProofGeneration.Isa
         public readonly int n;
 
         //if set to true, then the pretty printer will use "Suc" constructors to represent n and otherwise just decimal representation
-        public readonly bool useConstructorRepr = false;
+        public readonly bool useConstructorRepr;
 
         public NatConst(int n, bool useConstructorRepr)
         {
             this.n = n;
-            useConstructorRepr = false;
+            this.useConstructorRepr = useConstructorRepr;
         }
 
         public NatConst(int n)

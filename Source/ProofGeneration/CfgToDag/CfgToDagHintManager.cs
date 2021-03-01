@@ -47,8 +47,8 @@ namespace ProofGeneration.CfgToDag
             loopHeadHints.Add(block, hint);
         }
 
-        /// <param name="newBackedgeBlock">backedge block that is newly added in the CFG-to-DAG phase</param>
-        /// <param name="loopHead">corresponding loop head </param>
+        /// <param name="newBackedgeBlock">backedge block that is newly added in the CFG-to-DAG phase.</param>
+        /// <param name="loopHead">corresponding loop head.</param>
         public void AddNewBackedgeBlock(Block newBackedgeBlock, Block loopHead)
         {
             newBackedgeNodesToLoopHead.Add(newBackedgeBlock, loopHead);

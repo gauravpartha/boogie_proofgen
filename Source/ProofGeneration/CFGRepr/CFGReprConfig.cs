@@ -22,7 +22,7 @@ namespace ProofGeneration.CFGRepresentation
 
     /// <summary>
     ///     Builder for <see cref="CFGReprConfig" />.
-    ///     Defaults: no block copy, not acyclic, no desugaring of calls, no copying of commands
+    ///     Defaults: no block copy, not acyclic, no desugaring of calls, no copying of commands.
     /// </summary>
     public class CFGReprConfigBuilder
     {
