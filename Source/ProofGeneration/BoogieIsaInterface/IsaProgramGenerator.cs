@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.BaseTypes;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration
@@ -67,8 +68,8 @@ namespace ProofGeneration
 
             var methodBodyCFG =
                 IsaBoogieTerm.MethodCFGBody(
-                    entry, IsaCommonTerms.TermIdentFromName(outEdges.name),
-                    IsaCommonTerms.TermIdentFromName(nodesToBlocks.name)
+                    entry, IsaCommonTerms.TermIdentFromName(outEdges.Name),
+                    IsaCommonTerms.TermIdentFromName(nodesToBlocks.Name)
                 );
 
             var methodBodyDecl = GetMethodBodyCFGDecl(procName, methodBodyCFG);
@@ -111,7 +112,7 @@ namespace ProofGeneration
                 VariableDeclarationsName("constants", procName),
                 VariableDeclarationsName("params", procName),
                 VariableDeclarationsName("locals", procName),
-                methodBodyDecl.name);
+                methodBodyDecl.Name);
             // assume single versioning and order on constants, globals, params, locals
             var globalsMax = methodData.Constants.Count() + methodData.GlobalVars.Count() - 1;
             var localsMin = globalsMax + 1;
@@ -222,7 +223,7 @@ namespace ProofGeneration
                         NodeLemmaName(blockLabel),
                         ContextElem.CreateEmptyContext(),
                         TermBinary.Eq(IsaBoogieTerm.NodeToBlock(cfgTerm, blockLabel),
-                            IsaCommonTerms.TermIdentFromName(blockDecl.name)),
+                            IsaCommonTerms.TermIdentFromName(blockDecl.Name)),
                         new Proof(new List<string> {"by " + ProofUtil.Simp(cfgDef, nodeToBlockDef)}));
 
                     blockToNodesLemmas.Add(b, nodeDecl);
@@ -281,7 +282,7 @@ namespace ProofGeneration
             foreach (var b in cfg.GetBlocksBackwards())
                 //left side of equation is block number expressed using constructors
                 //right side of equation is command
-                nodeList.Add(IsaCommonTerms.TermIdentFromName(blockToDecl[b].name));
+                nodeList.Add(IsaCommonTerms.TermIdentFromName(blockToDecl[b].Name));
 
             return DefDecl.CreateWithoutArg("nodeToBlocks_" + methodName, new TermList(nodeList));
         }

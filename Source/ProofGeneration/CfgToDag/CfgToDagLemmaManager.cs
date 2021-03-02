@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag

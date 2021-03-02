@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
 using Microsoft.Boogie;
-using ProofGeneration.Isa;
-using SimpleType = ProofGeneration.Isa.SimpleType;
 using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration.BoogieIsaInterface
@@ -103,12 +102,11 @@ namespace ProofGeneration.BoogieIsaInterface
         public override Type VisitBasicType(BasicType node)
         {
             if (node.IsBool)
-                ReturnResult(new PrimitiveType(SimpleType.Bool));
+                ReturnResult(PrimitiveType.CreateBoolType());
             else if (node.IsInt)
-                ReturnResult(new PrimitiveType(SimpleType.Int));
+                ReturnResult(PrimitiveType.CreateIntType());
             else
-                //TODO: just returning some type so that can test, but need to adjust this
-                ReturnResult(new PrimitiveType(SimpleType.Int));
+                throw new ProofGenUnexpectedStateException("unexpected pure basic type");
 
             return node;
         }

@@ -1,35 +1,35 @@
 ﻿using System;
 using System.Linq;
-using ProofGeneration.Isa;
+using Isabelle.Ast;
 
-namespace ProofGeneration.IsaPrettyPrint
+namespace Isabelle.IsaPrettyPrint
 {
     public class TypeIsaPrettyPrinter : TypeIsaVisitor<string>
     {
         public override string VisitVarType(VarType t)
         {
-            return IsaPrettyPrinterHelper.Parenthesis("\'" + t.name);
+            return IsaPrettyPrinterHelper.Parenthesis("\'" + t.Name);
         }
 
         public override string VisitArrowType(ArrowType t)
         {
-            var rArg = Visit(t.argType);
-            var rRes = Visit(t.resType);
+            var rArg = Visit(t.ArgType);
+            var rRes = Visit(t.ResType);
 
             return IsaPrettyPrinterHelper.Parenthesis(rArg + " => " + rRes);
         }
 
         public override string VisitDataType(DataType t)
         {
-            var rArgs = VisitList(t.args);
-            if (t.args.Count == 0)
-                return IsaPrettyPrinterHelper.Parenthesis(t.name);
-            return IsaPrettyPrinterHelper.Parenthesis(rArgs.SpaceAggregate() + t.name);
+            var rArgs = VisitList(t.Args);
+            if (t.Args.Count == 0)
+                return IsaPrettyPrinterHelper.Parenthesis(t.Name);
+            return IsaPrettyPrinterHelper.Parenthesis(rArgs.SpaceAggregate() + t.Name);
         }
 
         public override string VisitPrimitiveType(PrimitiveType t)
         {
-            switch (t.simpleType)
+            switch (t.SimpleType)
             {
                 case SimpleType.Bool:
                     return "bool";
@@ -46,14 +46,14 @@ namespace ProofGeneration.IsaPrettyPrint
 
         public override string VisitTupleType(TupleType t)
         {
-            var rArgs = VisitList(t.args);
+            var rArgs = VisitList(t.Args);
             var aggr = rArgs.Aggregate((s1, s2) => s1 + " " + IsaPrettyPrinterHelper.TIMES + " " + s2);
             return IsaPrettyPrinterHelper.Parenthesis(aggr);
         }
 
         public override string VisitSumType(SumType t)
         {
-            var rArgs = VisitList(t.args);
+            var rArgs = VisitList(t.Args);
             var aggr = rArgs.Aggregate((s1, s2) => s1 + " + " + s2);
             return IsaPrettyPrinterHelper.Parenthesis(aggr);
         }

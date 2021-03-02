@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ProofGeneration.Isa
+namespace Isabelle.Ast
 {
     public class Proof
     {

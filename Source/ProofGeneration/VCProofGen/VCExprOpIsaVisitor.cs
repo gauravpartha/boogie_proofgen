@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen
@@ -34,12 +35,12 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitAddOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.ADD, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Add, arg);
         }
 
         public Term VisitAndOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.AND, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.And, arg);
         }
 
         public Term VisitBoogieFunctionOp(VCExprNAry node, List<Term> arg)
@@ -91,7 +92,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitEqOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.EQ, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Eq, arg);
         }
 
         public Term VisitFloatAddOp(VCExprNAry node, List<Term> arg)
@@ -146,12 +147,12 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitGeOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.GE, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Ge, arg);
         }
 
         public Term VisitGtOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.GT, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Gt, arg);
         }
 
         public Term VisitIfThenElseOp(VCExprNAry node, List<Term> arg)
@@ -161,17 +162,17 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitImpliesOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.IMPLIES, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Implies, arg);
         }
 
         public Term VisitLeOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.LE, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Le, arg);
         }
 
         public Term VisitLtOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.LT, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Lt, arg);
         }
 
         public Term VisitModOp(VCExprNAry node, List<Term> arg)
@@ -181,22 +182,22 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitMulOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.MUL, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Mul, arg);
         }
 
         public Term VisitNeqOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.NEQ, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Neq, arg);
         }
 
         public Term VisitNotOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleUnaryOp(TermUnary.UnaryOpCode.NOT, arg);
+            return HandleUnaryOp(TermUnary.UnaryOpCode.Not, arg);
         }
 
         public Term VisitOrOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.OR, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Or, arg);
         }
 
         public Term VisitPowOp(VCExprNAry node, List<Term> arg)
@@ -221,7 +222,7 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitSubOp(VCExprNAry node, List<Term> arg)
         {
-            return HandleBinaryOp(TermBinary.BinaryOpCode.SUB, arg);
+            return HandleBinaryOp(TermBinary.BinaryOpCode.Sub, arg);
         }
 
         public Term VisitSubtype3Op(VCExprNAry node, List<Term> arg)
@@ -260,10 +261,10 @@ namespace ProofGeneration.VCProofGen
             return new TermBinary(arg[0], arg[1], bop);
         }
 
-        public Term HandleUnaryOp(TermUnary.UnaryOpCode up, List<Term> arg)
+        public Term HandleUnaryOp(TermUnary.UnaryOpCode uop, List<Term> arg)
         {
             Contract.Assert(arg.Count == 1);
-            return new TermUnary(arg[0]);
+            return new TermUnary(arg[0], uop);
         }
 
         public Term VisitLabelOp(VCExprNAry node, List<Term> arg)

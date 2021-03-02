@@ -1,5 +1,6 @@
-﻿using Microsoft.Boogie;
-using ProofGeneration.Isa;
+﻿using Isabelle.Ast;
+using Isabelle.Util;
+using Microsoft.Boogie;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen

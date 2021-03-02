@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
-using SimpleType = ProofGeneration.Isa.SimpleType;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -68,7 +68,7 @@ namespace ProofGeneration.VCProofGen
             if (node == VCExpressionGenerator.False)
                 return new BoolConst(false);
             if (node is VCExprIntLit lit)
-                return new TermWithExplicitType(new IntConst(lit.Val), new PrimitiveType(SimpleType.Int));
+                return new TermWithExplicitType(new IntConst(lit.Val), PrimitiveType.CreateIntType());
             throw new NotImplementedException();
         }
 
@@ -134,7 +134,7 @@ namespace ProofGeneration.VCProofGen
         {
             if (VCBlockExtractor.PredictBlockName(node.Name, out var predictedBlockName) &&
                 TryGetDefFromBlock(predictedBlockName, out var block, out var def))
-                return new TermApp(IsaCommonTerms.TermIdentFromName(def.name),
+                return new TermApp(IsaCommonTerms.TermIdentFromName(def.Name),
                     blockToActiveVars[block].Select(v => Translate(v)).ToList());
 
             return IsaCommonTerms.TermIdentFromName(GetVcVarName(node));

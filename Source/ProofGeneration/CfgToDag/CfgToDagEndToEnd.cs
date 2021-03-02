@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Isabelle.Ast;
+using Isabelle.Util;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.PhasesUtil;
 using ProofGeneration.Util;
 

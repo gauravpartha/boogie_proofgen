@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.ML;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
@@ -140,7 +142,7 @@ namespace ProofGeneration.Passification
             //find smallest required version
             var smallestRequired = 1000; //TODO: set to correct initial value
             if (constrainedPassiveVars.Any())
-                smallestRequired = constrainedPassiveVars.Select(t => (t as NatConst).n).Min();
+                smallestRequired = constrainedPassiveVars.Select(t => (t as NatConst).Val).Min();
             else if (successors.Any())
                 smallestRequired = successors.Select(suc => smallestRequiredVersionDict[suc]).Min();
 

@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using ProofGeneration.Isa;
-using ProofGeneration.IsaPrettyPrint;
+using Isabelle.Ast;
+using Isabelle.IsaPrettyPrint;
 
 namespace ProofGeneration
 {
@@ -50,7 +50,7 @@ namespace ProofGeneration
 
         private static void StoreTheory(string dirName, Theory theory)
         {
-            var path = Path.Combine(dirName, theory.theoryName + ".thy");
+            var path = Path.Combine(dirName, theory.TheoryName + ".thy");
             var sw = new StreamWriter(path);
             var theoryString = IsaPrettyPrinter.PrintTheory(theory);
 
@@ -63,7 +63,7 @@ namespace ProofGeneration
             var sw = new StreamWriter(Path.Combine(dirPath, "ROOT"));
             sw.WriteLine("session " + Path.GetFileName(dirPath) + " = " + "Boogie_Lang + ");
             sw.WriteLine("theories");
-            sw.Write(string.Join(Environment.NewLine, theories.Select(thy => thy.theoryName)));
+            sw.Write(string.Join(Environment.NewLine, theories.Select(thy => thy.TheoryName)));
             sw.Close();
         }
     }

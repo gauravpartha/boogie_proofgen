@@ -1,16 +1,16 @@
 ﻿using System.Text;
-using ProofGeneration.Isa;
+using Isabelle.Ast;
 
-namespace ProofGeneration.IsaPrettyPrint
+namespace Isabelle.IsaPrettyPrint
 {
-    public class IsaPrettyPrinter
+    public static class IsaPrettyPrinter
     {
         public static string PrintTheory(Theory thy)
         {
             var sb = new StringBuilder();
 
-            sb.Append("theory ").Append(thy.theoryName);
-            sb.AppendLine().Append("imports ").Append(thy.importTheories.SpaceAggregate());
+            sb.Append("theory ").Append(thy.TheoryName);
+            sb.AppendLine().Append("imports ").Append(thy.ImportTheories.SpaceAggregate());
             sb.AppendLine().Append("begin");
             sb.AppendLine();
 
@@ -18,7 +18,7 @@ namespace ProofGeneration.IsaPrettyPrint
             var typeIsaPrinter = new TypeIsaPrettyPrinter();
             var outerDeclPrinter = new OuterDeclPrettyPrinter(sb, termPrinter, typeIsaPrinter);
 
-            foreach (var outerDecl in thy.decls)
+            foreach (var outerDecl in thy.Decls)
             {
                 outerDeclPrinter.Visit(outerDecl);
                 sb.AppendLine();

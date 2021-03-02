@@ -3,18 +3,19 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
+using Isabelle.Ast;
+using Isabelle.IsaPrettyPrint;
+using Isabelle.ML;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
-using ProofGeneration.IsaPrettyPrint;
 using ProofGeneration.PhasesUtil;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
-using SimpleType = ProofGeneration.Isa.SimpleType;
 using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration.ProgramToVCProof
@@ -497,7 +498,7 @@ namespace ProofGeneration.ProgramToVCProof
             var typeDeclTranslation = new GenericTypeDeclTranslation(uniqueNamer);
             var declToVCMapping =
                 LemmaHelper.DeclToTerm(ProgramVariables, vcFunctions, typeDeclTranslation, uniqueNamer);
-            var declIds = declToVCMapping.Values.Select(t => ((TermIdent) t).id).ToList();
+            var declIds = declToVCMapping.Values.Select(t => ((TermIdent) t).Id).ToList();
             var absValType = new VarType("a");
             var concretePureTyIsaTransformer = LemmaHelper.ConretePureTyIsaTransformer(absValType);
             var declTypes = declToVCMapping.Keys.Select(nd => concretePureTyIsaTransformer.Translate(nd)).ToList();
@@ -520,7 +521,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             var vcAssmWithoutQuant = vcBoogieInfo.VcAxioms.Reverse().Aggregate(vcAssmWithoutAxioms, (current, vcAx) =>
                 new TermBinary(vcBoogieInfo.VcInstAxiom.GetVCObjInstantiation(vcAx, declToVCMapping), current,
-                    TermBinary.BinaryOpCode.META_IMP));
+                    TermBinary.BinaryOpCode.MetaImp));
 
             /*List<TypeIsa> declTypes = methodData.Functions.Select(f => pureTyIsaTransformer.Translate(f)).ToList();
             declTypes.AddRange(ProgramVariables.Select(v => pureTyIsaTransformer.Translate(v)));*/
@@ -550,7 +551,7 @@ namespace ProofGeneration.ProgramToVCProof
             var globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext,
                 programAccessor.ConstsAndGlobalsDecl(), normalInitState);
 
-            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.Neq);
 
             var contextElem = ContextElem.CreateWithAssumptions(
                 new List<Term>
@@ -646,7 +647,7 @@ namespace ProofGeneration.ProgramToVCProof
                 {
                     def,
                     new FunDecl(ctorName,
-                        new ArrowType(IsaBoogieVC.BoogieClosedType(), new PrimitiveType(SimpleType.Int)),
+                        new ArrowType(IsaBoogieVC.BoogieClosedType(), PrimitiveType.CreateIntType()),
                         funEquations)
                 };
             result.AddRange(lemmas);
@@ -684,7 +685,7 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendInner(
                     new TermBinary(new TermApp(boogieContext.funContext, fStringConst),
                         IsaCommonTerms.SomeOption(IsaCommonTerms.TermIdentFromName(FunAbbrev(f))),
-                        TermBinary.BinaryOpCode.EQ).ToString());
+                        TermBinary.BinaryOpCode.Eq).ToString());
                 sb.AppendLine();
                 sb.AppendLine("apply " + ProofUtil.SimpOnly("opaque_comp_def"));
                 sb.AppendLine("by (rule " + ProofUtil.OF(
@@ -743,7 +744,7 @@ namespace ProofGeneration.ProgramToVCProof
 
 
             sb.Append("show ");
-            sb.AppendInner(new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ).ToString());
+            sb.AppendInner(new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.Neq).ToString());
             sb.AppendLine();
 
             sb.AppendLine("apply (rule " + ProofUtil.OF(entryBlockCorrectLemma, "_", RedAssmName) + ")");

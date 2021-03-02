@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
+using Isabelle.Ast;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
-using ProofGeneration.Isa;
 using ProofGeneration.VCProofGen;
 
 namespace ProofGeneration.ProgramToVCProof

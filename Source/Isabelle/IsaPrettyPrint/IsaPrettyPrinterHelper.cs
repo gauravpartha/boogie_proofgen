@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace ProofGeneration.IsaPrettyPrint
+namespace Isabelle.IsaPrettyPrint
 {
     public static class IsaPrettyPrinterHelper
     {

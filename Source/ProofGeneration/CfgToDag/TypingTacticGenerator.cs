@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.ML;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag
@@ -44,7 +45,7 @@ namespace ProofGeneration.CfgToDag
 
             var hintLemmas = equalityHintGenerator.GetHints(e);
 
-            var hintsML = MLUtil.IsaToMLThms(hintLemmas.Select(lemma => lemma.name));
+            var hintsML = MLUtil.IsaToMLThms(hintLemmas.Select(lemma => lemma.Name));
             var lookupTyML = MLUtil.IsaToMLThms(lookupTyThms);
             var funMemML = MLUtil.IsaToMLThms(funMemThms);
 

@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using ProofGeneration.Isa;
+using Isabelle.Ast;
 
 namespace ProofGeneration.ProgramToVCProof
 {

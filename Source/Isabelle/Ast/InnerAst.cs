@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.IsaPrettyPrint;
 using Microsoft.BaseTypes;
-using ProofGeneration.IsaPrettyPrint;
 
-namespace ProofGeneration.Isa
+namespace Isabelle.Ast
 {
     public abstract class Identifier
     {
@@ -13,16 +13,16 @@ namespace ProofGeneration.Isa
 
     public class SimpleIdentifier : Identifier
     {
-        public readonly string name;
-
         public SimpleIdentifier(string name)
         {
-            this.name = name;
+            Name = name;
         }
+
+        public string Name { get; }
 
         public override string ToString()
         {
-            return name;
+            return Name;
         }
     }
 
@@ -44,12 +44,12 @@ namespace ProofGeneration.Isa
 
     public class TermIdent : Term
     {
-        public readonly Identifier id;
-
         public TermIdent(Identifier id)
         {
-            this.id = id;
+            Id = id;
         }
+
+        public Identifier Id { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -59,18 +59,18 @@ namespace ProofGeneration.Isa
 
     public class TermApp : Term
     {
-        public readonly IList<Term> arg; //technically don't require lists, but allows one to keep structure
-        public readonly Term fun;
-
         public TermApp(Term fun, IList<Term> arg)
         {
-            this.fun = fun;
-            this.arg = arg;
+            Fun = fun;
+            Arg = arg;
         }
 
         public TermApp(Term fun, params Term[] args) : this(fun, args.ToList())
         {
         }
+
+        public IList<Term> Arg { get; }
+        public Term Fun { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -80,14 +80,14 @@ namespace ProofGeneration.Isa
 
     public class TermWithExplicitType : Term
     {
-        public readonly Term term;
-        public readonly TypeIsa type;
-
         public TermWithExplicitType(Term term, TypeIsa type)
         {
-            this.term = term;
-            this.type = type;
+            Term = term;
+            Type = type;
         }
+
+        public Term Term { get; }
+        public TypeIsa Type { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -97,12 +97,12 @@ namespace ProofGeneration.Isa
 
     public class TermList : Term
     {
-        public readonly IList<Term> list;
-
         public TermList(IList<Term> list)
         {
-            this.list = list;
+            List = list;
         }
+
+        public IList<Term> List { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -112,12 +112,12 @@ namespace ProofGeneration.Isa
 
     public class TermSet : Term
     {
-        public readonly IEnumerable<Term> elements;
-
         public TermSet(IEnumerable<Term> elements)
         {
-            this.elements = elements;
+            Elements = elements;
         }
+
+        public IEnumerable<Term> Elements { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -127,11 +127,11 @@ namespace ProofGeneration.Isa
 
     public class TermTuple : Term
     {
-        public readonly IList<Term> terms;
+        public IList<Term> Terms;
 
         public TermTuple(IList<Term> terms)
         {
-            this.terms = terms;
+            Terms = terms;
         }
 
         public TermTuple(Term t1, Term t2) : this(new List<Term> {t1, t2})
@@ -146,12 +146,12 @@ namespace ProofGeneration.Isa
 
     public class TermRecord : Term
     {
-        public readonly IList<Tuple<string, Term>> mapping;
-
         public TermRecord(IList<Tuple<string, Term>> mapping)
         {
-            this.mapping = mapping;
+            Mapping = mapping;
         }
+
+        public IList<Tuple<string, Term>> Mapping { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -169,30 +169,30 @@ namespace ProofGeneration.Isa
             LAMBDA
         }
 
-        public readonly IList<Identifier> boundVars;
-
-        //if boundVarTypes is null, then types must be inferred, otherwise a type is provided for each bound variable
-        public readonly IList<TypeIsa> boundVarTypes;
-
-        public readonly QuantifierKind quantifier;
-        public readonly Term term;
-
         //if boundVarTypes is null, then this represents not providing explicit types
         public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, IList<TypeIsa> boundVarTypes,
             Term term)
         {
             if (boundVars == null || boundVarTypes != null && boundVars.Count != boundVarTypes.Count)
                 throw new ArgumentException();
-            this.quantifier = quantifier;
-            this.boundVars = boundVars;
-            this.boundVarTypes = boundVarTypes;
-            this.term = term;
+            Quantifier = quantifier;
+            BoundVars = boundVars;
+            BoundVarTypes = boundVarTypes;
+            Term = term;
         }
 
         public TermQuantifier(QuantifierKind quantifier, IList<Identifier> boundVars, Term term) : this(quantifier,
             boundVars, null, term)
         {
         }
+
+        public IList<Identifier> BoundVars { get; }
+
+        //if boundVarTypes is null, then types must be inferred, otherwise a type is provided for each bound variable
+        public IList<TypeIsa> BoundVarTypes { get; }
+
+        public QuantifierKind Quantifier { get; }
+        public Term Term { get; }
 
         public static TermQuantifier ForAll(IList<Identifier> boundVars, IList<TypeIsa> boundVarsTypes, Term term)
         {
@@ -222,14 +222,14 @@ namespace ProofGeneration.Isa
 
     public class TermCaseOf : Term
     {
-        public readonly IEnumerable<Tuple<Term, Term>> matchCases;
-        public readonly Term termToMatch;
-
         public TermCaseOf(Term termToMatch, IEnumerable<Tuple<Term, Term>> matchCases)
         {
-            this.termToMatch = termToMatch;
-            this.matchCases = matchCases;
+            TermToMatch = termToMatch;
+            MatchCases = matchCases;
         }
+
+        public IEnumerable<Tuple<Term, Term>> MatchCases { get; }
+        public Term TermToMatch { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -241,66 +241,66 @@ namespace ProofGeneration.Isa
     {
         public enum BinaryOpCode
         {
-            META_IMP, //\<Longrightarrow>
-            EQ,
-            NEQ,
-            LT,
-            LE,
-            GT,
-            GE,
-            AND,
-            OR,
-            IMPLIES,
-            ADD,
-            SUB,
-            MUL
+            MetaImp, //\<Longrightarrow>
+            Eq,
+            Neq,
+            Lt,
+            Le,
+            Gt,
+            Ge,
+            And,
+            Or,
+            Implies,
+            Add,
+            Sub,
+            Mul
         }
-
-        public readonly Term argLeft;
-        public readonly Term argRight;
-
-        public readonly BinaryOpCode op;
 
         public TermBinary(Term argLeft, Term argRight, BinaryOpCode op)
         {
-            this.argLeft = argLeft;
-            this.argRight = argRight;
-            this.op = op;
+            ArgLeft = argLeft;
+            ArgRight = argRight;
+            Op = op;
         }
+
+        public Term ArgLeft { get; }
+        public Term ArgRight { get; }
+
+        public BinaryOpCode Op { get; }
 
         public static TermBinary Eq(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.EQ);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.Eq);
         }
 
         public static TermBinary Neq(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.NEQ);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.Neq);
         }
 
         public static TermBinary Le(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.LE);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.Le);
         }
 
         public static TermBinary Ge(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.GE);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.Ge);
         }
 
         public static TermBinary And(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.AND);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.And);
         }
 
         public static TermBinary Implies(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.IMPLIES);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.Implies);
         }
 
         public static TermBinary MetaImplies(Term argLeft, Term argRight)
         {
-            return new TermBinary(argLeft, argRight, BinaryOpCode.META_IMP);
+            return new TermBinary(argLeft, argRight, BinaryOpCode.MetaImp);
         }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
@@ -313,17 +313,18 @@ namespace ProofGeneration.Isa
     {
         public enum UnaryOpCode
         {
-            NOT
+            Not
         }
 
-        public readonly Term arg;
-
-        public readonly UnaryOpCode op;
-
-        public TermUnary(Term arg)
+        public TermUnary(Term arg, UnaryOpCode op)
         {
-            this.arg = arg;
+            Arg = arg;
+            Op = op;
         }
+
+        public Term Arg { get; }
+
+        public UnaryOpCode Op { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -333,12 +334,12 @@ namespace ProofGeneration.Isa
 
     public class BoolConst : Term
     {
-        public readonly bool b;
-
-        public BoolConst(bool b)
+        public BoolConst(bool val)
         {
-            this.b = b;
+            Val = val;
         }
+
+        public bool Val { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -348,21 +349,21 @@ namespace ProofGeneration.Isa
 
     public class NatConst : Term
     {
-        public readonly int n;
+        public NatConst(int val, bool useConstructorRepr)
+        {
+            Val = val;
+            UseConstructorRepr = useConstructorRepr;
+        }
+
+        public NatConst(int val)
+        {
+            Val = val;
+        }
+
+        public int Val { get; }
 
         //if set to true, then the pretty printer will use "Suc" constructors to represent n and otherwise just decimal representation
-        public readonly bool useConstructorRepr;
-
-        public NatConst(int n, bool useConstructorRepr)
-        {
-            this.n = n;
-            this.useConstructorRepr = useConstructorRepr;
-        }
-
-        public NatConst(int n)
-        {
-            this.n = n;
-        }
+        public bool UseConstructorRepr { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -372,23 +373,23 @@ namespace ProofGeneration.Isa
         [ContractInvariantMethod]
         protected void ObjectInvariant()
         {
-            Contract.Invariant(n >= 0);
+            Contract.Invariant(Val >= 0);
         }
     }
 
     public class IntConst : Term
     {
-        public readonly BigNum i;
-
-        public IntConst(BigNum i)
+        public IntConst(BigNum val)
         {
-            this.i = i;
+            Val = val;
         }
 
-        public IntConst(int i)
+        public IntConst(int val)
         {
-            this.i = BigNum.FromInt(i);
+            Val = BigNum.FromInt(val);
         }
+
+        public BigNum Val { get; }
 
         public override T Dispatch<T>(TermVisitor<T> visitor)
         {
@@ -422,12 +423,12 @@ namespace ProofGeneration.Isa
 
     public class VarType : TypeIsa
     {
-        public readonly string name;
-
         public VarType(string name)
         {
-            this.name = name;
+            Name = name;
         }
+
+        public string Name { get; }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
@@ -437,14 +438,14 @@ namespace ProofGeneration.Isa
 
     public class ArrowType : TypeIsa
     {
-        public readonly TypeIsa argType;
-        public readonly TypeIsa resType;
-
         public ArrowType(TypeIsa argType, TypeIsa resType)
         {
-            this.argType = argType;
-            this.resType = resType;
+            ArgType = argType;
+            ResType = resType;
         }
+
+        public TypeIsa ArgType { get; }
+        public TypeIsa ResType { get; }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
@@ -454,18 +455,18 @@ namespace ProofGeneration.Isa
 
     public class DataType : TypeIsa
     {
-        public readonly IList<TypeIsa> args;
-        public readonly string name;
-
         public DataType(string name, IList<TypeIsa> args)
         {
-            this.name = name;
-            this.args = args;
+            Name = name;
+            Args = args;
         }
 
         public DataType(string name, params TypeIsa[] args) : this(name, new List<TypeIsa>(args))
         {
         }
+
+        public IList<TypeIsa> Args { get; }
+        public string Name { get; }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
@@ -475,16 +476,16 @@ namespace ProofGeneration.Isa
 
     public class TupleType : TypeIsa
     {
-        public readonly IList<TypeIsa> args;
-
         public TupleType(IList<TypeIsa> args)
         {
-            this.args = args;
+            Args = args;
         }
 
         public TupleType(params TypeIsa[] args) : this(new List<TypeIsa>(args))
         {
         }
+
+        public IList<TypeIsa> Args { get; }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
@@ -494,16 +495,16 @@ namespace ProofGeneration.Isa
 
     public class SumType : TypeIsa
     {
-        public readonly IList<TypeIsa> args;
-
         public SumType(IList<TypeIsa> args)
         {
-            this.args = args;
+            Args = args;
         }
 
         public SumType(params TypeIsa[] args) : this(new List<TypeIsa>(args))
         {
         }
+
+        public IList<TypeIsa> Args { get; }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)
         {
@@ -521,11 +522,31 @@ namespace ProofGeneration.Isa
 
     public class PrimitiveType : TypeIsa
     {
-        public readonly SimpleType simpleType;
-
         public PrimitiveType(SimpleType simpleType)
         {
-            this.simpleType = simpleType;
+            SimpleType = simpleType;
+        }
+
+        public SimpleType SimpleType { get; }
+
+        public static PrimitiveType CreateBoolType()
+        {
+            return new PrimitiveType(SimpleType.Bool);
+        }
+
+        public static PrimitiveType CreateNatType()
+        {
+            return new PrimitiveType(SimpleType.Nat);
+        }
+
+        public static PrimitiveType CreateIntType()
+        {
+            return new PrimitiveType(SimpleType.Int);
+        }
+
+        public static PrimitiveType CreateStringType()
+        {
+            return new PrimitiveType(SimpleType.String);
         }
 
         public override T Dispatch<T>(TypeIsaVisitor<T> visitor)

@@ -1,8 +1,9 @@
 ﻿using System.Collections.Generic;
+using Isabelle.Ast;
 
-namespace ProofGeneration.Isa
+namespace Isabelle.Util
 {
-    internal class IsaCommonTerms
+    public static class IsaCommonTerms
     {
         private static readonly TermIdent SomeId = TermIdentFromName("Some");
         private static readonly TermIdent NoneId = TermIdentFromName("None");
@@ -150,7 +151,7 @@ namespace ProofGeneration.Isa
 
         public static TermIdent TermIdentFromDecl(OuterDecl decl)
         {
-            return TermIdentFromName(decl.name);
+            return TermIdentFromName(decl.Name);
         }
     }
 }

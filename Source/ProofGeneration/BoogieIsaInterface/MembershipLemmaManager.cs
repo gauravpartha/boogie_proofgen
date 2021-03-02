@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 
@@ -206,13 +207,13 @@ namespace ProofGeneration.BoogieIsaInterface
             /* for variables we don't have a fine-grained distinction (which would require knowing whether the variable is
              * global or not) --> TODO use subtype to distinguish */
             if (d is Variable && membershipLemmas.TryGetValue(d, out var result))
-                return QualifyAccessName(result.name);
+                return QualifyAccessName(result.Name);
 
             if (d is Function && config.GenerateFunctions)
-                return QualifyAccessName(membershipLemmas[d].name);
+                return QualifyAccessName(membershipLemmas[d].Name);
 
             if (d is Axiom && config.GenerateAxioms)
-                return QualifyAccessName(membershipLemmas[d].name);
+                return QualifyAccessName(membershipLemmas[d].Name);
 
             return parent.MembershipLemma(d);
         }
@@ -220,7 +221,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public string ConstantMembershipLemma(Variable c)
         {
             if (constantMembershipLemmas.TryGetValue(c, out var result))
-                return QualifyAccessName(result.name);
+                return QualifyAccessName(result.Name);
 
             return parent.ConstantMembershipLemma(c);
         }
@@ -233,7 +234,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public string LookupVarTyLemma(Variable v)
         {
             if (lookupVarTyLemmas.TryGetValue(v, out var result))
-                return QualifyAccessName(result.name);
+                return QualifyAccessName(result.Name);
 
             return parent.LookupVarTyLemma(v);
         }
@@ -343,7 +344,7 @@ namespace ProofGeneration.BoogieIsaInterface
                     d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
                     true,
                     false);
-                membershipLemmaLookup = v => membershipLemmas[v].name;
+                membershipLemmaLookup = v => membershipLemmas[v].Name;
             }
             else
             {
@@ -476,12 +477,12 @@ namespace ProofGeneration.BoogieIsaInterface
                         TermBinary.Implies(
                             IsaCommonTerms.Elem(x, IsaCommonTerms.SetOfList(varNames)),
                             new TermBinary(x, new NatConst(bound),
-                                isGlobal ? TermBinary.BinaryOpCode.LE : TermBinary.BinaryOpCode.GE)
+                                isGlobal ? TermBinary.BinaryOpCode.Le : TermBinary.BinaryOpCode.Ge)
                         )
                     ),
                     new Proof(new List<string>
                     {
-                        "using " + boundHelperLemma.name + (isGlobal ? " helper_max" : " helper_min"),
+                        "using " + boundHelperLemma.Name + (isGlobal ? " helper_max" : " helper_min"),
                         "by blast"
                     })
                 );

@@ -1,4 +1,4 @@
-﻿namespace ProofGeneration.IsaML
+﻿namespace Isabelle.ML
 {
     public interface INodeML
     {

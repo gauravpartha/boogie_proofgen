@@ -1,8 +1,9 @@
 ﻿using System.Collections.Generic;
+using Isabelle.Ast;
 
-namespace ProofGeneration.Isa
+namespace Isabelle.Util
 {
-    internal class IsaCommonTypes
+    public static class IsaCommonTypes
     {
         public static TypeIsa GetUnitType()
         {

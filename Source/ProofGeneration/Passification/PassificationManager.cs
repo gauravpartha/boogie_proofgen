@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.Passification
@@ -55,7 +56,7 @@ namespace ProofGeneration.Passification
             passificationProofDecls.AddRange(oldRelationData.VarToLookupLemma.Values);
             if (oldRelationData.VarToLookupLemma.Any())
                 passificationProofDecls.Add(new LemmasDecl(allOldLookupLemmasName,
-                    oldRelationData.VarToLookupLemma.Values.Select(lemma => lemma.name).ToList()));
+                    oldRelationData.VarToLookupLemma.Values.Select(lemma => lemma.Name).ToList()));
 
             var beforePassiveLemmaManager = new PassificationLemmaManager(
                 beforePassificationCfg,
@@ -108,7 +109,7 @@ namespace ProofGeneration.Passification
 
                 passificationProofDecls.AddRange(endToEnd.EndToEndProof(
                     GetCfgLemmaName(beforePassificationCfg.entry, lemmaNamer),
-                    boogieToVcTheoryName + "." + boogieToVcLemma.name,
+                    boogieToVcTheoryName + "." + boogieToVcLemma.Name,
                     vcAssm,
                     beforePassiveProgAccess,
                     passiveProgAccess,

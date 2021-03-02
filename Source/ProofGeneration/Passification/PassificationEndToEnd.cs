@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.PhasesUtil;
 using ProofGeneration.Util;
 
@@ -99,7 +100,7 @@ namespace ProofGeneration.Passification
             var varIds = new List<Tuple<int, Variable>>();
             foreach (var v in liveEntryVars)
                 if (varTranslation.TryTranslateVariableId(v, out var termId, out _))
-                    varIds.Add(Tuple.Create((termId as NatConst).n, v));
+                    varIds.Add(Tuple.Create((termId as NatConst).Val, v));
                 else
                     throw new ProofGenUnexpectedStateException("cannot extract variable id");
 
@@ -200,7 +201,7 @@ namespace ProofGeneration.Passification
                 {
                     ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("rel_well_typed_state_typ_wf", paramsLocalsAssmName,
                         constsGlobalsAssmName))),
-                    "using " + relWellFormed.name + " by auto"
+                    "using " + relWellFormed.Name + " by auto"
                 })
             );
 
@@ -224,7 +225,7 @@ namespace ProofGeneration.Passification
             );
             result.Add(u0SetDecl);
 
-            Term u0Set = IsaCommonTerms.TermIdentFromName(u0SetDecl.name);
+            Term u0Set = IsaCommonTerms.TermIdentFromName(u0SetDecl.Name);
 
             var nstateRelU0 = new LemmaDecl(
                 "U0_ns_rel",
@@ -317,13 +318,13 @@ namespace ProofGeneration.Passification
                     {
                         "apply (rule init_set_non_empty)",
                         ProofUtil.Apply("erule " + nonEmptyTypesAssmName),
-                        ProofUtil.Apply("erule " + variableClosedTypes.name),
-                        "using " + relWellFormed.name + " apply fastforce",
-                        ProofUtil.Apply(ProofUtil.Rule(relWellTypedLemma.name)),
-                        ProofUtil.Apply(ProofUtil.Rule(injectiveLemma.name)),
+                        ProofUtil.Apply("erule " + variableClosedTypes.Name),
+                        "using " + relWellFormed.Name + " apply fastforce",
+                        ProofUtil.Apply(ProofUtil.Rule(relWellTypedLemma.Name)),
+                        ProofUtil.Apply(ProofUtil.Rule(injectiveLemma.Name)),
                         "apply simp",
                         ProofUtil.Apply(ProofUtil.Rule(constsGlobalsAssmName)),
-                        "using " + relWellFormed.name + " apply fastforce",
+                        "using " + relWellFormed.Name + " apply fastforce",
                         "using " + programAccessor.GlobalsLocalsDisjointLemma() + " apply auto[1]",
                         "using " + passiveProgramAccessor.GlobalsLocalsDisjointLemma() + " apply auto[1]",
                         "done"
@@ -390,14 +391,14 @@ namespace ProofGeneration.Passification
                         ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF(entryCfgLemma, redAssmName))),
                         "unfolding passive_lemma_assms_2_def",
                         "apply (intro conjI)?",
-                        ProofUtil.Apply(ProofUtil.Rule(nstateRelU0.name)),
-                        ProofUtil.Apply(ProofUtil.Rule(nstateOldRelU0.name)),
-                        ProofUtil.Apply(ProofUtil.Rule(relWellTypedLemma.name)),
+                        ProofUtil.Apply(ProofUtil.Rule(nstateRelU0.Name)),
+                        ProofUtil.Apply(ProofUtil.Rule(nstateOldRelU0.Name)),
+                        ProofUtil.Apply(ProofUtil.Rule(relWellTypedLemma.Name)),
                         ProofUtil.Apply(ProofUtil.Rule("init_state_dependent")),
-                        "using " + ProofUtil.OF("helper_init_disj", maxRelRangeLemma.name,
+                        "using " + ProofUtil.OF("helper_init_disj", maxRelRangeLemma.Name,
                             programAccessor.GlobalsAtMostMax()),
                         "apply simp",
-                        ProofUtil.Apply(ProofUtil.Rule(u0NonEmpty.name)),
+                        ProofUtil.Apply(ProofUtil.Rule(u0NonEmpty.Name)),
                         ProofUtil.By(ProofUtil.SimpAll(stateRelDefName + "_def", stateRelListDefName + "_def")) + "?",
                         "with A1 obtain u mp' where uElem: " + Inner(IsaCommonTerms.Elem(u, u0Set)) + " and " +
                         "AredPassive:" +

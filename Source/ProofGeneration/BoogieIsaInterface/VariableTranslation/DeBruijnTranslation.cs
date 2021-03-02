@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using ProofGeneration.Isa;
+using Isabelle.Ast;
 
 namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 {

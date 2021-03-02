@@ -1,5 +1,5 @@
-﻿using Microsoft.Boogie;
-using ProofGeneration.Isa;
+﻿using Isabelle.Ast;
+using Microsoft.Boogie;
 
 namespace ProofGeneration.BoogieIsaInterface
 {

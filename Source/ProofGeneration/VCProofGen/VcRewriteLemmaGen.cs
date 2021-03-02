@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using Isabelle.Ast;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
-using ProofGeneration.Isa;
 
 namespace ProofGeneration.VCProofGen
 {

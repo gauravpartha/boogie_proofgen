@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag
@@ -203,7 +204,7 @@ namespace ProofGeneration.CfgToDag
             {
                 var endToEndManager = new CfgToDagEndToEnd();
                 var endToEndDecls = endToEndManager.EndToEndProof(
-                    cfgToDagLemmasLocale.name + "." + entryLemma.name,
+                    cfgToDagLemmasLocale.Name + "." + entryLemma.Name,
                     phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.Passification, true),
                     vcAssm,
                     beforeDagProgAccess,

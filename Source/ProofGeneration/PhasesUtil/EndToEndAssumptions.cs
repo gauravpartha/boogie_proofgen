@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
+using Isabelle.Ast;
+using Isabelle.Util;
 using ProofGeneration.BoogieIsaInterface;
-using ProofGeneration.Isa;
 
 namespace ProofGeneration.PhasesUtil
 {

@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.ML;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using Microsoft.Boogie.VCExprAST;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 

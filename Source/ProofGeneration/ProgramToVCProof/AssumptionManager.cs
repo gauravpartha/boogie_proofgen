@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using Isabelle.Ast;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.PhasesUtil;
 
 namespace ProofGeneration.ProgramToVCProof

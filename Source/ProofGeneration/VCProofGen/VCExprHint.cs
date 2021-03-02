@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using ProofGeneration.Isa;
-using ProofGeneration.IsaML;
+using Isabelle.Ast;
+using Isabelle.ML;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -22,7 +22,7 @@ namespace ProofGeneration.VCProofGen
                 return "NONE";
             }
 
-            var list = LemmaToApplyBefore.Select(lem => "@{thm " + lem.name + "}");
+            var list = LemmaToApplyBefore.Select(lem => "@{thm " + lem.Name + "}");
             var listString = "[" + string.Join(",", list) + "]";
             return "SOME (RewriteVC " + listString + ")";
         }

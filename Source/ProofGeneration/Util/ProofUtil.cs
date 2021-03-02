@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using ProofGeneration.IsaPrettyPrint;
+using Isabelle.IsaPrettyPrint;
 
 namespace ProofGeneration.Util
 {
@@ -82,11 +82,6 @@ namespace ProofGeneration.Util
         public static string MLTactic(string tactic, int subgoal)
         {
             return "(tactic \\<open> " + tactic + " " + subgoal + "\\<close>)";
-        }
-
-        public static string TryRepeatConjI()
-        {
-            return "tryRepeatConjI";
         }
     }
 }

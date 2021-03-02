@@ -1,6 +1,7 @@
-﻿using Microsoft.Boogie;
+﻿using Isabelle.Ast;
+using Isabelle.Util;
+using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
-using ProofGeneration.Isa;
 
 namespace ProofGeneration.VCProofGen
 {

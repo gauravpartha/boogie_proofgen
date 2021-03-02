@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
+using Isabelle.Ast;
 using Microsoft.Boogie;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.VCProofGen

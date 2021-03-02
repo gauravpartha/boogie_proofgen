@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using ProofGeneration.IsaML;
 
-namespace ProofGeneration.Util
+namespace Isabelle.ML
 {
     public static class MLUtil
     {
@@ -12,7 +11,6 @@ namespace ProofGeneration.Util
         {
             return "val " + varName + " = " + value;
         }
-
 
         public static string MLList<T>(IEnumerable<T> e) where T : INodeML
         {

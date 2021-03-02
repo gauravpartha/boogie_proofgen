@@ -1,11 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.ML;
 using Microsoft.Boogie;
 using Microsoft.Boogie.ProofGen;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 
@@ -126,9 +127,9 @@ namespace ProofGeneration.ProgramToVCProof
                     vcProofData.VcBoogieInfo,
                     afterPassificationCfg,
                     finalCfg,
-                    afterPassificationLocale.name + "." + cfgProgramLemmas[afterPassificationCfg.entry].name,
-                    axiomLocale.name,
-                    ax => axiomLocale.name + "." + axiomToLemma[ax].name,
+                    afterPassificationLocale.Name + "." + cfgProgramLemmas[afterPassificationCfg.entry].Name,
+                    axiomLocale.Name,
+                    ax => axiomLocale.Name + "." + axiomToLemma[ax].Name,
                     varFactory,
                     vcProofData.VcTranslator,
                     eraserFactory,

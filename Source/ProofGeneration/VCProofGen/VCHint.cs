@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics.Contracts;
-using ProofGeneration.IsaML;
+using Isabelle.ML;
 
 namespace ProofGeneration.VCProofGen
 {

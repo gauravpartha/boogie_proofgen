@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 
@@ -152,7 +153,7 @@ namespace ProofGeneration.ProgramToVCProof
                 }
             }
 
-            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+            Term conclusion = new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.Neq);
 
             var nodeLemma = isaBlockInfo.BlockCmdsMembershipLemma(block);
             var outEdgesLemma = isaBlockInfo.OutEdgesMembershipLemma(block);
@@ -160,7 +161,7 @@ namespace ProofGeneration.ProgramToVCProof
 
 
             var eruleLocalBlock =
-                "erule " + (hasVcAssm ? ProofUtil.OF(BlockLemma.name, "_", "assms(2)") : BlockLemma.name);
+                "erule " + (hasVcAssm ? ProofUtil.OF(BlockLemma.Name, "_", "assms(2)") : BlockLemma.Name);
 
             if (isContainedInFinalCfg && LemmaHelper.FinalStateIsMagic(block))
             {
@@ -198,9 +199,9 @@ namespace ProofGeneration.ProgramToVCProof
                 proofMethods.Add("apply (rule " + ProofUtil.OF("red_cfg_multi_backwards_step_no_succ", "assms(1)",
                     nodeLemma, outEdgesLemma) + ")");
                 if (isContainedInFinalCfg)
-                    proofMethods.Add("using " + ProofUtil.OF(BlockLemma.name, "_", "assms(2)") + " by blast");
+                    proofMethods.Add("using " + ProofUtil.OF(BlockLemma.Name, "_", "assms(2)") + " by blast");
                 else
-                    proofMethods.Add("using " + BlockLemma.name + " by blast");
+                    proofMethods.Add("using " + BlockLemma.Name + " by blast");
             }
 
             return new LemmaDecl(cfgLemmaName(block), ContextElem.CreateWithAssumptions(assumption), conclusion,
@@ -267,17 +268,17 @@ namespace ProofGeneration.ProgramToVCProof
             bool useMagicFinalState = false)
         {
             if (useMagicFinalState)
-                return new TermBinary(finalState, IsaBoogieTerm.Magic(), TermBinary.BinaryOpCode.EQ);
+                return new TermBinary(finalState, IsaBoogieTerm.Magic(), TermBinary.BinaryOpCode.Eq);
 
             Term nonFailureConclusion =
-                new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.NEQ);
+                new TermBinary(finalState, IsaBoogieTerm.Failure(), TermBinary.BinaryOpCode.Neq);
 
             var normalFinalState = IsaCommonTerms.TermIdentFromName("n_s'");
 
             Term ifNormalConclusionLhs = new TermBinary(finalState, IsaBoogieTerm.Normal(normalFinalState),
-                TermBinary.BinaryOpCode.EQ);
+                TermBinary.BinaryOpCode.Eq);
 
-            Term ifNormalConclusionRhs1 = new TermBinary(normalFinalState, normalInitState, TermBinary.BinaryOpCode.EQ);
+            Term ifNormalConclusionRhs1 = new TermBinary(normalFinalState, normalInitState, TermBinary.BinaryOpCode.Eq);
 
             var ifNormalConclusionRhs =
                 !b_successors.Any()
@@ -285,19 +286,19 @@ namespace ProofGeneration.ProgramToVCProof
                     : new TermBinary(
                         ifNormalConclusionRhs1,
                         LemmaHelper.ConjunctionOfSuccessorBlocks(b_successors, declToVCMapping, vcinst),
-                        TermBinary.BinaryOpCode.AND);
+                        TermBinary.BinaryOpCode.And);
 
             Term ifNormalConclusion =
                 new TermQuantifier(
                     TermQuantifier.QuantifierKind.ALL,
-                    new List<Identifier> {normalFinalState.id},
+                    new List<Identifier> {normalFinalState.Id},
                     new TermBinary(
                         ifNormalConclusionLhs,
                         ifNormalConclusionRhs,
-                        TermBinary.BinaryOpCode.IMPLIES)
+                        TermBinary.BinaryOpCode.Implies)
                 );
 
-            return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.AND);
+            return new TermBinary(nonFailureConclusion, ifNormalConclusion, TermBinary.BinaryOpCode.And);
         }
     }
 }

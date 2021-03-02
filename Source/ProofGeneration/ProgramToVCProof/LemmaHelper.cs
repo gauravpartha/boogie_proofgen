@@ -1,10 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
 
@@ -29,7 +30,7 @@ namespace ProofGeneration.ProgramToVCProof
         {
             return
                 successorBlocks.Select(b_suc => vcinst.GetVCObjInstantiation(b_suc, declToVCMapping))
-                    .Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.AND));
+                    .Aggregate((vc1, vc2) => new TermBinary(vc1, vc2, TermBinary.BinaryOpCode.And));
         }
 
         public static Term BinaryOpAggregate(IEnumerable<Term> term, TermBinary.BinaryOpCode bop)
@@ -81,7 +82,7 @@ namespace ProofGeneration.ProgramToVCProof
                 var left = IsaBoogieTerm.LookupVar(varContext, normalState, varId);
                 var right =
                     IsaCommonTerms.SomeOption(pureToBoogieValConverter.ConvertToBoogieVal(v.TypedIdent.Type, vcVar));
-                return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
+                return new TermBinary(left, right, TermBinary.BinaryOpCode.Eq);
             }
 
             throw new ProofGenUnexpectedStateException(typeof(LemmaHelper), "Can't retrieve variable id");
@@ -90,14 +91,14 @@ namespace ProofGeneration.ProgramToVCProof
         public static Term VariableAssumptionExplicit(Variable v, Term state, Term rhs, IsaUniqueNamer uniqueNamer)
         {
             Term left = new TermApp(state, new StringConst(v.Name));
-            return new TermBinary(left, rhs, TermBinary.BinaryOpCode.EQ);
+            return new TermBinary(left, rhs, TermBinary.BinaryOpCode.Eq);
         }
 
         public static Term VarContextTypeAssumption(Variable v, Term varContext, TypeIsaVisitor typeIsaVisitor)
         {
             Term left = new TermApp(varContext, new StringConst(v.Name));
             var right = IsaCommonTerms.SomeOption(typeIsaVisitor.Translate(v.TypedIdent.Type));
-            return new TermBinary(left, right, TermBinary.BinaryOpCode.EQ);
+            return new TermBinary(left, right, TermBinary.BinaryOpCode.Eq);
         }
 
         public static Term FunctionCtxtWfAssm(Function f,
@@ -108,7 +109,7 @@ namespace ProofGeneration.ProgramToVCProof
             Term ctxWfLeft = new TermApp(boogieContext.funContext, new List<Term> {new StringConst(f.Name)});
             var ctxWfRight = IsaCommonTerms.SomeOption(funInterpMapping[f]);
 
-            return new TermBinary(ctxWfLeft, ctxWfRight, TermBinary.BinaryOpCode.EQ);
+            return new TermBinary(ctxWfLeft, ctxWfRight, TermBinary.BinaryOpCode.Eq);
         }
 
         public static Term FunctionVcCorresAssm(

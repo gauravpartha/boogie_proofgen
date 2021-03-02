@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.BaseTypes;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 

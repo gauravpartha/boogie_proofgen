@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using ProofGeneration.Isa;
+using Isabelle.Ast;
+using Isabelle.Util;
 
 namespace ProofGeneration.BoogieIsaInterface
 {

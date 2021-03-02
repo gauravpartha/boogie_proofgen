@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
+using Isabelle.Ast;
 using Microsoft.Boogie;
-using ProofGeneration.Isa;
 
 namespace ProofGeneration.BoogieIsaInterface
 {
@@ -47,7 +47,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         private string QualifiedName(OuterDecl decl)
         {
-            return theoryName + "." + decl.name;
+            return theoryName + "." + decl.Name;
         }
     }
 }

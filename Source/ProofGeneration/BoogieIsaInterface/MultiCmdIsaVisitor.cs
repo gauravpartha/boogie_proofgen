@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Isabelle.Ast;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 
 namespace ProofGeneration.BoogieIsaInterface
 {

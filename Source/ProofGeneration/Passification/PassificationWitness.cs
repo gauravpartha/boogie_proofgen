@@ -1,4 +1,4 @@
-﻿using ProofGeneration.Isa;
+﻿using Isabelle.Ast;
 
 namespace ProofGeneration.Passification
 {

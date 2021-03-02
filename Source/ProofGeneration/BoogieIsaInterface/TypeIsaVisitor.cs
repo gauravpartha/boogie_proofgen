@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.Ast;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
-using ProofGeneration.Isa;
 using Type = Microsoft.Boogie.Type;
 
 namespace ProofGeneration

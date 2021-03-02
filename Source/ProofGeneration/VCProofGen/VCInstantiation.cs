@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.Ast;
+using Isabelle.Util;
 using Microsoft.Boogie;
-using ProofGeneration.Isa;
 
 namespace ProofGeneration.VCProofGen
 {
@@ -87,7 +88,7 @@ namespace ProofGeneration.VCProofGen
 
             var prefix = qualified && localeName.Count() > 0 ? localeName + "." : "";
 
-            return prefix + objToDef[block].name;
+            return prefix + objToDef[block].Name;
         }
     }
 }

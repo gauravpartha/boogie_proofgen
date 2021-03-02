@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using Isabelle.Ast;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
 using Microsoft.Boogie.ProofGen;
@@ -11,7 +12,6 @@ using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.CfgToDag;
-using ProofGeneration.Isa;
 using ProofGeneration.Passification;
 using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
@@ -454,7 +454,7 @@ namespace ProofGeneration
 
             var passificationProofTheory = PassificationManager.PassificationProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
-                theoryPassive.theoryName,
+                theoryPassive.TheoryName,
                 _proofGenConfig.GeneratePassifE2E,
                 endToEndLemma,
                 vcAssm,
