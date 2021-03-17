@@ -65,9 +65,35 @@ namespace ProofGeneration
         private static readonly ProofGenConfig _proofGenConfig =
             new ProofGenConfig(true, true, true);
 
+        private static IProgramAccessor globalDataProgAccess;
+
         public static void Program(Program p)
         {
-            boogieGlobalData = new BoogieGlobalData(p.Functions, p.Axioms, p.GlobalVariables, p.Constants);
+            if (boogieGlobalData == null)
+            {
+                boogieGlobalData = new BoogieGlobalData(p.Functions, p.Axioms, p.GlobalVariables, p.Constants);
+                
+                var methodData = BoogieMethodData.CreateOnlyGlobal(boogieGlobalData);
+                var fixedVarTranslation = new DeBruijnFixedVarTranslation(methodData);
+                var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(methodData);
+                var factory =
+                    new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
+                var globalDataTheoryName = "global_data";
+                var globalDataConfig = new IsaProgramGeneratorConfig(null, true, true, true, false, false);
+                globalDataProgAccess = new IsaProgramGenerator().GetIsaProgram(
+                    globalDataTheoryName,
+                    "proc",
+                    methodData, globalDataConfig, factory, 
+                    null,
+                    out var declsGlobalData,
+                    true
+                    );
+                
+                var globalDataTheory = new Theory(globalDataTheoryName,
+                    new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util"},
+                    declsGlobalData);
+                ProofGenerationOutput.StoreTheoriesTopLevel(new List<Theory> { globalDataTheory });
+            }
         }
 
         public static void BeforeCFGToDAG(Implementation impl)
@@ -336,18 +362,16 @@ namespace ProofGeneration
             var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
             var varTranslationFactory2 =
                 new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
-
+            
             #region before cfg to dag program
-
             var beforeCfgToDagTheoryName = afterPassificationImpl.Name + "_before_cfg_to_dag_prog";
-            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(null, true, true, true, true, true);
+            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, true);
             var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
                 afterPassificationImpl.Name,
                 beforePassiveData, beforeCfgToDagConfig, varTranslationFactory2,
                 beforeDagCfg,
                 out var programDeclsBeforeCfgToDag);
-
             #endregion
 
             #region before passive program
@@ -474,7 +498,7 @@ namespace ProofGeneration
             #region cfg to dag
 
             var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
-                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util"},
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util", "\"../"+globalDataProgAccess.TheoryName()+"\""},
                 programDeclsBeforeCfgToDag);
             theories.Add(beforeCfgToDagProgTheory);
 
@@ -498,10 +522,9 @@ namespace ProofGeneration
                 beforePassiveProgAccess,
                 varTranslationFactory2);
             theories.Add(cfgToDagProofTheory);
-
             #endregion
-
-            ProofGenerationOutput.StoreProofs("proofs_" + afterPassificationImpl.Proc.Name, theories);
+            
+            ProofGenerationOutput.StoreTheoriesInNewDirWithSession("proofs_" + afterPassificationImpl.Proc.Name, theories);
         }
     }
 }

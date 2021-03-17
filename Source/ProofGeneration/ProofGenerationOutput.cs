@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,7 +8,7 @@ using Isabelle.IsaPrettyPrint;
 
 namespace ProofGeneration
 {
-    public class ProofGenerationOutput
+    public static class ProofGenerationOutput
     {
         private static string mainDir;
 
@@ -18,14 +19,31 @@ namespace ProofGeneration
             mainDir = FreeDirName(Path.GetFileName(fileName) + "_proofs");
             Directory.CreateDirectory(mainDir);
         }
+        
+        public static void StoreTheoriesTopLevel(IEnumerable<Theory> theories)
+        {
+            if (mainDir == null)
+                throw new ProofGenUnexpectedStateException("main directory not yet set");
 
-        public static void StoreProofs(string name, IEnumerable<Theory> theories)
+            foreach (var theory in theories) StoreTheory(mainDir, theory);
+        }
+        
+        /// <summary>
+        /// Stores the provided theories into a new subdirectory with prefix <paramref name="preferredDirName"/>. The
+        /// created subdirectory is located in the main proof generation directory used for the current run.
+        /// Existing directories or files are not rewritten (i.e., a name that does not clash with any of the existing
+        /// directories/files is picked)
+        /// </summary>
+        /// <param name="preferredDirName">Prefix of new directory.</param>
+        /// <param name="theories">Theories to be stored.</param>
+        /// <exception cref="ProofGenUnexpectedStateException">Thrown if main proof generation directory is not set.</exception>
+        public static void StoreTheoriesInNewDirWithSession(string preferredDirName, IEnumerable<Theory> theories)
         {
             if (mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
             //create new directory
-            var dirPath = Path.Join(mainDir, FreeDirName(name + "_proofs"));
+            var dirPath = Path.Join(mainDir, FreeDirName(preferredDirName + "_proofs"));
             Directory.CreateDirectory(dirPath);
 
             foreach (var theory in theories) StoreTheory(dirPath, theory);
