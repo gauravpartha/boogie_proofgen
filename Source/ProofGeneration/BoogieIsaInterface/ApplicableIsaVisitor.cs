@@ -49,6 +49,14 @@ namespace ProofGeneration
 
             return IsaBoogieTerm.FunCall(functionCall.FunctionName, typeInstIsa, _args);
         }
+        
+        public Term Visit(TypeCoercion typeCoercion)
+        {
+            if(_args.Count != 1) throw new ExprArgException();
+
+            //type coercions are only relevant for the type inference
+            return _args[0];
+        }
 
         public Term Visit(MapSelect mapSelect)
         {
@@ -59,12 +67,7 @@ namespace ProofGeneration
         {
             throw new NotImplementedException();
         }
-
-        public Term Visit(TypeCoercion typeCoercion)
-        {
-            throw new NotImplementedException();
-        }
-
+        
         public Term Visit(ArithmeticCoercion arithCoercion)
         {
             throw new NotImplementedException();
