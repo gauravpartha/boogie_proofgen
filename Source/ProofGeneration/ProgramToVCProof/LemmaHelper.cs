@@ -141,7 +141,7 @@ namespace ProofGeneration.ProgramToVCProof
             var varSubstitution = new SimpleVarSubstitution<TypeVariable>(substitution);
             var typeIsaVisitor = new TypeIsaVisitor(varSubstitution);
 
-            IEnumerable<Term> typeArgConstraints =
+            IEnumerable<Term> valueArgConstraints =
                 f.InParams
                     .Select((v, idx) =>
                         !TypeUtil.IsPrimitive(v.TypedIdent.Type)
@@ -197,22 +197,16 @@ namespace ProofGeneration.ProgramToVCProof
             else
                 conclusion = equation;
 
-            if (typeArgConstraints.Any())
+            if (valueArgConstraints.Any())
             {
-                var aggregatedAssms = typeArgConstraints.Aggregate((t1, t2) => TermBinary.And(t2, t1));
+                conclusion = TermBinary.MetaImplies(valueArgConstraints.Aggregate((t1, t2) => TermBinary.And(t2, t1)), conclusion);
+            }
 
-                if (boogieFunTyArgs.Any())
-                {
-                    var closednessAssms = boogieFunTyArgs.Select(t1 => IsaBoogieTerm.IsClosedType(t1))
-                        .Aggregate((t1, t2) => TermBinary.And(t2, t1));
-                    return new TermQuantifier(TermQuantifier.QuantifierKind.META_ALL,
-                        boundParamVars.Union(boundTypeVars).ToList(),
-                        TermBinary.MetaImplies(closednessAssms, TermBinary.MetaImplies(aggregatedAssms, conclusion)));
-                }
-
-                return new TermQuantifier(TermQuantifier.QuantifierKind.META_ALL,
-                    boundParamVars.Union(boundTypeVars).ToList(),
-                    TermBinary.MetaImplies(aggregatedAssms, conclusion));
+            if (boogieFunTyArgs.Any())
+            {
+                var closednessAssms = boogieFunTyArgs.Select(t1 => IsaBoogieTerm.IsClosedType(t1))
+                    .Aggregate((t1, t2) => TermBinary.And(t2, t1));
+                conclusion = TermBinary.MetaImplies(closednessAssms, conclusion);
             }
 
             if (boundParamVars.Any())

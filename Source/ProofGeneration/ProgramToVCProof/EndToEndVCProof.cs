@@ -478,7 +478,7 @@ namespace ProofGeneration.ProgramToVCProof
 
             proofMethods.Add((proofMethodsExtractors.Count > 1 ? "ultimately " : "from this ") +
                              " show ?thesis " +
-                             (typeOfValAssms.Any()
+                             (typeOfValAssms.Any() || !String.IsNullOrEmpty(explicitTypeVarAssms)
                                  ? "using " + typeOfValAssms.SpaceAggregate() + explicitTypeVarAssms
                                  : "")
             );
