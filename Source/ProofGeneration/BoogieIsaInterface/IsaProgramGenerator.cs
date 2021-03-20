@@ -154,10 +154,15 @@ namespace ProofGeneration
                     decls.Add(postconditions);
                 }
 
-                decls.Add(GetVariableDeclarationsIsa("params", procName, methodData.InParams));
+                if(config.generateParamsAndLocals) {
+                    decls.Add(GetVariableDeclarationsIsa("params", procName, methodData.InParams));
+                    decls.Add(GetVariableDeclarationsIsa("locals", procName, methodData.Locals));
+                }
+                
+                /* membership lemmas might still be added even if the parameter and local variable definitions are not generated
+                 * at this point (since the variable context may still be different, which requires other lookup lemmas)
+                 */
                 membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams, VarKind.ParamOrLocal);
-
-                decls.Add(GetVariableDeclarationsIsa("locals", procName, methodData.Locals));
                 membershipLemmaManager.AddVariableMembershipLemmas(methodData.Locals, VarKind.ParamOrLocal);
             }
 
@@ -173,10 +178,12 @@ namespace ProofGeneration
                 membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions);
             }
 
-            decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
+            if (config.generateGlobalsAndConstants)
+            {
+                decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
+                decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
+            }
             membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, VarKind.Global);
-
-            decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
             membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, VarKind.Constant);
 
             decls.AddRange(membershipLemmaManager.OuterDecls());
