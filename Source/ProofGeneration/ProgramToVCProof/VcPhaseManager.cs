@@ -90,7 +90,7 @@ namespace ProofGeneration.ProgramToVCProof
             var axId = 0;
             var axiomToLemma = new Dictionary<Axiom, OuterDecl>();
             var vcRewriteLemmaGen =
-                new VcRewriteLemmaGen(eraserFactory, new VCExprToIsaTranslator(new IsaUniqueNamer()));
+                new VcRewriteLemmaGen(eraserFactory, VCExprToIsaTranslator.CreateNameBasedTranslator(new IsaUniqueNamer()));
 
             var vcAxiomLemmaManager = new VcAxiomLemmaManager(
                 vcProofData.VcBoogieInfo.VcInstAxiom,
