@@ -79,7 +79,7 @@ namespace ProofGeneration
                 var factory =
                     new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
                 var globalDataTheoryName = "global_data";
-                var globalDataConfig = new IsaProgramGeneratorConfig(null, true, true, true, false, false);
+                var globalDataConfig = new IsaProgramGeneratorConfig(null, true, true, true, false, false, false);
                 globalDataProgAccess = new IsaProgramGenerator().GetIsaProgram(
                     globalDataTheoryName,
                     "proc",
@@ -365,7 +365,7 @@ namespace ProofGeneration
             
             #region before cfg to dag program
             var beforeCfgToDagTheoryName = afterPassificationImpl.Name + "_before_cfg_to_dag_prog";
-            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, true);
+            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, true, true);
             var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
                 afterPassificationImpl.Name,
@@ -378,7 +378,7 @@ namespace ProofGeneration
 
             var beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
             var beforePassiveConfig =
-                new IsaProgramGeneratorConfig(beforeCfgToDagProgAccess, false, false, false, false, false);
+                new IsaProgramGeneratorConfig(beforeCfgToDagProgAccess, false, false, false, false, false, false);
             var beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
                 afterPassificationImpl.Name,
                 beforePassiveData, beforePassiveConfig, varTranslationFactory2,
@@ -418,7 +418,7 @@ namespace ProofGeneration
 
             var finalProgTheoryName = afterPassificationImpl.Name + "_passive_prog";
             var passiveProgConfig =
-                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, false);
+                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, false, false);
             var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
                 afterPassificationImpl.Name,
                 finalProgData, passiveProgConfig, varTranslationFactory,

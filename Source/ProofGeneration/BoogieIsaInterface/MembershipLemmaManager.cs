@@ -88,7 +88,7 @@ namespace ProofGeneration.BoogieIsaInterface
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(factory);
             
             isaProgramRepr = new IsaProgramRepr(globalProgRepr, null, null, null, null, null);
-            config = new IsaProgramGeneratorConfig(null, true, true, true, false, false);
+            config = new IsaProgramGeneratorConfig(null, true, true, true, false, false, false);
 
             consts = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.constantsDeclDef);
             globals = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.globalsDeclDef);
@@ -146,7 +146,7 @@ namespace ProofGeneration.BoogieIsaInterface
                 IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(consts),
                     IsaCommonTerms.TermIdentFromName(globals));
             AddDisjointnessLemmas(GlobalsMaxLocalsMin.Item1, GlobalsMaxLocalsMin.Item2);
-            if (config.generateFunctions) AddTypingHelperLemmas();
+            AddTypingHelperLemmas();
         }
 
         public string TheoryName()
@@ -301,7 +301,12 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public string VarContextWfTyLemma()
         {
-            return QualifyAccessName(varContextWfName);
+            if(config.generateVarContextWfLemma)
+                return QualifyAccessName(varContextWfName);
+            else if (CreatesNewVarContext())
+                throw new ProofGenUnexpectedStateException("do not have var context well-formedness lemma");
+            else
+                return parent.VarContextWfTyLemma();
         }
 
         public string FuncsWfTyLemma()
@@ -589,20 +594,15 @@ namespace ProofGeneration.BoogieIsaInterface
             Term wfTy0 = new TermApp(IsaCommonTerms.TermIdentFromName("wf_ty"), new NatConst(0));
 
 
-            if (config.generateGlobalsAndConstants)
-            {
-                helperLemmas.Add(WfLemma(constsWfName, isaProgramRepr.GlobalProgramRepr.constantsDeclDef, wfTy0));
-                helperLemmas.Add(WfLemma(globalsWfName, isaProgramRepr.GlobalProgramRepr.globalsDeclDef, wfTy0));
-            }
 
-            if (config.generateParamsAndLocals)
+            if (config.generateVarContextWfLemma)
             {
-                helperLemmas.Add(WfLemma(paramsWfName, isaProgramRepr.paramsDeclDef, wfTy0));
-                helperLemmas.Add(WfLemma(localsWfName, isaProgramRepr.localVarsDeclDef, wfTy0));
-            }
-
-            if (CreatesNewVarContext())
-            {
+                //TODO: could share wf lemmas with ancestors in certain cases
+                helperLemmas.Add(WfLemma(constsWfName, ConstsDecl(), wfTy0));
+                helperLemmas.Add(WfLemma(globalsWfName, GlobalsDecl(), wfTy0));
+                helperLemmas.Add(WfLemma(paramsWfName, ParamsDecl(), wfTy0));
+                helperLemmas.Add(WfLemma(localsWfName, LocalsDecl(), wfTy0));
+                
                 var xId = new SimpleIdentifier("x");
                 var tauId = new SimpleIdentifier("\\<tau>");
 

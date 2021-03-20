@@ -19,6 +19,7 @@ namespace ProofGeneration
         public readonly bool generateGlobalsAndConstants;
         public readonly bool generateParamsAndLocals;
         public readonly bool generateSpecs;
+        public readonly bool generateVarContextWfLemma;
         public readonly IProgramAccessor parentAccessor;
 
         public IsaProgramGeneratorConfig(
@@ -27,7 +28,8 @@ namespace ProofGeneration
             bool generateAxioms,
             bool generateGlobalsAndConstants,
             bool generateParamsAndLocals,
-            bool generateSpecs
+            bool generateSpecs,
+            bool generateVarContextWfLemma
         )
         {
             parentAccessor = parent;
@@ -36,6 +38,7 @@ namespace ProofGeneration
             this.generateSpecs = generateSpecs;
             this.generateGlobalsAndConstants = generateGlobalsAndConstants;
             this.generateParamsAndLocals = generateParamsAndLocals;
+            this.generateVarContextWfLemma = generateVarContextWfLemma;
         }
     }
 
