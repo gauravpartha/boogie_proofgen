@@ -331,15 +331,16 @@ namespace ProofGeneration
             var vdecls = new List<Term>();
 
             foreach (var v in variables)
+            {
                 if (varTranslation.VarTranslation.TryTranslateVariableId(v, out var resId, out _))
                 {
-                    var vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
-                    vdecls.Add(new TermTuple(new List<Term> {resId, vType}));
+                    vdecls.Add(IsaBoogieTerm.VarDecl(v, resId, typeIsaVisitor, cmdIsaVisitor.TranslateSingle));
                 }
                 else
                 {
                     throw new ProofGenUnexpectedStateException(GetType(), "Cannot translate variable " + v.Name);
                 }
+            }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(vdecls));
             return new DefDecl(VariableDeclarationsName(varKind, methodName), IsaBoogieType.VariableDeclsType,

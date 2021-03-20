@@ -509,13 +509,31 @@ namespace ProofGeneration
             return new TermTuple(new List<Term> {numTypeParams, argTypes, retType});
         }
 
-        public static Term VarDecl(Variable v, TypeIsaVisitor typeIsaVisitor, bool includeName = true)
+        public static Term VarDeclWithoutName(Variable v, TypeIsaVisitor typeIsaVisitor, Func<Absy, Term> boogieToIsa)
         {
-            Term vName = new StringConst(v.Name);
+            return VarDecl(v, null, typeIsaVisitor, boogieToIsa);
+        }
+
+        /// <summary>
+        /// Computes the variable declaration.
+        /// </summary>
+        /// <param name="v">input variable</param>
+        /// <param name="id">id to be used for variable. If it is null, then the id will not be included in the result (in which case
+        /// can instead invoke <see cref="VarDeclWithoutName"/>.</param>
+        /// <param name="typeIsaVisitor">type isabelle visitor</param>
+        /// <param name="boogieToIsa">boogie to isabelle translator</param>
+        /// <returns>Variable declaration representation of <paramref name="v"/>.
+        ///          The identifier <paramref name="id"/> is excluded if it is null.</returns>
+        public static Term VarDecl(Variable v, Term id, TypeIsaVisitor typeIsaVisitor, Func<Absy, Term> boogieToIsa)
+        {
             var vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
-            if (includeName)
-                return new TermTuple(new List<Term> {vName, vType});
-            return vType;
+            var vWhereClause = v.TypedIdent.WhereExpr != null
+                ? IsaCommonTerms.SomeOption(boogieToIsa(v.TypedIdent.WhereExpr))
+                : IsaCommonTerms.NoneOption();
+            if (id != null)
+                return new TermTuple(new List<Term> {id, vType, vWhereClause});
+            
+            return new TermTuple(new List<Term> {vType, vWhereClause});
         }
 
         public static Term ConvertValToBool(Term val)

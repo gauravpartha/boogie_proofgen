@@ -370,7 +370,7 @@ namespace ProofGeneration.BoogieIsaInterface
                         IsaCommonTerms.TermIdentFromName(consts),
                         new[] {consts + "_def"},
                         idOfVar,
-                        d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
+                        d => IsaBoogieTerm.VarDeclWithoutName((Variable) d, typeIsaVisitor, basicCmdIsaVisitor.Translate),
                         true);
 
                 string[] defs;
@@ -385,7 +385,7 @@ namespace ProofGeneration.BoogieIsaInterface
                         : paramsAndLocalsList,
                     defs,
                     idOfVar,
-                    d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
+                    d => IsaBoogieTerm.VarDeclWithoutName((Variable) d, typeIsaVisitor, basicCmdIsaVisitor.Translate),
                     false);
                 membershipLemmaLookup = v => membershipLemmas[v].Name;
             }
@@ -399,7 +399,7 @@ namespace ProofGeneration.BoogieIsaInterface
                  //must come after adding membership lemmas (lemmas are looked up)
                  AddLookupVarTyLemmas(variables,
                      idOfVar,
-                     d => IsaBoogieTerm.VarDecl((Variable) d, typeIsaVisitor, false),
+                     d => IsaBoogieTerm.VarDeclWithoutName((Variable) d, typeIsaVisitor, basicCmdIsaVisitor.Translate),
                      membershipLemmaLookup
                  );
             }
