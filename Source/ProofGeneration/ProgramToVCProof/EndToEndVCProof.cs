@@ -691,15 +691,6 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine("by (rule " + ProofUtil.OF(
                         "finterp_member", finterpAssmName, programAccessor.MembershipLemma(f)) + ")"
                 );
-
-                /*
-                sb.Append("from " + finterpAssmName + " have " + WfName(f) + ":");
-                sb.AppendInner(IsaBoogieTerm.FunInterpSingleWf(f, boogieContext.absValTyMap, IsaCommonTerms.TermIdentFromName(FunAbbrev(f)), varTranslationFactory).ToString());
-                sb.AppendLine();
-                sb.AppendLine("apply " + ProofUtil.SimpOnly("opaque_comp_def"));
-                sb.AppendLine("using " + "fun_interp_wf_def " + MembershipName(f) + " option.sel by metis");
-                sb.AppendLine();
-                */
             }
 
             //variables
@@ -722,23 +713,6 @@ namespace ProofGeneration.ProgramToVCProof
                 sb.AppendLine("have " + axiomLocaleFact + ":\"" + AxiomLocaleAssm() + "\"");
                 AppendAxiomLocaleAssmProof(sb);
             }
-
-            //store function theorems
-            /*
-            sb.AppendLine("ML_prf \\<open>");
-            sb.AppendLine();
-            foreach(Function f in methodData.Functions)
-            {
-                sb.AppendLine("val " + FunCorresName(f, true) + " = " + "@{thm " + ProofUtil.OF(FunCorresName(f), WfName(f)) + "}");
-                sb.AppendLine("val " + InterpMemName(f, true) + " = " + "@{thm " + InterpMemName(f) + "}");
-            }
-            string storedFunctionThms = "storedFunctionThms";
-            string interpLemmasList = "[" + IsaPrettyPrinterHelper.CommaAggregate(methodData.Functions.Select(f => FunCorresName(f, true))) + ", " +
-    IsaPrettyPrinterHelper.CommaAggregate(methodData.Functions.Select(f => InterpMemName(f, true))) + "]";
-
-            sb.AppendLine("val " + storedFunctionThms + " = " + interpLemmasList);
-            sb.AppendLine("\\<close>");
-            */
 
             //conclusion
 
@@ -995,11 +969,12 @@ namespace ProofGeneration.ProgramToVCProof
                         stateEvalType).ToString());
                     sb.AppendLine();
                     sb.AppendLine("apply " + ProofUtil.SimpOnly("state_typ_wf_def"));
-                    sb.AppendLine("apply (erule allE, erule allE, erule impE, rule " +
-                                  (scKind == StateCorresKind.OnlyConst
-                                      ? programAccessor.ConstantMembershipLemma(v)
-                                      : programAccessor.MembershipLemma(v))
-                                  + ")");
+                    sb.AppendLine(ProofUtil.Apply("erule allE, erule allE, erule impE, rule " +
+                                                  ProofUtil.OF("map_of_lookup_vdecls_ty",
+                                                      (scKind == StateCorresKind.OnlyConst
+                                                          ? programAccessor.ConstantMembershipLemma(v)
+                                                          : programAccessor.MembershipLemma(v)))));
+                                 
                     if (scKind == StateCorresKind.OnlyConst)
                         sb.AppendLine("apply (subst lookup_var_global_no_locals)+");
                     else if (scKind == StateCorresKind.Global)

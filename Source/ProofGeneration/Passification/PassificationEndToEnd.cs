@@ -482,7 +482,7 @@ namespace ProofGeneration.Passification
             var result = new List<Tuple<TermIdent, TypeIsa>>
             {
                 Tuple.Create((TermIdent) boogieContext.absValTyMap, IsaBoogieType.AbstractValueTyFunType(absValType)),
-                Tuple.Create((TermIdent) boogieContext.methodContext, IsaBoogieType.MethodContextType()),
+                Tuple.Create((TermIdent) boogieContext.methodContext, IsaBoogieType.ProcContextType()),
                 Tuple.Create((TermIdent) boogieContext.funContext, IsaBoogieType.FunInterpType(absValType)),
                 Tuple.Create(finalNodeOrReturn, IsaBoogieType.CFGNodeOrReturnType()),
                 Tuple.Create(normalInitState, IsaBoogieType.NormalStateType(absValType)),

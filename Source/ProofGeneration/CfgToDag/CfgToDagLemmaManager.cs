@@ -514,7 +514,7 @@ namespace ProofGeneration.CfgToDag
 
             if (blockHeadHint != null)
                 foreach (var x in blockHeadHint.ModifiedVars)
-                    proofMethods.Add(ProofUtil.Apply(ProofUtil.Simp(beforeDagProgAccess.LookupVarTyLemma(x))));
+                    proofMethods.Add(ProofUtil.Apply(ProofUtil.Simp(beforeDagProgAccess.LookupVarDeclLemma(x))));
 
             //TODO proof that post invariants reduce to booleans
             proofMethods.Add(TypingTactics(typingTactics, null));

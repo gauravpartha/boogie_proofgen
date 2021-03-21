@@ -25,6 +25,7 @@ namespace ProofGeneration
         private static readonly TermIdent oldVarId = IsaCommonTerms.TermIdentFromName("Old");
 
         private static readonly TermIdent lookupVarId = IsaCommonTerms.TermIdentFromName("lookup_var");
+        private static readonly TermIdent lookupVarDeclId = IsaCommonTerms.TermIdentFromName("lookup_var_decl");
         private static readonly TermIdent lookupVarTyId = IsaCommonTerms.TermIdentFromName("lookup_var_ty");
         private static readonly TermIdent localStateId = IsaCommonTerms.TermIdentFromName("local_state");
         private static readonly TermIdent globalStateId = IsaCommonTerms.TermIdentFromName("global_state");
@@ -158,6 +159,11 @@ namespace ProofGeneration
         public static Term LookupVar(Term varContext, Term normalState, Term var)
         {
             return new TermApp(lookupVarId, new List<Term> {varContext, normalState, var});
+        }
+        
+        public static Term LookupVarDecl(Term varContext, Term var)
+        {
+            return new TermApp(lookupVarDeclId, new List<Term> {varContext, var});
         }
 
         public static Term LookupVarTy(Term varContext, Term var)
@@ -508,7 +514,6 @@ namespace ProofGeneration
                 return new TermTuple(new List<Term> {fname, numTypeParams, argTypes, retType});
             return new TermTuple(new List<Term> {numTypeParams, argTypes, retType});
         }
-
         public static Term VarDeclWithoutName(Variable v, TypeIsaVisitor typeIsaVisitor, Func<Absy, Term> boogieToIsa)
         {
             return VarDecl(v, null, typeIsaVisitor, boogieToIsa);
@@ -526,15 +531,27 @@ namespace ProofGeneration
         ///          The identifier <paramref name="id"/> is excluded if it is null.</returns>
         public static Term VarDecl(Variable v, Term id, TypeIsaVisitor typeIsaVisitor, Func<Absy, Term> boogieToIsa)
         {
-            var vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
-            var vWhereClause = v.TypedIdent.WhereExpr != null
-                ? IsaCommonTerms.SomeOption(boogieToIsa(v.TypedIdent.WhereExpr))
-                : IsaCommonTerms.NoneOption();
+            var (vType, vWhereClause) = VarDeclTuple(v, typeIsaVisitor, boogieToIsa);
+            
             if (id != null)
                 return new TermTuple(new List<Term> {id, vType, vWhereClause});
             
             return new TermTuple(new List<Term> {vType, vWhereClause});
         }
+        
+        /// <summary>
+        /// Returns the properties associated with <paramref name="v"/> in its variable declaration.
+        /// The first element of the result tuple is the type and the second element is the where clause.
+        /// </summary>
+        public static Tuple<Term, Term> VarDeclTuple(Variable v, TypeIsaVisitor typeIsaVisitor, Func<Absy, Term> boogieToIsa)
+        {
+            var vType = typeIsaVisitor.Translate(v.TypedIdent.Type);
+            var vWhereClause = v.TypedIdent.WhereExpr != null
+                ? IsaCommonTerms.SomeOption(boogieToIsa(v.TypedIdent.WhereExpr))
+                : IsaCommonTerms.NoneOption();
+            
+            return Tuple.Create(vType, vWhereClause);
+       }
 
         public static Term ConvertValToBool(Term val)
         {

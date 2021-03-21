@@ -100,7 +100,7 @@ namespace ProofGeneration.BoogieIsaInterface
                     IsaCommonTerms.TermIdentFromName(globals));
             
             AddMinOrMaxLemma(true, globalsMax, VariableNames(constsAndGlobalsList));
-            AddTypingHelperLemmas();
+            AddWellFormednessLemmas();
         }
 
         public MembershipLemmaManager(
@@ -146,7 +146,7 @@ namespace ProofGeneration.BoogieIsaInterface
                 IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(consts),
                     IsaCommonTerms.TermIdentFromName(globals));
             AddDisjointnessLemmas(GlobalsMaxLocalsMin.Item1, GlobalsMaxLocalsMin.Item2);
-            AddTypingHelperLemmas();
+            AddWellFormednessLemmas();
         }
 
         public string TheoryName()
@@ -264,10 +264,20 @@ namespace ProofGeneration.BoogieIsaInterface
             return isaBlockInfo;
         }
 
+        public string LookupVarDeclLemma(Variable v)
+        {
+            //the proved lemma contains two statements, the second one is just for the type
+            if (lookupVarTyLemmas.TryGetValue(v, out var result))
+                return QualifyAccessName(result.Name+"(1)"); 
+
+            return parent.LookupVarTyLemma(v);
+        }
+
         public string LookupVarTyLemma(Variable v)
         {
+            //the proved lemma contains two statements, the first one is for the full declaration value
             if (lookupVarTyLemmas.TryGetValue(v, out var result))
-                return QualifyAccessName(result.Name);
+                return QualifyAccessName(result.Name+"(2)"); 
 
             return parent.LookupVarTyLemma(v);
         }
@@ -397,9 +407,9 @@ namespace ProofGeneration.BoogieIsaInterface
             if (CreatesNewVarContext())
             {
                  //must come after adding membership lemmas (lemmas are looked up)
-                 AddLookupVarTyLemmas(variables,
+                 AddLookupVarDeclTyLemmas(variables,
                      idOfVar,
-                     d => IsaBoogieTerm.VarDeclWithoutName((Variable) d, typeIsaVisitor, basicCmdIsaVisitor.Translate),
+                     d => IsaBoogieTerm.VarDeclTuple((Variable) d, typeIsaVisitor, basicCmdIsaVisitor.Translate),
                      membershipLemmaLookup
                  );
             }
@@ -434,24 +444,34 @@ namespace ProofGeneration.BoogieIsaInterface
             }
         }
 
-        private void AddLookupVarTyLemmas(
+        private void AddLookupVarDeclTyLemmas(
             IEnumerable<Variable> vars,
             Func<NamedDeclaration, Term> nameOf,
-            Func<NamedDeclaration, Term> declOf,
+            Func<NamedDeclaration, Tuple<Term,Term>> declOf,
             Func<Variable, string> getMembershipLemma)
         {
             foreach (var v in vars)
             {
-                var lhs = IsaBoogieTerm.LookupVarTy(VarContext(), nameOf(v));
-                var rhs = IsaCommonTerms.SomeOption(declOf(v));
-                Term statement = TermBinary.Eq(lhs, rhs);
+                var (ty, whereClause) = declOf(v);
+                var lookupDeclLhs = IsaBoogieTerm.LookupVarDecl(VarContext(), nameOf(v));
+                var lookupDeclRhs = IsaCommonTerms.SomeOption(new TermTuple(ty, whereClause));
+                Term lookupDeclStmt = TermBinary.Eq(lookupDeclLhs, lookupDeclRhs);
+                
+                var lookupTyLhs = IsaBoogieTerm.LookupVarTy(VarContext(), nameOf(v));
+                var lookupTyRhs = IsaCommonTerms.SomeOption(ty);
+                Term lookupTyStmt = TermBinary.Eq(lookupTyLhs, lookupTyRhs);
+                
                 var proof =
                     new Proof(new List<string>
                     {
                         "using " + globalsLocalsDisjName + " " + getMembershipLemma(v),
-                        "by (simp add: lookup_var_ty_global_2 lookup_var_ty_local)"
+                        "by (simp_all add: lookup_var_decl_global_2 lookup_var_decl_local lookup_var_decl_ty_Some)"
                     });
-                lookupVarTyLemmas.Add(v, new LemmaDecl(lookupVarTyNamer.GetName(v, "l_" + v.Name), statement, proof));
+                lookupVarTyLemmas.Add(v, new LemmaDecl(
+                    lookupVarTyNamer.GetName(v, "l_" + v.Name),
+                    new List<Term> {lookupDeclStmt, lookupTyStmt},
+                    proof)
+                );
             }
         }
 
@@ -565,43 +585,39 @@ namespace ProofGeneration.BoogieIsaInterface
             );
         }
 
-        private void AddTypingHelperLemmas()
+        private void AddWellFormednessLemmas()
         {
-            Func<string, string, Term, LemmaDecl> WfLemma =
-                (lemmaName, listDef, fun) =>
-                {
-                    Term wfStmt =
-                        new TermApp(IsaCommonTerms.ListAll(
-                            IsaCommonTerms.Composition(fun, IsaCommonTerms.SndId),
-                            IsaCommonTerms.TermIdentFromName(listDef))
-                        );
-                    return
-                        new LemmaDecl(lemmaName, ContextElem.CreateEmptyContext(), wfStmt,
-                            new Proof(new List<string>
-                            {
-                                "unfolding " + listDef + "_def",
-                                "by simp"
-                            })
-                        );
-                };
+            LemmaDecl WfLemma(string lemmaName, string listDef, Term fun, Term destruct)
+            {
+                Term wfStmt = new TermApp(IsaCommonTerms.ListAll(
+                    IsaCommonTerms.Composition(fun, destruct), IsaCommonTerms.TermIdentFromName(listDef)
+                    ));
+                return new LemmaDecl(lemmaName, 
+                    ContextElem.CreateEmptyContext(), 
+                    wfStmt, 
+                    new Proof(new List<string> {"unfolding " + listDef + "_def", "by simp"}));
+            }
+
+            LemmaDecl WfSnd(string lemmaName, string listDef, Term fun) => WfLemma(lemmaName, listDef, fun, IsaCommonTerms.SndId);
+
+            LemmaDecl WfFstSnd(string lemmaName, string listDef, Term fun) =>
+                    WfLemma(lemmaName, listDef, fun, IsaCommonTerms.Composition(IsaCommonTerms.FstId, IsaCommonTerms.SndId));
             
             if (config.generateFunctions)
             {
-                helperLemmas.Add(WfLemma(funcsWfName, isaProgramRepr.GlobalProgramRepr.funcsDeclDef,
+                helperLemmas.Add(WfSnd(funcsWfName, isaProgramRepr.GlobalProgramRepr.funcsDeclDef,
                     IsaCommonTerms.TermIdentFromName("wf_fdecl")));
             }
             
             Term wfTy0 = new TermApp(IsaCommonTerms.TermIdentFromName("wf_ty"), new NatConst(0));
 
-
-
             if (config.generateVarContextWfLemma)
             {
                 //TODO: could share wf lemmas with ancestors in certain cases
-                helperLemmas.Add(WfLemma(constsWfName, ConstsDecl(), wfTy0));
-                helperLemmas.Add(WfLemma(globalsWfName, GlobalsDecl(), wfTy0));
-                helperLemmas.Add(WfLemma(paramsWfName, ParamsDecl(), wfTy0));
-                helperLemmas.Add(WfLemma(localsWfName, LocalsDecl(), wfTy0));
+                helperLemmas.Add(WfFstSnd(constsWfName, ConstsDecl(), wfTy0));
+                helperLemmas.Add(WfFstSnd(globalsWfName, GlobalsDecl(), wfTy0));
+                helperLemmas.Add(WfFstSnd(paramsWfName, ParamsDecl(), wfTy0));
+                helperLemmas.Add(WfFstSnd(localsWfName, LocalsDecl(), wfTy0));
                 
                 var xId = new SimpleIdentifier("x");
                 var tauId = new SimpleIdentifier("\\<tau>");
