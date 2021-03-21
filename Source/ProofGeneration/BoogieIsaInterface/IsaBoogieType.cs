@@ -112,17 +112,10 @@ namespace ProofGeneration
             return new DataType("var_context", new List<TypeIsa>());
         }
 
-        public static TypeIsa MethodContextType()
+        public static TypeIsa ProcContextType()
         {
-            return new DataType("method_context", new List<TypeIsa>());
+            return new DataType("proc_context", new List<TypeIsa>());
         }
-
-        /*
-        public static TypeIsa FunContextType(TypeIsa absValType)
-        {
-            return new DataType("fun_context", new List<TypeIsa>() { absValType } );
-        }
-        */
 
         public static TypeIsa FunInterpType(TypeIsa absValType)
         {

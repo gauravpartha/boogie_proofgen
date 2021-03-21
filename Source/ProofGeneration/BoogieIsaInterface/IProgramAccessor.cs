@@ -41,7 +41,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public string LocalsAtLeastMin();
         public string FuncsWfTyLemma();
         public string VarContextWfTyLemma();
-
+        public string LookupVarDeclLemma(Variable v);
         public string LookupVarTyLemma(Variable v);
     }
 }

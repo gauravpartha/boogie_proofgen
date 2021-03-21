@@ -99,7 +99,15 @@ namespace Isabelle.IsaPrettyPrint
             _sb.AppendLine();
 
             _sb.Append("shows ");
-            AppendInner(_termPrinter.Visit(d.Statement));
+            bool first = true;
+            foreach (var stmt in d.Statements)
+            {
+                if (first)
+                    first = false;
+                else
+                    _sb.Append(" and ");
+                AppendInner(_termPrinter.Visit(stmt));
+            }
 
             _sb.AppendLine();
             PrintProof(d.Proof);

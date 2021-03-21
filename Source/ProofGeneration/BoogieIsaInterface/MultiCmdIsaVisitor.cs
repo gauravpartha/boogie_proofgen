@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Isabelle.Ast;
 using Microsoft.Boogie;
@@ -25,6 +26,14 @@ namespace ProofGeneration.BoogieIsaInterface
             if (cmd is HavocCmd havocCmd)
                 return TranslateHavocCmd(havocCmd);
             return new List<Term> {basicCmdVisitor.Translate(cmd)};
+        }
+        
+        public Term TranslateSingle(Absy cmd)
+        {
+            if(cmd is HavocCmd)
+                throw new ArgumentException("Can only input commands that are desugared to single commands");
+            
+            return basicCmdVisitor.Translate(cmd);
         }
 
         public IList<Term> Translate(IList<Cmd> cmds)

@@ -172,21 +172,28 @@ namespace Isabelle.Ast
 
     public class LemmaDecl : OuterDecl
     {
-        public LemmaDecl(string name, ContextElem contextElem, Term statement, Proof proof) : base(name)
+        public LemmaDecl(string name, ContextElem contextElem, IList<Term> statements, Proof proof) : base(name)
         {
             ContextElem = contextElem;
-            Statement = statement;
+            Statements = statements;
             Proof = proof;
         }
-
+        
+        public LemmaDecl(string name, IList<Term> statements, Proof proof) : 
+            this(name, ContextElem.CreateEmptyContext(), statements, proof)
+        { }
+        
+        public LemmaDecl(string name, ContextElem contextElem, Term statement, Proof proof) : 
+            this(name, contextElem, new List<Term>{statement}, proof)
+        { }
+        
         public LemmaDecl(string name, Term statement, Proof proof) :
             this(name, ContextElem.CreateEmptyContext(), statement, proof)
-        {
-        }
+        { }
 
         public ContextElem ContextElem { get; }
         public Proof Proof { get; }
-        public Term Statement { get; }
+        public IList<Term> Statements { get; }
 
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
