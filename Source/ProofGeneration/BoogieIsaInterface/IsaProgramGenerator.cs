@@ -21,7 +21,7 @@ namespace ProofGeneration
         public readonly bool generateSpecs;
         public readonly bool generateVarContextWfLemma;
         public readonly IProgramAccessor parentAccessor;
-
+        
         public IsaProgramGeneratorConfig(
             IProgramAccessor parent,
             bool generateFunctions,
@@ -47,6 +47,9 @@ namespace ProofGeneration
         private MultiCmdIsaVisitor cmdIsaVisitor;
         private BoogieVariableTranslation varTranslation;
         private IVariableTranslationFactory varTranslationFactory;
+        
+        private readonly string nodeToBlocksName = "node_to_blocks";
+        private readonly string cfgName = "method_body";
 
         public IProgramAccessor GetIsaProgram(
             string theoryName,
@@ -56,6 +59,7 @@ namespace ProofGeneration
             IVariableTranslationFactory varTranslationFactory,
             CFGRepr cfg,
             out IList<OuterDecl> decls,
+            bool generateMembershipLemmas = true,
             bool onlyGlobalData = false
         )
         {
@@ -94,8 +98,8 @@ namespace ProofGeneration
             var isaGlobalProgramRepr = new IsaGlobalProgramRepr(
                 FunctionDeclarationsName(),
                 AxiomDeclarationsName(),
-                VariableDeclarationsName("globals", procName),
-                VariableDeclarationsName("constants", procName)
+                VariableDeclarationsName("globals"),
+                VariableDeclarationsName("constants")
                 );
             var globalsMax = methodData.Constants.Count() + methodData.GlobalVars.Count() - 1;
             // assume single versioning and order on constants, globals, params, locals
@@ -117,13 +121,13 @@ namespace ProofGeneration
                     isaGlobalProgramRepr,
                     PreconditionDeclarationName(procName),
                     PostconditionDeclarationName(procName),
-                    VariableDeclarationsName("params", procName),
-                    VariableDeclarationsName("locals", procName),
-                    CfgName(procName));
+                    VariableDeclarationsName("params"),
+                    VariableDeclarationsName("locals"),
+                    cfgName);
                 membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo,
                 Tuple.Create(globalsMax, localsMin), varTranslationFactory, theoryName);
                 
-                var nodesToBlocks = GetNodeToBlocksIsa(procName, cfg, blockInfo.BlockCmdsDefs);
+                var nodesToBlocks = GetNodeToBlocksIsa(cfg, blockInfo.BlockCmdsDefs);
 
                 decls.AddRange(blockInfo.BlockCmdsDefs.Values);
                 
@@ -155,38 +159,44 @@ namespace ProofGeneration
                 }
 
                 if(config.generateParamsAndLocals) {
-                    decls.Add(GetVariableDeclarationsIsa("params", procName, methodData.InParams));
-                    decls.Add(GetVariableDeclarationsIsa("locals", procName, methodData.Locals));
+                    decls.Add(GetVariableDeclarationsIsa("params", methodData.InParams));
+                    decls.Add(GetVariableDeclarationsIsa("locals", methodData.Locals));
                 }
                 
                 /* membership lemmas might still be added even if the parameter and local variable definitions are not generated
                  * at this point (since the variable context may still be different, which requires other lookup lemmas)
                  */
-                membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams, VarKind.ParamOrLocal);
-                membershipLemmaManager.AddVariableMembershipLemmas(methodData.Locals, VarKind.ParamOrLocal);
+                if (generateMembershipLemmas)
+                {
+                    membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams, VarKind.ParamOrLocal);
+                    membershipLemmaManager.AddVariableMembershipLemmas(methodData.Locals, VarKind.ParamOrLocal);
+                }
             }
 
             if (config.generateAxioms)
             {
                 decls.Add(GetAxioms(methodData.Axioms));
-                membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms);
+                if(generateMembershipLemmas) membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms);
             }
 
             if (config.generateFunctions)
             {
                 decls.Add(GetFunctionDeclarationsIsa(methodData.Functions));
-                membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions);
+                if(generateMembershipLemmas) membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions);
             }
 
             if (config.generateGlobalsAndConstants)
             {
-                decls.Add(GetVariableDeclarationsIsa("globals", procName, methodData.GlobalVars));
-                decls.Add(GetVariableDeclarationsIsa("constants", procName, methodData.Constants));
+                decls.Add(GetVariableDeclarationsIsa("globals", methodData.GlobalVars));
+                decls.Add(GetVariableDeclarationsIsa("constants", methodData.Constants));
             }
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, VarKind.Global);
-            membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, VarKind.Constant);
 
-            decls.AddRange(membershipLemmaManager.OuterDecls());
+            if (generateMembershipLemmas)
+            {
+                membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, VarKind.Global);
+                membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, VarKind.Constant);
+                decls.AddRange(membershipLemmaManager.OuterDecls());
+            }
 
             return membershipLemmaManager;
         }
@@ -220,9 +230,9 @@ namespace ProofGeneration
             var blockToDecl = new Dictionary<Block, OuterDecl>();
             var blockToNodesLemmas = new Dictionary<Block, LemmaDecl>();
 
-            var cfgTerm = IsaCommonTerms.TermIdentFromName(CfgName(methodName));
-            var cfgDef = CfgName(methodName) + "_def";
-            var nodeToBlockDef = "nodeToBlocks_" + methodName + "_def";
+            var cfgTerm = IsaCommonTerms.TermIdentFromName(cfgName);
+            var cfgDef = cfgName + "_def";
+            var nodeToBlockDef = nodeToBlocksName + "_def";
 
             foreach (var b in cfg.GetBlocksBackwards())
             {
@@ -258,9 +268,10 @@ namespace ProofGeneration
             var edgeList = new List<Term>();
             edgeLemmas = new Dictionary<Block, LemmaDecl>();
 
-            var cfgTerm = IsaCommonTerms.TermIdentFromName(CfgName(methodName));
-            var cfgDef = CfgName(methodName) + "_def";
-            var outEdgesDef = "outEdges_" + methodName + "_def";
+            var cfgTerm = IsaCommonTerms.TermIdentFromName(cfgName);
+            var cfgDef = cfgName + "_def";
+            string outEdgesDefName = "outEdges";
+            var outEdgesDef = outEdgesDefName + "_def";
 
             foreach (var b in cfg.GetBlocksBackwards())
             {
@@ -280,7 +291,7 @@ namespace ProofGeneration
             }
 
             //empty set for remaining cases
-            return DefDecl.CreateWithoutArg("outEdges_" + methodName, new TermList(edgeList));
+            return DefDecl.CreateWithoutArg(outEdgesDefName, new TermList(edgeList));
         }
 
         private string OutEdgesLemmaName(int blockId)
@@ -293,7 +304,7 @@ namespace ProofGeneration
             return "node_" + blockId;
         }
 
-        private OuterDecl GetNodeToBlocksIsa(string methodName, CFGRepr cfg, IDictionary<Block, OuterDecl> blockToDecl)
+        private OuterDecl GetNodeToBlocksIsa(CFGRepr cfg, IDictionary<Block, OuterDecl> blockToDecl)
         {
             var nodeList = new List<Term>();
 
@@ -302,7 +313,7 @@ namespace ProofGeneration
                 //right side of equation is command
                 nodeList.Add(IsaCommonTerms.TermIdentFromName(blockToDecl[b].Name));
 
-            return DefDecl.CreateWithoutArg("nodeToBlocks_" + methodName, new TermList(nodeList));
+            return DefDecl.CreateWithoutArg(nodeToBlocksName, new TermList(nodeList));
         }
 
         private DefDecl GetFunctionDeclarationsIsa(IEnumerable<Function> functions)
@@ -331,7 +342,7 @@ namespace ProofGeneration
             return "post";
         }
 
-        private DefDecl GetVariableDeclarationsIsa(string varKind, string methodName, IEnumerable<Variable> variables)
+        private DefDecl GetVariableDeclarationsIsa(string varKind, IEnumerable<Variable> variables)
         {
             var typeIsaVisitor = new TypeIsaVisitor(varTranslation.TypeVarTranslation);
 
@@ -350,31 +361,31 @@ namespace ProofGeneration
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(vdecls));
-            return new DefDecl(VariableDeclarationsName(varKind, methodName), IsaBoogieType.VariableDeclsType,
+            return new DefDecl(VariableDeclarationsName(varKind), IsaBoogieType.VariableDeclsType,
                 equation);
         }
 
-        private string VariableDeclarationsName(string varKind, string methodName)
+        private string VariableDeclarationsName(string varKind)
         {
-            return varKind + "_vdecls_" + methodName;
+            return varKind + "_vdecls";
         }
 
-        private DefDecl GetExprListIsa(string declName, IEnumerable<Expr> exprs)
+        private DefDecl GetExprListIsa(string declName, IEnumerable<Tuple<Expr,bool>> exprs)
         {
             var result = new List<Term>();
-            foreach (var expr in exprs) result.Add(cmdIsaVisitor.Translate(expr).First());
+            foreach (var expr in exprs)
+            {
+                var termTuple = new TermTuple(cmdIsaVisitor.TranslateSingle(expr.Item1), new BoolConst(expr.Item2));
+                result.Add(termTuple);
+            }
 
             return DefDecl.CreateWithoutArg(declName, new TermList(result));
         }
 
         private DefDecl GetMethodBodyCFGDecl(string methodName, Term methodBodyCFG)
         {
-            return DefDecl.CreateWithoutArg(CfgName(methodName), methodBodyCFG);
+            return DefDecl.CreateWithoutArg(cfgName, methodBodyCFG);
         }
 
-        private string CfgName(string methodName)
-        {
-            return "G_" + methodName;
-        }
     }
 }

@@ -772,6 +772,10 @@ namespace Microsoft.Boogie
     // is empty it means that all procedures should be checked.
     private List<string /*!*/> procsToCheck = new List<string /*!*/>();
     private List<string /*!*/> procsToIgnore = new List<string /*!*/>();
+    
+    #region proof generation options
+    public bool OnlyGenerateIsaProgram = false;
+    #endregion
 
     [ContractInvariantMethod]
     void ObjectInvariant5()
@@ -1456,6 +1460,15 @@ namespace Microsoft.Boogie
         case "kInductionDepth":
           ps.GetNumericArgument(ref KInductionDepth);
           return true;
+        case "proofGenOnlyGenerateIsaProg":
+        {
+          if (ps.ConfirmArgumentCount(0))
+          {
+            OnlyGenerateIsaProgram = true;
+          }
+
+          return true;
+        }
 
         default:
           bool optionValue = false;

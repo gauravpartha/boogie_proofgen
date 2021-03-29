@@ -347,9 +347,13 @@ namespace ProofGeneration.CfgToDag
             var lemmas = new List<LemmaDecl>();
             foreach (var post in beforeDagData.Postconditions)
             {
-                var (typingTac, tacHelperLemmas) = typingTacticGenerator.GenerateTactic(post);
-                typingTactics.Add(typingTac);
-                lemmas.AddRange(tacHelperLemmas);
+                //only need to guarantee postconditions that are not free
+                if (!post.Item2)
+                {
+                     var (typingTac, tacHelperLemmas) = typingTacticGenerator.GenerateTactic(post.Item1);
+                     typingTactics.Add(typingTac);
+                     lemmas.AddRange(tacHelperLemmas);
+                }
             }
 
             var mainLemma =
@@ -435,11 +439,15 @@ namespace ProofGeneration.CfgToDag
 
             if (!successors.Any() && afterExitBlock == null)
             {
-                //postcondition is at the end 
-                postInvsList.AddRange(
-                    beforeDagData.Postconditions.Select(post => basicCmdIsaVisitor.Translate(post))
-                );
-                foreach (var inv in beforeDagData.Postconditions) addTypingTactic(inv);
+                //postcondition is at the end: only need to consider non-free postconditions 
+                foreach (var post in beforeDagData.Postconditions)
+                {
+                    if (!post.Item2)
+                    {
+                       postInvsList.Add(basicCmdIsaVisitor.Translate(post.Item1));
+                       addTypingTactic(post.Item1);
+                    }
+                }
             }
 
             #region modified variables

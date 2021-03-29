@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Net.Http;
 using Isabelle.Ast;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
@@ -86,8 +88,9 @@ namespace ProofGeneration
                     methodData, globalDataConfig, factory, 
                     null,
                     out var declsGlobalData,
+                    !CommandLineOptions.Clo.OnlyGenerateIsaProgram,
                     true
-                    );
+                );
                 
                 var globalDataTheory = new Theory(globalDataTheoryName,
                     new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util"},
@@ -121,6 +124,9 @@ namespace ProofGeneration
 
         public static void BeforePassification(Implementation impl)
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
+            
             var config = new CFGReprConfigBuilder().SetIsAcyclic(true).SetBlockCopy(true).SetDesugarCalls(true)
                 .Build();
             beforePassificationCfg = CFGReprTransformer.GetCfgRepresentation(
@@ -156,31 +162,19 @@ namespace ProofGeneration
              * for pre- and postcondition
              */
             var formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
-            var preconditions = new List<Expr>();
+            var preconditions = new List<Tuple<Expr,bool>>();
             foreach (var req in impl.Proc.Requires)
-                if (!req.Free)
-                {
-                    // skip free ensures clauses
-                    var e = Substituter.Apply(formalProcImplSubst, req.Condition);
-                    preconditions.Add(e);
-                }
-                else
-                {
-                    throw new ProofGenUnexpectedStateException("Don't support free precondition");
-                }
+            {
+                var e = Substituter.Apply(formalProcImplSubst, req.Condition);
+                preconditions.Add(Tuple.Create(e, req.Free));
+            }
 
-            var postconditions = new List<Expr>();
+            var postconditions = new List<Tuple<Expr,bool>>();
             foreach (var ens in impl.Proc.Ensures)
-                if (!ens.Free)
-                {
-                    // skip free ensures clauses
-                    var e = Substituter.Apply(formalProcImplSubst, ens.Condition);
-                    postconditions.Add(e);
-                }
-                else
-                {
-                    throw new ProofGenUnexpectedStateException("Don't support free postcondition");
-                }
+            {
+                var e = Substituter.Apply(formalProcImplSubst, ens.Condition);
+                postconditions.Add(Tuple.Create(e, ens.Free));
+            }
 
 
             return new BoogieMethodData(
@@ -198,7 +192,9 @@ namespace ProofGeneration
         {
             Contract.Requires(b != null);
             Contract.Requires(variableToExpr != null);
-
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
+            
             initialVarMapping.Add(b, new Dictionary<Variable, Expr>(variableToExpr));
         }
 
@@ -219,8 +215,12 @@ namespace ProofGeneration
 
         public static void AfterPassificationCheckGlobalMap(Implementation impl)
         {
-            finalProgData = MethodDataFromImpl(impl, boogieGlobalData);
             afterPassificationImpl = impl;
+            
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
+            
+            finalProgData = MethodDataFromImpl(impl, boogieGlobalData);
             var config = new CFGReprConfigBuilder().SetIsAcyclic(true).SetBlockCopy(true).SetDesugarCalls(false)
                 .SetDeepCopyPredCmd(TypeCheckBeforeVcMaybeRewritesCmd).Build();
             afterPassificationCfg =
@@ -281,6 +281,9 @@ namespace ProofGeneration
 
         public static void AfterUnreachablePruning(Implementation impl)
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
+            
             var config = new CFGReprConfigBuilder().SetIsAcyclic(true).SetBlockCopy(true).SetDesugarCalls(false)
                 .SetDeepCopyPredCmd(TypeCheckBeforeVcMaybeRewritesCmd).Build();
             afterUnreachablePruningCfg =
@@ -307,26 +310,36 @@ namespace ProofGeneration
             CommandLineOptions.SubsumptionOption subsumptionOption
         )
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
         public static void NextPassificationHint(Block block, Cmd cmd, Variable origVar, Expr passiveExpr)
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
             passificationHintManager.AddHint(block, cmd, origVar, passiveExpr);
         }
 
         public static void LoopHeadHint(Block block, IEnumerable<Variable> varsToHavoc, IEnumerable<Expr> invariants)
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
             cfgToDagHintManager.AddHint(block, new LoopHeadHint(varsToHavoc, invariants));
         }
 
         public static void NewBackedgeBlock(Block oldBackedgeBlock, Block newBackedgeBlock, Block loopHead)
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
             cfgToDagHintManager.AddNewBackedgeBlock(newBackedgeBlock, loopHead);
         }
 
         public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)
         {
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+                return;
             typePremiseEraserFactory = factory;
             var uniqueNamer = new IsaUniqueNamer();
             /* Hack: try to make sure unique namer uses names for Boogie functions and Boogie variables that are different
@@ -354,36 +367,53 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
+            var uniqueNamer = new IsaUniqueNamer();
             var theories = new List<Theory>();
             if (axiomBuilder == null && typeAxioms != null)
                 throw new ArgumentException("type axioms can only be null if axiom builder is null");
 
-            var fixedVarTranslation2 = new DeBruijnFixedVarTranslation(beforePassiveData);
-            var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(beforePassiveData);
+            /* Since in the proofs calls are desugared, there can be more variables in "beforePassiveData". If only
+             the progam should be generaed, then these variables should be ignored. */
+            var mainData = CommandLineOptions.Clo.OnlyGenerateIsaProgram ? beforeDagData : beforePassiveData;
+            
+            var fixedVarTranslation2 = new DeBruijnFixedVarTranslation(mainData);
+            var fixedTyVarTranslation2 = new DeBruijnFixedTVarTranslation(mainData);
             var varTranslationFactory2 =
                 new DeBruijnVarFactory(fixedVarTranslation2, fixedTyVarTranslation2, boogieGlobalData);
             
             #region before cfg to dag program
-            var beforeCfgToDagTheoryName = afterPassificationImpl.Name + "_before_cfg_to_dag_prog";
+            var beforeCfgToDagTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_cfg_to_dag_prog");
             var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, true, true);
             var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
                 afterPassificationImpl.Name,
-                beforePassiveData, beforeCfgToDagConfig, varTranslationFactory2,
+                mainData, beforeCfgToDagConfig, varTranslationFactory2,
                 beforeDagCfg,
-                out var programDeclsBeforeCfgToDag);
+                out var programDeclsBeforeCfgToDag,
+                !CommandLineOptions.Clo.OnlyGenerateIsaProgram);
+            var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util", "\"../"+globalDataProgAccess.TheoryName()+"\""},
+                programDeclsBeforeCfgToDag);
+            theories.Add(beforeCfgToDagProgTheory);
             #endregion
+
+            if (CommandLineOptions.Clo.OnlyGenerateIsaProgram)
+            {
+                StoreResult("program_" + afterPassificationImpl.Proc.Name, theories);
+                return;
+            }
 
             #region before passive program
 
-            var beforePassiveProgTheoryName = afterPassificationImpl.Name + "_before_passive_prog";
+            var beforePassiveProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
             var beforePassiveConfig =
                 new IsaProgramGeneratorConfig(beforeCfgToDagProgAccess, false, false, false, false, false, false);
             var beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
                 afterPassificationImpl.Name,
-                beforePassiveData, beforePassiveConfig, varTranslationFactory2,
+                mainData, beforePassiveConfig, varTranslationFactory2,
                 beforePassificationCfg,
-                out var programDeclsBeforePassive);
+                out var programDeclsBeforePassive,
+                !CommandLineOptions.Clo.OnlyGenerateIsaProgram);
 
             #endregion
 
@@ -416,7 +446,7 @@ namespace ProofGeneration
             varTranslationFactory =
                 new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
-            var finalProgTheoryName = afterPassificationImpl.Name + "_passive_prog";
+            var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
             var passiveProgConfig =
                 new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, false, false);
             var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
@@ -424,7 +454,8 @@ namespace ProofGeneration
                 finalProgData, passiveProgConfig, varTranslationFactory,
                 //we use the CFG before the peep-hole transformations, so that we can directly use the VC to program proof in the passification phase
                 afterPassificationCfg,
-                out var programDecls);
+                out var programDecls,
+                !CommandLineOptions.Clo.OnlyGenerateIsaProgram);
 
             var finalProgTheory =
                 new Theory(finalProgTheoryName,
@@ -487,7 +518,7 @@ namespace ProofGeneration
                 passiveRelationGen,
                 beforePassiveProgAccess,
                 passiveProgAccess,
-                beforePassiveData,
+                mainData,
                 varTranslationFactory2,
                 varTranslationFactory
             );
@@ -496,12 +527,7 @@ namespace ProofGeneration
             #endregion
 
             #region cfg to dag
-
-            var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
-                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util", "\"../"+globalDataProgAccess.TheoryName()+"\""},
-                programDeclsBeforeCfgToDag);
-            theories.Add(beforeCfgToDagProgTheory);
-
+            
             var uniqueExitBlock =
                 uniqueExitBlockOrig != null
                     ? beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key
@@ -524,6 +550,11 @@ namespace ProofGeneration
             theories.Add(cfgToDagProofTheory);
             #endregion
             
+            StoreResult("proofs_" + afterPassificationImpl.Proc.Name, theories);
+        }
+
+        public static void StoreResult(string preferredDirName, IEnumerable<Theory> theories)
+        {
             ProofGenerationOutput.StoreTheoriesInNewDirWithSession("proofs_" + afterPassificationImpl.Proc.Name, theories);
         }
     }

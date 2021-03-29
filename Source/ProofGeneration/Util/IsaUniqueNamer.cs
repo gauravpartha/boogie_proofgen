@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.Boogie.VCExprAST;
 
@@ -26,18 +27,35 @@ namespace ProofGeneration.Util
 
             illegalChars = new List<char>();
             illegalChars.Add('@');
+            illegalChars.Add('.');
+            illegalChars.Add('$');
+            illegalChars.Add('?');
         }
 
         public IsaUniqueNamer() : this("AA")
         {
         }
 
+        /// <summary>
+        /// Same as invoking <see cref="GetName(object, string)"/> with input string is the same for both arguments. 
+        /// </summary>
+        public string GetName(string preferredName)
+        {
+            return GetName(preferredName, preferredName);
+        }
+
+        /// <summary>
+        /// Returns a unique, legal Isabelle name resembling <paramref name="preferredName"/>.
+        /// <paramref name="obj"/> functions as a key. This means that any call to this method where the key is the same
+        /// must return the same output. Uniqueness is w.r.t. all names that have been returned by this method.
+        /// </summary>
         public string GetName(object obj, string preferredName)
         {
             var preferredNameMod = preferredName;
             foreach (var illegalChar in illegalChars) preferredNameMod = preferredNameMod.Replace(illegalChar, '_');
 
             if (reservedNames.Contains(preferredNameMod)) preferredNameMod = preferredNameMod + "ZZ";
+            if (preferredName.Last() == '_') preferredNameMod = preferredNameMod + "n";
             return uniqueNamer.GetName(obj, GetValidIsaString(preferredNameMod));
         }
 

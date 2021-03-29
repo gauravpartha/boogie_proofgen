@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 
@@ -15,8 +16,8 @@ namespace ProofGeneration.BoogieIsaInterface
             IEnumerable<Variable> locals,
             IEnumerable<Variable> outParams,
             IEnumerable<IdentifierExpr> modifies,
-            IEnumerable<Expr> pres,
-            IEnumerable<Expr> posts)
+            IEnumerable<Tuple<Expr, bool>> pres,
+            IEnumerable<Tuple<Expr, bool>> posts)
         {
             this.globalData = globalData;
             TypeParams = typeParams;
@@ -40,8 +41,12 @@ namespace ProofGeneration.BoogieIsaInterface
 
         //public IEnumerable<Variable> OutParams { get; }
         public IEnumerable<IdentifierExpr> ModifiedVars { get; }
-        public IEnumerable<Expr> Preconditions { get; }
-        public IEnumerable<Expr> Postconditions { get; }
+        
+        //flag indicates whether precondition is free or not
+        public IEnumerable<Tuple<Expr,bool>> Preconditions { get; }
+        
+        //flag indicates whether postcondition is free or not
+        public IEnumerable<Tuple<Expr,bool>> Postconditions { get; }
 
         public static BoogieMethodData CreateEmpty()
         {
@@ -51,8 +56,8 @@ namespace ProofGeneration.BoogieIsaInterface
                 new List<Variable>(),
                 new List<Variable>(),
                 new List<IdentifierExpr>(),
-                new List<Expr>(),
-                new List<Expr>());
+                new List<Tuple<Expr, bool>>(),
+                new List<Tuple<Expr, bool>>());
         }
 
         public static BoogieMethodData CreateOnlyGlobal(BoogieGlobalData globalData)
@@ -63,8 +68,8 @@ namespace ProofGeneration.BoogieIsaInterface
                 new List<Variable>(),
                 new List<Variable>(),
                 new List<IdentifierExpr>(),
-                new List<Expr>(),
-                new List<Expr>());
+                new List<Tuple<Expr, bool>>(),
+                new List<Tuple<Expr, bool>>());
         }
 
         //in the following order: constants then globals then parameters then locals
