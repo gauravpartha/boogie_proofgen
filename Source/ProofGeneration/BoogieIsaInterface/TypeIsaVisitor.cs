@@ -32,7 +32,7 @@ namespace ProofGeneration
         {
             return node is Type;
         }
-
+        
         public override Type VisitTypeVariable(TypeVariable node)
         {
             ReturnResult(typeVarTranslation.TranslateVariable(node, out _));
@@ -54,7 +54,11 @@ namespace ProofGeneration
             else if (node.IsInt)
                 ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType(), usedClosedConstructors));
             else
-                throw new NotImplementedException();
+            {
+                //TODO: change to actual reals once formalization has been updated
+                Console.Error.WriteLine("Representing reals as integers");
+                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType(), usedClosedConstructors));
+            }
 
             return node;
         }
@@ -63,6 +67,13 @@ namespace ProofGeneration
         {
             if (node.ProxyFor == null) throw new NotImplementedException();
             ReturnResult(Translate(node.ProxyFor));
+            return node;
+        }
+
+        public override Type VisitTypeSynonymAnnotation(TypeSynonymAnnotation node)
+        {
+            ReturnResult(Translate(node.ExpandedType));
+            //ignoring arguments
             return node;
         }
 
