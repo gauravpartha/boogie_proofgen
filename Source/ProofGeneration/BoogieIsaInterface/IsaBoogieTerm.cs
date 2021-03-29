@@ -54,6 +54,9 @@ namespace ProofGeneration
 
         private static readonly TermIdent typeOfValId = IsaCommonTerms.TermIdentFromName("type_of_val");
 
+        private static readonly TermIdent procCallId = IsaCommonTerms.TermIdentFromName("ProcCall");
+        private static readonly TermIdent funCallId = IsaCommonTerms.TermIdentFromName("FunExp");
+        
         private static readonly TermIdent forallId = IsaCommonTerms.TermIdentFromName("Forall");
         private static readonly TermIdent existsId = IsaCommonTerms.TermIdentFromName("Exists");
         private static readonly TermIdent forallTypeId = IsaCommonTerms.TermIdentFromName("ForallT");
@@ -245,6 +248,12 @@ namespace ProofGeneration
                 case BinaryOperator.Opcode.Mul:
                     bopIsa = "Mul";
                     break;
+                case BinaryOperator.Opcode.Div:
+                    bopIsa = "Div";
+                    break;
+                case BinaryOperator.Opcode.Mod:
+                    bopIsa = "Mod";
+                    break;
                 case BinaryOperator.Opcode.Lt:
                     bopIsa = "Lt";
                     break;
@@ -340,7 +349,12 @@ namespace ProofGeneration
             var wrapArgs = new TermList(args);
             var fnameAndArgs = new List<Term> {new StringConst(fname), wrapTypeArgs, wrapArgs};
 
-            return new TermApp(IsaCommonTerms.TermIdentFromName("FunExp"), fnameAndArgs);
+            return new TermApp(funCallId, fnameAndArgs);
+        }
+
+        public static Term ProcCall(string procname, IList<Term> args, IList<Term> returnVars)
+        {
+            return new TermApp(procCallId, new StringConst(procname), new TermList(args), new TermList(returnVars));
         }
 
         public static Term MethodCFGBody(Term entryNode, Term outEdges, Term nodeToBlock)

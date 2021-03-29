@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using Isabelle.Ast;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
@@ -205,6 +206,27 @@ namespace ProofGeneration
 
             return node;
         }
+        
+        public override Cmd VisitCallCmd(CallCmd node)
+        {
+            if(node.TypeParameters != null && node.TypeParameters.FormalTypeParams.Any())
+                throw new NotImplementedException("Do not support procedures with type parameters");
+
+            var argsTerm = node.Ins.Select(e => Translate(e)).ToList();
+            var outsTerm = node.Outs.Select(e =>
+            {
+                if (boogieVarTranslation.VarTranslation.TryTranslateVariableId(e.Decl, out Term id, out _))
+                {
+                    return id;
+                }
+
+                throw new ProofGenUnexpectedStateException("Could not retrieve id of variable");
+            }).ToList();
+            
+            ReturnResult(IsaBoogieTerm.ProcCall(node.Proc.Name, argsTerm, outsTerm));
+
+            return node;
+        }
 
         //not implemented cmds
         public override Cmd VisitHavocCmd(HavocCmd node)
@@ -212,12 +234,7 @@ namespace ProofGeneration
             //handled elsewhere, since havoc of multiple variables is desugared into multiple basic havoc commands
             throw new NotImplementedException();
         }
-
-        public override Cmd VisitCallCmd(CallCmd node)
-        {
-            throw new NotImplementedException();
-        }
-
+        
         public override Cmd VisitParCallCmd(ParCallCmd node)
         {
             throw new NotImplementedException();
