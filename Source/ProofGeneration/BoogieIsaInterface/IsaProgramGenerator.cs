@@ -49,7 +49,8 @@ namespace ProofGeneration
         private IVariableTranslationFactory varTranslationFactory;
         
         private readonly string nodeToBlocksName = "node_to_blocks";
-        private readonly string cfgName = "method_body";
+        private readonly string cfgName = "proc_body";
+        private readonly string procDefName = "proc_name";
 
         public IProgramAccessor GetIsaProgram(
             string theoryName,
@@ -67,18 +68,6 @@ namespace ProofGeneration
             varTranslation = varTranslationFactory.CreateTranslation();
             cmdIsaVisitor = new MultiCmdIsaVisitor(varTranslationFactory);
 
-            /*
-            Term method = IsaBoogieTerm.Method(
-                procName, 
-                methodData.TypeParams.Count(), 
-                IsaCommonTerms.TermIdentFromName(parameters.name), 
-                IsaCommonTerms.TermIdentFromName(localVariables.name), 
-                modifiedVariables,
-                IsaCommonTerms.TermIdentFromName(preconditions.name),
-                IsaCommonTerms.TermIdentFromName(postconditions.name),
-                IsaCommonTerms.TermIdentFromName(methodBodyDecl.name)
-                    );
-            */
             /*
             Term program = IsaBoogieTerm.Program(IsaCommonTerms.TermIdentFromName(funcs.name),
                 new TermList(new List<Term>()),
@@ -119,8 +108,8 @@ namespace ProofGeneration
                 var blockInfo = BlockToInfo(theoryName, procName, cfg, edgeLemmas);
                 var isaProgramRepr = new IsaProgramRepr(
                     isaGlobalProgramRepr,
-                    PreconditionDeclarationName(procName),
-                    PostconditionDeclarationName(procName),
+                    PreconditionDeclarationName(),
+                    PostconditionDeclarationName(),
                     VariableDeclarationsName("params"),
                     VariableDeclarationsName("locals"),
                     cfgName);
@@ -151,9 +140,9 @@ namespace ProofGeneration
                 if (config.generateSpecs)
                 {
                     OuterDecl preconditions =
-                        GetExprListIsa(PreconditionDeclarationName(procName), methodData.Preconditions);
+                        GetExprListIsa(PreconditionDeclarationName(), methodData.Preconditions);
                     OuterDecl postconditions =
-                        GetExprListIsa(PostconditionDeclarationName(procName), methodData.Postconditions);
+                        GetExprListIsa(PostconditionDeclarationName(), methodData.Postconditions);
                     decls.Add(preconditions);
                     decls.Add(postconditions);
                 }
@@ -198,6 +187,12 @@ namespace ProofGeneration
                 decls.AddRange(membershipLemmaManager.OuterDecls());
             }
 
+            if (config.generateSpecs)
+            {
+                DefDecl methodDef = MethodDefinition(membershipLemmaManager, methodData);
+                decls.Add(methodDef);
+            }
+
             return membershipLemmaManager;
         }
 
@@ -220,6 +215,29 @@ namespace ProofGeneration
         private string AxiomDeclarationsName()
         {
             return "axioms";
+        }
+
+        private DefDecl MethodDefinition(IProgramAccessor programAccessor, BoogieMethodData methodData)
+        {
+            var mapping =
+                new List<Tuple<string, Term>>
+                {
+                    Tuple.Create("proc_ty_args", (Term) new NatConst(methodData.TypeParams.Count())),
+                    Tuple.Create("proc_args", (Term) IsaCommonTerms.TermIdentFromName(programAccessor.ParamsDecl())),
+                    //TODO: incorporate return values and modified variables
+                    Tuple.Create("proc_rets", (Term) IsaCommonTerms.EmptyList),
+                    Tuple.Create("proc_modifs", (Term) IsaCommonTerms.EmptyList),
+                    Tuple.Create("proc_pres", programAccessor.PreconditionsDecl()),
+                    Tuple.Create("proc_posts", programAccessor.PostconditionsDecl()),
+                    //TODO: support abstract procedures
+                    Tuple.Create("proc_body", 
+                        IsaCommonTerms.SomeOption(new TermTuple(IsaCommonTerms.TermIdentFromName(programAccessor.LocalsDecl()), programAccessor.CfgDecl())))
+                };
+            
+            Term method = new TermRecord(mapping);
+
+            DefDecl methodDef = DefDecl.CreateWithoutArg(procDefName, IsaBoogieType.ProcedureType(), method);
+            return methodDef;
         }
 
         private IsaBlockInfo BlockToInfo(string theoryName, string methodName, CFGRepr cfg,
@@ -332,12 +350,12 @@ namespace ProofGeneration
             return "fdecls";
         }
 
-        private string PreconditionDeclarationName(string methodName)
+        private string PreconditionDeclarationName()
         {
             return "pres";
         }
 
-        private string PostconditionDeclarationName(string methodName)
+        private string PostconditionDeclarationName()
         {
             return "post";
         }

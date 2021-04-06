@@ -37,23 +37,17 @@ namespace Isabelle.IsaPrettyPrint
 
         public static string CommaAggregate(IEnumerable<string> list)
         {
-            if (!list.Any())
-                return "";
-            return list.Aggregate((s1, s2) => s1 + ", " + s2);
+            return String.Join(",", list);
         }
 
         public static string CommaNewLineAggregate(IEnumerable<string> list)
         {
-            if (!list.Any())
-                return "";
-            return list.Aggregate((s1, s2) => s1 + ", " + Environment.NewLine + s2);
+            return String.Join(", " + Environment.NewLine, list);
         }
 
         public static string SpaceAggregate<T>(this IEnumerable<T> list)
         {
-            if (!list.Any())
-                return "";
-            return list.Aggregate("", (s1, s2) => s1 + " " + s2);
+            return String.Join(" ", list);
         }
 
         public static string Inner(string innerTerm)

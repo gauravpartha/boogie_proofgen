@@ -362,9 +362,9 @@ namespace ProofGeneration
             var mapping =
                 new List<Tuple<string, Term>>
                 {
-                    new Tuple<string, Term>("entry", entryNode),
-                    new Tuple<string, Term>("out_edges", outEdges),
-                    new Tuple<string, Term>("node_to_block", nodeToBlock)
+                    Tuple.Create("entry", entryNode),
+                    Tuple.Create("out_edges", outEdges),
+                    Tuple.Create("node_to_block", nodeToBlock)
                 };
 
             return new TermRecord(mapping);

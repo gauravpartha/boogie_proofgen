@@ -74,6 +74,11 @@ namespace Isabelle.Ast
             return new DefDecl(name, new Tuple<IList<Term>, Term>(new List<Term>(), rhs));
         }
 
+        public static DefDecl CreateWithoutArg(string name, TypeIsa type, Term rhs)
+        {
+            return new DefDecl(name, type, new Tuple<IList<Term>, Term>(new List<Term>(), rhs));
+        }
+
         public override R Dispatch<R>(OuterDeclVisitor<R> visitor)
         {
             return visitor.VisitDefDecl(this);

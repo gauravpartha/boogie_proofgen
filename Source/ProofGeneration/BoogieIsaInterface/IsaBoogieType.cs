@@ -84,6 +84,11 @@ namespace ProofGeneration
             return new SumType(GetCFGNodeType(), IsaCommonTypes.GetUnitType());
         }
 
+        public static TypeIsa ProcedureType()
+        {
+            return new DataType("procedure");
+        }
+
         public static TypeIsa GetBlockType()
         {
             return new DataType("block", new List<TypeIsa>());
