@@ -535,6 +535,9 @@ namespace Microsoft.Boogie
         
         var stats = new PipelineStatistics();
         oc = InferAndVerify(program, stats, 1 < CommandLineOptions.Clo.VerifySnapshots ? programId : null);
+        
+        ProofGenerationOutput.FinishStoring();
+        
         switch (oc)
         {
           case PipelineOutcome.Done:

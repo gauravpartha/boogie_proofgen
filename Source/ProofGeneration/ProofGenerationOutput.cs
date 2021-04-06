@@ -10,22 +10,22 @@ namespace ProofGeneration
 {
     public static class ProofGenerationOutput
     {
-        private static string mainDir;
+        private static string _mainDir;
 
         public static void CreateMainDirectory(string fileName)
         {
-            if (mainDir != null)
+            if (_mainDir != null)
                 throw new ProofGenUnexpectedStateException("main directory already set");
-            mainDir = FreeDirName(Path.GetFileName(fileName) + "_proofs");
-            Directory.CreateDirectory(mainDir);
+            _mainDir = FreeDirName(Path.GetFileName(fileName) + "_proofs");
+            Directory.CreateDirectory(_mainDir);
         }
         
         public static void StoreTheoriesTopLevel(IEnumerable<Theory> theories)
         {
-            if (mainDir == null)
+            if (_mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
-            foreach (var theory in theories) StoreTheory(mainDir, theory);
+            foreach (var theory in theories) StoreTheory(_mainDir, theory);
         }
         
         /// <summary>
@@ -39,16 +39,16 @@ namespace ProofGeneration
         /// <exception cref="ProofGenUnexpectedStateException">Thrown if main proof generation directory is not set.</exception>
         public static void StoreTheoriesInNewDirWithSession(string preferredDirName, IEnumerable<Theory> theories)
         {
-            if (mainDir == null)
+            if (_mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
             //create new directory
-            var dirPath = Path.Join(mainDir, FreeDirName(preferredDirName + "_proofs"));
+            var dirPath = Path.Join(_mainDir, FreeDirName(preferredDirName + "_proofs"));
             Directory.CreateDirectory(dirPath);
 
             foreach (var theory in theories) StoreTheory(dirPath, theory);
 
-            StoreSessionRoot(dirPath, theories);
+            //StoreSessionRoot(dirPath, theories);
         }
 
         private static string NameWithId(string prefix, int id)
@@ -76,9 +76,45 @@ namespace ProofGeneration
             sw.Close();
         }
 
-        private static void StoreSessionRoot(string dirPath, IEnumerable<Theory> theories)
+        private static string ExtractTheoryName(string filename)
         {
-            var sw = new StreamWriter(Path.Combine(dirPath, "ROOT"));
+            var theoryFile = Path.GetFileName(filename);
+            return theoryFile.Remove(theoryFile.Length - 4, 4);
+        }
+
+        private static string CombineLinux(string dir, string file)
+        {
+            return dir + "/" + file;
+        }
+
+        public static void FinishStoring()
+        {
+            if (_mainDir == null)
+                throw new ProofGenUnexpectedStateException("main directory not yet set");
+
+            using var sw = new StreamWriter(Path.Combine(_mainDir, "ROOT"));
+            sw.WriteLine("session " + Path.GetFileName(_mainDir) + " = " + "Boogie_Lang + ");
+            
+            var subDirs = Directory.EnumerateDirectories(_mainDir).ToList();
+            if (subDirs.Any())
+                sw.WriteLine("directories " + String.Join(" ", subDirs.Select(Path.GetFileName)));
+    
+            sw.WriteLine("theories");
+            sw.WriteLine(string.Join(Environment.NewLine,
+                Directory.EnumerateFiles(_mainDir).Where(f => f.EndsWith(".thy")).Select(ExtractTheoryName)));
+                
+            foreach (var subDir in subDirs)
+            {
+                var subDirName = Path.GetFileName(subDir);
+                var theoryFiles = Directory.EnumerateFiles(subDir)
+                    .Where(f => f.EndsWith(".thy")).Select(ExtractTheoryName);
+                sw.WriteLine(string.Join(Environment.NewLine, theoryFiles.Select(thy => "\""+ CombineLinux(subDirName, thy) + "\"")));
+            }
+        }
+
+        private static void StoreSessionRoot(string dirPath, IEnumerable<Theory> theories)
+        { 
+            using var sw = new StreamWriter(Path.Combine(dirPath, "ROOT"));
             sw.WriteLine("session " + Path.GetFileName(dirPath) + " = " + "Boogie_Lang + ");
             sw.WriteLine("theories");
             sw.Write(string.Join(Environment.NewLine, theories.Select(thy => thy.TheoryName)));
