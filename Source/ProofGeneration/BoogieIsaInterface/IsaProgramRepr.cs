@@ -28,6 +28,7 @@
         public readonly string paramsDeclDef;
         public readonly string postconditionsDeclDef;
         public readonly string preconditionsDeclDef;
+        public readonly string procDeclDef;
 
         public IsaProgramRepr(
             IsaGlobalProgramRepr globalProgramRepr,
@@ -35,7 +36,8 @@
             string postconditionsDeclDef,
             string paramsDeclDef,
             string localVarsDeclDef,
-            string cfgDeclDef)
+            string cfgDeclDef,
+            string procDeclDef)
         {
             GlobalProgramRepr = globalProgramRepr;
             this.cfgDeclDef = cfgDeclDef;
@@ -43,6 +45,7 @@
             this.localVarsDeclDef = localVarsDeclDef;
             this.preconditionsDeclDef = preconditionsDeclDef;
             this.postconditionsDeclDef = postconditionsDeclDef;
+            this.procDeclDef = procDeclDef;
         }
     }
 }

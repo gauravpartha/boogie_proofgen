@@ -87,8 +87,8 @@ namespace ProofGeneration.BoogieIsaInterface
             typeIsaVisitor = new TypeIsaVisitor(factory.CreateTranslation().TypeVarTranslation);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(factory);
             
-            isaProgramRepr = new IsaProgramRepr(globalProgRepr, null, null, null, null, null);
-            config = new IsaProgramGeneratorConfig(null, true, true, true, false, false, false);
+            isaProgramRepr = new IsaProgramRepr(globalProgRepr, null, null, null, null, null, null);
+            config = new IsaProgramGeneratorConfig(null, true, true, true, false, SpecsConfig.None, false);
 
             consts = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.constantsDeclDef);
             globals = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.globalsDeclDef);
@@ -170,9 +170,19 @@ namespace ProofGeneration.BoogieIsaInterface
             return parent.AxiomsDecl();
         }
 
+        public Term ProcDecl()
+        {
+            return QualifyAccessTerm(isaProgramRepr.procDeclDef);
+        }
+
+        public string ProcDeclName()
+        {
+            return QualifyAccessName(isaProgramRepr.procDeclDef);
+        }
+
         public Term PreconditionsDecl()
         {
-            if (config.generateSpecs)
+            if (config.specsConfig != SpecsConfig.None)
                 return QualifyAccessTerm(isaProgramRepr.preconditionsDeclDef);
 
             return parent.PreconditionsDecl();
@@ -180,7 +190,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public string PreconditionsDeclName()
         {
-            if (config.generateSpecs)
+            if (config.specsConfig != SpecsConfig.None)
                 return QualifyAccessName(isaProgramRepr.preconditionsDeclDef);
 
             return parent.PreconditionsDeclName();
@@ -188,7 +198,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public Term PostconditionsDecl()
         {
-            if (config.generateSpecs)
+            if (config.specsConfig != SpecsConfig.None)
                 return QualifyAccessTerm(isaProgramRepr.postconditionsDeclDef);
 
             return parent.PostconditionsDecl();
@@ -196,7 +206,7 @@ namespace ProofGeneration.BoogieIsaInterface
 
         public string PostconditionsDeclName()
         {
-            if (config.generateSpecs)
+            if (config.specsConfig != SpecsConfig.None)
                 return QualifyAccessName(isaProgramRepr.postconditionsDeclDef);
 
             return parent.PostconditionsDeclName();
@@ -235,6 +245,11 @@ namespace ProofGeneration.BoogieIsaInterface
         public string GlobalsDecl()
         {
             return globals;
+        }
+
+        public BoogieVariableTranslation VariableTranslation()
+        {
+            return factory.CreateTranslation();
         }
 
         public string MembershipLemma(Declaration d)

@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Net.Http;
 using Isabelle.Ast;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
@@ -69,6 +67,8 @@ namespace ProofGeneration
 
         private static IProgramAccessor globalDataProgAccess;
 
+        private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
+        
         public static void Program(Program p)
         {
             if (boogieGlobalData == null)
@@ -81,7 +81,7 @@ namespace ProofGeneration
                 var factory =
                     new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
                 var globalDataTheoryName = "global_data";
-                var globalDataConfig = new IsaProgramGeneratorConfig(null, true, true, true, false, false, false);
+                var globalDataConfig = new IsaProgramGeneratorConfig(null, true, true, true, false, SpecsConfig.None, false);
                 globalDataProgAccess = new IsaProgramGenerator().GetIsaProgram(
                     globalDataTheoryName,
                     "proc",
@@ -383,7 +383,9 @@ namespace ProofGeneration
             
             #region before cfg to dag program
             var beforeCfgToDagTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_cfg_to_dag_prog");
-            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, true, true);
+            //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
+            var specsConfig = CommandLineOptions.Clo.OnlyGenerateIsaProgram ? SpecsConfig.All : SpecsConfig.AllPreCheckedPost;
+            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, specsConfig, true);
             var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
                 afterPassificationImpl.Name,
@@ -391,6 +393,8 @@ namespace ProofGeneration
                 beforeDagCfg,
                 out var programDeclsBeforeCfgToDag,
                 !CommandLineOptions.Clo.OnlyGenerateIsaProgram);
+            procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name, beforeCfgToDagProgAccess);
+            
             var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util", "\"../"+globalDataProgAccess.TheoryName()+"\""},
                 programDeclsBeforeCfgToDag);
@@ -407,7 +411,7 @@ namespace ProofGeneration
 
             var beforePassiveProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
             var beforePassiveConfig =
-                new IsaProgramGeneratorConfig(beforeCfgToDagProgAccess, false, false, false, false, false, false);
+                new IsaProgramGeneratorConfig(beforeCfgToDagProgAccess, false, false, false, false, SpecsConfig.None, false);
             var beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
                 afterPassificationImpl.Name,
                 mainData, beforePassiveConfig, varTranslationFactory2,
@@ -416,7 +420,6 @@ namespace ProofGeneration
                 !CommandLineOptions.Clo.OnlyGenerateIsaProgram);
 
             #endregion
-
 
             var vcAllAxioms = AxiomHandler.AxiomInfo(
                 axiomBuilder != null,
@@ -448,7 +451,7 @@ namespace ProofGeneration
 
             var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
             var passiveProgConfig =
-                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, false, false);
+                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, SpecsConfig.None, false);
             var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
                 afterPassificationImpl.Name,
                 finalProgData, passiveProgConfig, varTranslationFactory,
@@ -476,7 +479,6 @@ namespace ProofGeneration
 
             var phasesTheories = new PhasesTheories(afterPassificationImpl.Name);
 
-
             var theoryPassive = VcPhaseManager.ProgramToVcProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Vc),
                 _proofGenConfig.GenerateVcE2E,
@@ -503,9 +505,10 @@ namespace ProofGeneration
                 programDeclsBeforePassive);
             theories.Add(passificationProgTheory);
 
+            /*
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
-
+            */
 
             var passificationProofTheory = PassificationManager.PassificationProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
@@ -556,6 +559,11 @@ namespace ProofGeneration
         public static void StoreResult(string preferredDirName, IEnumerable<Theory> theories)
         {
             ProofGenerationOutput.StoreTheoriesInNewDirWithSession("proofs_" + afterPassificationImpl.Proc.Name, theories);
+        }
+
+        public static BoogieIsaProgInterface BoogieIsaProgInterface()
+        {
+            return new BoogieIsaProgInterface(new Dictionary<string, IProgramAccessor>(procNameToTopLevelPrograms), globalDataProgAccess);
         }
     }
 }

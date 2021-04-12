@@ -12,13 +12,17 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
+    public enum SpecsConfig
+    {
+        None, AllPreCheckedPost, All
+    }
     public class IsaProgramGeneratorConfig
     {
         public readonly bool generateAxioms;
         public readonly bool generateFunctions;
         public readonly bool generateGlobalsAndConstants;
         public readonly bool generateParamsAndLocals;
-        public readonly bool generateSpecs;
+        public readonly SpecsConfig specsConfig;
         public readonly bool generateVarContextWfLemma;
         public readonly IProgramAccessor parentAccessor;
         
@@ -28,14 +32,14 @@ namespace ProofGeneration
             bool generateAxioms,
             bool generateGlobalsAndConstants,
             bool generateParamsAndLocals,
-            bool generateSpecs,
+            SpecsConfig specsConfig,
             bool generateVarContextWfLemma
         )
         {
             parentAccessor = parent;
             this.generateFunctions = generateFunctions;
             this.generateAxioms = generateAxioms;
-            this.generateSpecs = generateSpecs;
+            this.specsConfig = specsConfig;
             this.generateGlobalsAndConstants = generateGlobalsAndConstants;
             this.generateParamsAndLocals = generateParamsAndLocals;
             this.generateVarContextWfLemma = generateVarContextWfLemma;
@@ -50,7 +54,7 @@ namespace ProofGeneration
         
         private readonly string nodeToBlocksName = "node_to_blocks";
         private readonly string cfgName = "proc_body";
-        private readonly string procDefName = "proc_name";
+        private readonly string procDefName = "proc";
 
         public IProgramAccessor GetIsaProgram(
             string theoryName,
@@ -112,7 +116,8 @@ namespace ProofGeneration
                     PostconditionDeclarationName(),
                     VariableDeclarationsName("params"),
                     VariableDeclarationsName("locals"),
-                    cfgName);
+                    cfgName,
+                    procDefName);
                 membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo,
                 Tuple.Create(globalsMax, localsMin), varTranslationFactory, theoryName);
                 
@@ -137,12 +142,22 @@ namespace ProofGeneration
                 decls.AddRange(blockInfo.BlockCmdsLemmas.Values);
                 decls.AddRange(blockInfo.BlockOutEdgesLemmas.Values);
                 
-                if (config.generateSpecs)
+                if (config.specsConfig != SpecsConfig.None)
                 {
-                    OuterDecl preconditions =
-                        GetExprListIsa(PreconditionDeclarationName(), methodData.Preconditions);
-                    OuterDecl postconditions =
-                        GetExprListIsa(PostconditionDeclarationName(), methodData.Postconditions);
+                    OuterDecl preconditions;
+                    OuterDecl postconditions;
+
+                    if (config.specsConfig == SpecsConfig.AllPreCheckedPost)
+                    {
+                        preconditions = GetExprListIsa(PreconditionDeclarationName(), methodData.Preconditions.Select(pre => pre.Item1));
+                        postconditions = GetExprListIsa(PostconditionDeclarationName(), methodData.Postconditions.Where(post => !post.Item2).Select(post => post.Item1));
+                    }
+                    else
+                    {
+                        preconditions = GetExprListIsa(PreconditionDeclarationName(), methodData.Preconditions);
+                        postconditions = GetExprListIsa(PostconditionDeclarationName(), methodData.Postconditions);
+                    }
+                    
                     decls.Add(preconditions);
                     decls.Add(postconditions);
                 }
@@ -187,7 +202,7 @@ namespace ProofGeneration
                 decls.AddRange(membershipLemmaManager.OuterDecls());
             }
 
-            if (config.generateSpecs)
+            if (config.specsConfig == SpecsConfig.All)
             {
                 DefDecl methodDef = MethodDefinition(membershipLemmaManager, methodData);
                 decls.Add(methodDef);
@@ -386,6 +401,18 @@ namespace ProofGeneration
         private string VariableDeclarationsName(string varKind)
         {
             return varKind + "_vdecls";
+        }
+        
+        private DefDecl GetExprListIsa(string declName, IEnumerable<Expr> exprs)
+        {
+            var result = new List<Term>();
+            foreach (var expr in exprs)
+            {
+                var termTuple = cmdIsaVisitor.TranslateSingle(expr);
+                result.Add(termTuple);
+            }
+
+            return DefDecl.CreateWithoutArg(declName, new TermList(result));
         }
 
         private DefDecl GetExprListIsa(string declName, IEnumerable<Tuple<Expr,bool>> exprs)
