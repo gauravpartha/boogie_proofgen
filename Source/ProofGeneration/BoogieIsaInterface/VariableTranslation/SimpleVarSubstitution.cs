@@ -40,7 +40,11 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 
         public bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar)
         {
-            isBoundVar = false;
+            throw new NotSupportedException();
+        }
+
+        public bool TryTranslateVariableIntId(T variable, out int id, out bool isBoundVar)
+        {
             throw new NotSupportedException();
         }
     }

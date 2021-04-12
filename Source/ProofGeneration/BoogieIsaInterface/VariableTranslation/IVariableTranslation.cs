@@ -30,5 +30,11 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
         /// <param name="isBoundVar"></param>
         /// <returns></returns>
         bool TryTranslateVariableId(T variable, out Term id, out bool isBoundVar);
+        
+        /// <summary>
+        /// Same as <see cref="TryTranslateVariableId(T,out Isabelle.Ast.Term,out bool)"/>, but only returns true if the
+        /// identifier is represented by a number and if so, returns the corresponding integer (instead of the term)
+        /// </summary>
+        bool TryTranslateVariableIntId(T variable, out int id, out bool isBoundVar);
     }
 }
