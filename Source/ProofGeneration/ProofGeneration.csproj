@@ -2,8 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <AssemblyName>BoogieProofGeneration</AssemblyName>
-    <RootNamespace>ProofGeneration-NetCore</RootNamespace>
+    <AssemblyName>Boogie.ProofGeneration</AssemblyName>
   </PropertyGroup>
   
   <ItemGroup>
