@@ -775,6 +775,7 @@ namespace Microsoft.Boogie
     
     #region proof generation options
     public bool OnlyGenerateIsaProgram = false;
+    public bool DesugarMaps = false;
     #endregion
 
     [ContractInvariantMethod]
@@ -1461,15 +1462,19 @@ namespace Microsoft.Boogie
           ps.GetNumericArgument(ref KInductionDepth);
           return true;
         case "proofGenOnlyGenerateIsaProg":
-        {
           if (ps.ConfirmArgumentCount(0))
           {
             OnlyGenerateIsaProgram = true;
           }
-
+          
           return true;
-        }
-
+        case "desugarMaps":
+          if (ps.ConfirmArgumentCount(0))
+          {
+            DesugarMaps = true;
+          }
+          
+          return true;
         default:
           bool optionValue = false;
           if (ps.CheckBooleanFlag("printUnstructured", ref optionValue))

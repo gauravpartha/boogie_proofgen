@@ -897,6 +897,11 @@ namespace Microsoft.Boogie
         }
       }
 
+      if (CommandLineOptions.Clo.DesugarMaps)
+      {
+        MapDesugaring.DesugarMaps(program);
+      }
+
       #endregion
 
       #region Infer invariants using Abstract Interpretation
