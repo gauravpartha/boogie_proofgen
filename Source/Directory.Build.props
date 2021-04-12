@@ -2,7 +2,8 @@
 
   <!-- Target framework and package configuration -->
   <PropertyGroup>
-    <Version>2.8.26</Version>
+    <!-- Corresponding Original Boogie Version: <Version>2.8.26</Version> -->
+	<Version>500.0.1</Version>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <Authors>Boogie</Authors>
