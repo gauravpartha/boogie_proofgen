@@ -774,7 +774,7 @@ namespace Microsoft.Boogie
     private List<string /*!*/> procsToIgnore = new List<string /*!*/>();
     
     #region proof generation options
-    public bool OnlyGenerateIsaProgram = false;
+    public bool GenerateIsaProgNoProofs = false;
     public bool DesugarMaps = false;
     #endregion
 
@@ -1461,10 +1461,10 @@ namespace Microsoft.Boogie
         case "kInductionDepth":
           ps.GetNumericArgument(ref KInductionDepth);
           return true;
-        case "proofGenOnlyGenerateIsaProg":
+        case "isaProgNoProofs":
           if (ps.ConfirmArgumentCount(0))
           {
-            OnlyGenerateIsaProgram = true;
+            GenerateIsaProgNoProofs = true;
           }
           
           return true;
