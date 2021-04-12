@@ -55,6 +55,12 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
             return true;
         }
 
+        public bool TryTranslateVariableIntId(T variable, out int id, out bool isBoundVar)
+        {
+            id = TranslateVariableIdx(variable, out isBoundVar);
+            return true;
+        }
+
         private int TranslateVariableIdx(T variable, out bool isBoundVar)
         {
             var i = 0;
