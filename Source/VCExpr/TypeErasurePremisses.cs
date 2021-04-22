@@ -1320,7 +1320,9 @@ namespace Microsoft.Boogie.TypeErasure
       if (typeVarBindings.Count < node.TypeParameters.Count) {
         if (!_extractTypeArgs)
         {
-          // type variables are quantified over first to make proof generation easier (hence Reverse + Insert at beginning)
+          /* This is not invoked for the final VC, but just for proof generation purposes (parts of the VC are rewritten into this form;
+             this rewriting is proved correct in Isabelle).
+             Type variables are quantified over first to make proof generation easier (hence Reverse + Insert at beginning). */
           foreach (TypeVariable /*!*/ var in ((IEnumerable<TypeVariable>) node.TypeParameters).Reverse())
           {
             Contract.Assert(var != null);
@@ -1329,6 +1331,8 @@ namespace Microsoft.Boogie.TypeErasure
         }
         else
         {
+          /* This is the standard implementation that is also invoked for the VC that is translated to the Isabelle
+           representation for the proof generation. */
           foreach (TypeVariable/*!*/ var in node.TypeParameters) 
           {
             Contract.Assert(var != null);
