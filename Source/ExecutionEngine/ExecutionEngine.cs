@@ -507,31 +507,33 @@ namespace Microsoft.Boogie
 
         Inline(program);
         
-        ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames));
 
-        /*
         #region check if proof gen supports subset
-        ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
-        if (!proofGenSubsetChecker.ProofGenSupportsSubset(program, out object resultNode))
+
+        if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
         {
-          Console.WriteLine("Failure: " + fileNames[0] + " " + resultNode.GetType());
+          ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
+          if (proofGenSubsetChecker.ProofGenPotentiallySupportsSubset(program, out object resultNode))
+          {
+            //num commands
+            Console.WriteLine("Success:"+fileNames[0]);
+            /*
+            int totalNumOfCommands = program.Implementations.Sum(i => i.Blocks.Sum(b => b.cmds.Count()));
+            Console.WriteLine("Success: " + fileNames[0] + 
+                              " Commands: " + totalNumOfCommands + 
+                              " Axioms: " + program.Axioms.Count() + 
+                              " Variables: " + program.Variables.Count() + 
+                              " Constants: " + program.Constants.Count() +
+                              " Funcs: " + program.Functions.Count() + 
+                              " Procs: " + program.Procedures.Count() + 
+                              " Impls: " + program.Implementations.Count());
+            */
+          }
+          Environment.Exit(0);
         }
-        else
-        {
-          //num commands
-          int totalNumOfCommands = program.Implementations.Sum(i => i.Blocks.Sum(b => b.cmds.Count()));
-          Console.WriteLine("Success: " + fileNames[0] + 
-                            " Commands: " + totalNumOfCommands + 
-                            " Axioms: " + program.Axioms.Count() + 
-                            " Variables: " + program.Variables.Count() + 
-                            " Constants: " + program.Constants.Count() +
-                            " Funcs: " + program.Functions.Count() + 
-                            " Procs: " + program.Procedures.Count() + 
-                            " Impls: " + program.Implementations.Count());
-        }
-        Environment.Exit(0);
         #endregion
-        */
+        
+        ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames));
         
         var stats = new PipelineStatistics();
         oc = InferAndVerify(program, stats, 1 < CommandLineOptions.Clo.VerifySnapshots ? programId : null);

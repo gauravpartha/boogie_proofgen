@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Isabelle.Ast;
 using Isabelle.IsaPrettyPrint;
+using Microsoft.Boogie;
 
 namespace ProofGeneration
 {
@@ -14,14 +15,20 @@ namespace ProofGeneration
 
         public static void CreateMainDirectory(string fileName)
         {
+            if (CommandLineOptions.Clo.DontStoreProofGenFiles)
+                return;
+            
             if (_mainDir != null)
                 throw new ProofGenUnexpectedStateException("main directory already set");
-            _mainDir = FreeDirName(Path.GetFileName(fileName) + "_proofs");
+            _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs");
             Directory.CreateDirectory(_mainDir);
         }
         
         public static void StoreTheoriesTopLevel(IEnumerable<Theory> theories)
         {
+            if (CommandLineOptions.Clo.DontStoreProofGenFiles)
+                return;
+            
             if (_mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
@@ -39,6 +46,9 @@ namespace ProofGeneration
         /// <exception cref="ProofGenUnexpectedStateException">Thrown if main proof generation directory is not set.</exception>
         public static void StoreTheoriesInNewDirWithSession(string preferredDirName, IEnumerable<Theory> theories)
         {
+            if (CommandLineOptions.Clo.DontStoreProofGenFiles)
+                return;
+            
             if (_mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
@@ -61,7 +71,7 @@ namespace ProofGeneration
         private static string FreeDirName(string preferredName)
         {
             var i = 1;
-            while (Directory.Exists(NameWithId(preferredName, i))) i++;
+            while (Directory.Exists(SessionName(NameWithId(preferredName, i)))) i++;
 
             return NameWithId(preferredName, i);
         }
@@ -87,13 +97,22 @@ namespace ProofGeneration
             return dir + "/" + file;
         }
 
+        private static string SessionName(string preferredName)
+        {
+            //hyphens are not allowed in session names
+            return preferredName.Replace('-', '_').Replace('\'', 'A');
+        }
+        
         public static void FinishStoring()
         {
+            if (CommandLineOptions.Clo.DontStoreProofGenFiles)
+                return;
+            
             if (_mainDir == null)
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
             using var sw = new StreamWriter(Path.Combine(_mainDir, "ROOT"));
-            sw.WriteLine("session " + Path.GetFileName(_mainDir) + " = " + "Boogie_Lang + ");
+            sw.WriteLine("session " + SessionName(Path.GetFileName(_mainDir)) + " = " + "Boogie_Lang + ");
             
             var subDirs = Directory.EnumerateDirectories(_mainDir).ToList();
             if (subDirs.Any())
@@ -110,15 +129,6 @@ namespace ProofGeneration
                     .Where(f => f.EndsWith(".thy")).Select(ExtractTheoryName);
                 sw.WriteLine(string.Join(Environment.NewLine, theoryFiles.Select(thy => "\""+ CombineLinux(subDirName, thy) + "\"")));
             }
-        }
-
-        private static void StoreSessionRoot(string dirPath, IEnumerable<Theory> theories)
-        { 
-            using var sw = new StreamWriter(Path.Combine(dirPath, "ROOT"));
-            sw.WriteLine("session " + Path.GetFileName(dirPath) + " = " + "Boogie_Lang + ");
-            sw.WriteLine("theories");
-            sw.Write(string.Join(Environment.NewLine, theories.Select(thy => thy.TheoryName)));
-            sw.Close();
         }
     }
 }
