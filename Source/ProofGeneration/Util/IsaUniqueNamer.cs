@@ -55,7 +55,7 @@ namespace ProofGeneration.Util
             foreach (var illegalChar in illegalChars) preferredNameMod = preferredNameMod.Replace(illegalChar, '_');
 
             if (reservedNames.Contains(preferredNameMod)) preferredNameMod = preferredNameMod + "ZZ";
-            if (preferredName.Last() == '_') preferredNameMod = preferredNameMod + "n";
+            if (preferredName.Length > 0 && preferredName.Last() == '_') preferredNameMod = preferredNameMod + "n";
             return uniqueNamer.GetName(obj, GetValidIsaString(preferredNameMod));
         }
 

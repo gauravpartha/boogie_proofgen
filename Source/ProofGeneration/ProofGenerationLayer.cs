@@ -553,12 +553,12 @@ namespace ProofGeneration
             theories.Add(cfgToDagProofTheory);
             #endregion
             
-            StoreResult("proofs_" + afterPassificationImpl.Proc.Name, theories);
+            StoreResult(afterPassificationImpl.Proc.Name, theories);
         }
 
         public static void StoreResult(string preferredDirName, IEnumerable<Theory> theories)
         {
-            ProofGenerationOutput.StoreTheoriesInNewDirWithSession("proofs_" + afterPassificationImpl.Proc.Name, theories);
+            ProofGenerationOutput.StoreTheoriesInNewDirWithSession(preferredDirName, theories);
         }
 
         public static BoogieIsaProgInterface BoogieIsaProgInterface()
