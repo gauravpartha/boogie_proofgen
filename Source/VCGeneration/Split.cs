@@ -1186,13 +1186,13 @@ namespace VC
         var declFreeProverContext = ctx as DeclFreeProverContext;
         var premiseEraserProvider = typePremiseEraserFactory?.NewEraser();
 
-        VCExpr eraseVC (VCExpr vc) 
+        VCExpr eraseVC (VCExpr vc, int polarity) 
         {
-          return !premiseEraserProvider.ProgramIsPolymorphic ? vc : premiseEraserProvider.EraseAndSortLet(vc);
+          return !premiseEraserProvider.ProgramIsPolymorphic ? vc : premiseEraserProvider.EraseAndSortLet(vc, polarity);
         }
 
-        VCExpr erasedVC = eraseVC(vc);
-        VCExpr erasedAxioms = eraseVC(declFreeProverContext.Axioms);
+        VCExpr erasedVC = eraseVC(vc, 1);
+        VCExpr erasedAxioms = eraseVC(declFreeProverContext.Axioms, -1);
 
         VCExpr typeAxioms = null;
         List<VCAxiomInfo> vcAxiomsInfo = null;
