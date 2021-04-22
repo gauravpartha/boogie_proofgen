@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using Isabelle.Ast;
 using Isabelle.Util;
 using Microsoft.Boogie.VCExprAST;
@@ -87,7 +88,8 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitDivOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            Contract.Assert(arg.Count == 2);
+            return new TermApp(IsaCommonTerms.TermIdentFromName("smt_div"), arg[0], arg[1]);
         }
 
         public Term VisitEqOp(VCExprNAry node, List<Term> arg)
