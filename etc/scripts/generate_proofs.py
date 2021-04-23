@@ -4,7 +4,7 @@ from datetime import datetime
 import argparse
 
 # The following command should point to the Boogie proof generation binary 
-boogie_proofgen_bin = "boogie_proofgen"
+boogie_proofgen_bin = "boogieproof"
 
 def generate_proofs(input_dir, output_dir):
     n_success = 0
