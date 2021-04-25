@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
@@ -627,6 +628,11 @@ namespace ProofGeneration
                     boogieContext.absValTyMap, boogieContext.varContext, boogieContext.funContext,
                     boogieContext.rtypeEnv, normalState, exprs
                 });
+        }
+
+        public static Term LiftExprsToCheckedSpecs(Term expressions)
+        {
+            return new TermApp(IsaCommonTerms.TermIdentFromName("exprs_to_only_checked_spec"), expressions);
         }
 
         public static Term AxiomAssm(Term absValTyMap, Term funContext, Term consts, Term normalState, Term axioms)

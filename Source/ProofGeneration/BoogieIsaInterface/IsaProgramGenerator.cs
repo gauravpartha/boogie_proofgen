@@ -202,9 +202,9 @@ namespace ProofGeneration
                 decls.AddRange(membershipLemmaManager.OuterDecls());
             }
 
-            if (config.specsConfig == SpecsConfig.All)
+            if (config.specsConfig != SpecsConfig.None)
             {
-                DefDecl methodDef = MethodDefinition(membershipLemmaManager, methodData);
+                DefDecl methodDef = MethodDefinition(membershipLemmaManager, methodData, config.specsConfig);
                 decls.Add(methodDef);
             }
 
@@ -232,7 +232,7 @@ namespace ProofGeneration
             return "axioms";
         }
 
-        private DefDecl MethodDefinition(IProgramAccessor programAccessor, BoogieMethodData methodData)
+        private DefDecl MethodDefinition(IProgramAccessor programAccessor, BoogieMethodData methodData, SpecsConfig specConfig)
         {
             var mapping =
                 new List<Tuple<string, Term>>
@@ -242,8 +242,8 @@ namespace ProofGeneration
                     //TODO: incorporate return values and modified variables
                     Tuple.Create("proc_rets", (Term) IsaCommonTerms.EmptyList),
                     Tuple.Create("proc_modifs", (Term) IsaCommonTerms.EmptyList),
-                    Tuple.Create("proc_pres", programAccessor.PreconditionsDecl()),
-                    Tuple.Create("proc_posts", programAccessor.PostconditionsDecl()),
+                    Tuple.Create("proc_pres", specConfig == SpecsConfig.All ?  programAccessor.PreconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PreconditionsDecl())),
+                    Tuple.Create("proc_posts", specConfig == SpecsConfig.All ? programAccessor.PostconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PostconditionsDecl())),
                     //TODO: support abstract procedures
                     Tuple.Create("proc_body", 
                         IsaCommonTerms.SomeOption(new TermTuple(IsaCommonTerms.TermIdentFromName(programAccessor.LocalsDecl()), programAccessor.CfgDecl())))

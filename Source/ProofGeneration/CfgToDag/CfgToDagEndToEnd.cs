@@ -103,15 +103,40 @@ namespace ProofGeneration.CfgToDag
             proofSb.AppendLine("done");
             proofSb.AppendLine("qed");
 
-            var lemma =
+            var helperLemmaName = "end_to_end_theorem_aux";
+            
+            var helperLemma =
                 new LemmaDecl(
-                    "end_to_end_theorem",
+                    helperLemmaName,
                     LemmaContext(cfg, vcAssm),
                     CfgToDagLemmaManager.CfgLemmaConclusion(boogieContext, programAccessor.PostconditionsDecl(),
                         finalNodeOrReturn, finalState),
                     new Proof(new List<string> {proofSb.ToString()})
                 );
-            result.Add(lemma);
+            result.Add(helperLemma);
+            //transform end to end theorem to a compact representation
+
+            var endToEndLemma = 
+                new LemmaDecl(
+                    "end_to_end_theorem",
+                    ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
+                    ProcedureIsCorrect(
+                        programAccessor.FunctionsDecl(), 
+                        IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
+                        IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
+                        programAccessor.AxiomsDecl(),
+                        programAccessor.ProcDecl()),
+                    new Proof(
+                        new List<string>
+                        {
+                            ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util",helperLemmaName))),
+                            "apply assumption " + "using VC apply simp " + " apply assumption+",
+                            ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
+                                             programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def")
+                        }
+                    ) );
+            
+            result.Add(endToEndLemma);
             return result;
         }
 
@@ -161,6 +186,25 @@ namespace ProofGeneration.CfgToDag
                         binderEmptyAssmName
                     }
                 );
+        }
+        
+        public static Term ProcedureIsCorrect(Term funDecls, Term constantDecls, Term globalDecls, Term axioms,
+            Term procedure)
+        {
+            var typeInterpId = new SimpleIdentifier("A");
+            return 
+                TermQuantifier.MetaAll(
+                    new List<Identifier>{ typeInterpId},
+                    null,
+                    new TermApp(
+                IsaCommonTerms.TermIdentFromName("proc_is_correct"),
+                //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
+                new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
+                funDecls,
+                constantDecls,
+                globalDecls,
+                axioms,
+                procedure));
         }
     }
 }

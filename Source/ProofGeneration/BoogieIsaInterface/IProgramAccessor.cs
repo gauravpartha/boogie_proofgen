@@ -28,6 +28,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public Term PostconditionsDecl();
         public string PostconditionsDeclName();
         public Term CfgDecl();
+        public string CfgDeclName();
         
         /// <summary>
         /// params + local variables

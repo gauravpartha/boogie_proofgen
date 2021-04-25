@@ -216,6 +216,11 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             return QualifyAccessTerm(isaProgramRepr.cfgDeclDef);
         }
+        
+        public string CfgDeclName()
+        {
+            return QualifyAccessName(isaProgramRepr.cfgDeclDef);
+        }
 
         public Term ParamsAndLocalsDecl()
         {
