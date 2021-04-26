@@ -522,8 +522,23 @@ namespace Microsoft.Boogie
           Environment.Exit(0);
         }
         #endregion
-        
-        ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames));
+
+        if (CommandLineOptions.Clo.ProofOutputDir != null)
+        {
+          if (Directory.Exists(CommandLineOptions.Clo.ProofOutputDir))
+          {
+            Console.WriteLine("Proof generation output directory " + CommandLineOptions.Clo.ProofOutputDir + " already exists ");
+            Environment.Exit(1);
+          }
+          else
+          {
+            ProofGenerationOutput.CreateMainDirectory(CommandLineOptions.Clo.ProofOutputDir, true);
+          }
+        }
+        else
+        {
+          ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames), false);
+        }
         
         var stats = new PipelineStatistics();
         oc = InferAndVerify(program, stats, 1 < CommandLineOptions.Clo.VerifySnapshots ? programId : null);

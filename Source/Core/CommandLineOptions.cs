@@ -774,6 +774,7 @@ namespace Microsoft.Boogie
     private List<string /*!*/> procsToIgnore = new List<string /*!*/>();
     
     #region proof generation options
+    public string ProofOutputDir = null;
     public bool OnlyCheckProofGenSupport = false;
     public bool DontStoreProofGenFiles = false;
     public bool GenerateIsaProgNoProofs = false;
@@ -1463,6 +1464,14 @@ namespace Microsoft.Boogie
         case "kInductionDepth":
           ps.GetNumericArgument(ref KInductionDepth);
           return true;
+        case "proofOutputDir":
+          if (ps.ConfirmArgumentCount(1))
+          {
+            string s = cce.NonNull(args[ps.i]);
+            ProofOutputDir = s;
+          }
+
+          return true;
         case "onlyCheckProofGenSupport":
           if (ps.ConfirmArgumentCount(0))
           {
@@ -1489,7 +1498,7 @@ namespace Microsoft.Boogie
           {
             DesugarMaps = true;
           }
-          
+
           return true;
         default:
           bool optionValue = false;

@@ -13,14 +13,18 @@ namespace ProofGeneration
     {
         private static string _mainDir;
 
-        public static void CreateMainDirectory(string fileName)
+        public static void CreateMainDirectory(string fileName, bool onlyUseFileName)
         {
             if (CommandLineOptions.Clo.DontStoreProofGenFiles)
                 return;
             
             if (_mainDir != null)
                 throw new ProofGenUnexpectedStateException("main directory already set");
-            _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs");
+
+            if (!onlyUseFileName)
+                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs");
+            else
+                _mainDir = fileName;
             Directory.CreateDirectory(_mainDir);
         }
         
