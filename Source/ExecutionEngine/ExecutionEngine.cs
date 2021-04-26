@@ -508,27 +508,17 @@ namespace Microsoft.Boogie
         Inline(program);
         
 
-        #region check if proof gen supports subset
-
-        if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
+        #region check if proof gen potentially supports input program
+        ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
+        if (!proofGenSubsetChecker.ProofGenPotentiallySupportsSubset(program, out object resultNode))
         {
-          ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
-          if (proofGenSubsetChecker.ProofGenPotentiallySupportsSubset(program, out object resultNode))
-          {
-            //num commands
-            Console.WriteLine("Success:"+fileNames[0]);
-            /*
-            int totalNumOfCommands = program.Implementations.Sum(i => i.Blocks.Sum(b => b.cmds.Count()));
-            Console.WriteLine("Success: " + fileNames[0] + 
-                              " Commands: " + totalNumOfCommands + 
-                              " Axioms: " + program.Axioms.Count() + 
-                              " Variables: " + program.Variables.Count() + 
-                              " Constants: " + program.Constants.Count() +
-                              " Funcs: " + program.Functions.Count() + 
-                              " Procs: " + program.Procedures.Count() + 
-                              " Impls: " + program.Implementations.Count());
-            */
-          }
+          if(!CommandLineOptions.Clo.OnlyCheckProofGenSupport)
+            Console.WriteLine("Proof generation does not support this program, because of node " + resultNode);
+          
+          Environment.Exit(0);
+        } else if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
+        {
+          Console.WriteLine("Success:" + fileNames[0]);
           Environment.Exit(0);
         }
         #endregion

@@ -32,25 +32,13 @@ namespace ProofGeneration.Util
             return problematicNode == null;
         }
 
-        public override Procedure VisitProcedure(Procedure node)
-        {
-            //no procedure type parameters, free pre- and postconditions, no where clauses
-            if (node.TypeParameters.Any() || 
-                node.Requires.Any(req => req.Free) || 
-                node.Ensures.Any(ens => ens.Free) ||
-                node.InParams.Union(node.OutParams).Any(v => v.TypedIdent.WhereExpr != null))
-            {
-                problematicNode = node;
-                return node;
-            }
-
-            return base.VisitProcedure(node);
-        }
-
         public override Implementation VisitImplementation(Implementation node)
         {
-            //no where clauses
-            if (node.LocVars.Any(v => v.TypedIdent.WhereExpr != null))
+            //no procedure type parameters, free pre- and postconditions, no where clauses
+            if (node.Proc.TypeParameters.Any() ||
+                node.Proc.Requires.Any(req => req.Free) || 
+                node.Proc.Ensures.Any(ens => ens.Free) ||
+                node.Proc.InParams.Union(node.Proc.OutParams).Union(node.LocVars).Any(v => v.TypedIdent.WhereExpr != null))
             {
                 problematicNode = node;
                 return node;
