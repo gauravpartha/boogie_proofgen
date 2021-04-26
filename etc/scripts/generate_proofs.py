@@ -9,11 +9,15 @@ boogie_proofgen_bin = "boogieproof"
 def generate_proofs(input_dir, output_dir):
     n_success = 0
     n_failure = 0
-    
+
+    # turn input directory path into an absolute path, since we are going to 
+    # change the working directory
+    input_dir_absolute = os.path.abspath(input_dir)    
+
     os.mkdir(output_dir)
     os.chdir(output_dir)
 
-    for root, dirs, files in os.walk(input_dir):
+    for root, dirs, files in os.walk(input_dir_absolute):
         for file in files:
             if file.endswith('.bpl'):
                 boogie_file_path = os.path.join(root, file)
