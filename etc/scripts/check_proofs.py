@@ -70,8 +70,7 @@ def main():
         "-r", "--reps",
         help="Specify the number of times the same proof should be checked (for timing purposes).",
         type=int,
-        default=1,
-        required=True)
+        default=1)
 
     args = parser.parse_args()
 

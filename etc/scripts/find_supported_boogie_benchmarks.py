@@ -101,13 +101,16 @@ def main():
                             # print(output_split[0][8:])
                             potentially_supported_file.write(output_split[0][8:]+"\n")
         print("Finished coarse-grained selection of tests")
-
-
+    
     """ 
      From the identified files, select those tests that verify after removing attributes 
      (this has a side effect on the files --> attributes removed).
     """
     adjust_and_filter(filename, args.outputfile)
+
+    # remove the temporary file
+    os.remove(filename)
+
 
 if __name__ == '__main__':
     main()
