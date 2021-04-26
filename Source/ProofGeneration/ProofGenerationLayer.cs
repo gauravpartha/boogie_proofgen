@@ -69,6 +69,9 @@ namespace ProofGeneration
 
         private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
         
+        /// <summary>
+        /// Provide program for the next procedure (for the global declarations).
+        /// </summary>
         public static void Program(Program p)
         {
             if (boogieGlobalData == null)
@@ -99,6 +102,9 @@ namespace ProofGeneration
             }
         }
 
+        /// <summary>
+        /// Provide source CFG for CFG-to-DAG phase
+        /// </summary>
         public static void BeforeCFGToDAG(Implementation impl)
         {
             var config = new CFGReprConfigBuilder().SetIsAcyclic(false).SetBlockCopy(true).SetDesugarCalls(true)
@@ -111,17 +117,27 @@ namespace ProofGeneration
             uniqueExitBlockOrig = null;
         }
 
-        /// <param name="g">graph for which all the loop information has been computed</param>
+        /// <summary>
+        /// Provide graph for which all the loop information has been computed</param>
+        /// </summary>
         public static void GraphCfgToDag(Graph<Block> g)
         {
             cfgToDagHintManager = new CfgToDagHintManager(g, beforeDagOrigBlock);
         }
 
+        /// <summary>
+        /// Provide the generated unified exit block. If no unified exit block is created (for example, when there is only
+        /// one exit block), then invoke this method with null.
+        /// </summary>
         public static void CreateUnifiedExitBlock(Block generatedExitBlock)
         {
             uniqueExitBlockOrig = generatedExitBlock;
         }
 
+        
+        /// <summary>
+        /// Provide source CFG for passification phase
+        /// </summary>
         public static void BeforePassification(Implementation impl)
         {
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
@@ -188,6 +204,10 @@ namespace ProofGeneration
                 postconditions);
         }
 
+        /// <summary>
+        /// Provide variable relation <paramref name="variableToExpr"/>at the beginning of <paramref name="b"/>
+        /// for the passification phase.
+        /// </summary>
         public static void RecordInitialVariableMapping(Block b, IDictionary<Variable, Expr> variableToExpr)
         {
             Contract.Requires(b != null);
@@ -213,6 +233,12 @@ namespace ProofGeneration
             return false;
         }
 
+        /// <summary>
+        /// Provide target CFG for passification phase, construct global version map.
+        /// </summary>
+        /// <param name="impl">source CFG after passification phase</param>
+        /// <exception cref="ProofGenUnexpectedStateException">thrown if global version map is incorrect
+        ///  (should never happen). </exception>
         public static void AfterPassificationCheckGlobalMap(Implementation impl)
         {
             afterPassificationImpl = impl;
@@ -279,6 +305,9 @@ namespace ProofGeneration
             return result;
         }
 
+        /// <summary>
+        /// Provide target CFG after unreachable blocks are pruned (after passification).
+        /// </summary>
         public static void AfterUnreachablePruning(Implementation impl)
         {
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
@@ -315,6 +344,11 @@ namespace ProofGeneration
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
 
+        /// <summary>
+        /// Provide a hint that passification of the non-passive command <paramref name="cmd"/> in block
+        /// <paramref name="block"/> leads to non-passive variable <paramref name="origVar"/> being related to
+        /// passive expression <paramref name="passiveExpr"/>
+        /// </summary>
         public static void NextPassificationHint(Block block, Cmd cmd, Variable origVar, Expr passiveExpr)
         {
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
@@ -322,6 +356,10 @@ namespace ProofGeneration
             passificationHintManager.AddHint(block, cmd, origVar, passiveExpr);
         }
 
+        /// <summary>
+        /// Provide hint that <paramref name="block"/> is a loop head of a loop with invariants <paramref name="invariants"/>
+        /// and modified variables <paramref name="varsToHavoc"/>
+        /// </summary>
         public static void LoopHeadHint(Block block, IEnumerable<Variable> varsToHavoc, IEnumerable<Expr> invariants)
         {
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
@@ -329,6 +367,10 @@ namespace ProofGeneration
             cfgToDagHintManager.AddHint(block, new LoopHeadHint(varsToHavoc, invariants));
         }
 
+        /// <summary>
+        /// Provide hint that the backedge block <paramref name="oldBackedgeBlock"/> is replaced by a new backedge block
+        /// <paramref name="newBackedgeBlock"/> for a loop with loop head <paramref name="loopHead"/>.
+        /// </summary>
         public static void NewBackedgeBlock(Block oldBackedgeBlock, Block newBackedgeBlock, Block loopHead)
         {
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
@@ -357,7 +399,20 @@ namespace ProofGeneration
             vcHintManager = new VCHintManager(new VcRewriteLemmaGen(factory, translator));
         }
 
-        //axiom builder is null iff types are not erased (since no polymorphism in vc)
+        /// <summary>
+        /// Generate all proofs for the current procedure. 
+        /// </summary>
+        /// <param name="vc">WP of the procedure body</param>
+        /// <param name="vcAxioms">VC assumptions for the Boogie axioms</param>
+        /// <param name="typeAxioms">VC assumptions for the Boogie type encoding</param>
+        /// <param name="typeAxiomInfo">Hints about the type encoding</param>
+        /// <param name="gen"></param>
+        /// <param name="translator"></param>
+        /// <param name="axiomBuilder"></param>
+        /// <exception cref="ArgumentException">
+        /// axiom builder must be null iff types are not erased (since no polymorphism in vc), otherwise exception is
+        /// thrown
+        /// </exception>
         public static void VCGenerateAllProofs(
             VCExpr vc,
             VCExpr vcAxioms,
@@ -556,7 +611,7 @@ namespace ProofGeneration
             StoreResult(afterPassificationImpl.Proc.Name, theories);
         }
 
-        public static void StoreResult(string preferredDirName, IEnumerable<Theory> theories)
+        private static void StoreResult(string preferredDirName, IEnumerable<Theory> theories)
         {
             ProofGenerationOutput.StoreTheoriesInNewDirWithSession(preferredDirName, theories);
         }
