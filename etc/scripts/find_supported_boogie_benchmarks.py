@@ -5,8 +5,8 @@ import sys
 import argparse
 import re
 
-boogie_path = 'boogieproof'
-boogie_bin = 'boogieorig'
+boogie_proofgen_bin = 'boogieproof'
+boogie_orig_bin = 'boogieorig'
 
 def adjust_and_filter(filename, output_filename):
     n_supported_success = 0
@@ -42,8 +42,8 @@ def adjust_and_filter(filename, output_filename):
                         fout.write(newStr)
                 
                 if include:
-                    # check whether Boogie can verify file with default options            
-                    output = subprocess.check_output([boogie_bin,boogie_file])
+                    # check whether Boogie can verify file with default options (we use the original Boogie version for this)            
+                    output = subprocess.check_output([boogie_orig_bin,boogie_file])
                                 
                     # space before 0, otherwise "10 errors" would succeed the test as well
                     if " 0 errors" in str(output) and (not ("inconclusive" in str(output))):    
@@ -94,7 +94,7 @@ def main():
 
                     with open(test_file_path) as f:
                         n_candidate_files += 1                    
-                        output = subprocess.check_output([boogie_path, "/onlyCheckProofGenSupport",test_file_path]).decode(sys.stdout.encoding)
+                        output = subprocess.check_output([boogie_proofgen_bin, "/onlyCheckProofGenSupport",test_file_path]).decode(sys.stdout.encoding)
                         #potentially_supported_file.write(out)
                         output_split = output.splitlines()
                         if len(output_split) > 0 and output_split[0].startswith("Success:"):
