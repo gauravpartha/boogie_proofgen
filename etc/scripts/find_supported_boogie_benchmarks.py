@@ -93,9 +93,11 @@ def main():
                     test_file_path = os.path.join(root, file)
 
                     with open(test_file_path) as f:
-                        n_candidate_files += 1                    
+                        n_candidate_files += 1
+                        # the option "/onlyCheckProofGenSupport" only performs a coarse-grained check whether
+                        # proof generation supports a file and does not generate any proofs                  
                         output = subprocess.check_output([boogie_proofgen_bin, "/onlyCheckProofGenSupport",test_file_path]).decode(sys.stdout.encoding)
-                        #potentially_supported_file.write(out)
+                       
                         output_split = output.splitlines()
                         if len(output_split) > 0 and output_split[0].startswith("Success:"):
                             # print(output_split[0][8:])
