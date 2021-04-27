@@ -1,9 +1,10 @@
 import os
 import argparse
 
-def print_theory_line_info(input_folder):
-    for dir in os.listdir(input_folder):
-        dir_path = os.path.join(input_folder, dir)
+def print_theory_line_info(input_dir):
+    input_dir_abs = os.path.abspath(input_dir)
+    for dir in os.listdir(input_dir_abs):
+        dir_path = os.path.join(input_dir_abs, dir)
         length_certificate = 0
         has_theories = False
         for root, dirs, files in os.walk(dir_path):        
