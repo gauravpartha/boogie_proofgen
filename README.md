@@ -7,7 +7,7 @@ supported subset).
 
 The goal of this project is to increase the reliability of the Boogie verifier.
 Whenever the tool is run on a program, the proof generation extension generates 
-an Isabelle proof that shows (a transformed version of) the input program is 
+an Isabelle proof that shows a transformed version of the input program is 
 correct under the assumption of the VC that Boogie generates.
 
 Most of the source code in the `Source` folder is directly forked from the original
@@ -59,7 +59,7 @@ language features, we currently support:
 * Most operations on integers/booleans
 * Type and value quantification
 * Old expressions
-* Any gotos/labels that Boogie accepts
+* Any gotos/labels/while loops that Boogie accepts
 * Commands: assertions, assumptions, assignments, havocs
 
 Moreover, we currently do not support files that contain type constructors without
