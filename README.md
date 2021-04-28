@@ -58,6 +58,7 @@ language features, we currently support:
 * (Polymorphic) functions
 * Most operations on integers/booleans
 * Type and value quantification
+* Old expressions
 * Any gotos/labels that Boogie accepts
 * Commands: assertions, assumptions, assignments, havocs
 
