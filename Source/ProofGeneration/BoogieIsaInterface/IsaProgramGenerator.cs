@@ -234,6 +234,19 @@ namespace ProofGeneration
 
         private DefDecl MethodDefinition(IProgramAccessor programAccessor, BoogieMethodData methodData, SpecsConfig specConfig)
         {
+            var modifiedVarsTerm = new TermList(
+                methodData.ModifiedVars.Select(id =>
+                {
+                    if (varTranslation.VarTranslation.TryTranslateVariableId(id.Decl, out Term idTerm, out _))
+                    {
+                        return idTerm;
+                    }
+                    else
+                    {
+                        throw new ProofGenUnexpectedStateException("Could not get variable id");
+                    }
+                }).ToList());
+            
             var mapping =
                 new List<Tuple<string, Term>>
                 {
@@ -241,7 +254,7 @@ namespace ProofGeneration
                     Tuple.Create("proc_args", (Term) IsaCommonTerms.TermIdentFromName(programAccessor.ParamsDecl())),
                     //TODO: incorporate return values and modified variables
                     Tuple.Create("proc_rets", (Term) IsaCommonTerms.EmptyList),
-                    Tuple.Create("proc_modifs", (Term) IsaCommonTerms.EmptyList),
+                    Tuple.Create("proc_modifs", (Term) modifiedVarsTerm),
                     Tuple.Create("proc_pres", specConfig == SpecsConfig.All ?  programAccessor.PreconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PreconditionsDecl())),
                     Tuple.Create("proc_posts", specConfig == SpecsConfig.All ? programAccessor.PostconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PostconditionsDecl())),
                     //TODO: support abstract procedures
