@@ -4,22 +4,17 @@ function select(m: IntMap, idx: int):int;
 function store(m: IntMap, idx: int, val: int):IntMap;
 axiom (forall m: IntMap, idx:int, val:int :: select(store(m,idx,val), idx) == val);
 axiom (forall m: IntMap, idx1:int, idx2:int, val:int :: idx1 != idx2 ==> select(store(m,idx1,val), idx2) == select(m,idx2));
-
 const blue: int;
 const white: int;
 const red: int;
-
 function is_flag_color ( col: int ) returns (bool);
 axiom (forall col:int :: is_flag_color(col) <==> (col == blue  ||  col == white  ||  col == red));
-
 function is_flag_color_array ( a: IntMap, low: int, high: int) returns (bool);
 axiom (forall a: IntMap, low:int, high:int ::
 	  is_flag_color_array(a,low,high) <==> ( forall i: int :: low <= i && i <= high  ==>  is_flag_color(select(a,i)) ));
-
 function monochrome ( a: IntMap, low: int, high: int, col: int) returns (bool);
 axiom (forall a: IntMap, low:int, high:int,col:int ::
 	monochrome(a,low,high,col) <==> ( forall i: int :: low <= i && i <= high  ==>  select(a,i) == col ));
-
 procedure swap (a1: IntMap, i1 : int, j1: int) returns(b1: IntMap)
 	ensures (select(b1,i1) == select(a1,j1)  &&  select(b1,j1) == select(a1,i1));	
 	ensures (forall k: int :: k != i1 && k != j1  ==>  select(b1,k) == select(a1,k));
@@ -79,4 +74,3 @@ procedure make_flag (a: IntMap, n: int)
 		}
 	}	
 }
-
