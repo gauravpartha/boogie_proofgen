@@ -110,7 +110,7 @@ namespace ProofGeneration.Passification
                 .Select(t => (Term) new TermTuple(new NatConst(t.Item1), IsaCommonTerms.Inl(new NatConst(t.Item1))))
                 .ToList());
 
-            var stateRelListDef = new DefDecl(stateRelListDefName, PassificationManager.StateRelType,
+            var stateRelListDef = new DefDecl(stateRelListDefName, PassificationManager.StateRelListReprType,
                 Tuple.Create((IList<Term>) new List<Term>(), stateRelationList));
 
             var stateRelDef = DefDecl.CreateWithoutArg(stateRelDefName,

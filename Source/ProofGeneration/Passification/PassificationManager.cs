@@ -19,7 +19,7 @@ namespace ProofGeneration.Passification
         private static readonly TermIdent oldRel = IsaCommonTerms.TermIdentFromName("R_old");
         private static readonly string allOldLookupLemmasName = "R_old_lemmas";
 
-        public static TypeIsa StateRelType =
+        public static TypeIsa StateRelListReprType =
             IsaCommonTypes.GetListType(new TupleType(
                 IsaBoogieType.VnameType(),
                 new SumType(IsaBoogieType.VnameType(), IsaBoogieType.LitType())));
@@ -172,7 +172,7 @@ namespace ProofGeneration.Passification
             //TODO: ensure no name clashes
             oldRelDecls = new List<OuterDecl>
             {
-                DefDecl.CreateWithoutArg(oldRelListName, new TermList(oldRelTuples)),
+                DefDecl.CreateWithoutArg(oldRelListName, StateRelListReprType, new TermList(oldRelTuples)),
                 DefDecl.CreateWithoutArg(oldRelName,
                     new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), oldRelList))
             };
