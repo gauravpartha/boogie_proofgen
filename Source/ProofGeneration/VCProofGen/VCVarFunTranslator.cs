@@ -33,8 +33,9 @@ namespace ProofGeneration.VCProofGen
                     {
                         result = axiomBuilder.TryTyped2Untyped(result);
                         if (result == null)
-                            throw new ProofGenUnexpectedStateException(typeof(VCToIsaInterface),
-                                "Cannot retrieve untyped VCExprVar");
+                        {
+                            continue;
+                        }
                     }
 
                     vcToBoogie.Add(result, v);
