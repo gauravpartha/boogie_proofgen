@@ -22,7 +22,7 @@ namespace ProofGeneration
                 throw new ProofGenUnexpectedStateException("main directory already set");
 
             if (!onlyUseFileName)
-                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs");
+                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs", false);
             else
                 _mainDir = fileName;
             Directory.CreateDirectory(_mainDir);
@@ -57,7 +57,7 @@ namespace ProofGeneration
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
             //create new directory
-            var dirPath = Path.Join(_mainDir, FreeDirName(preferredDirName + "_proofs"));
+            var dirPath = Path.Join(_mainDir, FreeDirName(preferredDirName + "_proofs", true));
             Directory.CreateDirectory(dirPath);
 
             foreach (var theory in theories) StoreTheory(dirPath, theory);
@@ -72,10 +72,13 @@ namespace ProofGeneration
             return prefix + "_" + id;
         }
 
-        private static string FreeDirName(string preferredName)
+        private static string FreeDirName(string preferredName, bool insideMainDir)
         {
+            Func<string, string> dirPath = 
+                dirName => (insideMainDir && _mainDir != null) ? Path.Combine(_mainDir, dirName) : dirName;
+            
             var i = 1;
-            while (Directory.Exists(SessionName(NameWithId(preferredName, i)))) i++;
+            while (Directory.Exists(dirPath(NameWithId(preferredName, i)))) i++;
 
             return NameWithId(preferredName, i);
         }
