@@ -110,3 +110,8 @@ procedure. There are multiple Isabelle theory files in each folder. The main
 theorem for the procedure is the last Isabelle lemma in the file with the suffix
 `cfg_to_dag_proof.thy`. This final lemma shows that the validity of the VC 
 implies correctness of the input CFG of the CFG-to-DAG phase.
+
+When using the tool, one currently needs to make sure that no special characters
+are used that are reserved in Isabelle (such as `#` or `'`). Moreover, for
+files that do not verify, the tool cannot provide detailed information, since
+the counterexample information is not available.
