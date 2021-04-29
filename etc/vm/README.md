@@ -11,8 +11,8 @@ All required dependencies are pre-installed on the provided Ubuntu 20.04 64-bit 
 machine. We have set the virtual machine settings to use 8 GB RAM and 4 cores.
 The password for the VM user `boogie` is `test123`.
 A script to install the dependencies for the sake of reproducing the artifact
-is provided in `~/boogie_proofgen/etc/vm/setup_vm.sh` (also check that file
-to see which commit hashes we fix).
+is provided in `artifact/boogie_proofgen/etc/vm/setup_vm.sh` 
+(also check that file to see which commit hashes we fix).
 
 For commands that take a longer duration we provide estimates on how long the
 command runs based on our own runs of the commands in the VM (using 8 GB RAM
