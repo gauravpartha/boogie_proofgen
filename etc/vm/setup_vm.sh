@@ -111,6 +111,10 @@ sudo su boogie <<-'EOF'
 
     # clone and compile boogie proof generation tool
     git clone https://github.com/gauravpartha/boogie_proofgen/
+    cd boogie_proofgen
+    git checkout 3d9ace1cb5b
+    cd ..
+
     dotnet build boogie_proofgen/Source/Boogie.sln
     # add boogie proof generation tool to path (after renaming)
     mv boogie_proofgen/Source/BoogieDriver/bin/Debug/netcoreapp3.1/BoogieDriver boogie_proofgen/Source/BoogieDriver/bin/Debug/netcoreapp3.1/boogieproof
@@ -130,6 +134,6 @@ sudo su boogie <<-'EOF'
 
     # copy README
     cp artifact/boogie_proofgen/etc/vm/README.md README.md
-    
+
     echo "Finished setup."
 EOF
