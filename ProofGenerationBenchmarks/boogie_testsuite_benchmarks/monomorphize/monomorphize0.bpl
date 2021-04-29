@@ -5,7 +5,10 @@ function  foo<T>(x: T): T {
     x
 }
 
+/* MANUAL REWRITE 
 function  foo'<T>(x: T): T {
+*/
+function  foo2<T>(x: T): T {
     /** MANUAL REWRITE 
     (var y := x; foo(y))
     */
@@ -13,18 +16,18 @@ function  foo'<T>(x: T): T {
 }
 
 function  bar1<T>(x: T): T {
-    foo'(x)
+    foo2(x)
 }
 
 function  bar2<T>(x: T): T {
-    foo'(x)
+    foo2(x)
 }
 
 procedure A(a: int) returns (a': int)
 ensures a' == a;
 {
     a' := foo(a);
-    a' := foo'(a);
+    a' := foo2(a);
 }
 
 procedure B(a: int) returns (a': int)
@@ -58,7 +61,7 @@ procedure A2(a: X) returns (a': X)
 ensures a' == a;
 {
     a' := foo(a);
-    a' := foo'(a);
+    a' := foo2(a);
 }
 
 /*MANUAL REWRITE
