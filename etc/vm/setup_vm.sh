@@ -112,7 +112,7 @@ sudo su boogie <<-'EOF'
     # clone and compile boogie proof generation tool
     git clone https://github.com/gauravpartha/boogie_proofgen/
     cd boogie_proofgen
-    git checkout 3d9ace1cb5b
+    git checkout fca0aa6bb01
     cd ..
 
     dotnet build boogie_proofgen/Source/Boogie.sln
