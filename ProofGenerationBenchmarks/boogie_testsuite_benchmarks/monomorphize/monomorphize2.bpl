@@ -1,67 +1,68 @@
 // RUN: %boogie -monomorphize "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
+/** MANUAL REWRITE: Replaced all # with H */
 type Vec T;
-function Vec#Empty<T>(): Vec T;
-function Vec#Unit<T>(t: T): Vec T;
-function Vec#Concat<T>(s1: Vec T, s2: Vec T): Vec T;
-function Vec#Extract<T>(s: Vec T, pos: int, len: int): Vec T;
-function Vec#Update<T>(s: Vec T, pos: int, t: T): Vec T;
-function Vec#Len<T>(s: Vec T): int;
-function Vec#Select<T>(s: Vec T, pos: int): T;
-function Vec#IsEqual<T>(s1: Vec T, s2: Vec T): bool;
-axiom  (forall<U> :: Vec#Len(Vec#Empty() : Vec U) == 0);
-axiom  (forall<U> e: U :: Vec#Len(Vec#Unit(e)) == 1);
+function VecHEmpty<T>(): Vec T;
+function VecHUnit<T>(t: T): Vec T;
+function VecHConcat<T>(s1: Vec T, s2: Vec T): Vec T;
+function VecHExtract<T>(s: Vec T, pos: int, len: int): Vec T;
+function VecHUpdate<T>(s: Vec T, pos: int, t: T): Vec T;
+function VecHLen<T>(s: Vec T): int;
+function VecHSelect<T>(s: Vec T, pos: int): T;
+function VecHIsEqual<T>(s1: Vec T, s2: Vec T): bool;
+axiom  (forall<U> :: VecHLen(VecHEmpty() : Vec U) == 0);
+axiom  (forall<U> e: U :: VecHLen(VecHUnit(e)) == 1);
 
 type Set T;
-function Set#Empty<T>(): Set T;
-function Set#Unit<T>(t: T): Set T;
-function Set#Add<T>(s: Set T, t: T): Set T;
-function Set#Remove<T>(s: Set T, t: T): Set T;
-function Set#Union<T>(s1: Set T, s2: Set T): Set T;
-function Set#Intersection<T>(s1: Set T, s2: Set T): Set T;
-function Set#Difference<T>(s1: Set T, s2: Set T): Set T;
-function Set#Size<T>(s: Set T): int;
-function Set#Contains<T>(s: Set T, t: T): bool;
-function Set#IsEqual<T>(s1: Set T, s2: Set T): bool;
-axiom  (forall<U> :: Set#Size(Set#Empty() : Set U) == 0);
-axiom  (forall<U> e: U :: Set#Size(Set#Unit(e)) == 1);
+function SetHEmpty<T>(): Set T;
+function SetHUnit<T>(t: T): Set T;
+function SetHAdd<T>(s: Set T, t: T): Set T;
+function SetHRemove<T>(s: Set T, t: T): Set T;
+function SetHUnion<T>(s1: Set T, s2: Set T): Set T;
+function SetHIntersection<T>(s1: Set T, s2: Set T): Set T;
+function SetHDifference<T>(s1: Set T, s2: Set T): Set T;
+function SetHSize<T>(s: Set T): int;
+function SetHContains<T>(s: Set T, t: T): bool;
+function SetHIsEqual<T>(s1: Set T, s2: Set T): bool;
+axiom  (forall<U> :: SetHSize(SetHEmpty() : Set U) == 0);
+axiom  (forall<U> e: U :: SetHSize(SetHUnit(e)) == 1);
 
 procedure empty_vec() returns (v: Vec int)
-ensures Vec#Len(v) == 0;
+ensures VecHLen(v) == 0;
 {
-    v := Vec#Empty();
+    v := VecHEmpty();
 }
 
 procedure unit_vec(e: int) returns (v: Vec int)
-ensures Vec#Len(v) == 1;
+ensures VecHLen(v) == 1;
 {
-    v := Vec#Unit(e);
+    v := VecHUnit(e);
 }
 
 procedure empty_set() returns (v: Set int)
-ensures Set#Size(v) == 0;
+ensures SetHSize(v) == 0;
 {
-    v := Set#Empty();
+    v := SetHEmpty();
 }
 
 procedure unit_set(e: int) returns (v: Set int)
-ensures Set#Size(v) == 1;
+ensures SetHSize(v) == 1;
 {
-    v := Set#Unit(e);
+    v := SetHUnit(e);
 }
 
 type K;
 
 procedure empty_vec_k() returns (v: Vec K)
-ensures Vec#Len(v) == 0;
+ensures VecHLen(v) == 0;
 {
-    v := Vec#Empty();
+    v := VecHEmpty();
 }
 
-procedure empty_set_k() returns (v: Set K)
-ensures Set#Size(v) == 0;
+procedure empty_set_k() returns (v  : Set K)
+ensures SetHSize(v) == 0;
 {
-    v := Set#Empty();
+    v := SetHEmpty();
 }
 

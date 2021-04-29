@@ -15,8 +15,8 @@ We manually rewrote the following files into our subset
     `stratifiedinline/bar4.bpl`, `textbook/DivMod.bpl`
   - Rewrite block expression (for example, `(var y := x; foo(y))` to `foo(x)`). 
     Files: `monomorphize/monomorphize0.bpl`
-  - Rewrite problematic procedure names with apostrophes. 
-    Files: `monomorphize/monomorphize0.bpl`
+  - Rewrite problematic procedure names with apostrophes and hashtag. 
+    Files: `monomorphize/monomorphize0.bpl`, `monomorphize/monomorphize2.bpl`
   - Rewrite procedure calls within loops.
     Files: `extractloops/detLoopExtract.bpl`, `lock/Lock.bpl`
 
