@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
@@ -84,6 +85,16 @@ namespace ProofGeneration
             result.Add(repr.Store);
           }
 
+          return result;
+        }
+
+        public IEnumerable<TypeCtorDecl> AllAbstractions()
+        {
+          var result = new HashSet<TypeCtorDecl>();
+          foreach (var repr in classRepresentations.Values)
+          {
+            result.Add(repr.RepresentingType);
+          }
           return result;
         }
 
@@ -175,10 +186,19 @@ namespace ProofGeneration
             {
                 abstraction = ThinOutMapType(rawType, out instantiation);
             }
+            else
+            {
+                /* do not create any holes if a unique abstraction should be used for the raw type: abstraction is just
+                 the maptype where inputs/outputs are abstracted*/
+                abstraction = ThinOutMapType(rawType, out _, false);
+            }
 
             var repr = GetClassRepresentation(abstraction, rawType);
 
-            ctorType = new CtorType(Token.NoToken, repr.RepresentingType, instantiation);
+            //need to make sure each the maps contained in the instantiation are desugared
+            var instantiationDesugared = instantiation.Select(inst => 
+            ThinOutType(inst, new List<TypeVariable>(), new List<Type>(), false)).ToList();
+            ctorType = new CtorType(Token.NoToken, repr.RepresentingType, instantiationDesugared);
 
             rawToAbstractType.Add(rawType, Tuple.Create(abstraction, ctorType));
             return repr;
@@ -215,41 +235,56 @@ namespace ProofGeneration
           return result;
         }
 
-        protected MapType ThinOutMapType(MapType rawType, out List<Type> instantiation)
+        protected MapType ThinOutMapType(MapType rawType, out List<Type> instantiation, bool thin=true)
         {
             instantiation = new List<Type>();
-            return ThinOutMapType(rawType, instantiation);
+            return ThinOutMapType(rawType, instantiation, thin);
         }
     
-        protected MapType ThinOutMapType(MapType rawType, List<Type> instantiations)
+        protected MapType ThinOutMapType(MapType rawType, List<Type> instantiations, bool thin=true)
         {
           List<Type> /*!*/
             newArguments = new List<Type>();
           foreach (Type /*!*/ subtype in rawType.Arguments.ToList())
           {
             newArguments.Add(ThinOutType(subtype, rawType.TypeParameters,
-              instantiations));
+              instantiations, thin));
           }
     
           Type /*!*/
             newResult = ThinOutType(rawType.Result, rawType.TypeParameters,
-              instantiations);
+              instantiations, thin);
           return new MapType(Token.NoToken, rawType.TypeParameters, newArguments, newResult);
         }
-    
-        // the instantiations of inserted type variables, the order corresponds to the order in which "AbstractionVariable(int)" delivers variables
-        private Type /*!*/ ThinOutType(Type rawType, List<TypeVariable> boundTypeParams, List<Type> instantiations)
+
+        /// <summary>
+        /// Returns a version of <paramref name="rawType"/> that abstracts away the maps.
+        /// If <paramref name="thin"/> is true, then it does so by returning the most general template of <paramref name="rawType"/>,
+        /// which may contain fresh type variables (for the "holes")
+        /// A template is a type for which the free variables can be substituted to get <paramref name="rawType"/>.
+        /// A template is most general, if it is a template for any other template of <paramref name="rawType"/>.
+        /// Moreover, expresses all map types in the template directly via their abstractions.
+        /// In this case, <paramref name="instantiations"/> returns the substitution to obtain <paramref name="rawType"/>
+        /// from the template.
+        ///
+        /// If <paramref name="thin"/> is false, then the concrete desugared translation, where all maps in
+        /// <paramref name="rawType"/> are desugared, is returned.
+        /// </summary>
+        private Type /*!*/ ThinOutType(Type rawType, List<TypeVariable> boundTypeParams, List<Type> instantiations, bool thin=true)
         {
           if (rawType.FreeVariables.All(var => !boundTypeParams.Contains(var)))
           {
-            // Bingo!
-            // if the type does not contain any bound variables, we can simply
-            // replace it with a type variable
-            TypeVariable /*!*/
-              abstractionVar = AbstractionVariable(instantiations.Count);
-            instantiations.Add(rawType);
-            return abstractionVar;
-          }
+            if (thin)
+            {
+              // Bingo!
+              // if the type does not contain any bound variables, we can simply
+              // replace it with a type variable
+              TypeVariable /*!*/
+                abstractionVar = AbstractionVariable(instantiations.Count);
+              instantiations.Add(rawType);
+              return abstractionVar;
+            }
+          } 
     
           if (rawType.IsVariable)
           {
@@ -266,7 +301,7 @@ namespace ProofGeneration
             // recursively abstract this map type and continue abstracting
             CtorType /*!*/
               abstraction = AbstractMapType(rawType.AsMap);
-            return ThinOutType(abstraction, boundTypeParams, instantiations);
+            return ThinOutType(abstraction, boundTypeParams, instantiations, thin);
             //
           }
           else if (rawType.IsCtor)
@@ -280,11 +315,16 @@ namespace ProofGeneration
             foreach (Type /*!*/ subtype in rawCtorType.Arguments.ToList())
             {
               newArguments.Add(ThinOutType(subtype, boundTypeParams,
-                instantiations));
+                instantiations, thin));
             }
     
             return new CtorType(Token.NoToken, rawCtorType.Decl, newArguments);
             //
+          }
+          else if (!thin)
+          {
+            //can reach this case, since types are not abstracted away
+            return rawType;
           }
           else
           {
