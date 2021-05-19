@@ -776,6 +776,7 @@ namespace Microsoft.Boogie
     #region proof generation options
     public bool GenerateIsaProgNoProofs = false;
     public bool DesugarMaps = false;
+    public bool PrintMapDesugaring = false;
     #endregion
 
     [ContractInvariantMethod]
@@ -1474,6 +1475,13 @@ namespace Microsoft.Boogie
             DesugarMaps = true;
           }
           
+          return true;
+        case "printMapDesugaring":
+          if (ps.ConfirmArgumentCount(0))
+          {
+            PrintMapDesugaring = true;
+          }
+
           return true;
         default:
           bool optionValue = false;

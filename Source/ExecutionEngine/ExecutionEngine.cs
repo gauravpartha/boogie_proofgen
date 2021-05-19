@@ -900,6 +900,10 @@ namespace Microsoft.Boogie
       if (CommandLineOptions.Clo.DesugarMaps)
       {
         MapDesugaring.DesugarMaps(program);
+        if (CommandLineOptions.Clo.PrintFile != null && CommandLineOptions.Clo.PrintMapDesugaring)
+        {
+          PrintBplFile(CommandLineOptions.Clo.PrintFile, program, false, true, CommandLineOptions.Clo.PrettyPrint);
+        }
       }
 
       #endregion
