@@ -25,11 +25,17 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             if (cmd is HavocCmd havocCmd)
                 return TranslateHavocCmd(havocCmd);
+            if (cmd is CommentCmd)
+                return new List<Term>();
+            
             return new List<Term> {basicCmdVisitor.Translate(cmd)};
         }
         
         public Term TranslateSingle(Absy cmd)
         {
+            if(cmd is CommentCmd)
+                throw new ArgumentException("Cannot translate single comment command");
+            
             if(cmd is HavocCmd)
                 throw new ArgumentException("Can only input commands that are desugared to single commands");
             
@@ -40,7 +46,13 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             var cmdsIsa = new List<Term>();
 
-            foreach (var cmd in cmds) cmdsIsa.AddRange(Translate(cmd));
+            foreach (var cmd in cmds)
+            {
+                if (!(cmd is CommentCmd))
+                {
+                    cmdsIsa.AddRange(Translate(cmd));
+                }
+            }
 
             return cmdsIsa;
         }
