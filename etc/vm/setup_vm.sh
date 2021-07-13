@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 
 # This script sets up the dependencies for the artifact in the VM.
-# run "sudo setup_vm.sh"
-# make sure to source .profile after this has run to get the updated PATH
+# Note that the script is hardcoded for the user "boogie" (see "sudo su boogie"
+# in script) --> change it to whatever user you want to specify.
+#
+# run "sudo setup_vm.sh" in the home directory of the user that you specify.
+# Make sure to source .profile after this has run to get the updated PATH.
 
 export DEBIAN_FRONTEND=noninteractive
 # *** General dependencies ***
