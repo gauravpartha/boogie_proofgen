@@ -13,8 +13,4 @@
     <ProjectReference Include="..\VCExpr\VCExpr.csproj" />
   </ItemGroup>
   
-  <ItemGroup>
-    <Folder Include="IsaML" />
-  </ItemGroup>
-  
 </Project>
