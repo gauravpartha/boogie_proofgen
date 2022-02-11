@@ -6,13 +6,10 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\Basetypes\Basetypes-NetCore.csproj" />
-    <ProjectReference Include="..\Core\Core-NetCore.csproj" />
+    <ProjectReference Include="..\Basetypes\Basetypes.csproj" />
     <ProjectReference Include="..\Core\Core.csproj" />
-    <ProjectReference Include="..\Graph\Graph-NetCore.csproj" />
+    <ProjectReference Include="..\Graph\Graph.csproj" />
     <ProjectReference Include="..\Isabelle\Isabelle.csproj" />
-    <ProjectReference Include="..\ParserHelper\ParserHelper-NetCore.csproj" />
-    <ProjectReference Include="..\VCExpr\VCExpr-NetCore.csproj" />
     <ProjectReference Include="..\VCExpr\VCExpr.csproj" />
   </ItemGroup>
   
