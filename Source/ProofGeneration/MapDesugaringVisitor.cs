@@ -28,6 +28,11 @@ namespace ProofGeneration
             _mapAbstractionBuilder = mapAbstractionBuilder;
             var desugaredProg = VisitProgram(p);
 
+            foreach (var decl in _mapAbstractionBuilder.AllAbstractions())
+            {
+                p.AddTopLevelDeclaration(decl);
+            }
+            
             foreach (var f in _mapAbstractionBuilder.AllSelectAndStoreFunctions())
             {
                 p.AddTopLevelDeclaration(f);
