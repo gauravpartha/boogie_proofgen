@@ -63,8 +63,12 @@ namespace Microsoft.Boogie
         get
         {
           foreach (var f in references)
+          {
             if (f.Result == this)
+            {
               yield return f;
+            }
+          }
         }
       }
 
@@ -259,8 +263,28 @@ namespace Microsoft.Boogie
     {
       public readonly Model Model;
       public readonly string Name;
-      public readonly int Arity;
+      private int? arity; // can be null if arity is unknown
       internal readonly List<FuncTuple> apps = new List<FuncTuple>();
+
+      /// <summary>
+      /// Arity can be set to null if it is not known at the time of creation
+      /// Once set to an integer, however, an attempt to change arity leads
+      /// to an exception
+      /// </summary>
+      public virtual int? Arity {
+        get {
+          return arity; 
+        }
+        set {
+          if ((arity != null) && (value != null) && (arity != value)) {
+            throw new ArgumentException(string.Format(
+              "function '{0}' previously created with arity {1}, " +
+              "is now being assigned arity {2}", Name, arity,
+              value));
+          }
+          arity = value;
+        }
+      }
 
       public IEnumerable<FuncTuple> Apps
       {
@@ -274,29 +298,43 @@ namespace Microsoft.Boogie
 
       private Element @else;
 
-      internal Func(Model p, string n, int a)
+      internal Func(Model p, string n, int? a)
       {
         Model = p;
         Name = n;
-        Arity = a;
+        arity = a;
       }
 
-      public override string ToString()
-      {
-        return string.Format("{0}/{1}", Name, Arity);
+      public override string ToString() {
+        if (Arity != null)
+        {
+          return string.Format("{0}/{1}", Name, Arity);
+        }
+
+        return string.Format("{0}/{1}", Name, "?");
       }
 
       internal void Substitute(Dictionary<Element, Element> mapping)
       {
-        Element e;
-        if (@else != null && mapping.TryGetValue(@else, out e))
+        if (@else != null && mapping.TryGetValue(@else, out var e))
+        {
           @else = e;
+        }
+
         foreach (var ft in apps)
         {
-          if (mapping.TryGetValue(ft.Result, out e)) ft.Result = e;
+          if (mapping.TryGetValue(ft.Result, out e))
+          {
+            ft.Result = e;
+          }
+
           for (var i = 0; i < ft.Args.Length; ++i)
+          {
             if (mapping.TryGetValue(ft.Args[i], out e))
+            {
               ft.Args[i] = e;
+            }
+          }
         }
       }
 
@@ -306,15 +344,21 @@ namespace Microsoft.Boogie
         set
         {
           if (@else != null)
+          {
             throw new ArgumentException();
+          }
+
           @else = value;
         }
       }
 
-      public void SetConstant(Element res)
-      {
-        if (Arity != 0 || apps.Count > 0)
+      public void SetConstant(Element res) {
+        if (apps.Count > 0)
+        {
           throw new ArgumentException();
+        }
+
+        Arity = 0; // will throw exception if arity is not null or already 0
         var t = new FuncTuple(this, res, null);
         apps.Add(t);
         res.references.Add(t);
@@ -326,7 +370,10 @@ namespace Microsoft.Boogie
       public FuncTuple AppWithArg(int argIdx, Element elt)
       {
         foreach (var a in AppsWithArg(argIdx, elt))
+        {
           return a;
+        }
+
         return null;
       }
 
@@ -336,7 +383,10 @@ namespace Microsoft.Boogie
       public FuncTuple AppWithResult(Element elt)
       {
         foreach (var a in AppsWithResult(elt))
+        {
           return a;
+        }
+
         return null;
       }
 
@@ -348,7 +398,9 @@ namespace Microsoft.Boogie
         foreach (var r in elt.References)
         {
           if (r.Func == this && r.Args[argIdx] == elt)
+          {
             yield return r;
+          }
         }
       }
 
@@ -360,7 +412,9 @@ namespace Microsoft.Boogie
         foreach (var r in elt0.References)
         {
           if (r.Func == this && r.Args[argIdx0] == elt0 && r.Args[argIdx1] == elt1)
+          {
             yield return r;
+          }
         }
       }
 
@@ -372,17 +426,17 @@ namespace Microsoft.Boogie
         foreach (var r in elt.References)
         {
           if (r.Func == this && r.Result == elt)
+          {
             yield return r;
+          }
         }
       }
 
       /// <summary>
       /// For a nullary function, return its value.
       /// </summary>
-      public Element GetConstant()
-      {
-        if (Arity != 0)
-          throw new ArgumentException();
+      public Element GetConstant() {
+        Arity = 0; // will throw exception if arity is not null or already 0
         if (apps.Count == 0)
         {
           // value missing in the returned model
@@ -396,7 +450,11 @@ namespace Microsoft.Boogie
       /// </summary>
       public Element OptEval(params Element[] args)
       {
-        if (args.Any(a => a == null)) return null;
+        if (args.Any(a => a == null))
+        {
+          return null;
+        }
+
         return TryEval(args);
       }
 
@@ -406,30 +464,47 @@ namespace Microsoft.Boogie
       public Element TryEval(params Element[] args)
       {
         for (int i = 0; i < args.Length; ++i)
+        {
           if (args[i] == null)
+          {
             throw new ArgumentException();
+          }
+        }
 
         if (apps.Count > 10)
         {
           var best = apps;
           for (int i = 0; i < args.Length; ++i)
+          {
             if (args[i].references.Count < best.Count)
+            {
               best = args[i].references;
+            }
+          }
+
           if (best != apps)
           {
             foreach (var tpl in best)
             {
               bool same = true;
               if (tpl.Func != this)
+              {
                 continue;
+              }
+
               for (int i = 0; i < args.Length; ++i)
+              {
                 if (tpl.Args[i] != args[i])
                 {
                   same = false;
                   break;
                 }
+              }
 
-              if (same) return tpl.Result;
+              if (same)
+              {
+                return tpl.Result;
+              }
             }
 
             return null;
@@ -440,13 +515,18 @@ namespace Microsoft.Boogie
         {
           bool same = true;
           for (int i = 0; i < args.Length; ++i)
+          {
             if (tpl.Args[i] != args[i])
             {
               same = false;
               break;
             }
+          }
 
-          if (same) return tpl.Result;
+          if (same)
+          {
+            return tpl.Result;
+          }
         }
 
         return null;
@@ -466,7 +546,9 @@ namespace Microsoft.Boogie
             {
               j++;
               if (j == tpl.Args.Length)
+              {
                 return tpl.Result;
+              }
             }
           }
         }
@@ -492,25 +574,27 @@ namespace Microsoft.Boogie
         return r != null && !r.Value;
       }
 
-      public void AddApp(Element res, params Element[] args)
-      {
+      public void AddApp(Element res, params Element[] args) {
+        Arity = args.Length;
         if (Arity == 0)
+        {
           SetConstant(res);
+        }
         else
         {
-          if (args.Length != Arity)
-            throw new ArgumentException();
           var t = new FuncTuple(this, res, (Element[]) args.Clone());
           apps.Add(t);
           var u = new HashSet<Element>();
           res.references.Add(t);
           u.Add(res);
           foreach (var a in args)
+          {
             if (!u.Contains(a))
             {
               u.Add(a);
               a.references.Add(t);
             }
+          }
         }
       }
     }
@@ -526,8 +610,15 @@ namespace Microsoft.Boogie
 
       internal FuncTuple(Func func, Element res, Element[] args)
       {
-        if (args == null) Args = EmptyArgs;
-        else Args = args;
+        if (args == null)
+        {
+          Args = EmptyArgs;
+        }
+        else
+        {
+          Args = args;
+        }
+
         Func = func;
         Result = res;
       }
@@ -558,11 +649,20 @@ namespace Microsoft.Boogie
 
     Element ConstructElement(string name)
     {
-      if (name.ToLower() == "true") return True;
-      if (name.ToLower() == "false") return False;
+      if (name.ToLower() == "true")
+      {
+        return True;
+      }
+
+      if (name.ToLower() == "false")
+      {
+        return False;
+      }
 
       if (name.StartsWith("bv") && name.Length > 4 && Char.IsDigit(name[2]))
+      {
         name = name.Substring(2);
+      }
 
       if (Char.IsDigit(name[0]) || (name[0] == '-' && name.Length > 1 && Char.IsDigit(name[1])))
       {
@@ -570,7 +670,9 @@ namespace Microsoft.Boogie
         int szi = -1;
 
         if (name.EndsWith(":int"))
+        {
           name = name.Substring(0, name.Length - 4);
+        }
 
         if (col > 0)
         {
@@ -601,9 +703,13 @@ namespace Microsoft.Boogie
         if (allDigits.IsMatch(name))
         {
           if (szi > 0)
+          {
             return new BitVector(this, name, szi);
+          }
           else
+          {
             return new Integer(this, name);
+          }
         }
         else if (real.IsMatch(name))
         {
@@ -631,17 +737,22 @@ namespace Microsoft.Boogie
 
     public Element TryMkElement(string name)
     {
-      Element res;
-
-      if (elementsByName.TryGetValue(name, out res))
+      if (elementsByName.TryGetValue(name, out var res))
+      {
         return res;
+      }
 
       var tmp = ConstructElement(name);
-      if (tmp == null) return null;
+      if (tmp == null)
+      {
+        return null;
+      }
 
       name = tmp.ToString();
       if (elementsByName.TryGetValue(name, out res))
+      {
         return res;
+      }
 
       elementsByName.Add(name, tmp);
       elements.Add(tmp);
@@ -652,19 +763,17 @@ namespace Microsoft.Boogie
     {
       Element res = TryMkElement(name);
       if (res == null)
+      {
         throw new ArgumentException("invalid element name: '" + name + "'");
+      }
+
       return res;
     }
 
-    public Func MkFunc(string name, int arity)
+    public Func MkFunc(string name, int? arity)
     {
-      Func res;
-      if (functionsByName.TryGetValue(name, out res))
-      {
-        if (res.Arity != arity)
-          throw new ArgumentException(string.Format(
-            "function '{0}' previously created with arity {1}, now trying to recreate with arity {2}", name, res.Arity,
-            arity));
+      if (functionsByName.TryGetValue(name, out var res)) {
+        res.Arity = arity;
         return res;
       }
 
@@ -698,9 +807,13 @@ namespace Microsoft.Boogie
         get
         {
           if (previous != null)
+          {
             return previous.AllVariables.Concat(Variables).Distinct();
+          }
           else
+          {
             return Variables;
+          }
         }
       }
 
@@ -719,9 +832,11 @@ namespace Microsoft.Boogie
         CapturedState curr = this;
         while (curr != null)
         {
-          Element res;
-          if (curr.valuations.TryGetValue(varname, out res))
+          if (curr.valuations.TryGetValue(varname, out var res))
+          {
             return res;
+          }
+
           curr = curr.previous;
         }
 
@@ -752,14 +867,26 @@ namespace Microsoft.Boogie
 
         foreach (var v in oldVars)
         {
-          if (varNameMap.ContainsKey(v)) vars.Add(varNameMap[v]);
-          else vars.Add(v);
+          if (varNameMap.ContainsKey(v))
+          {
+            vars.Add(varNameMap[v]);
+          }
+          else
+          {
+            vars.Add(v);
+          }
         }
 
         foreach (var kvp in oldValuations)
         {
-          if (varNameMap.ContainsKey(kvp.Key)) valuations.Add(varNameMap[kvp.Key], kvp.Value);
-          else valuations.Add(kvp.Key, kvp.Value);
+          if (varNameMap.ContainsKey(kvp.Key))
+          {
+            valuations.Add(varNameMap[kvp.Key], kvp.Value);
+          }
+          else
+          {
+            valuations.Add(kvp.Key, kvp.Value);
+          }
         }
       }
 
@@ -828,18 +955,24 @@ namespace Microsoft.Boogie
 
     public Func TryGetFunc(string name)
     {
-      Func res;
-      if (functionsByName.TryGetValue(name, out res))
+      if (functionsByName.TryGetValue(name, out var res))
+      {
         return res;
+      }
       else
+      {
         return null;
+      }
     }
 
     public Func GetFunc(string name)
     {
       Func res = TryGetFunc(name);
       if (res == null)
+      {
         throw new KeyNotFoundException("function '" + name + "' undefined in the model");
+      }
+
       return res;
     }
 
@@ -850,11 +983,14 @@ namespace Microsoft.Boogie
 
     public Element GetElement(string name)
     {
-      Element res;
-      if (elementsByName.TryGetValue(name, out res))
+      if (elementsByName.TryGetValue(name, out var res))
+      {
         return res;
+      }
       else
+      {
         throw new KeyNotFoundException("element '" + name + "' undefined in the model");
+      }
     }
 
     public Element MkIntElement(int v)
@@ -926,12 +1062,16 @@ namespace Microsoft.Boogie
 
     public void Substitute(Dictionary<Element, Element> mapping)
     {
-      foreach (var f in functions) f.Substitute(mapping);
+      foreach (var f in functions)
+      {
+        f.Substitute(mapping);
+      }
     }
 
-    public static List<Model> ParseModels(System.IO.TextReader rd)
+    public static List<Model> ParseModels(System.IO.TextReader rd, Func<string, string> nameMapper = null)
     {
-      ModelParser p = new ParserZ3();
+      nameMapper ??= x => x;
+      ModelParser p = new ParserZ3(nameMapper);
       p.rd = rd;
       p.Run();
       return p.resModels;

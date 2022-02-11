@@ -247,6 +247,7 @@ namespace Microsoft.Boogie
       {
         int id = varCopies[v].Count;
         var copyVar = trc.civlTypeChecker.LocalVariable(string.Format(copierFormat, v.Name, id), v.TypedIdent.Type);
+        copyVar.Attributes = v.Attributes;
         varCopies[v].Add(copyVar);
         copyToOriginalVar[copyVar] = v;
       }
@@ -330,7 +331,9 @@ namespace Microsoft.Boogie
 
         // In case there were no commands from the second action
         if (trc.IsJoint && trc.path.Count == trc.transferIndex)
+        {
           PopulateIntermediateFrameCopy();
+        }
       }
 
       private void SetDefinedVariables()
@@ -458,7 +461,10 @@ namespace Microsoft.Boogie
           // If a variable is forward and backward assigned, we might
           // have a substitution for the lhs here.
           if (!varToExpr.TryGetValue(assignment.Var, out Expr x))
+          {
             x = Expr.Ident(assignment.Var);
+          }
+
           pathExprs.Add(Expr.Eq(x, assignment.Expr));
         }
       }
@@ -471,6 +477,10 @@ namespace Microsoft.Boogie
       {
         var remainingVars = NotEliminatedVars.Except(IntermediateFrameWithWitnesses);
         existsVarMap = remainingVars.ToDictionary(v => v, v => (Variable) VarHelper.BoundVariable(v.Name, v.TypedIdent.Type));
+        existsVarMap.Iter(kv =>
+        {
+          kv.Value.Attributes = copyToOriginalVar[kv.Key].Attributes;
+        });
         pathExprs = SubstitutionHelper.Apply(existsVarMap, pathExprs).ToList();
       }
 
@@ -479,9 +489,14 @@ namespace Microsoft.Boogie
         var sub = new Dictionary<Variable, Expr>();
 
         foreach (var v in trc.allInParams)
+        {
           sub[varCopies[v][0]] = Expr.Ident(v);
+        }
+
         foreach (var v in trc.frame)
+        {
           sub[varCopies[v][0]] = ExprHelper.Old(Expr.Ident(v));
+        }
 
         if (!trc.ignorePostState)
         {

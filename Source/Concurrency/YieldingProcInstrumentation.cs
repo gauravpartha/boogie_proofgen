@@ -163,7 +163,11 @@ namespace Microsoft.Boogie
 
     private void AddNoninterferenceCheckers()
     {
-      if (CommandLineOptions.Clo.TrustNoninterference) return;
+      if (CommandLineOptions.Clo.TrustNoninterference)
+      {
+        return;
+      }
+
       foreach (var proc in civlTypeChecker.procToYieldInvariant.Keys)
       {
         var yieldInvariant = civlTypeChecker.procToYieldInvariant[proc];
@@ -185,7 +189,11 @@ namespace Microsoft.Boogie
       foreach (var proc in absyMap.Keys.OfType<Procedure>())
       {
         var yieldingProc = civlTypeChecker.procToYieldingProc[absyMap.Original(proc)];
-        if (yieldingProc is MoverProc && yieldingProc.upperLayer == layerNum) continue;
+        if (yieldingProc is MoverProc && yieldingProc.upperLayer == layerNum)
+        {
+          continue;
+        }
+
         noninterferenceCheckerDecls.AddRange(
           NoninterferenceChecker.CreateNoninterferenceCheckers(civlTypeChecker,
             layerNum, absyMap, proc, new List<Variable>()));
@@ -329,7 +337,11 @@ namespace Microsoft.Boogie
         // But this is fine because a mover procedure at its disappearing layer does not have a yield in it.
         linearPermissionInstrumentation.AddDisjointnessAssumptions(impl, yieldingProcs);
         var yieldingProc = GetYieldingProc(impl);
-        if (yieldingProc is MoverProc && yieldingProc.upperLayer == layerNum) continue;
+        if (yieldingProc is MoverProc && yieldingProc.upperLayer == layerNum)
+        {
+          continue;
+        }
+
         TransformImpl(impl, implToPreconditions[impl]);
       }
     }
@@ -369,9 +381,17 @@ namespace Microsoft.Boogie
 
     private bool IsYieldingLoopHeader(Block b)
     {
-      if (!absyMap.ContainsKey(b)) return false;
+      if (!absyMap.ContainsKey(b))
+      {
+        return false;
+      }
+
       var originalBlock = absyMap.Original(b);
-      if (!civlTypeChecker.yieldingLoops.ContainsKey(originalBlock)) return false;
+      if (!civlTypeChecker.yieldingLoops.ContainsKey(originalBlock))
+      {
+        return false;
+      }
+
       return civlTypeChecker.yieldingLoops[originalBlock].layers.Contains(layerNum);
     }
 
@@ -417,9 +437,7 @@ namespace Microsoft.Boogie
       var returnBlock = BlockHelper.Block(civlTypeChecker.AddNamePrefix("UnifiedReturn"), new List<Cmd>());
       SplitBlocks(impl);
 
-      HashSet<Block> yieldingLoopHeaders;
-      HashSet<Block> blocksInYieldingLoops;
-      ComputeYieldingLoops(impl, out yieldingLoopHeaders, out blocksInYieldingLoops);
+      ComputeYieldingLoops(impl, out var yieldingLoopHeaders, out var blocksInYieldingLoops);
       foreach (Block header in yieldingLoopHeaders)
       {
         foreach (Block pred in header.Predecessors)
@@ -436,9 +454,7 @@ namespace Microsoft.Boogie
           }
         }
 
-        List<Cmd> firstCmds;
-        List<Cmd> secondCmds;
-        SplitCmds(header.Cmds, out firstCmds, out secondCmds);
+        SplitCmds(header.Cmds, out var firstCmds, out var secondCmds);
         List<Cmd> newCmds = new List<Cmd>();
         newCmds.AddRange(firstCmds);
         newCmds.AddRange(refinementInstrumentation.CreateAssumeCmds());
@@ -770,7 +786,10 @@ namespace Microsoft.Boogie
 
     private IEnumerable<Declaration> PendingAsyncNoninterferenceCheckers()
     {
-      if (CommandLineOptions.Clo.TrustNoninterference) yield break;
+      if (CommandLineOptions.Clo.TrustNoninterference)
+      {
+        yield break;
+      }
 
       HashSet<AtomicAction> pendingAsyncsToCheck = new HashSet<AtomicAction>(
         civlTypeChecker.procToAtomicAction.Values

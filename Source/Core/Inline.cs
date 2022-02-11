@@ -53,8 +53,7 @@ namespace Microsoft.Boogie
     protected void NextInlinedProcLabel(string procName)
     {
       Contract.Requires(procName != null);
-      int currentId;
-      if (inlinedProcLblMap.TryGetValue(procName, out currentId))
+      if (inlinedProcLblMap.TryGetValue(procName, out var currentId))
       {
         inlinedProcLblMap[procName] = currentId + 1;
       }
@@ -124,11 +123,18 @@ namespace Microsoft.Boogie
 
     private void DistinguishPrefix(string s)
     {
-      if (!s.StartsWith(prefix)) return;
+      if (!s.StartsWith(prefix))
+      {
+        return;
+      }
+
       for (int i = prefix.Length; i < s.Length; i++)
       {
         prefix = prefix + "$";
-        if (s[i] != '$') break;
+        if (s[i] != '$')
+        {
+          break;
+        }
       }
 
       if (prefix == s)
@@ -151,7 +157,9 @@ namespace Microsoft.Boogie
       Contract.Assert(cce.NonNullElements(newBlocks));
 
       if (!inlined)
+      {
         return;
+      }
 
       impl.InParams = new List<Variable>(impl.InParams);
       impl.OutParams = new List<Variable>(impl.OutParams);
@@ -212,18 +220,17 @@ namespace Microsoft.Boogie
       Contract.Requires(impl != null);
       Contract.Ensures(impl.Proc != null);
       ResolutionContext rc = new ResolutionContext(new DummyErrorSink());
-
       foreach (var decl in program.TopLevelDeclarations)
       {
         decl.Register(rc);
       }
-
       impl.Proc = null; // to force Resolve() redo the operation
       impl.Resolve(rc);
-
+      Debug.Assert(rc.ErrorCount == 0);
+      
       TypecheckingContext tc = new TypecheckingContext(new DummyErrorSink());
-
       impl.Typecheck(tc);
+      Debug.Assert(tc.ErrorCount == 0);
     }
 
     // Redundant for this class; but gives a chance for other classes to
@@ -243,8 +250,7 @@ namespace Microsoft.Boogie
       string /*!*/
         procName = impl.Name;
       Contract.Assert(procName != null);
-      int c;
-      if (recursiveProcUnrollMap.TryGetValue(procName, out c))
+      if (recursiveProcUnrollMap.TryGetValue(procName, out var c))
       {
         return c;
       }
@@ -484,7 +490,11 @@ namespace Microsoft.Boogie
           new TypedIdent(Token.NoToken, GetProcVarName(proc.Name, inVar.Name), inVar.TypedIdent.Type,
             inVar.TypedIdent.WhereExpr));
         newLocalVars.Add(localVar);
-        if (impl.Proc != null) localVar.Attributes = impl.Proc.InParams[i].Attributes; // copy attributes
+        if (impl.Proc != null)
+        {
+          localVar.Attributes = impl.Proc.InParams[i].Attributes; // copy attributes
+        }
+
         IdentifierExpr ie = new IdentifierExpr(Token.NoToken, localVar);
         substMap.Add(inVar, ie);
         // also add a substitution from the corresponding formal occurring in the PROCEDURE declaration
@@ -501,7 +511,11 @@ namespace Microsoft.Boogie
         LocalVariable localVar = new LocalVariable(Token.NoToken,
           new TypedIdent(Token.NoToken, GetProcVarName(proc.Name, outVar.Name), outVar.TypedIdent.Type,
             outVar.TypedIdent.WhereExpr));
-        if (impl.Proc != null) localVar.Attributes = impl.Proc.OutParams[i].Attributes; // copy attributes
+        if (impl.Proc != null)
+        {
+          localVar.Attributes = impl.Proc.OutParams[i].Attributes; // copy attributes
+        }
+
         newLocalVars.Add(localVar);
         IdentifierExpr ie = new IdentifierExpr(Token.NoToken, localVar);
         substMap.Add(outVar, ie);
@@ -543,9 +557,14 @@ namespace Microsoft.Boogie
       Requires /*!*/
         reqCopy = (Requires /*!*/) cce.NonNull(req.Clone());
       if (req.Free)
+      {
         reqCopy.Condition = Expr.True;
+      }
       else
+      {
         reqCopy.Condition = codeCopier.CopyExpr(req.Condition);
+      }
+
       AssertCmd /*!*/
         a = new AssertRequiresCmd(callCmd, reqCopy);
       a.ErrorDataEnhanced = reqCopy.ErrorDataEnhanced;
@@ -577,7 +596,11 @@ namespace Microsoft.Boogie
       for (int i = 0; i < cmds.Count; i++)
       {
         Cmd cmd = cmds[i];
-        if (cmd is AssertCmd) continue;
+        if (cmd is AssertCmd)
+        {
+          continue;
+        }
+
         newCmdSeq.Add(cmd);
       }
 

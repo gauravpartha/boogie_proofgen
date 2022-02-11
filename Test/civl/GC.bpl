@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //
 
-// RUN: %boogie "%s" > "%t"
+// RUN: %parallel-boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 type {:linear "tid"} X = int;
@@ -258,10 +258,10 @@ requires {:layer 100} (forall x: idx :: rootAddr(x) ==> rootAbs[x] == Int(0));
 
 procedure {:yields} {:layer 100}
 {:yield_requires "Yield_Initialize_100", tid, mutatorTids}
-{:yield_requires "Yield_InitVars99", mutatorTids, MapConst(false), old(rootScanBarrier)}
+{:yield_requires "Yield_InitVars99", mutatorTids, MapConst(false) : [int]bool, old(rootScanBarrier)}
 {:yield_ensures "Yield_Iso"}
 {:yield_ensures "Yield_RootScanBarrierInv"}
-{:yield_ensures "Yield_InitVars99", mutatorTids, MapConst(false), numMutators}
+{:yield_ensures "Yield_InitVars99", mutatorTids, MapConst(false) : [int]bool, numMutators}
 Initialize({:linear_in "tid"} tid:Tid, {:linear "tid"} mutatorTids:[int]bool)
 requires {:layer 97,98,99} gcAndMutatorTids(tid, mutatorTids);
 {

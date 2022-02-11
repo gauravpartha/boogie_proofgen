@@ -86,8 +86,7 @@ namespace Microsoft.Boogie
     /// </summary>
     public void Remove(T o)
     {
-      int idx;
-      if (ht.TryGetValue(o, out idx))
+      if (ht.TryGetValue(o, out var idx))
       {
         var last = arr[arr.Count - 1];
         arr.RemoveAt(arr.Count - 1);
@@ -128,7 +127,10 @@ namespace Microsoft.Boogie
     {
       Contract.Requires((Count > 0));
       foreach (var e in this)
+      {
         return e;
+      }
+
       return default(T);
     }
 
@@ -147,7 +149,11 @@ namespace Microsoft.Boogie
     public void Intersect(GSet<T> /*!*/ s)
     {
       Contract.Requires(s != null);
-      if (s == this) return;
+      if (s == this)
+      {
+        return;
+      }
+
       ht.Clear();
       var newArr = new List<T>();
       foreach (T key in arr)
@@ -318,7 +324,11 @@ namespace Microsoft.Boogie
 
     public bool AddAll(IEnumerable s)
     {
-      foreach (T e in s) Add(e);
+      foreach (T e in s)
+      {
+        Add(e);
+      }
+
       return true;
     }
   }

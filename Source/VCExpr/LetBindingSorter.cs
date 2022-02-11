@@ -26,7 +26,7 @@ namespace Microsoft.Boogie.VCExprAST
       Contract.Ensures(cce.NonNullElements(Contract.Result<List<VCExprVar>>()));
       FreeVarCollector.Collect(expr);
       List<VCExprVar /*!*/> /*!*/
-        freeVars = new List<VCExprVar /*!*/>(FreeVarCollector.FreeTermVars.Keys);
+        freeVars = new List<VCExprVar /*!*/>(FreeVarCollector.FreeTermVars);
       FreeVarCollector.Reset();
       return freeVars;
     }
@@ -64,8 +64,7 @@ namespace Microsoft.Boogie.VCExprAST
         foreach (VCExprVar /*!*/ v in b.FreeVars)
         {
           Contract.Assert(v != null);
-          Binding b2;
-          if (boundVars.TryGetValue(v, out b2))
+          if (boundVars.TryGetValue(v, out var b2))
           {
             cce.NonNull(b2).Occurrences.Add(b);
             b.InvOccurrencesNum = b.InvOccurrencesNum + 1;
@@ -79,7 +78,9 @@ namespace Microsoft.Boogie.VCExprAST
       {
         Contract.Assert(cce.NonNullElements(pair));
         if (pair.Value.InvOccurrencesNum == 0)
+        {
           rootBindings.Push(pair.Value);
+        }
       }
 
       List<Binding /*!*/> /*!*/
@@ -95,12 +96,16 @@ namespace Microsoft.Boogie.VCExprAST
           Contract.Assert(b2 != null);
           b2.InvOccurrencesNum = b2.InvOccurrencesNum - 1;
           if (b2.InvOccurrencesNum == 0)
+          {
             rootBindings.Push(b2);
+          }
         }
       }
 
       if (boundVars.Any(pair => pair.Value.InvOccurrencesNum > 0))
+      {
         System.Diagnostics.Debug.Fail("Cyclic let-bindings");
+      }
 
       Contract.Assert(node.Length == sortedBindings.Count);
 
@@ -115,7 +120,9 @@ namespace Microsoft.Boogie.VCExprAST
       {
         Contract.Assert(v != null);
         if (!usedVars.ContainsKey(v))
+        {
           usedVars.Add(v, v);
+        }
       }
 
       for (int i = sortedBindings.Count - 1; i >= 0; --i)
@@ -126,7 +133,9 @@ namespace Microsoft.Boogie.VCExprAST
           {
             Contract.Assert(v != null);
             if (!usedVars.ContainsKey(v))
+            {
               usedVars.Add(v, v);
+            }
           }
         }
         else
@@ -139,7 +148,9 @@ namespace Microsoft.Boogie.VCExprAST
       List<VCExprLetBinding /*!*/> /*!*/
         newBindings = new List<VCExprLetBinding /*!*/>();
       foreach (Binding b in sortedBindings)
+      {
         newBindings.Add(Gen.LetBinding(b.V, b.E));
+      }
 
       return Gen.Let(newBindings, newBody);
     }

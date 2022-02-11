@@ -94,7 +94,10 @@ namespace Microsoft.Boogie.VCExprAST
       List<VCExpr /*!*/> /*!*/
         res = new List<VCExpr /*!*/>();
       foreach (Expr e in exprs)
+      {
         res.Add(Translate(cce.NonNull(e)));
+      }
+
       return res;
     }
 
@@ -141,7 +144,10 @@ namespace Microsoft.Boogie.VCExprAST
         Contract.Ensures(Contract.Result<IAppliableTranslator>() != null);
 
         if (IAppTranslatorAttr == null)
+        {
           IAppTranslatorAttr = new IAppliableTranslator(this);
+        }
+
         return IAppTranslatorAttr;
       }
     }
@@ -237,11 +243,10 @@ namespace Microsoft.Boogie.VCExprAST
       private VCExprVar LookupHelp(VarKind boogieVar)
       {
         Contract.Requires(boogieVar != null);
-        VCExprVar res;
         foreach (Dictionary<VarKind /*!*/, VCExprVar /*!*/> /*!*/ d in Mapping)
         {
           //Contract.Assert(cce.NonNullElements(d));
-          if (d.TryGetValue(boogieVar, out res))
+          if (d.TryGetValue(boogieVar, out var res))
           {
             Contract.Assert(res != null);
             return res;
@@ -330,19 +335,25 @@ namespace Microsoft.Boogie.VCExprAST
         return BoundVariables.Lookup(bv);
       }
 
-      VCExprVar res;
       Formal fml = boogieVar as Formal;
-      if (fml != null && Formals.TryGetValue(fml, out res))
+      if (fml != null && Formals.TryGetValue(fml, out var res))
+      {
         return cce.NonNull(res);
+      }
 
       // global variables, local variables, incarnations, etc. are
       // bound the first time they occur
       if (!UnboundVariables.TryGetValue(boogieVar, out res))
       {
         if (boogieVar is Constant)
+        {
           res = new VCExprConstant(boogieVar.Name, boogieVar.TypedIdent.Type);
+        }
         else
+        {
           res = new VCExprVar(boogieVar.Name, boogieVar.TypedIdent.Type);
+        }
+
         UnboundVariables.Bind(boogieVar, res);
       }
 
@@ -360,10 +371,11 @@ namespace Microsoft.Boogie.VCExprAST
     {
       Contract.Requires(boogieVar != null);
 
-      VCExprVar res;
       Formal fml = boogieVar as Formal;
-      if (fml != null && Formals.TryGetValue(fml, out res))
+      if (fml != null && Formals.TryGetValue(fml, out var res))
+      {
         return cce.NonNull(res);
+      }
 
       if (UnboundVariables.TryGetValue(boogieVar, out res))
       {
@@ -489,13 +501,17 @@ namespace Microsoft.Boogie.VCExprAST
       {
         UnaryOperator oper = (UnaryOperator) node.Fun;
         if (oper.Op == UnaryOperator.Opcode.Not)
+        {
           flipContextForArg0 = true;
+        }
       }
       else if (node.Fun is BinaryOperator)
       {
         BinaryOperator oper = (BinaryOperator) node.Fun;
         if (oper.Op == BinaryOperator.Opcode.Imp)
+        {
           flipContextForArg0 = true;
+        }
       }
 
       int n = node.Args.Count;
@@ -505,10 +521,15 @@ namespace Microsoft.Boogie.VCExprAST
       for (int i = 0; i < n; i++)
       {
         if (i == 0 && flipContextForArg0)
+        {
           isPositiveContext = !isPositiveContext;
+        }
+
         vcs.Add(Translate(cce.NonNull(node.Args)[i]));
         if (i == 0 && flipContextForArg0)
+        {
           isPositiveContext = !isPositiveContext;
+        }
       }
 
       if (node.Type == null)
@@ -538,7 +559,9 @@ namespace Microsoft.Boogie.VCExprAST
       Contract.Requires(insts != null);
       Contract.Ensures(cce.NonNullElements(Contract.Result<List<Type>>()));
       if (insts.FormalTypeParams.Count == 0)
+      {
         return EMPTY_TYPE_LIST;
+      }
 
       List<Type /*!*/> /*!*/
         typeArgs = new List<Type /*!*/>();
@@ -594,7 +617,9 @@ namespace Microsoft.Boogie.VCExprAST
       List<VCExprVar /*!*/> /*!*/
         boundVars = new List<VCExprVar /*!*/>();
       foreach (Variable /*!*/ v in node.Dummies)
+      {
         boundVars.Add(BindVariable(v));
+      }
 
       try
       {
@@ -602,21 +627,25 @@ namespace Microsoft.Boogie.VCExprAST
           triggers = TranslateTriggers(node.Triggers);
         VCExpr /*!*/
           body = Translate(node.Body);
-        VCQuantifierInfos /*!*/
-          infos = GenerateQuantifierInfos(node);
+        VCQuantifierInfo /*!*/
+          info = GenerateQuantifierInfo(node, boundVars);
 
         Quantifier quan;
         if (node is ForallExpr)
+        {
           quan = Quantifier.ALL;
+        }
         else if (node is ExistsExpr)
+        {
           quan = Quantifier.EX;
+        }
         else
         {
           Contract.Assert(false);
           throw new cce.UnreachableException();
         }
 
-        return Gen.Quantify(quan, typeParams, boundVars, triggers, infos, body);
+        return Gen.Quantify(quan, typeParams, boundVars, triggers, info, body);
       }
       finally
       {
@@ -639,18 +668,24 @@ namespace Microsoft.Boogie.VCExprAST
       return res;
     }
 
-    private VCQuantifierInfos GenerateQuantifierInfos(QuantifierExpr node)
+    private VCQuantifierInfo GenerateQuantifierInfo(QuantifierExpr node, List<VCExprVar> boundVars)
     {
       Contract.Requires(node != null);
-      Contract.Ensures(Contract.Result<VCQuantifierInfos>() != null);
-      string qid = getQidNameFromQKeyValue(node.Dummies, node.Attributes);
-      return new VCQuantifierInfos(qid, node.SkolemId, false, node.Attributes);
+      Contract.Ensures(Contract.Result<VCQuantifierInfo>() != null);
+      return new VCQuantifierInfo(
+        GetQid(node), 
+        node.SkolemId,
+        QKeyValue.FindIntAttribute(node.Attributes, "weight", 1), 
+        Enumerable.Range(0, boundVars.Count)
+          .ToDictionary(x => boundVars[x], x => QuantifierInstantiationEngine.FindInstantiationHints(node.Dummies[x])),
+        QuantifierInstantiationEngine.FindInstantiationSources(node, "skolem_add_to_pool", this));
     }
 
-    private string getQidNameFromQKeyValue(List<Variable> vars, QKeyValue attributes)
+    private string GetQid(QuantifierExpr node)
     {
-      Contract.Requires(vars != null);
-      // Check for a 'qid, name' pair in keyvalues
+      List<Variable> vars = node.Dummies;
+      QKeyValue attributes = node.Attributes;
+      // Check for a 'qid, name' pair in attributes
       string qid = QKeyValue.FindStringAttribute(attributes, "qid");
       if (qid == null && vars.Count != 0)
       {
@@ -660,11 +695,15 @@ namespace Microsoft.Boogie.VCExprAST
         StringBuilder buf = new StringBuilder(20);
         string filename = v.tok.filename;
         if (filename == null)
+        {
           filename = "unknown";
+        }
         for (int i = 0; i < filename.Length; ++i)
         {
           if (filename[i] == '/' || filename[i] == '\\')
+          {
             buf.Length = 0;
+          }
           if (char.IsLetterOrDigit(filename[i]))
           {
             if (buf.Length == 0 && char.IsDigit(filename[i]))
@@ -672,15 +711,12 @@ namespace Microsoft.Boogie.VCExprAST
               // Z3 does not like QID's to start with a digit, so we prepend another character
               buf.Append('_');
             }
-
             buf.Append(filename[i]);
           }
         }
-
         buf.Append('.').Append(v.Line).Append(':').Append(v.Col);
         qid = buf.ToString();
       }
-
       return qid;
     }
 
@@ -1458,27 +1494,45 @@ namespace Microsoft.Boogie.VCExprAST
         case BinaryOperator.Opcode.Iff:
           // we don't distinguish between equality and equivalence at this point
           if (t.IsFloat)
+          {
             return Gen.Function(Gen.BinaryFloatOp(t.FloatSignificand, t.FloatExponent, "=="), args);
+          }
+
           return Gen.Function(VCExpressionGenerator.EqOp, args);
         case BinaryOperator.Opcode.Neq:
           if (t.IsFloat)
+          {
             return Gen.Function(Gen.BinaryFloatOp(t.FloatSignificand, t.FloatExponent, "!="), args);
+          }
+
           return Gen.Function(VCExpressionGenerator.NeqOp, args);
         case BinaryOperator.Opcode.Lt:
           if (t.IsFloat)
+          {
             return Gen.Function(Gen.BinaryFloatOp(t.FloatSignificand, t.FloatExponent, "<"), args);
+          }
+
           return Gen.Function(VCExpressionGenerator.LtOp, args);
         case BinaryOperator.Opcode.Le:
           if (t.IsFloat)
+          {
             return Gen.Function(Gen.BinaryFloatOp(t.FloatSignificand, t.FloatExponent, "<="), args);
+          }
+
           return Gen.Function(VCExpressionGenerator.LeOp, args);
         case BinaryOperator.Opcode.Ge:
           if (t.IsFloat)
+          {
             return Gen.Function(Gen.BinaryFloatOp(t.FloatSignificand, t.FloatExponent, ">="), args);
+          }
+
           return Gen.Function(VCExpressionGenerator.GeOp, args);
         case BinaryOperator.Opcode.Gt:
           if (t.IsFloat)
+          {
             return Gen.Function(Gen.BinaryFloatOp(t.FloatSignificand, t.FloatExponent, ">"), args);
+          }
+
           return Gen.Function(VCExpressionGenerator.GtOp, args);
         case BinaryOperator.Opcode.Imp:
           return Gen.Function(VCExpressionGenerator.ImpliesOp, args);
@@ -1507,7 +1561,9 @@ namespace Microsoft.Boogie.VCExprAST
 
       VCExpr res = ApplyExpansion(app, args, typeArgs);
       if (res != null)
+      {
         return res;
+      }
 
       VCExprOp /*!*/
         functionOp = Gen.BoogieFunctionOp(app.Func);
@@ -1523,15 +1579,11 @@ namespace Microsoft.Boogie.VCExprAST
 
       lock (app.Func)
       {
-        if (app.Func.doingExpansion)
-        {
-          System.Console.WriteLine("*** detected expansion loop on {0}", app.Func);
-          return null;
-        }
-
         var exp = app.Func.Body;
         if (exp == null)
+        {
           return null;
+        }
 
         VCExpr /*!*/
           translatedBody;
@@ -1541,13 +1593,14 @@ namespace Microsoft.Boogie.VCExprAST
         {
           BaseTranslator.PushFormalsScope();
           BaseTranslator.PushBoundVariableScope();
-          app.Func.doingExpansion = true;
 
           // first bind the formals to VCExpr variables, which are later
           // substituted with the actual parameters
           var inParams = app.Func.InParams;
           for (int i = 0; i < inParams.Count; ++i)
+          {
             subst[BaseTranslator.BindVariable(inParams[i])] = args[i];
+          }
 
           // recursively translate the body of the expansion
           translatedBody = BaseTranslator.Translate(exp);
@@ -1556,14 +1609,16 @@ namespace Microsoft.Boogie.VCExprAST
         {
           BaseTranslator.PopFormalsScope();
           BaseTranslator.PopBoundVariableScope();
-          app.Func.doingExpansion = false;
         }
 
         // substitute the formals with the actual parameters in the body
         var tparms = app.Func.TypeParameters;
         Contract.Assert(typeArgs.Count == tparms.Count);
         for (int i = 0; i < typeArgs.Count; ++i)
+        {
           subst[tparms[i]] = typeArgs[i];
+        }
+
         SubstitutingVCExprVisitor /*!*/
           substituter = new SubstitutingVCExprVisitor(Gen);
         return substituter.Mutate(translatedBody, subst);

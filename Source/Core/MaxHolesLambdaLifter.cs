@@ -37,7 +37,7 @@ namespace Core
     private readonly Dictionary<Expr, FunctionCall> _liftedLambdas;
     private readonly String _freshFnName;
     private readonly List<Function> _lambdaFunctions;
-    private readonly List<Expr> _lambdaAxioms;
+    private readonly List<Axiom> _lambdaAxioms;
     private int _freshVarCount;
 
     private readonly Dictionary<Absy, LambdaLiftingTemplate> _templates = new Dictionary<Absy, LambdaLiftingTemplate>();
@@ -47,7 +47,7 @@ namespace Core
       Dictionary<Expr, FunctionCall> liftedLambdas,
       string freshFnName,
       List<Function> lambdaFunctions,
-      List<Expr> lambdaAxioms,
+      List<Axiom> lambdaAxioms,
       int freshVarCount = 0
     )
     {
@@ -66,7 +66,10 @@ namespace Core
       {
         var newName = prefix + _freshVarCount;
         _freshVarCount++;
-        if (!existing.Contains(newName)) return newName;
+        if (!existing.Contains(newName))
+        {
+          return newName;
+        }
       }
     }
 
@@ -78,7 +81,11 @@ namespace Core
     public override Expr VisitNAryExpr(NAryExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       base.VisitNAryExpr(node);
       var nodeArgs = node.Args;
       if (nodeArgs.Any(arg => _templates[arg].ContainsBoundVariables()))
@@ -109,7 +116,11 @@ namespace Core
     public override Expr VisitIdentifierExpr(IdentifierExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       base.VisitIdentifierExpr(node);
       if (IsBound(node.Decl))
       {
@@ -126,7 +137,11 @@ namespace Core
     public override Expr VisitLiteralExpr(LiteralExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       base.VisitLiteralExpr(node);
       _templates[node] = new TemplateNoBoundVariables(node);
       return node;
@@ -135,7 +150,11 @@ namespace Core
     public override Expr VisitLetExpr(LetExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       _nestedBoundVariables.AddRange(node.Dummies);
       base.VisitLetExpr(node);
       var bodyTemplate = _templates[node.Body];
@@ -168,7 +187,11 @@ namespace Core
     public override Expr VisitForallExpr(ForallExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       _nestedBoundVariables.AddRange(node.Dummies);
       base.VisitForallExpr(node);
       var body = node.Body;
@@ -200,7 +223,11 @@ namespace Core
     public override Expr VisitExistsExpr(ExistsExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       _nestedBoundVariables.AddRange(node.Dummies);
       base.VisitExistsExpr(node);
       var body = node.Body;
@@ -245,7 +272,11 @@ namespace Core
 
     private Trigger ReplacementTrigger(Trigger trigger)
     {
-      if (trigger == null) return null;
+      if (trigger == null)
+      {
+        return null;
+      }
+
       var replacements = _templates[trigger].GetReplacements();
       var next = trigger.Next;
       return new Trigger(trigger.tok, trigger.Pos, replacements, next == null ? null : ReplacementTrigger(next));
@@ -254,7 +285,11 @@ namespace Core
     public override Trigger VisitTrigger(Trigger node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       base.VisitTrigger(node);
       var templates = (from e in node.Tr select _templates[e]).ToList();
       var replacements = new List<Expr>();
@@ -306,8 +341,8 @@ namespace Core
       var replDummies = allReplacementExprs.Zip(typedIdents,
         (replExpr, typedIdent) => (Variable) new BoundVariable(replExpr.tok, typedIdent)).ToList();
       var replDummyIds = (from dummy in replDummies select (Expr) new IdentifierExpr(dummy.tok, dummy)).ToList();
-      var dummies = new List<Variable>(_lambda.Dummies);
-      dummies.AddRange(replDummies);
+      var dummies = new List<Variable>(replDummies);
+      dummies.AddRange(_lambda.Dummies);
 
 
       var lambdaAttrs = _lambda.Attributes;
@@ -337,7 +372,6 @@ namespace Core
       string lam_str = sw.ToString();
 
       // the resulting lifted function applied to free variables
-      FunctionCall fcall;
       IToken tok = _lambda.tok;
       Formal res = new Formal(tok, new TypedIdent(tok, TypedIdent.NoName, cce.NonNull(_lambda.Type)), false);
 
@@ -345,7 +379,7 @@ namespace Core
         (from kvp in _templates where !kvp.Value.ContainsBoundVariables() select kvp.Key).ToList(),
         replDummies, _lambda, lambdaAttrs);
 
-      if (_liftedLambdas.TryGetValue(liftedLambda, out fcall))
+      if (_liftedLambdas.TryGetValue(liftedLambda, out var fcall))
       {
         if (CommandLineOptions.Clo.TraceVerify)
         {
@@ -395,15 +429,15 @@ namespace Core
 
         forallTypeVariables.AddRange(freeTypeVars);
         select.TypeParameters = SimpleTypeParamInstantiation.From(_lambda.TypeParameters, selectTypeParamActuals);
-
-
+        
         NAryExpr body = Expr.Eq(select, liftedLambda.Body);
         body.Type = Type.Bool;
         body.TypeParameters = SimpleTypeParamInstantiation.EMPTY;
         var trig = new Trigger(select.tok, true, new List<Expr> {select});
 
         _lambdaFunctions.Add(fn);
-        _lambdaAxioms.Add(new ForallExpr(tok, forallTypeVariables, dummies, liftedLambda.Attributes, trig, body));
+        fn.DefinitionAxiom = new Axiom(tok, new ForallExpr(tok, forallTypeVariables, dummies, liftedLambda.Attributes, trig, body));
+        _lambdaAxioms.Add(fn.DefinitionAxiom);
       }
 
       NAryExpr call = new NAryExpr(tok, fcall, allReplacementExprs.ToList())
@@ -417,7 +451,11 @@ namespace Core
     public override Variable VisitVariable(Variable node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       base.VisitVariable(node);
       if (IsBound(node))
       {
@@ -436,7 +474,11 @@ namespace Core
     public override Expr VisitOldExpr(OldExpr node)
     {
       Contract.Requires(node != null);
-      if (_templates.ContainsKey(node)) return node;
+      if (_templates.ContainsKey(node))
+      {
+        return node;
+      }
+
       base.VisitOldExpr(node);
       if (_templates[node.Expr] is TemplateNoBoundVariables t)
       {

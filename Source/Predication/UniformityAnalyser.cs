@@ -51,9 +51,11 @@ namespace Microsoft.Boogie
                (uni.IsUniform(impl.Name, pred) && uni.IsUniform(impl.Name, block)) ||
                (!uni.IsUniform(impl.Name, pred) && !uni.IsUniform(impl.Name, block))))
           {
-            Block predMapping;
-            while (predMap.TryGetValue(pred, out predMapping))
+            while (predMap.TryGetValue(pred, out var predMapping))
+            {
               pred = predMapping;
+            }
+
             pred.Cmds.AddRange(block.Cmds);
             pred.TransferCmd = block.TransferCmd;
             impl.Blocks.Remove(block);
@@ -98,7 +100,9 @@ namespace Microsoft.Boogie
         loopsWithNonuniformReturn.Add(Impl.Name, new HashSet<int>());
 
         foreach (var v in nonUniformVars)
+        {
           SetNonUniform(Impl.Name, v.Name);
+        }
 
         foreach (Variable v in Impl.LocVars)
         {
@@ -282,7 +286,9 @@ namespace Microsoft.Boogie
             nonUniformBlockSet.Add(block);
             Block pred = blockGraph.Predecessors(block).Single();
             if (ctrlDep.ContainsKey(pred))
+            {
               nonUniformBlockSet.UnionWith(ctrlDep[pred]);
+            }
           }
         }
       } while (changed);

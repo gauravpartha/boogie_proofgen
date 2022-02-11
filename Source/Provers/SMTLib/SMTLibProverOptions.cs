@@ -28,8 +28,9 @@ namespace Microsoft.Boogie.SMTLib
   public enum SolverKind
   {
     Z3,
-    CVC4,
-    YICES2
+    CVC5,
+    YICES2,
+    NoOpWithZ3Options
   }
 
   public class SMTLibProverOptions : ProverOptions
@@ -44,19 +45,6 @@ namespace Microsoft.Boogie.SMTLib
     // Z3 specific (at the moment; some of them make sense also for other provers)
     public string Inspector = null;
 
-    public bool ProduceModel()
-    {
-      return CommandLineOptions.Clo.ExplainHoudini || CommandLineOptions.Clo.UseProverEvaluate || ExpectingModel();
-    }
-
-    public bool ExpectingModel()
-    {
-      return CommandLineOptions.Clo.PrintErrorModel >= 1 ||
-             CommandLineOptions.Clo.EnhancedErrorMessages == 1 ||
-             CommandLineOptions.Clo.ModelViewFile != null ||
-             (CommandLineOptions.Clo.StratifiedInlining > 0 && !CommandLineOptions.Clo.StratifiedInliningWithoutModels);
-    }
-
     public void AddSolverArgument(string s)
     {
       SolverArguments.Add(s);
@@ -70,14 +58,19 @@ namespace Microsoft.Boogie.SMTLib
     public void AddWeakSmtOption(string name, string val)
     {
       if (!SmtOptions.Any(o => o.Option == name))
+      {
         SmtOptions.Add(new OptionValue(name, val));
+      }
     }
 
     public void AddSmtOption(string opt)
     {
       var idx = opt.IndexOf('=');
       if (idx <= 0 || idx == opt.Length - 1)
+      {
         ReportError("Options to be passed to the prover should have the format: <name>=<value>, got '" + opt + "'");
+      }
+
       AddSmtOption(opt.Substring(0, idx), opt.Substring(idx + 1));
     }
 
@@ -95,22 +88,25 @@ namespace Microsoft.Boogie.SMTLib
         return true;
       }
 
-      string SolverStr = null;
-      if (ParseString(opt, "SOLVER", ref SolverStr))
+      string solverStr = null;
+      if (ParseString(opt, "SOLVER", ref solverStr))
       {
-        switch (SolverStr.ToLower())
+        switch (solverStr.ToLower())
         {
+          case "noop":
+            Solver = SolverKind.NoOpWithZ3Options;
+            break;
           case "z3":
             Solver = SolverKind.Z3;
             break;
-          case "cvc4":
-            Solver = SolverKind.CVC4;
+          case "cvc5":
+            Solver = SolverKind.CVC5;
             break;
           case "yices2":
             Solver = SolverKind.YICES2;
             break;
           default:
-            ReportError("Invalid SOLVER value; must be 'Z3' or 'CVC4' or 'Yices2'");
+            ReportError("Invalid SOLVER value; must be 'Z3' or 'CVC5' or 'Yices2' or 'noop'");
             return false;
         }
 
@@ -128,25 +124,44 @@ namespace Microsoft.Boogie.SMTLib
     {
       base.PostParse();
 
+      string SolverBinaryName = null;
       switch (Solver)
       {
         case SolverKind.Z3:
           Z3.SetDefaultOptions(this);
           SolverArguments.Add("-smt2 -in");
+          SolverBinaryName = Solver.ToString().ToLower();
           break;
-        case SolverKind.CVC4:
+        case SolverKind.CVC5:
           SolverArguments.Add(
             "--lang=smt --no-strict-parsing --no-condense-function-values --incremental --produce-models");
-          if (Logic == null) Logic = "ALL_SUPPORTED";
+          if (Logic == null)
+          {
+            Logic = "ALL";
+          }
+
+          SolverBinaryName = Solver.ToString().ToLower();
           break;
         case SolverKind.YICES2:
           SolverArguments.Add("--incremental");
-          if (Logic == null) Logic = "ALL";
+          if (Logic == null)
+          {
+            Logic = "ALL";
+          }
+
+          SolverBinaryName = "yices-smt2";
           break;
+        case SolverKind.NoOpWithZ3Options:
+          ProverName = "noop";
+          break;
+        default:
+          Contract.Assert(false);
+          throw new cce.UnreachableException();
       }
 
-      if (ProverName == null)
-        ProverName = Solver.ToString().ToLower();
+      if (ProverName == null) {
+        ProverName = SolverBinaryName;
+      }
     }
 
     public override string Help
@@ -158,8 +173,9 @@ namespace Microsoft.Boogie.SMTLib
           @"
 SMT-specific options:
 ~~~~~~~~~~~~~~~~~~~~~
-SOLVER=<string>           Use the given SMT solver (z3, cvc4, yices2; default: z3)
-LOGIC=<string>            Pass (set-logic <string>) to the prover (default: empty, 'ALL_SUPPORTED' for CVC4)
+SOLVER=<string>           Use the given SMT solver (z3, cvc5, yices2, noop; default: z3)
+                          The noop solver never does any solving and always returns unknown.
+LOGIC=<string>            Pass (set-logic <string>) to the prover (default: empty, 'ALL' for CVC5)
 USE_WEIGHTS=<bool>        Pass :weight annotations on quantified formulas (default: true)
 VERBOSITY=<int>           1 - print prover output (default: 0)
 O:<name>=<value>          Pass (set-option :<name> <value>) to the SMT solver.
