@@ -489,7 +489,6 @@ namespace Microsoft.Boogie.TypeErasure
             var functionAxiom = GenFunctionAxiom(res, fun);
             AddTypeAxiom(functionAxiom, new VcFunctionAxiomInfo(functionAxiom, fun));
           }
-          }
         }
 
         Typed2UntypedFunctions.Add(fun, res);
@@ -1338,29 +1337,31 @@ namespace Microsoft.Boogie.TypeErasure
       // check whether some of the type parameters could not be
       // determined from the bound variable types. In this case, we
       // quantify explicitly over these variables
-      
-      if (typeVarBindings.Count < node.TypeParameters.Count) {
+
+      if (typeVarBindings.Count < node.TypeParameters.Count)
+      {
         if (!_extractTypeArgs)
         {
           /* This is not invoked for the final VC, but just for proof generation purposes (parts of the VC are rewritten into this form;
              this rewriting is proved correct in Isabelle).
              Type variables are quantified over first to make proof generation easier (hence Reverse + Insert at beginning). */
-          foreach (TypeVariable /*!*/ var in ((IEnumerable<TypeVariable>) node.TypeParameters).Reverse())
+          foreach (TypeVariable /*!*/ var in ((IEnumerable<TypeVariable>)node.TypeParameters).Reverse())
           {
             Contract.Assert(var != null);
-            newBoundVars.Insert(0, (VCExprVar) bindings.TypeVariableBindings[var]);
+            newBoundVars.Insert(0, (VCExprVar)bindings.TypeVariableBindings[var]);
           }
         }
         else
         {
           /* This is the standard implementation that is also invoked for the VC that is translated to the Isabelle
            representation for the proof generation. */
-          foreach (TypeVariable/*!*/ var in node.TypeParameters) 
+          foreach (TypeVariable /*!*/ var in node.TypeParameters)
           {
             Contract.Assert(var != null);
             if (typeVarBindings.All(b => !b.V.Equals(bindings.TypeVariableBindings[var])))
-          {
+            {
               newBoundVars.Add((VCExprVar)bindings.TypeVariableBindings[var]);
+            }
           }
         }
       }

@@ -17,7 +17,7 @@ namespace ProofGeneration.Util
         public IsaUniqueNamer(string spacer)
         {
             this.spacer = spacer;
-            uniqueNamer = new UniqueNamer
+            uniqueNamer = new KeepOriginalNamer
             {
                 Spacer = spacer
             };

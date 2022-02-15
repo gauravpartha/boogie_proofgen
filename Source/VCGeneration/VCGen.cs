@@ -1169,7 +1169,7 @@ namespace VC
           {
             if (a is AssertCmd)
             {
-              AssertCmd c = (AssertCmd) a;
+              AssertCmd c = (AssertCmd)a;
               AssertCmd b = null;
 
               if (CommandLineOptions.Clo.ConcurrentHoudini)
@@ -1247,7 +1247,7 @@ namespace VC
           Block pred = cce.NonNull(header.Predecessors[predIndex]);
 
           // Create a block between header and pred for the predicate commands if pred has more than one successor
-          GotoCmd gotocmd = cce.NonNull((GotoCmd) pred.TransferCmd);
+          GotoCmd gotocmd = cce.NonNull((GotoCmd)pred.TransferCmd);
           Contract.Assert(gotocmd.labelNames !=
                           null); // if "pred" is really a predecessor, it may be a GotoCmd with at least one label
           if (gotocmd.labelNames.Count > 1)
@@ -1260,7 +1260,7 @@ namespace VC
             {
               backEdgeNodes.Remove(pred);
               backEdgeNodes.Add(newBlock, null);
-              ProofGenerationLayer.NewBackedgeBlock(pred, newBlock, header); 
+              ProofGenerationLayer.NewBackedgeBlock(pred, newBlock, header);
             }
 
             pred = newBlock;
@@ -1344,7 +1344,7 @@ namespace VC
         #region Collect all variables that are assigned to in all of the natural loops for which this is the header
 
         List<Variable> varsToHavoc = VarsAssignedInLoop(g, header);
-        List<Variable> varsToHavocUnique = new List<Variable>(); 
+        List<Variable> varsToHavocUnique = new List<Variable>();
         List<IdentifierExpr> havocExprs = new List<IdentifierExpr>();
         foreach (Variable v in varsToHavoc)
         {
@@ -1354,7 +1354,6 @@ namespace VC
           {
             havocExprs.Add(ie);
             varsToHavocUnique.Add(v);
-          }
           }
         }
 
@@ -1370,10 +1369,12 @@ namespace VC
 
         header.Cmds = newCmds;
 
-        ProofGenerationLayer.LoopHeadHint(header, varsToHavocUnique, prefixOfPredicateCmdsInit.Select(cmd => ((PredicateCmd) cmd).Expr)); 
+        ProofGenerationLayer.LoopHeadHint(header, varsToHavocUnique,
+          prefixOfPredicateCmdsInit.Select(cmd => ((PredicateCmd)cmd).Expr));
+
         #endregion
       }
-
+      
       #endregion
 
       #endregion Convert program CFG into a DAG

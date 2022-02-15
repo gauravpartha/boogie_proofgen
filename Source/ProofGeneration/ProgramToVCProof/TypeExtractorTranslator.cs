@@ -30,7 +30,7 @@ namespace ProofGeneration.ProgramToVCProof
                 if (typeTranslation.TryTranslateTypeDecl(vcFunOp.Func, out var isaFun))
                 {
                     var isaArgs = new List<Term>();
-                    foreach (var nodeArg in node) isaArgs.Add(nodeArg.Accept(this, arg));
+                    foreach (var nodeArg in node.Arguments) isaArgs.Add(nodeArg.Accept(this, arg));
 
                     return new TermApp(isaFun, isaArgs);
                 }

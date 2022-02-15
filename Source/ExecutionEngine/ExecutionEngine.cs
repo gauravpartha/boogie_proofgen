@@ -509,37 +509,37 @@ namespace Microsoft.Boogie
       Inline(program);
         
 
-        #region check if proof gen potentially supports input program
-        ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
-        if (!proofGenSubsetChecker.ProofGenPotentiallySupportsSubset(program, out object resultNode))
-        {
-          if(!CommandLineOptions.Clo.OnlyCheckProofGenSupport)
-            Console.WriteLine("Proof generation does not support this program, because of node " + resultNode);
-          
-          Environment.Exit(0);
-        } else if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
-        {
-          Console.WriteLine("Success:" + fileNames[0]);
-          Environment.Exit(0);
-        }
-        #endregion
+      #region check if proof gen potentially supports input program
+      ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
+      if (!proofGenSubsetChecker.ProofGenPotentiallySupportsSubset(program, out object resultNode))
+      {
+        if(!CommandLineOptions.Clo.OnlyCheckProofGenSupport)
+          Console.WriteLine("Proof generation does not support this program, because of node " + resultNode);
+        
+        Environment.Exit(0);
+      } else if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
+      {
+        Console.WriteLine("Success:" + bplFileName);
+        Environment.Exit(0);
+      }
+      #endregion
 
-        if (CommandLineOptions.Clo.ProofOutputDir != null)
+      if (CommandLineOptions.Clo.ProofOutputDir != null)
+      {
+        if (Directory.Exists(CommandLineOptions.Clo.ProofOutputDir))
         {
-          if (Directory.Exists(CommandLineOptions.Clo.ProofOutputDir))
-          {
-            Console.WriteLine("Proof generation output directory " + CommandLineOptions.Clo.ProofOutputDir + " already exists ");
-            Environment.Exit(1);
-          }
-          else
-          {
-            ProofGenerationOutput.CreateMainDirectory(CommandLineOptions.Clo.ProofOutputDir, true);
-          }
+          Console.WriteLine("Proof generation output directory " + CommandLineOptions.Clo.ProofOutputDir + " already exists ");
+          Environment.Exit(1);
         }
         else
         {
-          ProofGenerationOutput.CreateMainDirectory(String.Join("_", fileNames), false);
+          ProofGenerationOutput.CreateMainDirectory(CommandLineOptions.Clo.ProofOutputDir, true);
         }
+      }
+      else
+      {
+        ProofGenerationOutput.CreateMainDirectory(String.Join("_", bplFileName), false);
+      }
         
       var stats = new PipelineStatistics();
       oc = InferAndVerify(program, stats, 1 < CommandLineOptions.Clo.VerifySnapshots ? programId : null);
