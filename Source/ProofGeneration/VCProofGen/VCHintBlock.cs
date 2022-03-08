@@ -7,7 +7,7 @@ namespace ProofGeneration.VCProofGen
 {
     internal class VCHintBlock
     {
-        private readonly VCHint[] _hints;
+        private VCHint[] _hints;
         private readonly Cmd[] cmds;
 
         private int nextCmd;
@@ -50,6 +50,35 @@ namespace ProofGeneration.VCProofGen
             _hints[nextCmd] = hint;
 
             nextCmd--;
+        }
+
+        public void TransformHintsForTrivialVc()
+        {
+          if (cmds.Length != _hints.Length)
+          {
+            throw new ProofGenUnexpectedStateException("Not same number of hints as commands in the block.");
+          }
+          
+          VCHint[] newHints = new VCHint[cmds.Length];
+          for (int i = 0; i < cmds.Length; i++)
+          {
+            if (!(cmds[i] is AssumeCmd))
+            {
+              throw new ProofGenUnexpectedStateException("Trivial VC but there are assert statements");
+            }
+
+            if (_hints[i] is AssumeSimpleHint assumeSimpleHint && assumeSimpleHint.hintType == AssumeSimpleHint.AssumeSimpleType.ASSUME_FALSE)
+            {
+                //don't change the hint, since may still want to prove that the execution goes to magic
+                newHints[i] = _hints[i];
+            }
+            else
+            {
+              newHints[i] = new AssumeSimpleHint(AssumeSimpleHint.AssumeSimpleType.ASSUME_TRUE);
+            }
+          }
+
+          _hints = newHints;
         }
 
         public void AddRequiredDecls(List<LemmaDecl> decls)

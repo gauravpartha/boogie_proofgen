@@ -64,6 +64,15 @@ namespace ProofGeneration.VCProofGen
             return false;
         }
 
+        public void TransformHintsToTrivialVc()
+        {
+          foreach (Block b in _blockTo.Keys)
+          {
+            var currentValue = _blockTo[b];
+            currentValue.TransformHintsForTrivialVc();
+          }
+        }
+
         /// <summary>
         ///     If no lemma is required for the proof, then <paramref name="decl" /> is null.
         /// </summary>

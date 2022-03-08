@@ -29,11 +29,8 @@ namespace ProofGeneration.VCProofGen
             out IVCVarFunTranslator vcTranslator,
             out IEnumerable<Function> vcTypeFunctions)
         {
-            var vcLet = vc as VCExprLet;
-            Contract.Assert(vcLet != null);
-
             var uniqueNamer = new IsaUniqueNamer();
-            var blockToVC = VCBlockExtractor.BlockToVCMapping(vcLet, cfg);
+            var blockToVC = VCBlockExtractor.BlockToVCMapping(vc, cfg);
 
             var declCollector = new VCFunDeclCollector();
             var funToVCfun =
@@ -83,7 +80,19 @@ namespace ProofGeneration.VCProofGen
             //add vc definitions of blocks in correct order
             IList<OuterDecl> vcOuterDecls = new List<OuterDecl>();
 
-            foreach (var block in cfg.GetBlocksBackwards()) vcOuterDecls.Add(blockToVCExpr[block]);
+            {
+              HashSet<OuterDecl> addedDecls = new HashSet<OuterDecl>();
+
+              foreach (var block in cfg.GetBlocksBackwards())
+              {
+                var vcDef = blockToVCExpr[block];
+                if (!addedDecls.Contains(vcDef))
+                {
+                  vcOuterDecls.Add(vcDef);
+                  addedDecls.Add(vcDef);
+                }
+              }
+            }
 
             vcinst = new VCInstantiation<Block>(blockToVCExpr, activeDeclsPerBlockSorted, localeName);
 

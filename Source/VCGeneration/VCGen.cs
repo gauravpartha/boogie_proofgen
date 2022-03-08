@@ -630,6 +630,7 @@ namespace VC
       CumulativeAssertionCount += assertionCount;
       if (assertionCount == 0)
       {
+        ProofGenerationLayer.VcIsTrivial();
         return VCExpressionGenerator.True;
       }
       return vc;

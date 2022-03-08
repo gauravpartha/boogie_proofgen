@@ -15,9 +15,27 @@ namespace ProofGeneration.VCProofGen
         ///     by
         ///     "blockName_correct"
         /// </summary>
-        public static IDictionary<Block, VCExpr> BlockToVCMapping(VCExprLet letExpr, CFGRepr cfg)
+        public static IDictionary<Block, VCExpr> BlockToVCMapping(VCExpr vcExpr, CFGRepr cfg)
         {
             var blockToVC = new Dictionary<Block, VCExpr>();
+
+            if (!(vcExpr is VCExprLet))
+            {
+                if (!vcExpr.Equals(VCExpressionGenerator.True))
+                {
+                  throw new ProofGenUnexpectedStateException("VC is in unexpected form");
+                }
+                
+                VCExpr trueLit = VCExpressionGenerator.True;
+                foreach (Block b in cfg.GetBlocksForwards())
+                {
+                    blockToVC.Add(b, trueLit);
+                }
+
+                return blockToVC;
+            }
+
+            var letExpr = vcExpr as VCExprLet;
 
             foreach (var binding in letExpr)
             {
