@@ -21,6 +21,8 @@ namespace Microsoft.Boogie
   [ContractClass(typeof(ExprContracts))]
   public abstract class Expr : Absy
   {
+    public abstract int ContentHash { get; }
+    
     public Expr(IToken /*!*/ tok, bool immutable)
       : base(tok)
     {
@@ -33,6 +35,20 @@ namespace Microsoft.Boogie
       Contract.Requires(stream != null);
       Emit(stream, 0, false);
     }
+
+    public enum Position
+    {
+      Pos,
+      Neg,
+      Neither
+    }
+
+    public static Position NegatePosition(Position p)
+    {
+      return p == Position.Neither ? Position.Neither : (p == Position.Neg ? Position.Pos : Position.Neg);
+    }
+
+    public Position pos = Position.Pos;
 
     /// <summary>
     /// If true the client is making a promise that this Expr will be
@@ -65,10 +81,8 @@ namespace Microsoft.Boogie
     {
       Contract.Ensures(Contract.Result<string>() != null);
       System.IO.StringWriter buffer = new System.IO.StringWriter();
-      using (TokenTextWriter stream = new TokenTextWriter("<buffer>", buffer, /*setTokens=*/ false, /*pretty=*/ false))
-      {
-        this.Emit(stream, 0, false);
-      }
+      using TokenTextWriter stream = new TokenTextWriter("<buffer>", buffer, /*setTokens=*/ false, /*pretty=*/ false);
+      this.Emit(stream, 0, false);
 
       return buffer.ToString();
     }
@@ -99,12 +113,16 @@ namespace Microsoft.Boogie
         else
         {
           if (Immutable && !_Type.Equals(value))
+          {
             throw new InvalidOperationException("Cannot change the Type of an Immutable Expr");
+          }
 
-          // Once the Type has been set (i.e. no longer null) we never change the reference 
+          // Once the Type has been set (i.e. no longer null) we never change the reference
           // if this Expr is immutable, even if the Type is equivalent (i.e. _Type.Equals(newType))
           if (!Immutable)
+          {
             _Type = value;
+          }
         }
       }
     }
@@ -540,7 +558,10 @@ namespace Microsoft.Boogie
       Expr[] /*!*/
         allArgs = new Expr[indexes.Count + 1];
       for (int i = 0; i < indexes.Count; ++i)
+      {
         allArgs[i] = indexes[i];
+      }
+
       allArgs[indexes.Count] = rhs;
       return Store(map, allArgs);
     }
@@ -587,11 +608,20 @@ namespace Microsoft.Boogie
     private static Expr BinaryTreeAnd(List<Expr> terms, int start, int end)
     {
       if (start > end)
+      {
         return Expr.True;
+      }
+
       if (start == end)
+      {
         return terms[start];
+      }
+
       if (start + 1 == end)
+      {
         return Expr.And(terms[start], terms[start + 1]);
+      }
+
       var mid = (start + end) / 2;
       return Expr.And(BinaryTreeAnd(terms, start, mid), BinaryTreeAnd(terms, mid + 1, end));
     }
@@ -679,6 +709,17 @@ namespace Microsoft.Boogie
 
   public class LiteralExpr : Expr
   {
+    public override int ContentHash
+    {
+      get
+      {
+        if (Val is string stringValue) {
+          return stringValue.GetDeterministicHashCode();
+        }
+        return Val.GetHashCode();
+      }
+    }
+
     public readonly object /*!*/
       Val; // false, true, a BigNum, a BigDec, a BigFloat, a BvConst, or a RoundingMode
 
@@ -700,7 +741,9 @@ namespace Microsoft.Boogie
       Val = b;
       Type = Type.Bool;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -715,7 +758,9 @@ namespace Microsoft.Boogie
       Val = v;
       Type = Type.Int;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -730,7 +775,9 @@ namespace Microsoft.Boogie
       Val = v;
       Type = Type.Real;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -745,7 +792,9 @@ namespace Microsoft.Boogie
       Val = v;
       Type = Type.GetFloatType(v.SignificandSize, v.ExponentSize);
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -759,7 +808,9 @@ namespace Microsoft.Boogie
       Val = new BvConst(v, b);
       Type = Type.GetBvType(b);
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -774,7 +825,9 @@ namespace Microsoft.Boogie
       Val = v;
       Type = Type.RMode;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -789,7 +842,9 @@ namespace Microsoft.Boogie
       Val = v;
       Type = Type.String;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -797,9 +852,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is LiteralExpr))
+      {
         return false;
+      }
 
       LiteralExpr other = (LiteralExpr) obj;
       return object.Equals(this.Val, other.Val);
@@ -809,9 +869,13 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return this.CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -1061,7 +1125,9 @@ namespace Microsoft.Boogie
         return res + ".bv" + Bits;
       }
       else
+      {
         return ToString();
+      }
     }
 
     [Pure]
@@ -1070,7 +1136,9 @@ namespace Microsoft.Boogie
     {
       BvConst other = obj as BvConst;
       if (other == null)
+      {
         return false;
+      }
 
       return Bits == other.Bits && Value == other.Value;
     }
@@ -1096,7 +1164,9 @@ namespace Microsoft.Boogie
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Cannot change Name on Immutable Expr");
+        }
 
         _Name = value;
       }
@@ -1111,7 +1181,9 @@ namespace Microsoft.Boogie
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Cannot change Decl on Immutable Expr");
+        }
 
         _Decl = value;
       }
@@ -1134,7 +1206,9 @@ namespace Microsoft.Boogie
       Contract.Requires(name != null);
       _Name = name;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -1152,7 +1226,9 @@ namespace Microsoft.Boogie
       _Name = name;
       Type = type;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     /// <summary>
@@ -1169,7 +1245,9 @@ namespace Microsoft.Boogie
       _Decl = d;
       Type = d.TypedIdent.Type;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -1177,9 +1255,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is IdentifierExpr))
+      {
         return false;
+      }
 
       IdentifierExpr other = (IdentifierExpr) obj;
       return object.Equals(this.Name, other.Name) && object.Equals(this.Decl, other.Decl);
@@ -1189,10 +1272,16 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return this.CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
+
+    public override int ContentHash => 1;
 
     [Pure]
     public override int ComputeHashCode()
@@ -1334,13 +1423,20 @@ namespace Microsoft.Boogie
   {
     private Expr _Expr;
 
+    public override int ContentHash => Util.GetHashCode(262567431, Expr.ContentHash);
+
     public Expr /*!*/ Expr
     {
-      get { return _Expr; }
+      get
+      {
+        return _Expr;
+      }
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Cannot change Expr of an Immutable OldExpr");
+        }
 
         _Expr = value;
       }
@@ -1359,7 +1455,9 @@ namespace Microsoft.Boogie
       Contract.Requires(expr != null);
       _Expr = expr;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -1367,9 +1465,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is OldExpr))
+      {
         return false;
+      }
 
       OldExpr other = (OldExpr) obj;
       return object.Equals(this.Expr, other.Expr);
@@ -1379,9 +1482,13 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return this.CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
 
     public override int ComputeHashCode()
@@ -1512,6 +1619,8 @@ namespace Microsoft.Boogie
   [ContractClass(typeof(IAppliableContracts))]
   public interface IAppliable
   {
+    public virtual int ContentHash => FunctionName.GetDeterministicHashCode();
+    
     string /*!*/ FunctionName { get; }
 
     /// <summary>
@@ -1681,9 +1790,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is UnaryOperator))
+      {
         return false;
+      }
 
       UnaryOperator other = (UnaryOperator) obj;
       return object.Equals(this.op, other.op);
@@ -1918,9 +2032,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is BinaryOperator))
+      {
         return false;
+      }
 
       BinaryOperator other = (BinaryOperator) obj;
       return object.Equals(this.op, other.op);
@@ -2200,7 +2319,7 @@ namespace Microsoft.Boogie
         case Opcode.Eq:
         case Opcode.Neq:
           // Comparison is allowed if the argument types are unifiable
-          // (i.e., if there is any chance that the values of the arguments are 
+          // (i.e., if there is any chance that the values of the arguments are
           // in the same domain)
           if (arg0type.Equals(arg1type))
           {
@@ -2214,7 +2333,10 @@ namespace Microsoft.Boogie
           unifiable.AddRange(arg1type.FreeVariables);
 
           if (arg0type.Unify(arg1type, unifiable, new Dictionary<TypeVariable /*!*/, Type /*!*/>()))
+          {
             return Type.Bool;
+          }
+
           goto BAD_TYPE;
         case Opcode.Gt:
         case Opcode.Ge:
@@ -2554,8 +2676,9 @@ namespace Microsoft.Boogie
 
   public class FunctionCall : IAppliable
   {
-    private IdentifierExpr /*!*/
-      name;
+    public int ContentHash => 1;
+
+    private IdentifierExpr /*!*/ name;
 
     public Function Func;
 
@@ -2690,11 +2813,9 @@ namespace Microsoft.Boogie
       Contract.Assume(actuals.Count == Func.InParams.Count);
       Contract.Assume(Func.OutParams.Count == 1);
 
-      List<Type /*!*/> /*!*/
-        resultingTypeArgs;
       List<Type> actualResultType =
         Type.CheckArgumentTypes(Func.TypeParameters,
-          out resultingTypeArgs,
+          out var resultingTypeArgs,
           new List<Type>(Func.InParams.Select(Item => Item.TypedIdent.Type).ToArray()),
           actuals,
           new List<Type>(Func.OutParams.Select(Item => Item.TypedIdent.Type).ToArray()),
@@ -2798,14 +2919,18 @@ namespace Microsoft.Boogie
                           (fragileContext && opBindingStrength == contextBindingStrength);
 
       if (parensNeeded)
+      {
         stream.Write("(");
+      }
 
       cce.NonNull(args[0]).Emit(stream, opBindingStrength, false);
       stream.Write("{0} ", FunctionName);
       Type.Emit(stream, 0);
 
       if (parensNeeded)
+      {
         stream.Write(")");
+      }
     }
 
     public void Resolve(ResolutionContext rc, Expr subjectForErrorReporting)
@@ -2834,8 +2959,11 @@ namespace Microsoft.Boogie
       tpInstantiation = SimpleTypeParamInstantiation.EMPTY;
 
       if (!this.Type.Unify(cce.NonNull(cce.NonNull(args[0]).Type)))
+      {
         tc.Error(this.tok, "{0} cannot be coerced to {1}",
           cce.NonNull(args[0]).Type, this.Type);
+      }
+
       return this.Type;
     }
 
@@ -2978,15 +3106,20 @@ namespace Microsoft.Boogie
 
   public class NAryExpr : Expr
   {
+    public override int ContentHash =>
+      Args.Select(a => a.ContentHash).Aggregate(Util.GetHashCode(98765939, Fun.ContentHash), Util.GetHashCode);
+    
     [Additive] [Peer] private IAppliable _Fun;
 
     public IAppliable /*!*/ Fun
     {
-      get { return _Fun; }
+      get => _Fun;
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Cannot change Function used by Immutable NAryExpr");
+        }
 
         _Fun = value;
       }
@@ -2999,14 +3132,20 @@ namespace Microsoft.Boogie
       get
       {
         if (Immutable)
+        {
           return _Args.AsReadOnly();
+        }
         else
+        {
           return _Args;
+        }
       }
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Cannot change Args of Immutable NAryExpr");
+        }
 
         _Args = value as List<Expr>;
       }
@@ -3062,9 +3201,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is NAryExpr))
+      {
         return false;
+      }
 
       NAryExpr other = (NAryExpr) obj;
       return object.Equals(this.Fun, other.Fun) && this.Args.SequenceEqual(other.Args);
@@ -3074,9 +3218,13 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return this.CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -3155,8 +3303,7 @@ namespace Microsoft.Boogie
                // typechecked and does not need to be checked again
                TypeParameters == null)
       {
-        TypeParamInstantiation tpInsts;
-        Type = Fun.Typecheck(Args, out tpInsts,
+        Type = Fun.Typecheck(Args, out var tpInsts,
           tc); // Make sure we pass Args so if this Expr is immutable it is protected
         TypeParameters = tpInsts;
       }
@@ -3228,7 +3375,9 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (!(obj is MapSelect))
+      {
         return false;
+      }
 
       MapSelect other = (MapSelect) obj;
       return this.Arity == other.Arity;
@@ -3367,7 +3516,9 @@ namespace Microsoft.Boogie
       // FIXME: Wny are we passing a copy?
       List<Expr> actualArgs = new List<Expr>();
       for (int i = 1; i < args.Count; ++i)
+      {
         actualArgs.Add(args[i]);
+      }
 
       return Typecheck(cce.NonNull(cce.NonNull(args[0]).Type), cce.NonNull(args[0]),
         actualArgs, out tpInstantiation, tc, this.tok, "map select");
@@ -3441,7 +3592,9 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (!(obj is MapStore))
+      {
         return false;
+      }
 
       MapStore other = (MapStore) obj;
       return this.Arity == other.Arity;
@@ -3489,7 +3642,10 @@ namespace Microsoft.Boogie
       // part of the type checking works exactly as for MapSelect
       List<Expr> selectArgs = new List<Expr>();
       for (int i = 1; i < args.Count - 1; ++i)
+      {
         selectArgs.Add(args[i]);
+      }
+
       Type resultType =
         MapSelect.Typecheck(cce.NonNull(cce.NonNull(args[0]).Type), cce.NonNull(args[0]),
           selectArgs, out tpInstantiation, tc, typeCheckingSubject, opName);
@@ -3589,7 +3745,10 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (!(obj is IfThenElse))
+      {
         return false;
+      }
+
       return true;
     }
 
@@ -3701,7 +3860,9 @@ namespace Microsoft.Boogie
       LocVars = localVariables;
       Blocks = blocks;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     // FIXME: This seems wrong we don't want reference equality, we want structural equality
@@ -3715,10 +3876,16 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
+
+    public override int ContentHash => throw new NotImplementedException();
 
     [Pure]
     public override int ComputeHashCode()
@@ -3833,6 +4000,8 @@ namespace Microsoft.Boogie
 
   public class BvExtractExpr : Expr
   {
+    public override int ContentHash => Util.GetHashCode(1947706825, Start, End, Bitvector.ContentHash);
+
     private /*readonly--except in StandardVisitor*/ Expr /*!*/
       _Bitvector;
 
@@ -3842,7 +4011,9 @@ namespace Microsoft.Boogie
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Cannot change BitVector field of an immutable BvExtractExpr");
+        }
 
         _Bitvector = value;
       }
@@ -3865,7 +4036,9 @@ namespace Microsoft.Boogie
       Start = start;
       End = end;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -3873,9 +4046,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is BvExtractExpr))
+      {
         return false;
+      }
 
       BvExtractExpr other = (BvExtractExpr) obj;
       return object.Equals(this.Bitvector, other.Bitvector) &&
@@ -3886,9 +4064,13 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -3990,16 +4172,20 @@ namespace Microsoft.Boogie
 
   public class BvConcatExpr : Expr
   {
+    public override int ContentHash => Util.GetHashCode(1653318336, E0.ContentHash, E1.ContentHash);
+    
     private /*readonly--except in StandardVisitor*/ Expr /*!*/
       _E0, _E1;
 
     public Expr E0
     {
-      get { return _E0; }
+      get => _E0;
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Can't change E0 reference on immutable Expr");
+        }
 
         _E0 = value;
       }
@@ -4007,11 +4193,13 @@ namespace Microsoft.Boogie
 
     public Expr E1
     {
-      get { return _E1; }
+      get => _E1;
       set
       {
         if (Immutable)
+        {
           throw new InvalidOperationException("Can't change E1 reference on immutable Expr");
+        }
 
         _E1 = value;
       }
@@ -4034,7 +4222,9 @@ namespace Microsoft.Boogie
       _E0 = e0;
       _E1 = e1;
       if (immutable)
+      {
         CachedHashCode = ComputeHashCode();
+      }
     }
 
     [Pure]
@@ -4042,9 +4232,14 @@ namespace Microsoft.Boogie
     public override bool Equals(object obj)
     {
       if (obj == null)
+      {
         return false;
+      }
+
       if (!(obj is BvConcatExpr))
+      {
         return false;
+      }
 
       BvConcatExpr other = (BvConcatExpr) obj;
       return object.Equals(this.E0, other.E0) && object.Equals(this.E1, other.E1);
@@ -4054,9 +4249,13 @@ namespace Microsoft.Boogie
     public override int GetHashCode()
     {
       if (Immutable)
+      {
         return CachedHashCode;
+      }
       else
+      {
         return ComputeHashCode();
+      }
     }
 
     [Pure]

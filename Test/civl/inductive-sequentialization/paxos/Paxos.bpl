@@ -64,6 +64,10 @@ function IsQuorum(ns: NodeSet): bool {
   (forall n: Node :: ns[n] ==> Node(n))
 }
 
+axiom (forall ns1: NodeSet, ns2: NodeSet ::
+  IsQuorum(ns1) && IsQuorum(ns2) ==> (exists n: Node :: Node(n) && ns1[n] && ns2[n])
+);
+
 function {:inline} IsSubset(ns1:NodeSet, ns2:NodeSet) : bool {
   MapImp(ns1, ns2) == MapConst(true)
 }
@@ -75,7 +79,7 @@ function {:inline} IsDisjoint(ns1:NodeSet, ns2:NodeSet) : bool {
 // MaxRound(r, ns, voteInfo) returns the highest round less than r that some node in ns voted for.
 // If no node in ns has voted for a round less than r, then it returns 0.
 function MaxRound(r: Round, ns: NodeSet, voteInfo: [Round]Option VoteInfo): int;
-axiom (forall r: Round, ns: NodeSet, voteInfo: [Round]Option VoteInfo :: { MaxRound(r, ns, voteInfo) }
+axiom (forall r: Round, ns: NodeSet, voteInfo: [Round]Option VoteInfo ::
   Round(r) ==>
   (
     var ret := MaxRound(r, ns, voteInfo);
@@ -84,26 +88,6 @@ axiom (forall r: Round, ns: NodeSet, voteInfo: [Round]Option VoteInfo :: { MaxRo
     (Round(ret) ==> is#Some(voteInfo[ret]) && !IsDisjoint(ns, ns#VoteInfo(t#Some(voteInfo[ret]))))
   )
 );
-
-function {:inline} Lemma_MaxRound_InitVote(voteInfo: [Round]Option VoteInfo, r: Round, r': Round) : bool
-{
-  (forall ns: NodeSet, v': Value ::
-    is#None(voteInfo[r']) ==>
-      MaxRound(r, ns, voteInfo) ==
-      MaxRound(r, ns, voteInfo[r' := Some(VoteInfo(v', NoNodes()))]))
-}
-
-function {:inline} Lemma_MaxRound_AddNodeToVote(voteInfo: [Round]Option VoteInfo, r: Round, r': Round, n: Node) : bool
-{
-  (forall ns: NodeSet ::
-    is#Some(voteInfo[r']) && (!ns[n] || r <= r') ==>
-    (
-      var v', ns' := value#VoteInfo(t#Some(voteInfo[r'])), ns#VoteInfo(t#Some(voteInfo[r']));
-      MaxRound(r, ns, voteInfo) ==
-      MaxRound(r, ns, voteInfo[r' := Some(VoteInfo(v', ns'[n:=true]))])
-    )
-  )
-}
 
 function {:inline} JoinPermissions(r: Round) : [Permission]bool
 {
@@ -206,8 +190,3 @@ function {:inline}{:linear "perm"} VoteResponseChannelCollector (permVoteChannel
 {
   domain#VoteResponseChannel(permVoteChannel)
 }
-////////////////////////////////////////////////////////////////////////////////
-//// Trigger dummies
-
-function triggerRound(r: Round) : bool { true }
-function triggerNode(n: Node) : bool { true }

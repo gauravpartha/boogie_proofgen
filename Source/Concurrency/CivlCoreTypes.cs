@@ -299,7 +299,10 @@ namespace Microsoft.Boogie
       while (action != null)
       {
         if (layer <= action.layerRange.upperLayerNum)
+        {
           return action;
+        }
+
         action = action.refinedAction;
       }
 
@@ -375,7 +378,7 @@ namespace Microsoft.Boogie
       foreach (Variable x in action.impl.LocVars)
       {
         Variable xCopy = new LocalVariable(Token.NoToken,
-          new TypedIdent(Token.NoToken, prefix + x.Name, x.TypedIdent.Type));
+          new TypedIdent(Token.NoToken, prefix + x.Name, x.TypedIdent.Type), x.Attributes);
         subst[x] = Expr.Ident(xCopy);
         localsCopy.Add(xCopy);
       }

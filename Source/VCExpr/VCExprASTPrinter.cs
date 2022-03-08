@@ -18,7 +18,10 @@ namespace Microsoft.Boogie.VCExprAST
         Contract.Ensures(Contract.Result<VCExprOpPrinter>() != null);
 
         if (OpPrinterVar == null)
+        {
           OpPrinterVar = new VCExprOpPrinter(this);
+        }
+
         return OpPrinterVar;
       }
     }
@@ -45,6 +48,10 @@ namespace Microsoft.Boogie.VCExprAST
       else if (node is VCExprIntLit)
       {
         wr.Write(((VCExprIntLit) node).Val);
+      }
+      else if (node is VCExprStringLit stringLit)
+      {
+        wr.Write(stringLit.Val);
       }
       else
       {
@@ -221,7 +228,7 @@ namespace Microsoft.Boogie.VCExprAST
       Contract.Requires(node != null);
       Contract.Requires(op != null);
       wr.Write("({0}", op);
-      foreach (VCExpr /*!*/ arg in node)
+      foreach (VCExpr /*!*/ arg in node.Arguments)
       {
         Contract.Assert(arg != null);
         wr.Write(" ");

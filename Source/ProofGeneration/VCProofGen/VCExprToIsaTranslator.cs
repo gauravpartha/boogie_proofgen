@@ -92,7 +92,7 @@ namespace ProofGeneration.VCProofGen
                 {
                     activeNAryStack.Push(Tuple.Create(curNAry, new List<Term>()));
 
-                    foreach (var child in curNAry) todoStack.Push(child);
+                    foreach (var child in curNAry.Arguments) todoStack.Push(child);
                 }
                 else
                 {
@@ -103,7 +103,7 @@ namespace ProofGeneration.VCProofGen
                     {
                         var top = activeNAryStack.Peek();
 
-                        if (top.Item1.Count() == top.Item2.Count())
+                        if (top.Item1.Arity == top.Item2.Count())
                         {
                             activeNAryStack.Pop();
 
@@ -203,7 +203,7 @@ namespace ProofGeneration.VCProofGen
         private Term VisitRecursive(VCExprNAry node, bool arg)
         {
             var term = new List<Term>();
-            foreach (var childNode in node) term.Add(childNode.Accept(this, arg));
+            foreach (var childNode in node.Arguments) term.Add(childNode.Accept(this, arg));
 
             return GetTermFromNAry(node, term);
         }

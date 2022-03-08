@@ -18,8 +18,8 @@ namespace Microsoft.Boogie
 
     // Say (DBG_WAS_VALID) or (DBG_WAS_INVALID) after query
     public bool ForceLogStatus = false;
-    public int TimeLimit = 0;
-    public int ResourceLimit = 0;
+    public uint TimeLimit = 0;
+    public uint ResourceLimit = 0;
     public int? RandomSeed = null;
     public int MemoryLimit = 0;
     public int Verbosity = 0;
@@ -56,7 +56,7 @@ namespace Microsoft.Boogie
              ParseBool(opt, "FORCE_LOG_STATUS", ref ForceLogStatus) ||
              ParseInt(opt, "MEMORY_LIMIT", ref MemoryLimit) ||
              ParseInt(opt, "VERBOSITY", ref Verbosity) ||
-             ParseInt(opt, "TIME_LIMIT", ref TimeLimit);
+             ParseUInt(opt, "TIME_LIMIT", ref TimeLimit);
     }
 
     public virtual string Help
@@ -76,7 +76,7 @@ LOG_FILE=<string>         Log input for the theorem prover. The string @PROC@ in
 APPEND_LOG_FILE=<bool>    Append, rather than overwrite the log file.
 MEMORY_LIMIT=<int>        Memory limit of the prover in megabytes.
 VERBOSITY=<int>           The higher, the more verbose.
-TIME_LIMIT=<int>          Time limit per verification condition in milliseconds.
+TIME_LIMIT=<uint>          Time limit per verification condition in milliseconds.
 
 The generic options may or may not be used by the prover plugin.
 ";
@@ -122,7 +122,9 @@ The generic options may or may not be used by the prover plugin.
       Contract.Ensures(confirmedProverPath != null);
 
       if (confirmedProverPath != null)
+      {
         return confirmedProverPath;
+      }
 
       // Explicitly set path always has priority
       if (ProverPath != null)
@@ -211,6 +213,7 @@ The generic options may or may not be used by the prover plugin.
       Contract.Requires(opt != null);
       string tmp = null;
       if (ParseString(opt, name, ref tmp))
+      {
         switch (cce.NonNull(tmp).ToLower())
         {
           case "1":
@@ -226,6 +229,7 @@ The generic options may or may not be used by the prover plugin.
             ReportError("Invalid Boolean option \"" + opt + "\"");
             return false;
         }
+      }
 
       return false;
     }
@@ -235,10 +239,9 @@ The generic options may or may not be used by the prover plugin.
       Contract.Requires(name != null);
       Contract.Requires(opt != null);
       string tmp = null;
-      int t2;
       if (ParseString(opt, name, ref tmp))
       {
-        if (int.TryParse(cce.NonNull(tmp), out t2))
+        if (int.TryParse(cce.NonNull(tmp), out var t2))
         {
           field = t2;
           return true;
@@ -252,6 +255,27 @@ The generic options may or may not be used by the prover plugin.
       return false;
     }
 
+    protected virtual bool ParseUInt(string opt, string name, ref uint field)
+    {
+      Contract.Requires(name != null);
+      Contract.Requires(opt != null);
+      string tmp = null;
+      if (ParseString(opt, name, ref tmp))
+      {
+        if (uint.TryParse(cce.NonNull(tmp), out var t2))
+        {
+          field = t2;
+          return true;
+        }
+        else
+        {
+          ReportError("Invalid unsigned integer option \"" + opt + "\"");
+        }
+      }
+
+      return false;
+    }
+
     public virtual TextWriter OpenLog(string /*?*/ descName)
     {
       if (LogFilename != null)
@@ -259,7 +283,10 @@ The generic options may or may not be used by the prover plugin.
         string filename = LogFilename;
         Contract.Assert(filename != null);
         if (descName != null)
+        {
           filename = Helpers.SubstituteAtPROC(descName, filename);
+        }
+
         return new StreamWriter(filename, AppendLogFile);
       }
       else
@@ -274,7 +301,7 @@ The generic options may or may not be used by the prover plugin.
   {
     // Really returns ProverInterface.
     //public abstract object! SpawnProver(ProverOptions! options, object! ctxt);
-    public abstract object SpawnProver(ProverOptions options, object ctxt);
+    public abstract object SpawnProver(SMTLibOptions libOptions, ProverOptions options, object ctxt);
 
     // Really returns ProverContext
     public abstract object /*!*/ NewProverContext(ProverOptions /*!*/ options);

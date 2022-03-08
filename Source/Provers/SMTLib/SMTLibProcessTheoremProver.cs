@@ -11,37 +11,9 @@ using System.Numerics;
 
 namespace Microsoft.Boogie.SMTLib
 {
-  public class FunctionDependencyCollector : BoundVarTraversingVCExprVisitor<bool, bool>
-  {
-    private List<Function> functionList;
-
-    // not used but required by interface
-    protected override bool StandardResult(VCExpr node, bool arg)
-    {
-      return true;
-    }
-
-    public List<Function> Collect(VCExpr expr)
-    {
-      functionList = new List<Function>();
-      Traverse(expr, true);
-      return functionList;
-    }
-
-    public override bool Visit(VCExprNAry node, bool arg)
-    {
-      VCExprBoogieFunctionOp op = node.Op as VCExprBoogieFunctionOp;
-      if (op != null)
-      {
-        functionList.Add(op.Func);
-      }
-
-      return base.Visit(node, arg);
-    }
-  }
-
   public class SMTLibProcessTheoremProver : ProverInterface
   {
+    private readonly SMTLibOptions libOptions;
     private readonly SMTLibProverContext ctx;
     private VCExpressionGenerator gen;
     protected readonly SMTLibProverOptions options;
@@ -58,31 +30,37 @@ namespace Microsoft.Boogie.SMTLib
       Contract.Invariant(_backgroundPredicates != null);
     }
 
-
     [NotDelayed]
-    public SMTLibProcessTheoremProver(ProverOptions options, VCExpressionGenerator gen,
+    public SMTLibProcessTheoremProver(SMTLibOptions libOptions, ProverOptions options, VCExpressionGenerator gen,
       SMTLibProverContext ctx)
     {
       Contract.Requires(options != null);
       Contract.Requires(gen != null);
       Contract.Requires(ctx != null);
 
-      InitializeGlobalInformation();
 
       this.options = (SMTLibProverOptions) options;
+      this.libOptions = libOptions;
       this.ctx = ctx;
       this.gen = gen;
-      this.usingUnsatCore = false;
+      usingUnsatCore = false;
 
+      InitializeGlobalInformation();
       SetupAxiomBuilder(gen);
 
-      Namer = new SMTLibNamer();
+      Namer = (RandomSeed: options.RandomSeed, libOptions.NormalizeNames) switch
+      {
+        (null, true) => new NormalizeNamer(),
+        (null, false) => new KeepOriginalNamer(),
+        _ => new RandomiseNamer(new Random(options.RandomSeed.Value))
+      };
+
       ctx.parent = this;
-      this.DeclCollector = new TypeDeclCollector((SMTLibProverOptions) options, Namer);
+      DeclCollector = new TypeDeclCollector(libOptions, Namer);
 
       SetupProcess();
 
-      if (CommandLineOptions.Clo.StratifiedInlining > 0 || CommandLineOptions.Clo.ContractInfer)
+      if (libOptions.ImmediatelyAcceptCommands)
       {
         // Prepare for ApiChecker usage
         if (options.LogFilename != null && currentLogFile == null)
@@ -92,6 +70,15 @@ namespace Microsoft.Boogie.SMTLib
 
         PrepareCommon();
       }
+    }
+    
+    private ScopedNamer ResetNamer(ScopedNamer namer) {
+      return (RandomSeed: options.RandomSeed, libOptions.NormalizeNames) switch
+      {
+        (null, true) => new NormalizeNamer(namer), 
+        (null, false) => new KeepOriginalNamer(namer),
+        _ => new RandomiseNamer(namer, new Random(options.RandomSeed.Value))
+      }; 
     }
 
     public override void AssertNamed(VCExpr vc, bool polarity, string name)
@@ -112,7 +99,7 @@ namespace Microsoft.Boogie.SMTLib
 
     private void SetupAxiomBuilder(VCExpressionGenerator gen)
     {
-      switch (CommandLineOptions.Clo.TypeEncodingMethod)
+      switch (libOptions.TypeEncodingMethod)
       {
         case CommandLineOptions.TypeEncoding.Arguments:
           AxBuilder = new TypeAxiomBuilderArguments(gen);
@@ -130,19 +117,15 @@ namespace Microsoft.Boogie.SMTLib
 
     void SetupProcess()
     {
-      if (Process != null) return;
-
-      Process = new SMTLibProcess(this.options);
-      Process.ErrorHandler += this.HandleProverError;
+      Process?.Close();
+      Process = options.Solver == SolverKind.NoOpWithZ3Options ? new NoopSolver() : new SMTLibProcess(libOptions, options);
+      Process.ErrorHandler += HandleProverError;
     }
-
 
     void PossiblyRestart()
     {
-      if (Process != null && Process.NeedsRestart)
-      {
-        Process.Close();
-        Process = null;
+      if (Process != null && ProcessNeedsRestart) {
+        ProcessNeedsRestart = false;
         SetupProcess();
         Process.Send(common.ToString());
       }
@@ -153,17 +136,17 @@ namespace Microsoft.Boogie.SMTLib
       get
       {
         Contract.Ensures(Contract.Result<ProverContext>() != null);
-
         return ctx;
       }
     }
 
     internal TypeAxiomBuilder AxBuilder { get; private set; }
     private TypeAxiomBuilder CachedAxBuilder;
-    private UniqueNamer CachedNamer;
-    internal UniqueNamer Namer { get; private set; }
+    private ScopedNamer CachedNamer;
+    internal ScopedNamer Namer { get; private set; }
     readonly TypeDeclCollector DeclCollector;
-    protected SMTLibProcess Process;
+    protected SMTLibSolver Process;
+    private bool ProcessNeedsRestart;
     readonly List<string> proverErrors = new List<string>();
     readonly List<string> proverWarnings = new List<string>();
     StringBuilder common = new StringBuilder();
@@ -184,7 +167,10 @@ namespace Microsoft.Boogie.SMTLib
     {
       var idx = msg.IndexOf('\n');
       if (idx > 0)
+      {
         msg = msg.Replace("\r", "").Replace("\n", "\r\n");
+      }
+
       return msg;
     }
 
@@ -208,10 +194,15 @@ namespace Microsoft.Boogie.SMTLib
       s = Sanitize(s);
 
       if (isCommon)
+      {
         common.Append(s).Append("\r\n");
+      }
 
       if (Process != null)
+      {
         Process.Send(s);
+      }
+
       if (currentLogFile != null)
       {
         currentLogFile.WriteLine(s);
@@ -221,6 +212,11 @@ namespace Microsoft.Boogie.SMTLib
 
     private void FindDependentTypes(Type type, List<DatatypeTypeCtorDecl> dependentTypes)
     {
+      DeclCollector.TypeToStringReg(type);
+      if (type.IsSeq)
+      {
+        FindDependentTypes(type.AsCtor.Arguments[0], dependentTypes);
+      }
       MapType mapType = type as MapType;
       if (mapType != null)
       {
@@ -228,12 +224,10 @@ namespace Microsoft.Boogie.SMTLib
         {
           FindDependentTypes(t, dependentTypes);
         }
-
         FindDependentTypes(mapType.Result, dependentTypes);
       }
-
-      CtorType ctorType = type as CtorType;
-      if (ctorType != null && ctorType.Decl is DatatypeTypeCtorDecl datatypeTypeCtorDecl && ctx.KnownDatatypes.Contains(datatypeTypeCtorDecl))
+      if (type is CtorType ctorType && ctorType.Decl is DatatypeTypeCtorDecl datatypeTypeCtorDecl &&
+          ctx.KnownDatatypes.Contains(datatypeTypeCtorDecl))
       {
         dependentTypes.Add(datatypeTypeCtorDecl);
       }
@@ -247,13 +241,6 @@ namespace Microsoft.Boogie.SMTLib
         foreach (var datatype in ctx.KnownDatatypes)
         {
           dependencyGraph.AddSource(datatype);
-          // Check for user-specified dependency (using ":dependson" attribute).
-          string userDependency = datatype.GetTypeDependency();
-          if (userDependency != null)
-          {
-            dependencyGraph.AddEdge(datatype, ctx.LookupDatatype(userDependency));
-          }
-
           foreach (Function f in datatype.Constructors)
           {
             var dependentTypes = new List<DatatypeTypeCtorDecl>();
@@ -278,7 +265,7 @@ namespace Microsoft.Boogie.SMTLib
           string datatypeConstructorsString = "";
           foreach (var datatype in scc)
           {
-            datatypesString += "(" + SMTLibExprLineariser.TypeToString(new CtorType(Token.NoToken, datatype, new List<Type>())) + " 0)";
+            datatypesString += "(" + new SMTLibExprLineariser(libOptions).TypeToString(new CtorType(Token.NoToken, datatype, new List<Type>())) + " 0)";
             string datatypeConstructorString = "";
             foreach (Function f in datatype.Constructors)
             {
@@ -345,17 +332,9 @@ namespace Microsoft.Boogie.SMTLib
         {
           if (ctx.DefinedFunctions.ContainsKey(fdep) && !definitionAdded.Contains(fdep))
           {
-            if (!dependenciesComputed.Contains(fdep))
-            {
-              // Handle dependencies first
-              functionDefs.Push(fdep);
-              hasDependencies = true;
-            }
-            else
-            {
-              HandleProverError(
-                "Function definition cycle detected: " + f.ToString() + " depends on " + fdep.ToString());
-            }
+            // Handle dependencies first
+            functionDefs.Push(fdep);
+            hasDependencies = true;
           }
         }
 
@@ -377,12 +356,12 @@ namespace Microsoft.Boogie.SMTLib
             DeclCollector.AddKnownVariable(varExpr); // add var to knows vars so that it does not get declared later on
             string printedName = Namer.GetQuotedLocalName(varExpr, varExpr.Name);
             Contract.Assert(printedName != null);
-            funcDef += "(" + printedName + " " + SMTLibExprLineariser.TypeToString(varExpr.Type) + ") ";
+            funcDef += "(" + printedName + " " + new SMTLibExprLineariser(libOptions).TypeToString(varExpr.Type) + ") ";
           }
 
           funcDef += ") ";
 
-          funcDef += SMTLibExprLineariser.TypeToString(defBody[0].Type) + " ";
+          funcDef += new SMTLibExprLineariser(libOptions).TypeToString(defBody[0].Type) + " ";
           funcDef += VCExpr2String(defBody[1], -1);
           funcDef += ")";
           generatedFuncDefs.Add(funcDef);
@@ -405,8 +384,11 @@ namespace Microsoft.Boogie.SMTLib
       {
         SendCommon("(set-option :print-success false)");
         SendCommon("(set-info :smt-lib-version 2.6)");
-        if (options.ProduceModel())
+        if (libOptions.ProduceModel)
+        {
           SendCommon("(set-option :produce-models true)");
+        }
+
         foreach (var opt in options.SmtOptions)
         {
           SendCommon("(set-option :" + opt.Option + " " + opt.Value + ")");
@@ -419,9 +401,7 @@ namespace Microsoft.Boogie.SMTLib
 
         // Set produce-unsat-cores last. It seems there's a bug in Z3 where if we set it earlier its value
         // gets reset by other set-option commands ( https://z3.codeplex.com/workitem/188 )
-        if (CommandLineOptions.Clo.PrintNecessaryAssumes || CommandLineOptions.Clo.EnableUnSatCoreExtract == 1 ||
-            (CommandLineOptions.Clo.ContractInfer && (CommandLineOptions.Clo.UseUnsatCoreForContractInfer ||
-                                                      CommandLineOptions.Clo.ExplainHoudini)))
+        if (libOptions.ProduceUnsatCores)
         {
           SendCommon("(set-option :produce-unsat-cores true)");
           this.usingUnsatCore = true;
@@ -436,16 +416,16 @@ namespace Microsoft.Boogie.SMTLib
           SendCommon("(assert (and (tickleBool true) (tickleBool false)))");
         }
 
-        if (CommandLineOptions.Clo.RunDiagnosticsOnTimeout)
+        if (libOptions.RunDiagnosticsOnTimeout)
         {
           SendCommon("(declare-fun timeoutDiagnostics (Int) Bool)");
         }
 
         PrepareDataTypes();
 
-        if (CommandLineOptions.Clo.ProverPreamble != null)
+        if (libOptions.ProverPreamble != null)
         {
-          SendCommon("(include \"" + CommandLineOptions.Clo.ProverPreamble + "\")");
+          SendCommon("(include \"" + libOptions.ProverPreamble + "\")");
         }
 
         PrepareFunctionDefinitions();
@@ -456,14 +436,20 @@ namespace Microsoft.Boogie.SMTLib
         var axioms = ctx.Axioms;
         var nary = axioms as VCExprNAry;
         if (nary != null && nary.Op == VCExpressionGenerator.AndOp)
+        {
           foreach (var expr in nary.UniformArguments)
           {
             var str = VCExpr2String(expr, -1);
             if (str != "true")
+            {
               AddAxiom(str);
+            }
           }
+        }
         else
+        {
           AddAxiom(VCExpr2String(axioms, -1));
+        }
 
         AxiomsAreSetup = true;
         CachedAxBuilder = AxBuilder;
@@ -494,7 +480,9 @@ namespace Microsoft.Boogie.SMTLib
       {
         Contract.Assert(s != null);
         if (s != "true")
+        {
           SendCommon("(assert " + s + ")");
+        }
       }
 
       Axioms.Clear();
@@ -523,7 +511,9 @@ namespace Microsoft.Boogie.SMTLib
       base.Close();
       CloseLogFile();
       if (Process != null)
+      {
         Process.Close();
+      }
     }
 
     public override void BeginCheck(string descriptiveName, VCExpr vc, ErrorHandler handler)
@@ -532,7 +522,10 @@ namespace Microsoft.Boogie.SMTLib
       //Contract.Requires(vc != null);
       //Contract.Requires(handler != null);
 
-      if (options.SeparateLogFiles) CloseLogFile(); // shouldn't really happen
+      if (options.SeparateLogFiles)
+      {
+        CloseLogFile(); // shouldn't really happen
+      }
 
       if (options.LogFilename != null && currentLogFile == null)
       {
@@ -546,8 +539,7 @@ namespace Microsoft.Boogie.SMTLib
       if (HasReset)
       {
         AxBuilder = (TypeAxiomBuilder) CachedAxBuilder?.Clone();
-        Namer = (SMTLibNamer) CachedNamer.Clone();
-        Namer.ResetLabelCount();
+        Namer = ResetNamer(CachedNamer);
         DeclCollector.SetNamer(Namer);
         DeclCollector.Push();
       }
@@ -560,14 +552,16 @@ namespace Microsoft.Boogie.SMTLib
       PossiblyRestart();
 
       SendThisVC("(push 1)");
-      SendThisVC("(set-info :boogie-vc-id " + SMTLibNamer.QuoteId(descriptiveName) + ")");
-      if (options.Solver == SolverKind.Z3)
+      if (this.libOptions.EmitDebugInformation) {
+        SendThisVC("(set-info :boogie-vc-id " + SmtLibNameUtils.QuoteId(descriptiveName) + ")");
+      }
+      if (options.Solver == SolverKind.Z3 || options.Solver == SolverKind.NoOpWithZ3Options)
       {
         SendThisVC("(set-option :" + Z3.TimeoutOption + " " + options.TimeLimit + ")");
         SendThisVC("(set-option :" + Z3.RlimitOption + " " + options.ResourceLimit + ")");
-        if (options.RandomSeed.HasValue)
-        {
-          SendThisVC("(set-option :" + Z3.RandomSeedOption + " " + options.RandomSeed.Value + ")");
+        if (options.RandomSeed != null) {
+          SendThisVC("(set-option :" + Z3.SmtRandomSeed + " " + options.RandomSeed.Value + ")");
+          SendThisVC("(set-option :" + Z3.SatRandomSeed + " " + options.RandomSeed.Value + ")");
         }
       }
       SendThisVC(vcString);
@@ -579,9 +573,7 @@ namespace Microsoft.Boogie.SMTLib
       if (Process != null)
       {
         Process.PingPong(); // flush any errors
-
-        if (Process.Inspector != null)
-          Process.Inspector.NewProblem(descriptiveName);
+        Process.NewProblem(descriptiveName);
       }
 
       if (HasReset)
@@ -612,6 +604,8 @@ namespace Microsoft.Boogie.SMTLib
       {
         this.gen = gen;
         SendThisVC("(reset)");
+        RecoverIfProverCrashedAfterReset();
+        SendThisVC("(set-option :" + Z3.RlimitOption + " 0)");
 
         if (0 < common.Length)
         {
@@ -627,12 +621,22 @@ namespace Microsoft.Boogie.SMTLib
       }
     }
 
+    private void RecoverIfProverCrashedAfterReset()
+    {
+      if (Process.GetExceptionIfProverDied() is Exception e)
+      {
+        // We recover the process but don't issue the `(reset)` command that fails.
+        SetupProcess();
+      }
+    }
+
     public override void FullReset(VCExpressionGenerator gen)
     {
       if (options.Solver == SolverKind.Z3)
       {
         this.gen = gen;
         SendThisVC("(reset)");
+        SendThisVC("(set-option :" + Z3.RlimitOption + " 0)");
         Namer.Reset();
         common.Clear();
         SetupAxiomBuilder(gen);
@@ -649,262 +653,8 @@ namespace Microsoft.Boogie.SMTLib
       }
     }
 
-
-    private string StripCruft(string name)
-    {
-      if (name.Contains("@@"))
-        return name.Remove(name.LastIndexOf("@@"));
-      return name;
-    }
-
     private class BadExprFromProver : Exception
     {
-    }
-
-    private delegate VCExpr ArgGetter(int pos);
-
-    private delegate VCExpr[] ArgsGetter();
-
-    private delegate VCExprVar[] VarsGetter();
-
-    private VCExprOp VCStringToVCOp(string op)
-    {
-      switch (op)
-      {
-        case "+":
-          return VCExpressionGenerator.AddIOp;
-        case "-":
-          return VCExpressionGenerator.SubIOp;
-        case "*":
-          return VCExpressionGenerator.MulIOp;
-        case "div":
-          return VCExpressionGenerator.DivIOp;
-        case "=":
-          return VCExpressionGenerator.EqOp;
-        case "<=":
-          return VCExpressionGenerator.LeOp;
-        case "<":
-          return VCExpressionGenerator.LtOp;
-        case ">=":
-          return VCExpressionGenerator.GeOp;
-        case ">":
-          return VCExpressionGenerator.GtOp;
-        case "and":
-          return VCExpressionGenerator.AndOp;
-        case "or":
-          return VCExpressionGenerator.OrOp;
-        case "not":
-          return VCExpressionGenerator.NotOp;
-        case "ite":
-          return VCExpressionGenerator.IfThenElseOp;
-        default:
-          return null;
-      }
-    }
-
-    private class MyDeclHandler : TypeDeclCollector.DeclHandler
-    {
-      public Dictionary<string, VCExprVar> var_map = new Dictionary<string, VCExprVar>();
-      public Dictionary<string, Function> func_map = new Dictionary<string, Function>();
-
-      public override void VarDecl(VCExprVar v)
-      {
-        var_map[v.Name] = v;
-      }
-
-      public override void FuncDecl(Function f)
-      {
-        func_map[f.Name] = f;
-      }
-
-      public MyDeclHandler()
-      {
-      }
-    }
-
-    private MyDeclHandler declHandler = null;
-
-    private VCExprVar SExprToVar(SExpr e)
-    {
-      if (e.Arguments.Count() != 1)
-      {
-        HandleProverError("Prover error: bad quantifier syntax");
-        throw new BadExprFromProver();
-      }
-
-      string vname = StripCruft(e.Name);
-      SExpr vtype = e[0];
-      switch (vtype.Name)
-      {
-        case "Int":
-          return gen.Variable(vname, Type.Int);
-        case "Bool":
-          return gen.Variable(vname, Type.Bool);
-        case "Array":
-        {
-          // TODO: handle more general array types
-          var idxType = Type.Int; // well, could be something else
-          var valueType =
-            (vtype.Arguments[1].Name == "Int") ? Type.Int : Type.Bool;
-          var types = new List<Type>();
-          types.Add(idxType);
-          return gen.Variable(vname, new MapType(Token.NoToken, new List<TypeVariable>(), types, valueType));
-        }
-        default:
-        {
-          HandleProverError("Prover error: bad type: " + vtype.Name);
-          throw new BadExprFromProver();
-        }
-      }
-    }
-
-    private VCExpr MakeBinary(VCExprOp op, VCExpr[] args)
-    {
-      if (args.Count() == 0)
-      {
-        // with zero args we need the identity of the op
-        if (op == VCExpressionGenerator.AndOp)
-          return VCExpressionGenerator.True;
-        if (op == VCExpressionGenerator.OrOp)
-          return VCExpressionGenerator.False;
-        if (op == VCExpressionGenerator.AddIOp)
-        {
-          Microsoft.BaseTypes.BigNum x = Microsoft.BaseTypes.BigNum.ZERO;
-          return gen.Integer(x);
-        }
-
-        HandleProverError("Prover error: bad expression ");
-        throw new BadExprFromProver();
-      }
-
-      var temp = args[0];
-      for (int i = 1; i < args.Count(); i++)
-        temp = gen.Function(op, temp, args[i]);
-      return temp;
-    }
-
-    protected VCExpr SExprToVCExpr(SExpr e, Dictionary<string, VCExpr> bound)
-    {
-      if (e.Arguments.Count() == 0)
-      {
-        var name = StripCruft(e.Name);
-        if (name[0] >= '0' && name[0] <= '9')
-        {
-          Microsoft.BaseTypes.BigNum x = Microsoft.BaseTypes.BigNum.FromString(name);
-          return gen.Integer(x);
-        }
-
-        if (bound.ContainsKey(name))
-        {
-          return bound[name];
-        }
-
-        if (name == "true")
-          return VCExpressionGenerator.True;
-        if (name == "false")
-          return VCExpressionGenerator.False;
-        if (declHandler.var_map.ContainsKey(name))
-          return declHandler.var_map[name];
-        HandleProverError("Prover error: unknown symbol:" + name);
-        //throw new BadExprFromProver ();
-        var v = gen.Variable(name, Type.Int);
-        bound.Add(name, v);
-        return v;
-      }
-
-      ArgGetter g = i => SExprToVCExpr(e[i], bound);
-      ArgsGetter ga = () => e.Arguments.Select(x => SExprToVCExpr(x, bound)).ToArray();
-      VarsGetter gb = () => e[0].Arguments.Select(x => SExprToVar(x)).ToArray();
-      switch (e.Name)
-      {
-        case "select":
-          return gen.Select(ga());
-        case "store":
-          return gen.Store(ga());
-        case "forall":
-        case "exists":
-        {
-          var binds = e.Arguments[0];
-          var vcbinds = new List<VCExprVar>();
-          var bound_copy = new Dictionary<string, VCExpr>(bound);
-          for (int i = 0; i < binds.Arguments.Count(); i++)
-          {
-            var bind = binds.Arguments[i];
-            var symb = StripCruft(bind.Name);
-            var vcv = SExprToVar(bind);
-            vcbinds.Add(vcv);
-            bound[symb] = vcv;
-          }
-
-          var body = g(1);
-          if (e.Name == "forall")
-            body = gen.Forall(vcbinds, new List<VCTrigger>(), body);
-          else
-            body = gen.Exists(vcbinds, new List<VCTrigger>(), body);
-          bound = bound_copy;
-          return body;
-        }
-        case "-": // have to deal with unary case
-        {
-          if (e.ArgCount == 1)
-          {
-            var args = new VCExpr[2];
-            args[0] = gen.Integer(Microsoft.BaseTypes.BigNum.ZERO);
-            args[1] = g(0);
-            return gen.Function(VCStringToVCOp("-"), args);
-          }
-
-          return gen.Function(VCStringToVCOp("-"), ga());
-        }
-        case "!": // this is commentary
-          return g(0);
-        case "let":
-        {
-          // we expand lets exponentially since there is no let binding in Boogie surface syntax
-          bool expand_lets = true;
-          var binds = e.Arguments[0];
-          var vcbinds = new List<VCExprLetBinding>();
-          var bound_copy = new Dictionary<string, VCExpr>(bound);
-          for (int i = 0; i < binds.Arguments.Count(); i++)
-          {
-            var bind = binds.Arguments[i];
-            var symb = bind.Name;
-            var def = bind.Arguments[0];
-            var vce = SExprToVCExpr(def, bound);
-            var vcv = gen.Variable(symb, vce.Type);
-            var vcb = gen.LetBinding(vcv, vce);
-            vcbinds.Add(vcb);
-            bound[symb] = expand_lets ? vce : vcv;
-          }
-
-          var body = g(1);
-          if (!expand_lets)
-            body = gen.Let(vcbinds, body);
-          bound = bound_copy;
-          return body;
-        }
-
-        default:
-        {
-          var op = VCStringToVCOp(e.Name);
-          if (op == null)
-          {
-            var name = StripCruft(e.Name);
-            if (declHandler.func_map.ContainsKey(name))
-            {
-              Function f = declHandler.func_map[name];
-              return gen.Function(f, ga());
-            }
-
-            HandleProverError("Prover error: unknown operator:" + e.Name);
-            throw new BadExprFromProver();
-          }
-
-          if (op.Arity == 2)
-            return MakeBinary(op, ga());
-          return gen.Function(op, ga());
-        }
-      }
     }
 
     class MyFileParser : SExpr.Parser
@@ -974,7 +724,7 @@ namespace Microsoft.Boogie.SMTLib
     {
       // Trying to match prover warnings of the form:
       // - for Z3: WARNING: warning_message
-      // - for CVC4: query.smt2:222.24: warning: warning_message
+      // - for CVC5: query.smt2:222.24: warning: warning_message
       // All other lines are considered to be errors.
 
       s = s.Replace("\r", "");
@@ -1000,7 +750,10 @@ namespace Microsoft.Boogie.SMTLib
 
       FlushProverWarnings();
 
-      if (errors == "") return;
+      if (errors == "")
+      {
+        return;
+      }
 
       lock (proverErrors)
       {
@@ -1012,11 +765,11 @@ namespace Microsoft.Boogie.SMTLib
     }
 
     [NoDefaultContract]
-    public override Outcome CheckOutcome(ErrorHandler handler, int taskID = -1)
+    public override Outcome CheckOutcome(ErrorHandler handler, int errorLimit)
     {
       Contract.EnsuresOnThrow<UnexpectedProverOutputException>(true);
 
-      var result = CheckOutcomeCore(handler, taskID: taskID);
+      var result = CheckOutcomeCore(handler, errorLimit);
       SendThisVC("(pop 1)");
       FlushLogFile();
 
@@ -1024,30 +777,21 @@ namespace Microsoft.Boogie.SMTLib
     }
 
     [NoDefaultContract]
-    public override Outcome CheckOutcomeCore(ErrorHandler handler, int taskID = -1)
+    public override Outcome CheckOutcomeCore(ErrorHandler handler, int errorLimit)
     {
       Contract.EnsuresOnThrow<UnexpectedProverOutputException>(true);
 
       var result = Outcome.Undetermined;
 
       if (Process == null || proverErrors.Count > 0)
+      {
         return result;
+      }
 
       try
       {
         currentErrorHandler = handler;
         FlushProverWarnings();
-
-        int errorLimit;
-        if (CommandLineOptions.Clo.ConcurrentHoudini)
-        {
-          Contract.Assert(taskID >= 0);
-          errorLimit = CommandLineOptions.Clo.Cho[taskID].ErrorLimit;
-        }
-        else
-        {
-          errorLimit = CommandLineOptions.Clo.ErrorLimit;
-        }
 
         int errorsDiscovered = 0;
 
@@ -1076,7 +820,7 @@ namespace Microsoft.Boogie.SMTLib
                 if (resp.Name != "")
                 {
                   UsedNamedAssumes.Add(resp.Name);
-                  if (CommandLineOptions.Clo.PrintNecessaryAssumes)
+                  if (libOptions.PrintNecessaryAssumes)
                   {
                     reporter.AddNecessaryAssume(resp.Name.Substring("aux$$assume$$".Length));
                   }
@@ -1085,7 +829,7 @@ namespace Microsoft.Boogie.SMTLib
                 foreach (var arg in resp.Arguments)
                 {
                   UsedNamedAssumes.Add(arg.Name);
-                  if (CommandLineOptions.Clo.PrintNecessaryAssumes)
+                  if (libOptions.PrintNecessaryAssumes)
                   {
                     reporter.AddNecessaryAssume(arg.Name.Substring("aux$$assume$$".Length));
                   }
@@ -1097,134 +841,19 @@ namespace Microsoft.Boogie.SMTLib
               }
             }
 
-            if (CommandLineOptions.Clo.RunDiagnosticsOnTimeout && result == Outcome.TimeOut)
-            {
-              #region Run timeout diagnostics
-
-              if (CommandLineOptions.Clo.TraceDiagnosticsOnTimeout)
-              {
-                Console.Out.WriteLine("Starting timeout diagnostics with initial time limit {0}.", options.TimeLimit);
-              }
-
-              SendThisVC("; begin timeout diagnostics");
-
-              var start = DateTime.UtcNow;
-              var unverified = new SortedSet<int>(ctx.TimeoutDiagnosticIDToAssertion.Keys);
-              var timedOut = new SortedSet<int>();
-              int frac = 2;
-              int queries = 0;
-              int timeLimitPerAssertion = 0 < options.TimeLimit
-                ? (options.TimeLimit / 100) * CommandLineOptions.Clo.TimeLimitPerAssertionInPercent
-                : 1000;
-              while (true)
-              {
-                int rem = unverified.Count;
-                if (rem == 0)
-                {
-                  if (0 < timedOut.Count)
-                  {
-                    result = CheckSplit(timedOut, ref popLater, options.TimeLimit, timeLimitPerAssertion, ref queries);
-                    if (result == Outcome.Valid)
-                    {
-                      timedOut.Clear();
-                    }
-                    else if (result == Outcome.TimeOut)
-                    {
-                      // Give up and report which assertions were not verified.
-                      var cmds = timedOut.Select(id => ctx.TimeoutDiagnosticIDToAssertion[id]);
-
-                      if (cmds.Any())
-                      {
-                        handler.OnResourceExceeded("timeout after running diagnostics", cmds);
-                      }
-                    }
-                  }
-                  else
-                  {
-                    result = Outcome.Valid;
-                  }
-
-                  break;
-                }
-
-                // TODO(wuestholz): Try out different ways for splitting up the work (e.g., randomly).
-                var cnt = Math.Max(1, rem / frac);
-                // It seems like assertions later in the control flow have smaller indexes.
-                var split = new SortedSet<int>(unverified.Where((val, idx) => (rem - idx - 1) < cnt));
-                Contract.Assert(0 < split.Count);
-                var splitRes = CheckSplit(split, ref popLater, timeLimitPerAssertion, timeLimitPerAssertion,
-                  ref queries);
-                if (splitRes == Outcome.Valid)
-                {
-                  unverified.ExceptWith(split);
-                  frac = 1;
-                }
-                else if (splitRes == Outcome.Invalid)
-                {
-                  result = splitRes;
-                  break;
-                }
-                else if (splitRes == Outcome.TimeOut)
-                {
-                  if (2 <= frac && (4 <= (rem / frac)))
-                  {
-                    frac *= 4;
-                  }
-                  else if (2 <= (rem / frac))
-                  {
-                    frac *= 2;
-                  }
-                  else
-                  {
-                    timedOut.UnionWith(split);
-                    unverified.ExceptWith(split);
-                    frac = 1;
-                  }
-                }
-                else
-                {
-                  break;
-                }
-              }
-
-              unverified.UnionWith(timedOut);
-
-              var end = DateTime.UtcNow;
-
-              SendThisVC("; end timeout diagnostics");
-
-              if (CommandLineOptions.Clo.TraceDiagnosticsOnTimeout)
-              {
-                Console.Out.WriteLine("Terminated timeout diagnostics after {0:F0} ms and {1} prover queries.",
-                  end.Subtract(start).TotalMilliseconds, queries);
-                Console.Out.WriteLine("Outcome: {0}", result);
-                Console.Out.WriteLine("Unverified assertions: {0} (of {1})", unverified.Count,
-                  ctx.TimeoutDiagnosticIDToAssertion.Keys.Count);
-
-                string filename = "unknown";
-                var assertion = ctx.TimeoutDiagnosticIDToAssertion.Values.Select(t => t.Item1)
-                  .FirstOrDefault(a => a.tok != null && a.tok != Token.NoToken && a.tok.filename != null);
-                if (assertion != null)
-                {
-                  filename = assertion.tok.filename;
-                }
-
-                File.AppendAllText("timeouts.csv",
-                  string.Format(";{0};{1};{2:F0};{3};{4};{5};{6}\n", filename, options.TimeLimit,
-                    end.Subtract(start).TotalMilliseconds, queries, result, unverified.Count,
-                    ctx.TimeoutDiagnosticIDToAssertion.Keys.Count));
-              }
-
-              #endregion
+            if (libOptions.RunDiagnosticsOnTimeout && result == Outcome.TimeOut) {
+              result = RunTimeoutDiagnostics(handler, result, ref popLater);
             }
 
             if (globalResult == Outcome.Undetermined)
+            {
               globalResult = result;
+            }
 
             if (result == Outcome.Invalid)
             {
               Model model = GetErrorModel();
-              if (CommandLineOptions.Clo.SIBoolControlVC)
+              if (libOptions.SIBoolControlVC)
               {
                 labels = new string[0];
               }
@@ -1245,7 +874,10 @@ namespace Microsoft.Boogie.SMTLib
             Debug.Assert(errorsDiscovered > 0);
             // if errorLimit is 0, loop will break only if there are no more 
             // counterexamples to be discovered.
-            if (labels == null || !labels.Any() || errorsDiscovered == errorLimit) break;
+            if (labels == null || !labels.Any() || errorsDiscovered == errorLimit)
+            {
+              break;
+            }
           }
           finally
           {
@@ -1255,19 +887,19 @@ namespace Microsoft.Boogie.SMTLib
             }
           }
 
-          {
-            string source = labels[labels.Length - 2];
-            string target = labels[labels.Length - 1];
-            // block the assert which was falsified by this counterexample
-            SendThisVC("(assert (not (= (ControlFlow 0 " + source + ") (- " + target + "))))");
-            SendCheckSat();
-          }
+          string source = labels[^2];
+          string target = labels[^1];
+          // block the assert which was falsified by this counterexample
+          SendThisVC($"(assert (not (= (ControlFlow 0 {source}) (- {target}))))");
+          SendCheckSat();
         }
 
         FlushLogFile();
 
-        if (CommandLineOptions.Clo.RestartProverPerVC && Process != null)
-          Process.NeedsRestart = true;
+        if (libOptions.RestartProverPerVC && Process != null)
+        {
+          ProcessNeedsRestart = true;
+        }
 
         return globalResult;
       }
@@ -1277,10 +909,105 @@ namespace Microsoft.Boogie.SMTLib
       }
     }
 
-    private Outcome CheckSplit(SortedSet<int> split, ref bool popLater, int timeLimit, int timeLimitPerAssertion,
+    private Outcome RunTimeoutDiagnostics(ErrorHandler handler, Outcome result, ref bool popLater)
+    {
+      if (libOptions.TraceDiagnosticsOnTimeout) {
+        Console.Out.WriteLine("Starting timeout diagnostics with initial time limit {0}.", options.TimeLimit);
+      }
+
+      SendThisVC("; begin timeout diagnostics");
+
+      var start = DateTime.UtcNow;
+      var unverified = new SortedSet<int>(ctx.TimeoutDiagnosticIDToAssertion.Keys);
+      var timedOut = new SortedSet<int>();
+      int frac = 2;
+      int queries = 0;
+      uint timeLimitPerAssertion = 0 < options.TimeLimit
+        ? (options.TimeLimit / 100) * libOptions.TimeLimitPerAssertionInPercent
+        : 1000;
+      while (true) {
+        int rem = unverified.Count;
+        if (rem == 0) {
+          if (0 < timedOut.Count) {
+            result = CheckSplit(timedOut, ref popLater, options.TimeLimit, timeLimitPerAssertion, ref queries);
+            if (result == Outcome.Valid) {
+              timedOut.Clear();
+            } else if (result == Outcome.TimeOut) {
+              // Give up and report which assertions were not verified.
+              var cmds = timedOut.Select(id => ctx.TimeoutDiagnosticIDToAssertion[id]);
+
+              if (cmds.Any()) {
+                handler.OnResourceExceeded("timeout after running diagnostics", cmds);
+              }
+            }
+          } else {
+            result = Outcome.Valid;
+          }
+
+          break;
+        }
+
+        // TODO(wuestholz): Try out different ways for splitting up the work (e.g., randomly).
+        var cnt = Math.Max(1, rem / frac);
+        // It seems like assertions later in the control flow have smaller indexes.
+        var split = new SortedSet<int>(unverified.Where((val, idx) => (rem - idx - 1) < cnt));
+        Contract.Assert(0 < split.Count);
+        var splitRes = CheckSplit(split, ref popLater, timeLimitPerAssertion, timeLimitPerAssertion,
+          ref queries);
+        if (splitRes == Outcome.Valid) {
+          unverified.ExceptWith(split);
+          frac = 1;
+        } else if (splitRes == Outcome.Invalid) {
+          result = splitRes;
+          break;
+        } else if (splitRes == Outcome.TimeOut) {
+          if (2 <= frac && (4 <= (rem / frac))) {
+            frac *= 4;
+          } else if (2 <= (rem / frac)) {
+            frac *= 2;
+          } else {
+            timedOut.UnionWith(split);
+            unverified.ExceptWith(split);
+            frac = 1;
+          }
+        } else {
+          break;
+        }
+      }
+
+      unverified.UnionWith(timedOut);
+
+      var end = DateTime.UtcNow;
+
+      SendThisVC("; end timeout diagnostics");
+
+      if (libOptions.TraceDiagnosticsOnTimeout) {
+        Console.Out.WriteLine("Terminated timeout diagnostics after {0:F0} ms and {1} prover queries.",
+          end.Subtract(start).TotalMilliseconds, queries);
+        Console.Out.WriteLine("Outcome: {0}", result);
+        Console.Out.WriteLine("Unverified assertions: {0} (of {1})", unverified.Count,
+          ctx.TimeoutDiagnosticIDToAssertion.Keys.Count);
+
+        string filename = "unknown";
+        var assertion = ctx.TimeoutDiagnosticIDToAssertion.Values.Select(t => t.Item1)
+          .FirstOrDefault(a => a.tok != null && a.tok != Token.NoToken && a.tok.filename != null);
+        if (assertion != null) {
+          filename = assertion.tok.filename;
+        }
+
+        File.AppendAllText("timeouts.csv",
+          string.Format(";{0};{1};{2:F0};{3};{4};{5};{6}\n", filename, options.TimeLimit,
+            end.Subtract(start).TotalMilliseconds, queries, result, unverified.Count,
+            ctx.TimeoutDiagnosticIDToAssertion.Keys.Count));
+      }
+
+      return result;
+    }
+
+    private Outcome CheckSplit(SortedSet<int> split, ref bool popLater, uint timeLimit, uint timeLimitPerAssertion,
       ref int queries)
     {
-      var tla = timeLimitPerAssertion * split.Count;
+      uint tla = (uint)(timeLimitPerAssertion * split.Count);
 
       if (popLater)
       {
@@ -1289,7 +1016,7 @@ namespace Microsoft.Boogie.SMTLib
 
       SendThisVC("(push 1)");
       // FIXME: Gross. Timeout should be set in one place! This is also Z3 specific!
-      int newTimeout = (0 < tla && tla < timeLimit) ? tla : timeLimit;
+      uint newTimeout = (0 < tla && tla < timeLimit) ? tla : timeLimit;
       if (newTimeout > 0)
       {
         SendThisVC(string.Format("(set-option :{0} {1})", Z3.TimeoutOption, newTimeout));
@@ -1329,21 +1056,35 @@ namespace Microsoft.Boogie.SMTLib
       var path = new List<string>();
       while (true)
       {
-        var resp = Process.GetProverResponse();
-        if (resp == null) break;
-        if (!(resp.Name == "" && resp.ArgCount == 1)) break;
-        resp = resp.Arguments[0];
-        if (!(resp.Name == "" && resp.ArgCount == 2)) break;
-        resp = resp.Arguments[1];
-        var v = resp.Name;
-        if (v == "-" && resp.ArgCount == 1)
+        var response = Process.GetProverResponse();
+        if (response == null)
         {
-          v = resp.Arguments[0].Name;
+          break;
+        }
+
+        if (!(response.Name == "" && response.ArgCount == 1))
+        {
+          break;
+        }
+
+        response = response.Arguments[0];
+        if (!(response.Name == "" && response.ArgCount == 2))
+        {
+          break;
+        }
+
+        response = response.Arguments[1];
+        var v = response.Name;
+        if (v == "-" && response.ArgCount == 1)
+        {
+          v = response.Arguments[0].Name;
           path.Add(v);
           break;
         }
-        else if (resp.ArgCount != 0)
+        else if (response.ArgCount != 0)
+        {
           break;
+        }
 
         path.Add(v);
         SendThisVC("(get-value ((ControlFlow " + controlFlowConstant + " " + v + ")))");
@@ -1379,27 +1120,37 @@ namespace Microsoft.Boogie.SMTLib
         return ErrorModel.ToString();
       }
 
-      bool isConstArray(SExpr element, SExpr type)
+      bool IsConstArray(SExpr element, SExpr type)
       {
         if (type.Name != "Array")
+        {
           return false;
+        }
 
-        if (element.Name == "__array_store_all__") // CVC4 1.4
+        if (element.Name == "__array_store_all__")
+        {
           return true;
+        }
         else if (element.Name == "" && element[0].Name == "as" &&
-                 element[0][0].Name == "const") // CVC4 > 1.4
+                 element[0][0].Name == "const")
+        {
           return true;
+        }
 
         return false;
       }
 
-      SExpr getConstArrayElement(SExpr element)
+      SExpr GetConstArrayElement(SExpr element)
       {
-        if (element.Name == "__array_store_all__") // CVC4 1.4
+        if (element.Name == "__array_store_all__")
+        {
           return element[1];
+        }
         else if (element.Name == "" && element[0].Name == "as" &&
-                 element[0][0].Name == "const") // CVC4 > 1.4
+                 element[0][0].Name == "const")
+        {
           return element[1];
+        }
 
         Parent.HandleProverError("Unexpected value: " + element);
         throw new BadExprFromProver();
@@ -1409,7 +1160,7 @@ namespace Microsoft.Boogie.SMTLib
       {
         if (type.Name == "Array")
         {
-          if (element.Name == "store" || isConstArray(element, type))
+          if (element.Name == "store" || IsConstArray(element, type))
           {
             NumNewArrays++;
             m.Append("as-array[k!" + NumNewArrays + ']');
@@ -1473,9 +1224,9 @@ namespace Microsoft.Boogie.SMTLib
             element = element[0];
           }
 
-          if (isConstArray(element, type))
+          if (IsConstArray(element, type))
           {
-            ConstructComplexValue(getConstArrayElement(element), type[1], m);
+            ConstructComplexValue(GetConstArrayElement(element), type[1], m);
             return;
           }
           else if (element.Name == "_" && element.ArgCount == 2 &&
@@ -1486,12 +1237,26 @@ namespace Microsoft.Boogie.SMTLib
           }
         }
 
+        if (type.Name == "Seq")
+        {
+          if (element.Name == "as")
+          {
+            m.Append(element[0]);
+            return;
+          }
+        }
+        
         if (SortSet.ContainsKey(type.Name) && SortSet[type.Name] == 0)
         {
           var prefix = "@uc_T@" + type.Name.Substring(2) + "_";
-          if (element.Name.StartsWith(prefix))
+          var elementName =  element.Name;
+          if (elementName == "as")
           {
-            m.Append(type.Name + "!val!" + element.Name.Substring(prefix.Length));
+            elementName = element[0].Name;
+          }
+          if (elementName.StartsWith(prefix))
+          {
+            m.Append(type.Name + "!val!" + elementName.Substring(prefix.Length));
             return;
           }
         }
@@ -1535,11 +1300,18 @@ namespace Microsoft.Boogie.SMTLib
         {
           int argNum;
           if (arguments[0].Name.StartsWith("_ufmt_"))
+          {
             argNum = System.Convert.ToInt32(arguments[0].Name.Substring("_uftm_".Length)) - 1;
+          }
           else if (arguments[0].Name.StartsWith("_arg_"))
+          {
             argNum = System.Convert.ToInt32(arguments[0].Name.Substring("_arg_".Length)) - 1;
+          }
           else /* if (arguments[0].Name.StartsWith("x!")) */
+          {
             argNum = System.Convert.ToInt32(arguments[0].Name.Substring("x!".Length)) - 1;
+          }
+
           if (argNum < 0 || argNum >= argTypes.Count)
           {
             Parent.HandleProverError("Unexpected function argument: " + arguments[0]);
@@ -1569,12 +1341,18 @@ namespace Microsoft.Boogie.SMTLib
           StringBuilder[] argValues = new StringBuilder[argTypes.Count];
           ConstructFunctionArguments(element[0], argTypes, argValues);
           foreach (var s in argValues)
+          {
             m.Append(s + " ");
+          }
+
           m.Append("-> ");
           ConstructComplexValue(element[1], outType, m);
           m.Append("\n  ");
           if (element[2].Name != "ite")
+          {
             m.Append("else -> ");
+          }
+
           element = element[2];
         }
 
@@ -1605,11 +1383,15 @@ namespace Microsoft.Boogie.SMTLib
         Debug.Assert(element.Name == "define-fun");
 
         if (element[1].ArgCount != 0)
+        {
           TopLevelProcessed.Add(element);
+        }
 
         m.Append(element[0] + " -> ");
         if (TopLevelProcessed.Contains(element))
+        {
           m.Append("{\n  ");
+        }
 
         if (element[1].ArgCount == 0 && element[2].Name == "Array" && !TopLevelProcessed.Contains(element))
         {
@@ -1625,7 +1407,10 @@ namespace Microsoft.Boogie.SMTLib
         }
 
         if (TopLevelProcessed.Contains(element))
+        {
           m.Append("\n}");
+        }
+
         m.Append("\n");
       }
 
@@ -1633,41 +1418,41 @@ namespace Microsoft.Boogie.SMTLib
       {
         Debug.Assert(datatypes.Name == "declare-datatypes");
 
-        if (datatypes[0].Name != "" || datatypes[1].Name != "" || datatypes[1].ArgCount != 1)
+        if (datatypes[0].Name != "" || datatypes[1].Name != "" || datatypes[0].ArgCount != datatypes[1].ArgCount)
         {
           Parent.HandleProverError("Unexpected datatype: " + datatypes);
           throw new BadExprFromProver();
         }
 
-        SExpr typeDef = datatypes[1][0];
-        Dictionary<string, List<SExpr>> dataTypeConstructors = new Dictionary<string, List<SExpr>>();
-        for (int j = 0; j < typeDef.ArgCount; ++j)
+        for (int typeIndex = 0; typeIndex < datatypes[1].ArgCount; typeIndex++)
         {
-          var argumentTypes = new List<SExpr>();
-          for (int i = 0; i < typeDef[j].ArgCount; ++i)
+          SExpr typeDef = datatypes[1][typeIndex];
+          Dictionary<string, List<SExpr>> dataTypeConstructors = new Dictionary<string, List<SExpr>>();
+          for (int j = 0; j < typeDef.ArgCount; ++j)
           {
-            if (typeDef[j][i].ArgCount != 1)
+            var argumentTypes = new List<SExpr>();
+            for (int i = 0; i < typeDef[j].ArgCount; ++i)
             {
-              Parent.HandleProverError("Unexpected datatype constructor: " + typeDef[j]);
-              throw new BadExprFromProver();
+              if (typeDef[j][i].ArgCount != 1)
+              {
+                Parent.HandleProverError("Unexpected datatype constructor: " + typeDef[j]);
+                throw new BadExprFromProver();
+              }
+              argumentTypes.Add(typeDef[j][i][0]);
             }
-
-            argumentTypes.Add(typeDef[j][i][0]);
+            dataTypeConstructors[typeDef[j].Name] = argumentTypes;
           }
-
-          dataTypeConstructors[typeDef[j].Name] = argumentTypes;
+          DataTypes[datatypes[0][typeIndex].Name] = dataTypeConstructors;
         }
-
-        DataTypes[datatypes[0][0].Name] = dataTypeConstructors;
       }
 
       private void ConvertErrorModel(StringBuilder m)
       {
-        if (Parent.options.Solver == SolverKind.Z3)
+        if (Parent.options.Solver == SolverKind.Z3 || Parent.options.Solver == SolverKind.CVC5)
         {
-          // Datatype declarations are not returned by Z3, so parse common
-          // instead. This is not very efficient, but currently not an issue,
-          // as this not the normal way of interfacing with Z3.
+          // Datatype declarations are not returned by Z3 or CVC5, so parse common
+          // instead. This is not very efficient, but currently not an issue for interfacing
+          // with Z3 as this not the normal way of interfacing with Z3.
           var ms = new MemoryStream(Encoding.ASCII.GetBytes(Parent.common.ToString()));
           var sr = new StreamReader(ms);
           SExpr.Parser p = new MyFileParser(sr, null);
@@ -1676,6 +1461,9 @@ namespace Microsoft.Boogie.SMTLib
           {
             switch (e.Name)
             {
+              case "declare-sort":
+                SortSet[e[0].Name] = System.Convert.ToInt32(e[1].Name);
+                break;
               case "declare-datatypes":
                 ExtractDataType(e);
                 break;
@@ -1706,7 +1494,6 @@ namespace Microsoft.Boogie.SMTLib
                 Parent.HandleProverError("Unexpected top level model element: " + e.Name);
                 throw new BadExprFromProver();
               }
-
               Functions[e[0].Name] = e[2];
               break;
             case "forall":
@@ -1722,8 +1509,10 @@ namespace Microsoft.Boogie.SMTLib
 
     private Model GetErrorModel()
     {
-      if (!options.ExpectingModel())
+      if (!libOptions.ExpectingModel)
+      {
         return null;
+      }
 
       SendThisVC("(get-model)");
       Process.Ping();
@@ -1732,12 +1521,17 @@ namespace Microsoft.Boogie.SMTLib
       {
         var resp = Process.GetProverResponse();
         if (resp == null || Process.IsPong(resp))
+        {
           break;
+        }
+
         if (theModel != null)
+        {
           HandleProverError("Expecting only one model but got many");
+        }
 
         string modelStr = null;
-        if (resp.Name == "model" && resp.ArgCount >= 1)
+        if (resp.ArgCount >= 1)
         {
           var converter = new SMTErrorModelConverter(resp, this);
           modelStr = converter.Convert();
@@ -1757,8 +1551,8 @@ namespace Microsoft.Boogie.SMTLib
           switch (options.Solver)
           {
             case SolverKind.Z3:
-            case SolverKind.CVC4:
-              models = Model.ParseModels(new StringReader("Error model: \n" + modelStr));
+            case SolverKind.CVC5:
+              models = Model.ParseModels(new StringReader("Error model: \n" + modelStr), Namer.GetOriginalName);
               break;
             default:
               Debug.Assert(false);
@@ -1771,42 +1565,24 @@ namespace Microsoft.Boogie.SMTLib
         }
 
         if (models == null)
+        {
           HandleProverError("Could not parse any models");
+        }
         else if (models.Count == 0)
+        {
           HandleProverError("Could not parse any models");
+        }
         else if (models.Count > 1)
+        {
           HandleProverError("Expecting only one model but got many");
+        }
         else
+        {
           theModel = models[0];
+        }
       }
 
       return theModel;
-    }
-
-    private string[] GetLabelsInfo()
-    {
-      SendThisVC("(labels)");
-      Process.Ping();
-
-      string[] res = null;
-      while (true)
-      {
-        var resp = Process.GetProverResponse();
-        if (resp == null || Process.IsPong(resp))
-          break;
-        if (res != null)
-          HandleProverError("Expecting only one sequence of labels but got many");
-        if (resp.Name == "labels")
-        {
-          res = resp.Arguments.Select(a => Namer.AbsyLabel(a.Name.Replace("|", ""))).ToArray();
-        }
-        else
-        {
-          HandleProverError("Unexpected prover response getting labels: " + resp.ToString());
-        }
-      }
-
-      return res;
     }
 
     private Outcome GetResponse()
@@ -1820,7 +1596,9 @@ namespace Microsoft.Boogie.SMTLib
       {
         var resp = Process.GetProverResponse();
         if (resp == null || Process.IsPong(resp))
+        {
           break;
+        }
 
         switch (resp.Name)
         {
@@ -1865,7 +1643,9 @@ namespace Microsoft.Boogie.SMTLib
         {
           var resp = Process.GetProverResponse();
           if (resp == null || Process.IsPong(resp))
+          {
             break;
+          }
 
           if (resp.ArgCount == 1 && resp.Name == ":reason-unknown")
           {
@@ -1879,7 +1659,7 @@ namespace Microsoft.Boogie.SMTLib
               case "memout":
                 currentErrorHandler.OnResourceExceeded("memory");
                 result = Outcome.OutOfMemory;
-                Process.NeedsRestart = true;
+                ProcessNeedsRestart = true;
                 break;
               case "timeout":
                 currentErrorHandler.OnResourceExceeded("timeout");
@@ -1933,12 +1713,10 @@ namespace Microsoft.Boogie.SMTLib
       lock (gen)
       {
         DateTime start = DateTime.UtcNow;
-        //if (CommandLineOptions.Clo.Trace)
-        //  Console.Write("Linearising ... ");
 
         // handle the types in the VCExpr
         VCExpr exprWithoutTypes;
-        switch (CommandLineOptions.Clo.TypeEncodingMethod)
+        switch (libOptions.TypeEncodingMethod)
         {
           case CommandLineOptions.TypeEncoding.Arguments:
           {
@@ -1974,18 +1752,20 @@ namespace Microsoft.Boogie.SMTLib
           Contract.Assert(sortedAxioms != null);
           DeclCollector.Collect(sortedAxioms);
           FeedTypeDeclsToProver();
-          AddAxiom(SMTLibExprLineariser.ToString(sortedAxioms, Namer, options, namedAssumes: NamedAssumes));
+          AddAxiom(SMTLibExprLineariser.ToString(sortedAxioms, Namer, libOptions, options, namedAssumes: NamedAssumes));
         }
 
-        string res = SMTLibExprLineariser.ToString(sortedExpr, Namer, options, NamedAssumes, OptimizationRequests);
+        string res = SMTLibExprLineariser.ToString(sortedExpr, Namer, libOptions, options, NamedAssumes, OptimizationRequests);
         Contract.Assert(res != null);
 
-        if (CommandLineOptions.Clo.Trace)
+        if (libOptions.Trace)
         {
           DateTime end = DateTime.UtcNow;
           TimeSpan elapsed = end - start;
           if (elapsed.TotalSeconds > 0.5)
+          {
             Console.WriteLine("Linearising   [{0} s]", elapsed.TotalSeconds);
+          }
         }
 
         return res;
@@ -2026,13 +1806,13 @@ namespace Microsoft.Boogie.SMTLib
 
     private static string _backgroundPredicates;
 
-    static void InitializeGlobalInformation()
+    void InitializeGlobalInformation()
     {
       Contract.Ensures(_backgroundPredicates != null);
       //throws ProverException, System.IO.FileNotFoundException;
       if (_backgroundPredicates == null)
       {
-        if (CommandLineOptions.Clo.TypeEncodingMethod == CommandLineOptions.TypeEncoding.Monomorphic)
+        if (libOptions.TypeEncodingMethod == CommandLineOptions.TypeEncoding.Monomorphic)
         {
           _backgroundPredicates = "";
         }
@@ -2115,9 +1895,15 @@ namespace Microsoft.Boogie.SMTLib
       SendThisVC("(get-unsat-core)");
       var resp = Process.GetProverResponse().ToString();
       if (resp == "" || resp == "()")
+      {
         return null;
+      }
+
       if (resp[0] == '(')
+      {
         resp = resp.Substring(1, resp.Length - 2);
+      }
+
       var ucore = resp.Split(' ').ToList();
       return ucore;
     }
@@ -2151,21 +1937,36 @@ namespace Microsoft.Boogie.SMTLib
       SendThisVC("(check-sat)");
     }
 
-    public override void SetTimeout(int ms)
+    public override void SetTimeout(uint ms)
     {
       options.TimeLimit = ms;
     }
 
-    public override void SetRlimit(int limit)
+    public override void SetRlimit(uint limit)
     {
       options.ResourceLimit = limit;
     }
 
-    public override void SetRandomSeed(int? randomSeed)
+    public override int GetRCount() 
     {
-      options.RandomSeed = randomSeed;
+      SendThisVC("(get-info :rlimit)");
+      var resp = Process.GetProverResponse();
+      try
+      {
+        return int.Parse(resp[0].Name);
+      }
+      catch
+      {
+        // If anything goes wrong with parsing the response from the solver,
+        // it's better to be able to continue, even with uninformative data.
+        lock (proverWarnings)
+        {
+          proverWarnings.Add($"Failed to parse resource count from solver. Got: {resp.ToString()}");
+        }
+        return -1;
+      }
     }
-    
+
     object ParseValueFromProver(SExpr expr)
     {
       return expr.ToString().Replace(" ", "").Replace("(", "").Replace(")", "");
@@ -2174,7 +1975,9 @@ namespace Microsoft.Boogie.SMTLib
     SExpr ReduceLet(SExpr expr)
     {
       if (expr.Name != "let")
+      {
         return expr;
+      }
 
       var bindings = expr.Arguments[0].Arguments;
       var subexpr = expr.Arguments[1];
@@ -2197,9 +2000,13 @@ namespace Microsoft.Boogie.SMTLib
         {
           var arg = curr.Arguments[i];
           if (dict.ContainsKey(arg.Name))
+          {
             curr.Arguments[i] = dict[arg.Name];
+          }
           else
+          {
             workList.Push(arg);
+          }
         }
       }
 
@@ -2210,15 +2017,31 @@ namespace Microsoft.Boogie.SMTLib
     {
       resp = ReduceLet(resp);
       var dict = GetArrayFromArrayExpr(resp);
-      if (dict == null) dict = GetArrayFromProverLambdaExpr(resp);
-      if (dict == null) return null;
+      if (dict == null)
+      {
+        dict = GetArrayFromProverLambdaExpr(resp);
+      }
+
+      if (dict == null)
+      {
+        return null;
+      }
+
       var str = new StringWriter();
       str.Write("{");
       foreach (var entry in dict)
+      {
         if (entry.Key != "*")
+        {
           str.Write("\"{0}\":{1},", entry.Key, entry.Value);
+        }
+      }
+
       if (dict.ContainsKey("*"))
+      {
         str.Write("\"*\":{0}", dict["*"]);
+      }
+
       str.Write("}");
       return str.ToString();
     }
@@ -2244,10 +2067,14 @@ namespace Microsoft.Boogie.SMTLib
             // TODO: nested arrays, as (ite (...) (_ as-array k!5) (_ as-array k!3))
 
             if (condition.Name != "=")
+            {
               throw new VCExprEvaluationException();
+            }
 
             if (condition.Arguments[0].Name != indexVar)
+            {
               throw new VCExprEvaluationException();
+            }
 
             var index = ParseValueFromProver(condition.Arguments[1]);
             var value = ParseValueFromProver(positive);
@@ -2306,31 +2133,53 @@ namespace Microsoft.Boogie.SMTLib
       string vcString = VCExpr2String(expr, 1);
       SendThisVC("(get-value (" + vcString + "))");
       var resp = Process.GetProverResponse();
-      if (resp == null) throw new VCExprEvaluationException();
-      if (!(resp.Name == "" && resp.ArgCount == 1)) throw new VCExprEvaluationException();
+      if (resp == null)
+      {
+        throw new VCExprEvaluationException();
+      }
+
+      if (!(resp.Name == "" && resp.ArgCount == 1))
+      {
+        throw new VCExprEvaluationException();
+      }
+
       resp = resp.Arguments[0];
       if (resp.Name == "")
       {
         // evaluating an expression
         if (resp.ArgCount == 2)
+        {
           resp = resp.Arguments[1];
+        }
         else
+        {
           throw new VCExprEvaluationException();
+        }
       }
       else
       {
         // evaluating a variable
         if (resp.ArgCount == 1)
+        {
           resp = resp.Arguments[0];
+        }
         else
+        {
           throw new VCExprEvaluationException();
+        }
       }
 
       if (resp.Name == "-" && resp.ArgCount == 1) // negative int
+      {
         return Microsoft.BaseTypes.BigNum.FromString("-" + resp.Arguments[0].Name);
+      }
+
       if (resp.Name == "_" && resp.ArgCount == 2 && resp.Arguments[0].Name.StartsWith("bv")) // bitvector
+      {
         return new BvConst(Microsoft.BaseTypes.BigNum.FromString(resp.Arguments[0].Name.Substring("bv".Length)),
           int.Parse(resp.Arguments[1].Name));
+      }
+
       if (resp.Name == "fp" && resp.ArgCount == 3)
       {
         Func<SExpr, BigInteger> getBvVal = e => BigInteger.Parse(e.Arguments[0].Name.Substring("bv".Length));
@@ -2355,15 +2204,27 @@ namespace Microsoft.Boogie.SMTLib
 
       var ary = GetArrayFromProverResponse(resp);
       if (ary != null)
+      {
         return ary;
+      }
+
       if (resp.ArgCount != 0)
+      {
         throw new VCExprEvaluationException();
+      }
+
       if (expr.Type.Equals(Boogie.Type.Bool))
+      {
         return bool.Parse(resp.Name);
+      }
       else if (expr.Type.Equals(Boogie.Type.Int))
+      {
         return Microsoft.BaseTypes.BigNum.FromString(resp.Name);
+      }
       else
+      {
         return resp.Name;
+      }
     }
 
     /// <summary>
@@ -2393,7 +2254,7 @@ namespace Microsoft.Boogie.SMTLib
 
       Check();
 
-      var outcome = CheckOutcomeCore(handler);
+      var outcome = CheckOutcomeCore(handler, libOptions.ErrorLimit);
 
       if (outcome != Outcome.Valid)
       {
@@ -2405,8 +2266,15 @@ namespace Microsoft.Boogie.SMTLib
       SendThisVC("(get-unsat-core)");
       var resp = Process.GetProverResponse();
       unsatCore = new List<int>();
-      if (resp.Name != "") unsatCore.Add(nameToAssumption[resp.Name]);
-      foreach (var s in resp.Arguments) unsatCore.Add(nameToAssumption[s.Name]);
+      if (resp.Name != "")
+      {
+        unsatCore.Add(nameToAssumption[resp.Name]);
+      }
+
+      foreach (var s in resp.Arguments)
+      {
+        unsatCore.Add(nameToAssumption[s.Name]);
+      }
 
       FlushLogFile();
       Pop();
@@ -2463,9 +2331,12 @@ namespace Microsoft.Boogie.SMTLib
         }
 
         Check();
-        outcome = CheckOutcomeCore(handler);
+        outcome = CheckOutcomeCore(handler, libOptions.ErrorLimit);
         if (outcome != Outcome.Valid)
+        {
           break;
+        }
+
         Pop();
         string relaxVar = "relax_" + k;
         relaxVars.Add(relaxVar);
@@ -2488,18 +2359,36 @@ namespace Microsoft.Boogie.SMTLib
           SendThisVC("(get-value (" + relaxVar + "))");
           FlushLogFile();
           var resp = Process.GetProverResponse();
-          if (resp == null) break;
-          if (!(resp.Name == "" && resp.ArgCount == 1)) break;
+          if (resp == null)
+          {
+            break;
+          }
+
+          if (!(resp.Name == "" && resp.ArgCount == 1))
+          {
+            break;
+          }
+
           resp = resp.Arguments[0];
-          if (!(resp.Name != "" && resp.ArgCount == 1)) break;
+          if (!(resp.Name != "" && resp.ArgCount == 1))
+          {
+            break;
+          }
+
           resp = resp.Arguments[0];
           if (resp.ArgCount != 0)
+          {
             break;
-          int v;
-          if (int.TryParse(resp.Name, out v))
+          }
+
+          if (int.TryParse(resp.Name, out var v))
+          {
             unsatisfiedSoftAssumptions.Add(v);
+          }
           else
+          {
             break;
+          }
         }
 
         Pop();
@@ -2542,7 +2431,7 @@ namespace Microsoft.Boogie.SMTLib
         var = v;
       }
 
-      return parent.Namer.Lookup(var);
+      return parent.Namer.GetOriginalName(parent.Namer.Lookup(var));
     }
 
     public override void DeclareFunction(Function f, string attributes)
@@ -2585,13 +2474,13 @@ namespace Microsoft.Boogie.SMTLib
 
   public class Factory : ProverFactory
   {
-    public override object SpawnProver(ProverOptions options, object ctxt)
+    public override object SpawnProver(SMTLibOptions libOptions, ProverOptions options, object ctxt)
     {
       //Contract.Requires(ctxt != null);
       //Contract.Requires(options != null);
       Contract.Ensures(Contract.Result<object>() != null);
 
-      return this.SpawnProver(options,
+      return this.SpawnProver(libOptions, options,
         cce.NonNull((SMTLibProverContext) ctxt).ExprGen,
         cce.NonNull((SMTLibProverContext) ctxt));
     }
@@ -2607,9 +2496,14 @@ namespace Microsoft.Boogie.SMTLib
       proverCommands.Add("smtlib");
       var opts = (SMTLibProverOptions) options;
       if (opts.Solver == SolverKind.Z3)
+      {
         proverCommands.Add("z3");
+      }
       else
+      {
         proverCommands.Add("external");
+      }
+
       VCGenerationOptions genOptions = new VCGenerationOptions(proverCommands);
       return new SMTLibProverContext(gen, genOptions);
     }
@@ -2619,7 +2513,7 @@ namespace Microsoft.Boogie.SMTLib
       return new SMTLibProverOptions();
     }
 
-    protected virtual SMTLibProcessTheoremProver SpawnProver(ProverOptions options,
+    protected virtual SMTLibProcessTheoremProver SpawnProver(SMTLibOptions libOptions, ProverOptions options,
       VCExpressionGenerator gen,
       SMTLibProverContext ctx)
     {
@@ -2627,7 +2521,7 @@ namespace Microsoft.Boogie.SMTLib
       Contract.Requires(gen != null);
       Contract.Requires(ctx != null);
       Contract.Ensures(Contract.Result<SMTLibProcessTheoremProver>() != null);
-      return new SMTLibProcessTheoremProver(options, gen, ctx);
+      return new SMTLibProcessTheoremProver(libOptions, options, gen, ctx);
     }
   }
 }

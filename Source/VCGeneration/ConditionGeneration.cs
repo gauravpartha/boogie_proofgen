@@ -31,8 +31,8 @@ namespace VC
       throw new NotImplementedException();
     }
 
-    public ConditionGenerationContracts(Program p, List<Checker> checkers)
-      : base(p, checkers)
+    public ConditionGenerationContracts(Program p, CheckerPool checkerPool)
+      : base(p, checkerPool)
     {
     }
   }
@@ -50,7 +50,8 @@ namespace VC
       OutOfResource,
       OutOfMemory,
       Inconclusive,
-      ReachedBound
+      ReachedBound,
+      SolverException
     }
 
     public static Outcome ProverInterfaceOutcomeToConditionGenerationOutcome(ProverInterface.Outcome outcome)
@@ -77,16 +78,13 @@ namespace VC
     [ContractInvariantMethod]
     void ObjectInvariant()
     {
-      Contract.Invariant(cce.NonNullElements(checkers));
       Contract.Invariant(cce.NonNullDictionaryAndValues(incarnationOriginMap));
       Contract.Invariant(program != null);
     }
 
     public int CumulativeAssertionCount; // for statistics
-
-    protected readonly List<Checker> /*!>!*/
-      checkers;
-
+    public int ResourceCount;
+    
     private bool _disposed;
 
     protected Implementation currentImplementation;
@@ -99,20 +97,15 @@ namespace VC
     public Dictionary<Incarnation, Absy> incarnationOriginMap = new Dictionary<Incarnation, Absy>();
 
     public Dictionary<Cmd, List<object>> debugInfos = new Dictionary<Cmd, List<object>>();
-    
+
     public Program program;
+    public CheckerPool CheckerPool { get; }
 
-    protected string /*?*/
-      logFilePath;
-
-    protected bool appendLogFile;
-
-    public ConditionGeneration(Program p, List<Checker> checkers)
+    public ConditionGeneration(Program p, CheckerPool checkerPool)
     {
-      Contract.Requires(p != null && checkers != null && cce.NonNullElements(checkers));
+      Contract.Requires(p != null && checkerPool != null);
       program = p;
-      this.checkers = checkers;
-      Cores = 1;
+      CheckerPool = checkerPool;
     }
 
     /// <summary>
@@ -149,7 +142,7 @@ namespace VC
       Helpers.ExtraTraceInformation("Finished implementation verification");
       return outcome;
     }
-    
+
     public abstract Outcome VerifyImplementation(Implementation impl, VerifierCallback callback);
 
     /////////////////////////////////// Common Methods and Classes //////////////////////////////////////////
@@ -310,9 +303,9 @@ namespace VC
       foreach (Ensures ens in impl.Proc.Ensures)
       {
         Contract.Assert(ens != null);
+
         if (!ens.Free)
         {
-          // skip free ensures clauses
           Expr e = Substituter.Apply(formalProcImplSubst, ens.Condition);
           Ensures ensCopy = (Ensures) cce.NonNull(ens.Clone());
           ensCopy.Condition = e;
@@ -323,6 +316,15 @@ namespace VC
           {
             c.Emit(debugWriter, 1);
           }
+        }
+        else if (ens.CanAlwaysAssume())
+        {
+          Expr e = Substituter.Apply(formalProcImplSubst, ens.Condition);
+          unifiedExitBlock.Cmds.Add(new AssumeCmd(ens.tok, e));
+        }
+        else
+        {
+          // skip free ensures if it doesn't have the :always_assume attr
         }
       }
 
@@ -503,86 +505,8 @@ namespace VC
     }
 
     #endregion
-
-
-    protected Checker FindCheckerFor(bool isBlocking = true, int waitTimeinMs = 50, int maxRetries = 3)
-    {
-      Contract.Requires(0 <= waitTimeinMs && 0 <= maxRetries);
-      Contract.Ensures(!isBlocking || Contract.Result<Checker>() != null);
-
-      lock (checkers)
-      {
-        retry:
-        // Look for existing checker.
-        for (int i = 0; i < checkers.Count; i++)
-        {
-          var c = checkers[i];
-          if (Monitor.TryEnter(c))
-          {
-            try
-            {
-              if (c.WillingToHandle(program))
-              {
-                c.GetReady();
-                return c;
-              }
-              else if (c.IsIdle || c.IsClosed)
-              {
-                if (c.IsIdle)
-                {
-                  c.Retarget(program, c.TheoremProver.Context);
-                  c.GetReady();
-                  return c;
-                }
-                else
-                {
-                  checkers.RemoveAt(i);
-                  i--;
-                  continue;
-                }
-              }
-            }
-            finally
-            {
-              Monitor.Exit(c);
-            }
-          }
-        }
-
-        if (Cores <= checkers.Count)
-        {
-          if (isBlocking || 0 < maxRetries)
-          {
-            if (0 < waitTimeinMs)
-            {
-              Monitor.Wait(checkers, waitTimeinMs);
-            }
-
-            maxRetries--;
-            goto retry;
-          }
-          else
-          {
-            return null;
-          }
-        }
-
-        // Create a new checker.
-        string log = logFilePath;
-        if (log != null && !log.Contains("@PROC@") && checkers.Count > 0)
-        {
-          log = log + "." + checkers.Count;
-        }
-
-        Checker ch = new Checker(this, program, log, appendLogFile);
-        ch.GetReady();
-        checkers.Add(ch);
-        return ch;
-      }
-    }
-
-
-    virtual public void Close()
+    
+    public virtual void Close()
     {
     }
 
@@ -699,7 +623,7 @@ namespace VC
       #endregion
     }
 
-    protected static void ResetPredecessors(List<Block> blocks)
+    internal static void ResetPredecessors(List<Block> blocks)
     {
       Contract.Requires(blocks != null);
       foreach (Block b in blocks)
@@ -829,7 +753,10 @@ namespace VC
       {
         Contract.Assert(v != null);
         if (!b.IsLive(v))
+        {
           continue;
+        }
+
         Variable v_prime = CreateIncarnation(v, b);
         IdentifierExpr ie = new IdentifierExpr(v_prime.tok, v_prime);
         Contract.Assert(incarnationMap != null);
@@ -941,18 +868,15 @@ namespace VC
           end.Subtract(start).TotalMilliseconds);
       }
 
-      if (CommandLineOptions.Clo.TraceCachingForDebugging)
-      {
-        using (var tokTxtWr = new TokenTextWriter("<console>", Console.Out, false, false))
-        {
-          var pd = CommandLineOptions.Clo.PrintDesugarings;
-          var pu = CommandLineOptions.Clo.PrintUnstructured;
-          CommandLineOptions.Clo.PrintDesugarings = true;
-          CommandLineOptions.Clo.PrintUnstructured = 1;
-          impl.Emit(tokTxtWr, 0);
-          CommandLineOptions.Clo.PrintDesugarings = pd;
-          CommandLineOptions.Clo.PrintUnstructured = pu;
-        }
+      if (CommandLineOptions.Clo.TraceCachingForDebugging) {
+        using var tokTxtWr = new TokenTextWriter("<console>", Console.Out, false, false);
+        var pd = CommandLineOptions.Clo.PrintDesugarings;
+        var pu = CommandLineOptions.Clo.PrintUnstructured;
+        CommandLineOptions.Clo.PrintDesugarings = true;
+        CommandLineOptions.Clo.PrintUnstructured = 1;
+        impl.Emit(tokTxtWr, 0);
+        CommandLineOptions.Clo.PrintDesugarings = pd;
+        CommandLineOptions.Clo.PrintUnstructured = pu;
       }
 
       currentImplementation = null;
@@ -983,22 +907,7 @@ namespace VC
 
       #region Topological sort -- need to process in a linearization of the partial order
 
-      Graph<Block> dag = new Graph<Block>();
-      dag.AddSource(cce.NonNull(blocks[0])); // there is always at least one node in the graph
-      foreach (Block b in blocks)
-      {
-        GotoCmd gtc = b.TransferCmd as GotoCmd;
-        if (gtc != null)
-        {
-          Contract.Assume(gtc.labelTargets != null);
-          foreach (Block dest in gtc.labelTargets)
-          {
-            Contract.Assert(dest != null);
-            dag.AddEdge(b, dest);
-          }
-        }
-      }
-
+      Graph<Block> dag = Program.GraphFromBlocks(blocks);
       IEnumerable sortedNodes;
       if (CommandLineOptions.Clo.ModifyTopologicalSorting)
       {
@@ -1032,7 +941,7 @@ namespace VC
         // b.liveVarsBefore has served its purpose in the just-finished call to ComputeIncarnationMap; null it out.
         b.liveVarsBefore = null;
 
-        // Decrement the succCount field in each predecessor. Once the field reaches zero in any block, 
+        // Decrement the succCount field in each predecessor. Once the field reaches zero in any block,
         // all its successors have been passified.  Consequently, its entry in block2Incarnation can be removed.
         byte[] currentChecksum = null;
         var mvc = new MutableVariableCollector();
@@ -1048,7 +957,9 @@ namespace VC
 
           mvc.AddUsedVariables(variableCollectors[p].UsedVariables);
           if (p.succCount == 0)
+          {
             block2Incarnation.Remove(p);
+          }
         }
 
         #region Each block's map needs to be available to successor blocks
@@ -1093,7 +1004,9 @@ namespace VC
       {
         Contract.Assert(ie != null);
         if (!oldFrameMap.ContainsKey(cce.NonNull(ie.Decl)))
+        {
           oldFrameMap.Add(ie.Decl, ie);
+        }
       }
 
       return Substituter.SubstitutionFromDictionary(oldFrameMap);
@@ -1113,17 +1026,14 @@ namespace VC
 
     void TraceCachingAction(Cmd cmd, CachingAction action)
     {
-      if (CommandLineOptions.Clo.TraceCachingForTesting)
-      {
-        using (var tokTxtWr = new TokenTextWriter("<console>", Console.Out, false, false))
-        {
-          var loc = cmd.tok != null && cmd.tok != Token.NoToken
-            ? string.Format("{0}({1},{2})", cmd.tok.filename, cmd.tok.line, cmd.tok.col)
-            : "<unknown location>";
-          Console.Write("Processing command (at {0}) ", loc);
-          cmd.Emit(tokTxtWr, 0);
-          Console.Out.WriteLine("  >>> {0}", action);
-        }
+      if (CommandLineOptions.Clo.TraceCachingForTesting) {
+        using var tokTxtWr = new TokenTextWriter("<console>", Console.Out, false, false);
+        var loc = cmd.tok != null && cmd.tok != Token.NoToken
+          ? string.Format("{0}({1},{2})", cmd.tok.filename, cmd.tok.line, cmd.tok.col)
+          : "<unknown location>";
+        Console.Write("Processing command (at {0}) ", loc);
+        cmd.Emit(tokTxtWr, 0);
+        Console.Out.WriteLine("  >>> {0}", action);
       }
 
       if (CommandLineOptions.Clo.TraceCachingForBenchmarking && CachingActionCounts != null)
@@ -1131,7 +1041,7 @@ namespace VC
         Interlocked.Increment(ref CachingActionCounts[(int) action]);
       }
     }
-    
+
     private void AddDebugInfo(Cmd c, Dictionary<Variable, Expr> incarnationMap, List<Cmd> passiveCmds)
     {
       if (c is ICarriesAttributes cmd)
@@ -1173,7 +1083,7 @@ namespace VC
         debugInfos.Add(debugCmd, debugExprs);
       }
     }
-    
+
     /// <summary>
     /// Turn a command into a passive command, and it remembers the previous step, to see if it is a havoc or not.
     /// In that case, it remembers the incarnation map BEFORE the havoc.
@@ -1191,6 +1101,8 @@ namespace VC
 
       AddDebugInfo(c, incarnationMap, passiveCmds);
       Substitution incarnationSubst = Substituter.SubstitutionFromDictionary(incarnationMap);
+
+      Microsoft.Boogie.VCExprAST.QuantifierInstantiationEngine.SubstituteIncarnationInInstantiationSources(c, incarnationSubst);
 
       #region assert/assume P |--> assert/assume P[x := in(x)], out := in
 
@@ -1231,17 +1143,12 @@ namespace VC
           string description = QKeyValue.FindStringAttribute(pc.Attributes, "captureState");
           if (description != null)
           {
-            Expr mv = new NAryExpr(pc.tok, new FunctionCall(ModelViewInfo.MVState_FunctionDef),
-              new List<Expr>
-                {Expr.Ident(ModelViewInfo.MVState_ConstantDef), Expr.Literal(mvInfo.CapturePoints.Count)});
-            copy = Expr.And(mv, copy);
             if (!mvInfo.BlockToCapturePointIndex.TryGetValue(enclosingBlock, out var points)) {
               points = new List<(AssumeCmd, ModelViewInfo.Mapping)>();
               mvInfo.BlockToCapturePointIndex[enclosingBlock] = points;
             }
             var mapping = new ModelViewInfo.Mapping(description, new Dictionary<Variable, Expr>(incarnationMap));
             points.Add((captureStateAssumeCmd, mapping));
-            mvInfo.CapturePoints.Add(mapping);
           }
         }
 
@@ -1280,8 +1187,7 @@ namespace VC
             }
             else
             {
-              bool isTrue;
-              var assmVars = currentImplementation.ConjunctionOfInjectedAssumptionVariables(incarnationMap, out isTrue);
+              var assmVars = currentImplementation.ConjunctionOfInjectedAssumptionVariables(incarnationMap, out var isTrue);
               TraceCachingAction(pc,
                 !isTrue ? CachingAction.MarkAsPartiallyVerified : CachingAction.MarkAsFullyVerified);
               var litExpr = ac.Expr as LiteralExpr;
@@ -1322,8 +1228,7 @@ namespace VC
               && currentImplementation.IsAssertionChecksumInCachedSnapshot(pc.SugaredCmdChecksum)
               && !currentImplementation.IsErrorChecksumInCachedSnapshot(pc.SugaredCmdChecksum))
           {
-            bool isTrue;
-            var assmVars = currentImplementation.ConjunctionOfInjectedAssumptionVariables(incarnationMap, out isTrue);
+            var assmVars = currentImplementation.ConjunctionOfInjectedAssumptionVariables(incarnationMap, out var isTrue);
             if (!isTrue)
             {
               copy = LiteralExpr.Imp(assmVars, copy);
@@ -1488,10 +1393,9 @@ namespace VC
             && assign.Lhss.Count == 1)
         {
           var identExpr = assign.Lhss[0].AsExpr as IdentifierExpr;
-          Expr incarnation;
           if (identExpr != null && identExpr.Decl != null &&
               QKeyValue.FindBoolAttribute(identExpr.Decl.Attributes, "assumption") &&
-              incarnationMap.TryGetValue(identExpr.Decl, out incarnation))
+              incarnationMap.TryGetValue(identExpr.Decl, out var incarnation))
           {
             TraceCachingAction(assign, CachingAction.AssumeNegationOfAssumptionVariable);
             passiveCmds.Add(new AssumeCmd(c.tok, Expr.Not(incarnation)));
@@ -1507,7 +1411,9 @@ namespace VC
       {
         if (this.preHavocIncarnationMap == null
         ) // Save a copy of the incarnation map (at the top of a sequence of havoc statements)
+        {
           this.preHavocIncarnationMap = new Dictionary<Variable, Expr>(incarnationMap);
+        }
 
         HavocCmd hc = (HavocCmd) c;
         Contract.Assert(c != null);
@@ -1576,7 +1482,7 @@ namespace VC
       else if (c is StateCmd st)
       {
         this.preHavocIncarnationMap = null; // we do not need to remember the previous incarnations
-        
+
         // account for any where clauses among the local variables
         foreach (Variable v in st.Locals)
         {
@@ -1617,7 +1523,9 @@ namespace VC
       #region We remember if we have put an havoc statement into a passive form
 
       if (!(c is HavocCmd))
+      {
         this.preHavocIncarnationMap = null;
+      }
       // else: it has already been set by the case for the HavocCmd
 
       #endregion
@@ -1746,6 +1654,5 @@ namespace VC
         _disposed = true;
       }
     }
-    public int Cores { get; set; }
   }
 }

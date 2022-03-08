@@ -32,11 +32,9 @@ public static Program ParseLibraryDefinitions()
   string libraryDefinitionsFileName = "LibraryDefinitions.bpl";
   Assembly asm = Assembly.GetExecutingAssembly();
   var resourceName = "Core.LibraryDefinitions.bpl";
-  using (Stream resourceStream = asm.GetManifestResourceStream(resourceName))
-  {
-    Parse(new StreamReader(resourceStream), libraryDefinitionsFileName, new List<string>(), out Program program);
-    return program;
-  }
+  using Stream resourceStream = asm.GetManifestResourceStream(resourceName);
+  Parse(new StreamReader(resourceStream), libraryDefinitionsFileName, new List<string>(), out Program program);
+  return program;
 }
 
 ///<summary>
@@ -51,10 +49,8 @@ public static int Parse(string/*!*/ filename, List<string/*!*/> defines, out /*m
     return Parse(Console.In, filename, defines, out program, useBaseName);
   } else
   {
-    using (FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
-    {
-      return Parse(new StreamReader(stream), filename, defines, out program, useBaseName);
-    }
+    using FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read);
+    return Parse(new StreamReader(stream), filename, defines, out program, useBaseName);
   }
 }
 
@@ -125,6 +121,9 @@ private class BvBounds : Expr {
     Contract.Assert(false);throw new cce.UnreachableException();
   }
   public override void ComputeFreeVariables(GSet<object>/*!*/ freeVars) { Contract.Assert(false);throw new cce.UnreachableException(); }
+  
+  public override int ContentHash => throw new NotSupportedException("Not supported since this type is translated away");
+  
   public override int ComputeHashCode()
   {
     return base.GetHashCode();
@@ -189,7 +188,7 @@ BoogiePL
      Implementation im;
      Implementation/*!*/ nnim;
   .)
-  { Consts<out vs>             (. foreach(Bpl.Variable/*!*/ v in vs){
+  { Consts<out ds>             (. foreach(Bpl.Declaration/*!*/ v in ds){
                                     Contract.Assert(v != null);
                                     Pgm.AddTopLevelDeclaration(v);
                                   }
@@ -399,9 +398,11 @@ Types<.List<Bpl.Type>/*!*/ ts.>
 
 
 /*------------------------------------------------------------------------*/
-Consts<.out List<Variable>/*!*/ ds.>
+Consts<.out List<Declaration>/*!*/ ds.>
 = (. Contract.Ensures(Contract.ValueAtReturn(out ds) != null); IToken/*!*/ y; List<TypedIdent>/*!*/ xs;
-     ds = new List<Variable>();
+     ds = new List<Declaration>();
+     var axioms = new List<Axiom>();
+     Axiom ax;
      bool u = false; QKeyValue kv = null;
      bool ChildrenComplete = false;
      List<ConstantParent/*!*/> Parents = null; .)
@@ -411,6 +412,7 @@ Consts<.out List<Variable>/*!*/ ds.>
   ]
   IdsType<out xs>
   [ OrderSpec<out ChildrenComplete, out Parents> ]
+  ( ";" | "uses" "{" { Axiom<out ax>(. axioms.Add(ax); .) } "}")
   (. bool makeClone = false;
      foreach(TypedIdent/*!*/ x in xs){
        Contract.Assert(x != null);
@@ -428,11 +430,14 @@ Consts<.out List<Variable>/*!*/ ds.>
          ParentsClone = Parents;
        }
        makeClone = true;
-
-       ds.Add(new Constant(y, x, u, ParentsClone, ChildrenComplete, kv));
+       
+       var constant = new Constant(y, x, u, ParentsClone, ChildrenComplete, kv, axioms);
+       ds.Add(constant);
+     }
+     foreach(var axiom in axioms) {
+       ds.Add(axiom);
      }
   .)
-  ";"
   .
 
 OrderSpec<.out bool ChildrenComplete, out List<ConstantParent/*!*/> Parents.>
@@ -466,6 +471,7 @@ Function<.out List<Declaration>/*!*/ ds.>
      IToken/*!*/ typeParamTok;
      var typeParams = new List<TypeVariable>();
      var arguments = new List<Variable>();
+     var axioms = new List<Axiom>();
      TypedIdent/*!*/ tyd;
      TypedIdent retTyd = null;
      Bpl.Type/*!*/ retTy;
@@ -473,6 +479,7 @@ Function<.out List<Declaration>/*!*/ ds.>
      QKeyValue kv = null;
      Expr definition = null;
      Expr/*!*/ tmp;
+     Axiom ax;
   .)
   "function" { Attribute<ref kv> } Ident<out z>
   [ TypeParams<out typeParamTok, out typeParams> ]
@@ -486,7 +493,10 @@ Function<.out List<Declaration>/*!*/ ds.>
     |
     ":" Type<out retTy>   (. retTyd = new TypedIdent(retTy.tok, TypedIdent.NoName, retTy); .)
   )
-  ( "{" Expression<out tmp> (. definition = tmp; .) "}" | ";" )
+  ( "{" Expression<out tmp> (. definition = tmp; .) "}" [ "uses" "{" { Axiom<out ax>(. axioms.Add(ax); .) } "}" ] 
+  | "uses" "{" { Axiom<out ax>(. axioms.Add(ax); .) } "}" 
+  | ";"
+  )
   (.
     if (retTyd == null) {
       // construct a dummy type for the case of syntax error
@@ -494,10 +504,15 @@ Function<.out List<Declaration>/*!*/ ds.>
     }
     Function/*!*/ func = new Function(z, z.val, typeParams, arguments,
                                       new Formal(retTyd.tok, retTyd, false, argKv), null, kv);
+    foreach(var axiom in axioms) {
+        ds.Add(axiom);
+        func.AddOtherDefinitionAxiom(axiom);
+    }
+    
     Contract.Assert(func != null);
     ds.Add(func);
     bool allUnnamed = true;
-    foreach(Formal/*!*/ f in arguments){
+    foreach(Formal/*!*/ f in arguments) {
       Contract.Assert(f != null);
       if (f.TypedIdent.HasName) {
         allUnnamed = false;

@@ -8,7 +8,7 @@ namespace Microsoft.Boogie
 {
   public static class LambdaHelper
   {
-    public static Program Desugar(Program program, out List<Expr /*!*/> /*!*/ axioms,
+    public static Program Desugar(Program program, out List<Axiom /*!*/> /*!*/ axioms,
       out List<Function /*!*/> /*!*/ functions)
     {
       Contract.Requires(program != null);
@@ -29,9 +29,9 @@ namespace Microsoft.Boogie
           f.Emit(wr, 0);
         }
 
-        foreach (Expr ax in axioms)
+        foreach (var ax in axioms)
         {
-          ax.Emit(wr);
+          ax.Emit(wr, 0);
           Console.WriteLine();
         }
       }
@@ -74,12 +74,8 @@ namespace Microsoft.Boogie
     public static void ExpandLambdas(Program prog)
     {
       Contract.Requires(prog != null);
-      List<Expr /*!*/> /*!*/
-        axioms;
-      List<Function /*!*/> /*!*/
-        functions;
 
-      Desugar(prog, out axioms, out functions);
+      Desugar(prog, out var axioms, out var functions);
       foreach (var f in functions)
       {
         prog.AddTopLevelDeclaration(f);
@@ -87,7 +83,7 @@ namespace Microsoft.Boogie
 
       foreach (var a in axioms)
       {
-        prog.AddTopLevelDeclaration(new Axiom(a.tok, a));
+        prog.AddTopLevelDeclaration(a);
       }
     }
 
@@ -96,8 +92,8 @@ namespace Microsoft.Boogie
       private readonly Dictionary<Expr, FunctionCall> liftedLambdas =
         new Dictionary<Expr, FunctionCall>(new AlphaEquality());
 
-      internal List<Expr /*!*/> /*!*/
-        lambdaAxioms = new List<Expr /*!*/>();
+      internal List<Axiom /*!*/> /*!*/
+        lambdaAxioms = new List<Axiom /*!*/>();
 
       internal List<Function /*!*/> /*!*/
         lambdaFunctions = new List<Function /*!*/>();
@@ -113,7 +109,7 @@ namespace Microsoft.Boogie
 
       string FreshLambdaFunctionName()
       {
-        return string.Format("lambda#{0}", lambdaid++);
+        return $"lambda#{lambdaid++}";
       }
 
       public override Expr VisitLambdaExpr(LambdaExpr lambda)
@@ -199,7 +195,7 @@ namespace Microsoft.Boogie
         var formals = new List<Variable>();
         var callArgs = new List<Expr>();
         var axCallArgs = new List<Expr>();
-        var dummies = new List<Variable>(lambda.Dummies);
+        var dummies = new List<Variable>();
         var freeTypeVars = new List<TypeVariable>();
         var fnTypeVarActuals = new List<Type /*!*/>();
         var freshTypeVars = new List<TypeVariable>(); // these are only used in the lambda@n function's definition
@@ -242,17 +238,17 @@ namespace Microsoft.Boogie
             freshTypeVars.Add(new TypeVariable(tv.tok, tv.Name));
           }
         }
+        dummies.AddRange(lambda.Dummies);
 
         var sw = new System.IO.StringWriter();
         var wr = new TokenTextWriter(sw, true);
         lambda.Emit(wr);
         string lam_str = sw.ToString();
 
-        FunctionCall fcall;
         IToken tok = lambda.tok;
         Formal res = new Formal(tok, new TypedIdent(tok, TypedIdent.NoName, cce.NonNull(lambda.Type)), false);
 
-        if (liftedLambdas.TryGetValue(lambda, out fcall))
+        if (liftedLambdas.TryGetValue(lambda, out var fcall))
         {
           if (CommandLineOptions.Clo.TraceVerify)
           {
@@ -306,9 +302,10 @@ namespace Microsoft.Boogie
           Trigger trig = new Trigger(select.tok, true, new List<Expr> {select});
 
           lambdaFunctions.Add(fn);
-          lambdaAxioms.Add(new ForallExpr(tok, forallTypeVariables, dummies,
+          fn.DefinitionAxiom = new Axiom(tok, new ForallExpr(tok, forallTypeVariables, dummies,
             Substituter.Apply(Substituter.SubstitutionFromDictionary(subst), lambdaAttrs),
             trig, body));
+          lambdaAxioms.Add(fn.DefinitionAxiom);
         }
 
         NAryExpr call = new NAryExpr(tok, fcall, callArgs);
@@ -348,10 +345,12 @@ namespace Microsoft.Boogie
         oldFinder.Visit(lambda);
         var oldSubst = new Dictionary<Variable, Expr>();
         foreach (var v in oldFinder.FreeOldVars)
+        {
           if (v is GlobalVariable g)
           {
             oldSubst.Add(g, new OldExpr(g.tok, new IdentifierExpr(g.tok, g)) {Type = g.TypedIdent.Type});
           }
+        }
 
         var lambdaBody = Substituter.ApplyReplacingOldExprs(
           Substituter.SubstitutionFromDictionary(new Dictionary<Variable, Expr>()),

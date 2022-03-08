@@ -9,23 +9,22 @@ using System.Diagnostics.Contracts;
 
 namespace Microsoft.Boogie.SMTLib
 {
-  public class SMTLibProcess
+  public class SMTLibProcess : SMTLibSolver
   {
     readonly Process prover;
     readonly Inspector inspector;
     readonly SMTLibProverOptions options;
-    readonly Queue<string> proverOutput = new Queue<string>();
-    readonly Queue<string> proverErrors = new Queue<string>();
+    readonly Queue<string> proverOutput = new();
+    readonly Queue<string> proverErrors = new();
     readonly TextWriter toProver;
     readonly int smtProcessId;
     static int smtProcessIdSeq = 0;
     ConsoleCancelEventHandler cancelEvent;
-    public bool NeedsRestart;
 
-    public SMTLibProcess(SMTLibProverOptions options)
+    public SMTLibProcess(SMTLibOptions libOptions, SMTLibProverOptions options)
     {
       this.options = options;
-      this.smtProcessId = smtProcessIdSeq++;
+      smtProcessId = smtProcessIdSeq++;
 
       var psi = new ProcessStartInfo(options.ExecutablePath(), options.SolverArguments.Concat(" "))
       {
@@ -41,9 +40,9 @@ namespace Microsoft.Boogie.SMTLib
         this.inspector = new Inspector(options);
       }
 
-      if (cancelEvent == null && CommandLineOptions.Clo.RunningBoogieFromCommandLine)
+      if (libOptions.RunningBoogieFromCommandLine)
       {
-        cancelEvent = new ConsoleCancelEventHandler(ControlCHandler);
+        cancelEvent = ControlCHandler;
         Console.CancelKeyPress += cancelEvent;
       }
 
@@ -97,13 +96,16 @@ namespace Microsoft.Boogie.SMTLib
       }
     }
 
-    public void Send(string cmd)
+    public override void Send(string cmd)
     {
       if (options.Verbosity >= 2)
       {
         var log = cmd;
         if (log.Length > 50)
+        {
           log = log.Substring(0, 50) + "...";
+        }
+
         log = log.Replace("\r", "").Replace("\n", " ");
         Console.WriteLine("[SMT-INP-{0}] {1}", smtProcessId, log);
       }
@@ -111,43 +113,12 @@ namespace Microsoft.Boogie.SMTLib
       toProver.WriteLine(cmd);
     }
 
-    // this is less than perfect; (echo ...) would be better
-    public void Ping()
-    {
-      Send("(get-info :name)");
-    }
-
-    public bool IsPong(SExpr sx)
-    {
-      return sx != null && sx.Name == ":name";
-    }
-
-    public void PingPong()
-    {
-      Ping();
-      while (true)
-      {
-        var sx = GetProverResponse();
-        if (sx == null)
-        {
-          this.NeedsRestart = true;
-          HandleError("Prover died");
-          return;
-        }
-
-        if (IsPong(sx))
-          return;
-        else
-          HandleError("Invalid PING response from the prover: " + sx.ToString());
-      }
-    }
-
     internal Inspector Inspector
     {
       get { return inspector; }
     }
 
-    public SExpr GetProverResponse()
+    public override SExpr GetProverResponse()
     {
       toProver.Flush();
 
@@ -156,17 +127,24 @@ namespace Microsoft.Boogie.SMTLib
         var exprs = ParseSExprs(true).ToArray();
         Contract.Assert(exprs.Length <= 1);
         if (exprs.Length == 0)
+        {
           return null;
+        }
+
         var resp = exprs[0];
         if (resp.Name == "error")
         {
           if (resp.Arguments.Length == 1 && resp.Arguments[0].IsId)
+          {
             if (resp.Arguments[0].Name.Contains("max. resource limit exceeded"))
+            {
               return resp;
+            }
             else {
               HandleError(resp.Arguments[0].Name);
               return null;
             }
+          }
           else {
             HandleError(resp.ToString());
             return null;
@@ -183,13 +161,17 @@ namespace Microsoft.Boogie.SMTLib
               {
                 sb.Append("STATS LABELS");
                 foreach (var x in a.Arguments)
+                {
                   sb.Append(" ").Append(x.Name);
+                }
               }
               else if (a.Name.StartsWith(":"))
               {
                 sb.Append("STATS NAMED_VALUES ").Append(a.Name);
                 foreach (var x in a.Arguments)
+                {
                   sb.Append(" ").Append(x.Name);
+                }
               }
               else
               {
@@ -215,12 +197,17 @@ namespace Microsoft.Boogie.SMTLib
       }
     }
 
+    public override void NewProblem(string descriptiveName)
+    {
+      Inspector?.NewProblem(descriptiveName);
+    }
+
 
     // NOTE: this field is used by Corral.
     // https://github.com/boogie-org/corral/blob/master/source/Driver.cs
     public static System.TimeSpan TotalUserTime = System.TimeSpan.Zero;
 
-    public void Close()
+    public override void Close()
     {
       try
       {
@@ -238,15 +225,17 @@ namespace Microsoft.Boogie.SMTLib
       DisposeProver();
     }
 
-    public event Action<string> ErrorHandler;
+    public override event Action<string> ErrorHandler;
     int errorCnt;
 
-    private void HandleError(string msg)
+    protected override void HandleError(string msg)
     {
       if (options.Verbosity >= 2)
+      {
         Console.WriteLine("[SMT-ERR-{0}] Handling error: {1}", smtProcessId, msg);
-      if (ErrorHandler != null)
-        ErrorHandler(msg);
+      }
+
+      ErrorHandler?.Invoke(msg);
     }
 
     #region SExpr parsing
@@ -262,15 +251,21 @@ namespace Microsoft.Boogie.SMTLib
         {
           currLine = ReadProver();
           if (currLine == null)
+          {
             return '\0';
+          }
         }
 
 
         while (linePos < currLine.Length && char.IsWhiteSpace(currLine[linePos]))
+        {
           linePos++;
+        }
 
         if (linePos < currLine.Length && currLine[linePos] != ';')
+        {
           return currLine[linePos];
+        }
         else
         {
           currLine = null;
@@ -292,25 +287,40 @@ namespace Microsoft.Boogie.SMTLib
 
       var quoted = beg == '"' || beg == '|';
       if (quoted)
+      {
         Shift();
+      }
+
       while (true)
       {
         if (linePos >= currLine.Length)
         {
           if (quoted)
           {
-            sb.Append("\n");
-            currLine = ReadProver();
-            linePos = 0;
+            do
+            {
+              sb.Append("\n");
+              currLine = ReadProver();
+            } while (currLine == "");
             if (currLine == null)
+            {
               break;
+            }
+
+            linePos = 0;
           }
-          else break;
+          else
+          {
+            break;
+          }
         }
 
         var c = currLine[linePos++];
         if (quoted && c == beg)
+        {
           break;
+        }
+
         if (!quoted && (char.IsWhiteSpace(c) || c == '(' || c == ')'))
         {
           linePos--;
@@ -341,12 +351,17 @@ namespace Microsoft.Boogie.SMTLib
       {
         var c = SkipWs();
         if (c == '\0')
+        {
           break;
+        }
 
         if (c == ')')
         {
           if (top)
+          {
             ParseError("stray ')'");
+          }
+
           break;
         }
 
@@ -390,7 +405,10 @@ namespace Microsoft.Boogie.SMTLib
           yield return new SExpr(id);
         }
 
-        if (top) break;
+        if (top)
+        {
+          break;
+        }
       }
     }
 
@@ -470,7 +488,10 @@ namespace Microsoft.Boogie.SMTLib
         if (e.Data != null)
         {
           if (options.Verbosity >= 1)
+          {
             Console.WriteLine("[SMT-ERR-{0}] {1}", smtProcessId, e.Data);
+          }
+
           proverErrors.Enqueue(e.Data);
           Monitor.Pulse(this);
         }

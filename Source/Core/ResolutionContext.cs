@@ -148,8 +148,13 @@ namespace Microsoft.Boogie
       if (name.StartsWith("bv") && name.Length > 2)
       {
         for (int i = 2; i < name.Length; ++i)
+        {
           if (!char.IsDigit(name[i]))
+          {
             return false;
+          }
+        }
+
         Error(absy, "type name: {0} is registered for bitvectors", name);
         return true;
       }
@@ -165,7 +170,9 @@ namespace Microsoft.Boogie
 
       string name = td.Name;
       if (CheckBvNameClashes(td, name))
+      {
         return; // error has already been reported
+      }
 
       if (!types.ContainsKey(name))
       {
@@ -456,7 +463,9 @@ namespace Microsoft.Boogie
     {
       string axiomName = QKeyValue.FindStringAttribute(axiom.Attributes, "name");
       if (axiomName == null)
+      {
         return;
+      }
 
       if (!axioms.ContainsKey(axiomName))
       {
@@ -537,7 +546,7 @@ namespace Microsoft.Boogie
     /// If both "a" and "b" have an ":extern" attribute, returns either one.
     /// If one of "a" and "b" has an ":extern" attribute, returns that one.
     /// If neither of "a" and "b" has an ":extern" attribute, returns null.
-    /// If a non-value value is returned, this method also adds the ":ignore"
+    /// If a non-null value is returned, this method also adds the ":ignore"
     /// attribute to the declaration NOT returned.
     /// </summary>
     T SelectNonExtern<T>(T a, T b) where T : Declaration 

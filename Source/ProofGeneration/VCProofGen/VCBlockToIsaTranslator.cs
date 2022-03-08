@@ -37,7 +37,20 @@ namespace ProofGeneration.VCProofGen
             IDictionary<Block, DefDecl> blockToDefVC = new Dictionary<Block, DefDecl>();
 
             var vcExprIsaVisitor = new VCExprToIsaTranslator(uniqueNamer, blockToDefVC, blockToActiveVars);
+            
+            if (blockToVC.All(kv => kv.Value.Equals(VCExpressionGenerator.True)))
+            {
+              //trivial vc --> use just a single definition
+                var term = vcExprIsaVisitor.Translate(VCExpressionGenerator.True);
+                var def = new DefDecl(GetVCDefName(cfg.entry), new Tuple<IList<Term>, Term>(new List<Term>(), term));
+                foreach (var block in cfg.GetBlocksForwards())
+                {
+                  blockToDefVC.Add(block, def);
+                }
 
+                return blockToDefVC;
+            }
+            
             foreach (var block in cfg.GetBlocksBackwards())
             {
                 // might be more efficient to hand over this:

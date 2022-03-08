@@ -217,7 +217,9 @@ namespace Microsoft.Boogie
       for (int i = 0, n = declarationList.Count; i < n; i++)
       {
         if (!(declarationList[i] is Procedure))
+        {
           continue;
+        }
 
         declarationList[i] = cce.NonNull((Declaration) this.Visit(declarationList[i]));
       }
@@ -226,7 +228,9 @@ namespace Microsoft.Boogie
       for (int i = 0, n = declarationList.Count; i < n; i++)
       {
         if (declarationList[i] is Procedure)
+        {
           continue;
+        }
 
         declarationList[i] = cce.NonNull((Declaration) this.Visit(declarationList[i]));
       }
@@ -443,7 +447,9 @@ namespace Microsoft.Boogie
       {
         newProcedure = base.VisitProcedure((Procedure) node.Clone());
         if (OldToNewProcedureMap != null)
+        {
           OldToNewProcedureMap[node] = newProcedure;
+        }
       }
 
       return newProcedure;
@@ -684,8 +690,7 @@ namespace Microsoft.Boogie
           return map[v];
         }
 
-        Expr e;
-        if (nameMap != null && proc != null && nameMap.TryGetValue(UniqueName(v, proc), out e))
+        if (nameMap != null && proc != null && nameMap.TryGetValue(UniqueName(v, proc), out var e))
         {
           return e;
         }

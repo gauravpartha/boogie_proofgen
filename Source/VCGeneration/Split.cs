@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -7,6 +6,7 @@ using System.Threading;
 using Microsoft.Boogie;
 using Microsoft.Boogie.GraphUtil;
 using System.Diagnostics.Contracts;
+using System.IO;
 using Microsoft.BaseTypes;
 using Microsoft.Boogie.ProofGen;
 using Microsoft.Boogie.VCExprAST;
@@ -17,31 +17,33 @@ namespace VC
 {
   using Bpl = Microsoft.Boogie;
   using System.Threading.Tasks;
-  
-  class Split
-    {
+
+  public class Split
+  {
+      public int? RandomSeed => Implementation.RandomSeed ?? CommandLineOptions.Clo.RandomSeed;
+    
       class BlockStats
       {
-        public bool big_block;
+        public bool bigBlock;
         public int id;
-        public double assertion_cost;
-        public double assumption_cost; // before multiplier
-        public double incomming_paths;
+        public double assertionCost;
+        public double assumptionCost; // before multiplier
+        public double incomingPaths;
 
         public List<Block> /*!>!*/
-          virtual_successors = new List<Block>();
+          virtualSuccessors = new List<Block>();
 
         public List<Block> /*!>!*/
-          virtual_predecesors = new List<Block>();
+          virtualPredecessors = new List<Block>();
 
-        public HashSet<Block> reachable_blocks;
+        public HashSet<Block> reachableBlocks;
         public readonly Block block;
 
         [ContractInvariantMethod]
         void ObjectInvariant()
         {
-          Contract.Invariant(cce.NonNullElements(virtual_successors));
-          Contract.Invariant(cce.NonNullElements(virtual_predecesors));
+          Contract.Invariant(cce.NonNullElements(virtualSuccessors));
+          Contract.Invariant(cce.NonNullElements(virtualPredecessors));
           Contract.Invariant(block != null);
         }
 
@@ -50,7 +52,7 @@ namespace VC
         {
           Contract.Requires(b != null);
           block = b;
-          assertion_cost = -1;
+          assertionCost = -1;
           id = i;
         }
       }
@@ -59,37 +61,37 @@ namespace VC
       void ObjectInvariant()
       {
         Contract.Invariant(cce.NonNullElements(blocks));
-        Contract.Invariant(cce.NonNullElements(big_blocks));
+        Contract.Invariant(cce.NonNullElements(bigBlocks));
         Contract.Invariant(cce.NonNullDictionaryAndValues(stats));
-        Contract.Invariant(cce.NonNullElements(assumized_branches));
+        Contract.Invariant(cce.NonNullElements(assumizedBranches));
         Contract.Invariant(gotoCmdOrigins != null);
         Contract.Invariant(parent != null);
-        Contract.Invariant(impl != null);
+        Contract.Invariant(Implementation != null);
         Contract.Invariant(copies != null);
-        Contract.Invariant(cce.NonNull(protected_from_assert_to_assume));
-        Contract.Invariant(cce.NonNull(keep_at_all));
+        Contract.Invariant(cce.NonNull(protectedFromAssertToAssume));
+        Contract.Invariant(cce.NonNull(keepAtAll));
       }
 
 
-      readonly List<Block> blocks;
-      readonly List<Block> big_blocks = new List<Block>();
+      private readonly List<Block> blocks;
+      public readonly IReadOnlyList<Declaration> TopLevelDeclarations;
+      readonly List<Block> bigBlocks = new();
 
       readonly Dictionary<Block /*!*/, BlockStats /*!*/> /*!*/
         stats = new Dictionary<Block /*!*/, BlockStats /*!*/>();
 
-      readonly int id;
-      static int current_id = -1;
-      Block split_block;
-      bool assert_to_assume;
+      static int currentId = -1;
+      Block splitBlock;
+      bool assertToAssume;
 
       List<Block /*!*/> /*!*/
-        assumized_branches = new List<Block /*!*/>();
+        assumizedBranches = new List<Block /*!*/>();
 
       double score;
-      bool score_computed;
-      double total_cost;
-      int assertion_count;
-      double assertion_cost; // without multiplication by paths
+      bool scoreComputed;
+      double totalCost;
+      int assertionCount;
+      double assertionCost; // without multiplication by paths
 
       Dictionary<TransferCmd, ReturnCmd> /*!*/
         gotoCmdOrigins;
@@ -97,40 +99,61 @@ namespace VC
       readonly public VCGen /*!*/
         parent;
 
-      Implementation /*!*/
-        impl;
+      public Implementation /*!*/ Implementation { get; private set; }
 
       Dictionary<Block /*!*/, Block /*!*/> /*!*/
         copies = new Dictionary<Block /*!*/, Block /*!*/>();
 
-      bool doing_slice;
-      double slice_initial_limit;
-      double slice_limit;
-      bool slice_pos;
+      bool doingSlice;
+      double sliceInitialLimit;
+      double sliceLimit;
+      bool slicePos;
 
       HashSet<Block /*!*/> /*!*/
-        protected_from_assert_to_assume = new HashSet<Block /*!*/>();
+        protectedFromAssertToAssume = new HashSet<Block /*!*/>();
 
       HashSet<Block /*!*/> /*!*/
-        keep_at_all = new HashSet<Block /*!*/>();
+        keepAtAll = new HashSet<Block /*!*/>();
 
       // async interface
       private Checker checker;
-      private int splitNo;
+      private int splitNum;
       internal VCGen.ErrorReporter reporter;
 
       public Split(List<Block /*!*/> /*!*/ blocks, Dictionary<TransferCmd, ReturnCmd> /*!*/ gotoCmdOrigins,
-        VCGen /*!*/ par, Implementation /*!*/ impl)
+        VCGen /*!*/ par, Implementation /*!*/ implementation)
       {
         Contract.Requires(cce.NonNullElements(blocks));
         Contract.Requires(gotoCmdOrigins != null);
         Contract.Requires(par != null);
-        Contract.Requires(impl != null);
+        Contract.Requires(implementation != null);
         this.blocks = blocks;
         this.gotoCmdOrigins = gotoCmdOrigins;
         this.parent = par;
-        this.impl = impl;
-        this.id = Interlocked.Increment(ref current_id);
+        this.Implementation = implementation;
+        Interlocked.Increment(ref currentId);
+
+        TopLevelDeclarations = par.program.TopLevelDeclarations;
+        PrintTopLevelDeclarationsForPruning(par.program, implementation, "before");        
+        TopLevelDeclarations = Prune.GetLiveDeclarations(par.program, blocks).ToList();
+        PrintTopLevelDeclarationsForPruning(par.program, implementation, "after");
+      }
+
+      private void PrintTopLevelDeclarationsForPruning(Program program, Implementation implementation, string suffix)
+      {
+        if (!CommandLineOptions.Clo.Prune || CommandLineOptions.Clo.PrintPrunedFile == null)
+        {
+          return;
+        }
+
+        using var writer = new TokenTextWriter(
+          $"{CommandLineOptions.Clo.PrintPrunedFile}-{suffix}-{Util.EscapeFilename(implementation.Name)}", false,
+          CommandLineOptions.Clo.PrettyPrint);
+        foreach (var declaration in TopLevelDeclarations ?? program.TopLevelDeclarations) {
+          declaration.Emit(writer, 0);
+        }
+
+        writer.Close();
       }
 
       public double Cost
@@ -138,7 +161,7 @@ namespace VC
         get
         {
           ComputeBestSplit();
-          return total_cost;
+          return totalCost;
         }
       }
 
@@ -147,7 +170,7 @@ namespace VC
         get
         {
           ComputeBestSplit();
-          return assertion_count == 1 && score < 0;
+          return assertionCount == 1 && score < 0;
         }
       }
 
@@ -156,28 +179,28 @@ namespace VC
         get
         {
           ComputeBestSplit();
-          return string.Format("(cost:{0:0}/{1:0}{2})", total_cost, assertion_cost, LastChance ? " last" : "");
+          return $"(cost:{totalCost:0}/{assertionCost:0}{(LastChance ? " last" : "")})";
         }
       }
 
-      public void DumpDot(int no)
+      public void DumpDot(int splitNum)
       {
-        using (System.IO.StreamWriter sw = System.IO.File.CreateText(string.Format("split.{0}.dot", no)))
+        using (System.IO.StreamWriter sw = System.IO.File.CreateText($"{Implementation.Name}.split.{splitNum}.dot"))
         {
           sw.WriteLine("digraph G {");
 
           ComputeBestSplit();
-          List<Block> saved = assumized_branches;
+          List<Block> saved = assumizedBranches;
           Contract.Assert(saved != null);
-          assumized_branches = new List<Block>();
+          assumizedBranches = new List<Block>();
           DoComputeScore(false);
-          assumized_branches = saved;
+          assumizedBranches = saved;
 
-          foreach (Block b in big_blocks)
+          foreach (Block b in bigBlocks)
           {
             Contract.Assert(b != null);
             BlockStats s = GetBlockStats(b);
-            foreach (Block t in s.virtual_successors)
+            foreach (Block t in s.virtualSuccessors)
             {
               Contract.Assert(t != null);
               sw.WriteLine("n{0} -> n{1};", s.id, GetBlockStats(t).id);
@@ -185,26 +208,26 @@ namespace VC
 
             sw.WriteLine("n{0} [label=\"{1}:\\n({2:0.0}+{3:0.0})*{4:0.0}\"{5}];",
               s.id, b.Label,
-              s.assertion_cost, s.assumption_cost, s.incomming_paths,
-              s.assertion_cost > 0 ? ",shape=box" : "");
+              s.assertionCost, s.assumptionCost, s.incomingPaths,
+              s.assertionCost > 0 ? ",shape=box" : "");
           }
 
           sw.WriteLine("}");
           sw.Close();
         }
 
-        string filename = string.Format("split.{0}.bpl", no);
+        string filename = string.Format("{0}.split.{1}.bpl", Implementation.Name, splitNum);
         using (System.IO.StreamWriter sw = System.IO.File.CreateText(filename))
         {
           int oldPrintUnstructured = CommandLineOptions.Clo.PrintUnstructured;
           CommandLineOptions.Clo.PrintUnstructured = 2; // print only the unstructured program
           bool oldPrintDesugaringSetting = CommandLineOptions.Clo.PrintDesugarings;
           CommandLineOptions.Clo.PrintDesugarings = false;
-          List<Block> backup = impl.Blocks;
+          List<Block> backup = Implementation.Blocks;
           Contract.Assert(backup != null);
-          impl.Blocks = blocks;
-          impl.Emit(new TokenTextWriter(filename, sw, /*setTokens=*/ false, /*pretty=*/ false), 0);
-          impl.Blocks = backup;
+          Implementation.Blocks = blocks;
+          Implementation.Emit(new TokenTextWriter(filename, sw, /*setTokens=*/ false, /*pretty=*/ false), 0);
+          Implementation.Blocks = backup;
           CommandLineOptions.Clo.PrintDesugarings = oldPrintDesugaringSetting;
           CommandLineOptions.Clo.PrintUnstructured = oldPrintUnstructured;
         }
@@ -217,8 +240,7 @@ namespace VC
         Contract.Requires(b != null);
         Contract.Ensures(Contract.Result<BlockStats>() != null);
 
-        BlockStats s;
-        if (!stats.TryGetValue(b, out s))
+        if (!stats.TryGetValue(b, out var s))
         {
           s = new BlockStats(b, bsid++);
           stats[b] = s;
@@ -236,43 +258,49 @@ namespace VC
       {
         Contract.Requires(b != null);
         BlockStats s = GetBlockStats(b);
-        if (s.assertion_cost >= 0)
+        if (s.assertionCost >= 0)
+        {
           return; // already done
-        s.big_block = true;
-        s.assertion_cost = 0;
-        s.assumption_cost = 0;
+        }
+
+        s.bigBlock = true;
+        s.assertionCost = 0;
+        s.assumptionCost = 0;
         foreach (Cmd c in b.Cmds)
         {
           if (c is AssertCmd)
           {
             double cost = AssertionCost((AssertCmd) c);
-            s.assertion_cost += cost;
-            assertion_count++;
-            assertion_cost += cost;
+            s.assertionCost += cost;
+            assertionCount++;
+            assertionCost += cost;
           }
           else if (c is AssumeCmd)
           {
-            s.assumption_cost += AssertionCost((AssumeCmd) c);
+            s.assumptionCost += AssertionCost((AssumeCmd) c);
           }
         }
 
         foreach (Block c in b.Exits())
         {
           Contract.Assert(c != null);
-          s.virtual_successors.Add(c);
+          s.virtualSuccessors.Add(c);
         }
 
-        if (s.virtual_successors.Count == 1)
+        if (s.virtualSuccessors.Count == 1)
         {
-          Block next = s.virtual_successors[0];
+          Block next = s.virtualSuccessors[0];
           BlockStats se = GetBlockStats(next);
           CountAssertions(next);
-          if (next.Predecessors.Count > 1 || se.virtual_successors.Count != 1)
+          if (next.Predecessors.Count > 1 || se.virtualSuccessors.Count != 1)
+          {
             return;
-          s.virtual_successors[0] = se.virtual_successors[0];
-          s.assertion_cost += se.assertion_cost;
-          s.assumption_cost += se.assumption_cost;
-          se.big_block = false;
+          }
+
+          s.virtualSuccessors[0] = se.virtualSuccessors[0];
+          s.assertionCost += se.assertionCost;
+          s.assumptionCost += se.assumptionCost;
+          se.bigBlock = false;
         }
       }
 
@@ -281,13 +309,13 @@ namespace VC
         Contract.Requires(b != null);
         Contract.Ensures(cce.NonNull(Contract.Result<HashSet<Block /*!*/>>()));
         BlockStats s = GetBlockStats(b);
-        if (s.reachable_blocks != null)
+        if (s.reachableBlocks != null)
         {
-          return s.reachable_blocks;
+          return s.reachableBlocks;
         }
 
         HashSet<Block /*!*/> blocks = new HashSet<Block /*!*/>();
-        s.reachable_blocks = blocks;
+        s.reachableBlocks = blocks;
         blocks.Add(b);
         foreach (Block /*!*/ succ in b.Exits())
         {
@@ -302,18 +330,21 @@ namespace VC
         return blocks;
       }
 
-      double ProverCost(double vc_cost)
+      double ProverCost(double vcCost)
       {
-        return vc_cost * vc_cost;
+        return vcCost * vcCost;
       }
 
       void ComputeBestSplit()
       {
-        if (score_computed)
+        if (scoreComputed)
+        {
           return;
-        score_computed = true;
+        }
 
-        assertion_count = 0;
+        scoreComputed = true;
+
+        assertionCount = 0;
 
         foreach (Block b in blocks)
         {
@@ -325,14 +356,14 @@ namespace VC
         {
           Contract.Assert(b != null);
           BlockStats bs = GetBlockStats(b);
-          if (bs.big_block)
+          if (bs.bigBlock)
           {
-            big_blocks.Add(b);
-            foreach (Block ch in bs.virtual_successors)
+            bigBlocks.Add(b);
+            foreach (Block ch in bs.virtualSuccessors)
             {
               Contract.Assert(ch != null);
               BlockStats chs = GetBlockStats(ch);
-              if (!chs.big_block)
+              if (!chs.bigBlock)
               {
                 Console.WriteLine("non-big {0} accessed from {1}", ch, b);
                 DumpDot(-1);
@@ -340,212 +371,229 @@ namespace VC
                 throw new cce.UnreachableException();
               }
 
-              chs.virtual_predecesors.Add(b);
+              chs.virtualPredecessors.Add(b);
             }
           }
         }
 
-        assumized_branches.Clear();
-        total_cost = ProverCost(DoComputeScore(false));
+        assumizedBranches.Clear();
+        totalCost = ProverCost(DoComputeScore(false));
 
         score = double.PositiveInfinity;
-        Block best_split = null;
-        List<Block> saved_branches = new List<Block>();
+        Block bestSplit = null;
+        List<Block> savedBranches = new List<Block>();
 
-        foreach (Block b in big_blocks)
+        foreach (Block b in bigBlocks)
         {
           Contract.Assert(b != null);
           GotoCmd gt = b.TransferCmd as GotoCmd;
           if (gt == null)
+          {
             continue;
+          }
+
           List<Block> targ = cce.NonNull(gt.labelTargets);
           if (targ.Count < 2)
+          {
             continue;
+          }
           // caution, we only consider two first exits
 
           double left0, right0, left1, right1;
-          split_block = b;
+          splitBlock = b;
 
-          assumized_branches.Clear();
-          assumized_branches.Add(cce.NonNull(targ[0]));
+          assumizedBranches.Clear();
+          assumizedBranches.Add(cce.NonNull(targ[0]));
           left0 = DoComputeScore(true);
           right0 = DoComputeScore(false);
 
-          assumized_branches.Clear();
+          assumizedBranches.Clear();
           for (int idx = 1; idx < targ.Count; idx++)
           {
-            assumized_branches.Add(cce.NonNull(targ[idx]));
+            assumizedBranches.Add(cce.NonNull(targ[idx]));
           }
 
           left1 = DoComputeScore(true);
           right1 = DoComputeScore(false);
 
-          double current_score = ProverCost(left1) + ProverCost(right1);
-          double other_score = ProverCost(left0) + ProverCost(right0);
+          double currentScore = ProverCost(left1) + ProverCost(right1);
+          double otherScore = ProverCost(left0) + ProverCost(right0);
 
-          if (other_score < current_score)
+          if (otherScore < currentScore)
           {
-            current_score = other_score;
-            assumized_branches.Clear();
-            assumized_branches.Add(cce.NonNull(targ[0]));
+            currentScore = otherScore;
+            assumizedBranches.Clear();
+            assumizedBranches.Add(cce.NonNull(targ[0]));
           }
 
-          if (current_score < score)
+          if (currentScore < score)
           {
-            score = current_score;
-            best_split = split_block;
-            saved_branches.Clear();
-            saved_branches.AddRange(assumized_branches);
+            score = currentScore;
+            bestSplit = splitBlock;
+            savedBranches.Clear();
+            savedBranches.AddRange(assumizedBranches);
           }
         }
 
-        if (CommandLineOptions.Clo.VcsPathSplitMult * score > total_cost)
+        if (CommandLineOptions.Clo.VcsPathSplitMult * score > totalCost)
         {
-          split_block = null;
+          splitBlock = null;
           score = -1;
         }
         else
         {
-          assumized_branches = saved_branches;
-          split_block = best_split;
+          assumizedBranches = savedBranches;
+          splitBlock = bestSplit;
         }
       }
 
       void UpdateIncommingPaths(BlockStats s)
       {
         Contract.Requires(s != null);
-        if (s.incomming_paths < 0.0)
+        if (s.incomingPaths < 0.0)
         {
           int count = 0;
-          s.incomming_paths = 0.0;
-          if (!keep_at_all.Contains(s.block))
+          s.incomingPaths = 0.0;
+          if (!keepAtAll.Contains(s.block))
+          {
             return;
-          foreach (Block b in s.virtual_predecesors)
+          }
+
+          foreach (Block b in s.virtualPredecessors)
           {
             Contract.Assert(b != null);
             BlockStats ch = GetBlockStats(b);
             Contract.Assert(ch != null);
             UpdateIncommingPaths(ch);
-            if (ch.incomming_paths > 0.0)
+            if (ch.incomingPaths > 0.0)
             {
-              s.incomming_paths += ch.incomming_paths;
+              s.incomingPaths += ch.incomingPaths;
               count++;
             }
           }
 
           if (count > 1)
           {
-            s.incomming_paths *= CommandLineOptions.Clo.VcsPathJoinMult;
+            s.incomingPaths *= CommandLineOptions.Clo.VcsPathJoinMult;
           }
         }
       }
 
-      void ComputeBlockSetsHelper(Block b, bool allow_small)
+      void ComputeBlockSetsHelper(Block b, bool allowSmall)
       {
         Contract.Requires(b != null);
-        if (keep_at_all.Contains(b))
+        if (keepAtAll.Contains(b))
+        {
           return;
-        keep_at_all.Add(b);
+        }
 
-        if (allow_small)
+        keepAtAll.Add(b);
+
+        if (allowSmall)
         {
           foreach (Block ch in b.Exits())
           {
             Contract.Assert(ch != null);
-            if (b == split_block && assumized_branches.Contains(ch))
+            if (b == splitBlock && assumizedBranches.Contains(ch))
+            {
               continue;
-            ComputeBlockSetsHelper(ch, allow_small);
+            }
+
+            ComputeBlockSetsHelper(ch, allowSmall);
           }
         }
         else
         {
-          foreach (Block ch in GetBlockStats(b).virtual_successors)
+          foreach (Block ch in GetBlockStats(b).virtualSuccessors)
           {
             Contract.Assert(ch != null);
-            if (b == split_block && assumized_branches.Contains(ch))
+            if (b == splitBlock && assumizedBranches.Contains(ch))
+            {
               continue;
-            ComputeBlockSetsHelper(ch, allow_small);
+            }
+
+            ComputeBlockSetsHelper(ch, allowSmall);
           }
         }
       }
 
-      void ComputeBlockSets(bool allow_small)
+      void ComputeBlockSets(bool allowSmall)
       {
-        protected_from_assert_to_assume.Clear();
-        keep_at_all.Clear();
+        protectedFromAssertToAssume.Clear();
+        keepAtAll.Clear();
 
-        Debug.Assert(split_block == null || GetBlockStats(split_block).big_block);
-        Debug.Assert(GetBlockStats(blocks[0]).big_block);
+        Debug.Assert(splitBlock == null || GetBlockStats(splitBlock).bigBlock);
+        Debug.Assert(GetBlockStats(blocks[0]).bigBlock);
 
-        if (assert_to_assume)
+        if (assertToAssume)
         {
-          foreach (Block b in allow_small ? blocks : big_blocks)
+          foreach (Block b in allowSmall ? blocks : bigBlocks)
           {
             Contract.Assert(b != null);
-            if (ComputeReachableNodes(b).Contains(cce.NonNull(split_block)))
+            if (ComputeReachableNodes(b).Contains(cce.NonNull(splitBlock)))
             {
-              keep_at_all.Add(b);
+              keepAtAll.Add(b);
             }
           }
 
-          foreach (Block b in assumized_branches)
+          foreach (Block b in assumizedBranches)
           {
             Contract.Assert(b != null);
             foreach (Block r in ComputeReachableNodes(b))
             {
               Contract.Assert(r != null);
-              if (allow_small || GetBlockStats(r).big_block)
+              if (allowSmall || GetBlockStats(r).bigBlock)
               {
-                keep_at_all.Add(r);
-                protected_from_assert_to_assume.Add(r);
+                keepAtAll.Add(r);
+                protectedFromAssertToAssume.Add(r);
               }
             }
           }
         }
         else
         {
-          ComputeBlockSetsHelper(blocks[0], allow_small);
+          ComputeBlockSetsHelper(blocks[0], allowSmall);
         }
       }
 
       bool ShouldAssumize(Block b)
       {
         Contract.Requires(b != null);
-        return assert_to_assume && !protected_from_assert_to_assume.Contains(b);
+        return assertToAssume && !protectedFromAssertToAssume.Contains(b);
       }
 
       double DoComputeScore(bool aa)
       {
-        assert_to_assume = aa;
+        assertToAssume = aa;
         ComputeBlockSets(false);
 
-        foreach (Block b in big_blocks)
+        foreach (Block b in bigBlocks)
         {
           Contract.Assert(b != null);
-          GetBlockStats(b).incomming_paths = -1.0;
+          GetBlockStats(b).incomingPaths = -1.0;
         }
 
-        GetBlockStats(blocks[0]).incomming_paths = 1.0;
+        GetBlockStats(blocks[0]).incomingPaths = 1.0;
 
         double cost = 0.0;
-        foreach (Block b in big_blocks)
+        foreach (Block b in bigBlocks)
         {
           Contract.Assert(b != null);
-          if (keep_at_all.Contains(b))
+          if (keepAtAll.Contains(b))
           {
             BlockStats s = GetBlockStats(b);
             UpdateIncommingPaths(s);
-            double local = s.assertion_cost;
+            double local = s.assertionCost;
             if (ShouldAssumize(b))
             {
-              local = (s.assertion_cost + s.assumption_cost) * CommandLineOptions.Clo.VcsAssumeMult;
+              local = (s.assertionCost + s.assumptionCost) * CommandLineOptions.Clo.VcsAssumeMult;
             }
             else
             {
-              local = s.assumption_cost * CommandLineOptions.Clo.VcsAssumeMult + s.assertion_cost;
+              local = s.assumptionCost * CommandLineOptions.Clo.VcsAssumeMult + s.assertionCost;
             }
 
-            local = local + local * s.incomming_paths * CommandLineOptions.Clo.VcsPathCostMult;
+            local = local + local * s.incomingPaths * CommandLineOptions.Clo.VcsPathCostMult;
             cost += local;
           }
         }
@@ -560,25 +608,28 @@ namespace VC
 
         List<Cmd> seq = b.Cmds;
         Contract.Assert(seq != null);
-        if (!doing_slice && !ShouldAssumize(b))
+        if (!doingSlice && !ShouldAssumize(b))
+        {
           return seq;
+        }
+
         List<Cmd> res = new List<Cmd>();
         foreach (Cmd c in seq)
         {
           Contract.Assert(c != null);
           AssertCmd a = c as AssertCmd;
-          Cmd the_new = c;
+          Cmd theNewCmd = c;
           bool swap = false;
           if (a != null)
           {
-            if (doing_slice)
+            if (doingSlice)
             {
               double cost = AssertionCost(a);
-              bool first = (slice_limit - cost) >= 0 || slice_initial_limit == slice_limit;
-              slice_limit -= cost;
-              swap = slice_pos == first;
+              bool first = (sliceLimit - cost) >= 0 || sliceInitialLimit == sliceLimit;
+              sliceLimit -= cost;
+              swap = slicePos == first;
             }
-            else if (assert_to_assume)
+            else if (assertToAssume)
             {
               swap = true;
             }
@@ -590,11 +641,11 @@ namespace VC
 
             if (swap)
             {
-              the_new = VCGen.AssertTurnedIntoAssume(a);
+              theNewCmd = VCGen.AssertTurnedIntoAssume(a);
             }
           }
 
-          res.Add(the_new);
+          res.Add(theNewCmd);
         }
 
         return res;
@@ -605,8 +656,7 @@ namespace VC
         Contract.Requires(b != null);
         Contract.Ensures(Contract.Result<Block>() != null);
 
-        Block res;
-        if (copies.TryGetValue(b, out res))
+        if (copies.TryGetValue(b, out var res))
         {
           return cce.NonNull(res);
         }
@@ -622,11 +672,11 @@ namespace VC
           foreach (Block ch in cce.NonNull(gt.labelTargets))
           {
             Contract.Assert(ch != null);
-            Contract.Assert(doing_slice ||
-                            (assert_to_assume || (keep_at_all.Contains(ch) || assumized_branches.Contains(ch))));
-            if (doing_slice ||
-                ((b != split_block || assumized_branches.Contains(ch) == assert_to_assume) &&
-                 keep_at_all.Contains(ch)))
+            Contract.Assert(doingSlice ||
+                            (assertToAssume || (keepAtAll.Contains(ch) || assumizedBranches.Contains(ch))));
+            if (doingSlice ||
+                ((b != splitBlock || assumizedBranches.Contains(ch) == assertToAssume) &&
+                 keepAtAll.Contains(ch)))
             {
               newGoto.AddTarget(CloneBlock(ch));
             }
@@ -649,8 +699,7 @@ namespace VC
         foreach (Block b in blocks)
         {
           Contract.Assert(b != null);
-          Block tmp;
-          if (copies.TryGetValue(b, out tmp))
+          if (copies.TryGetValue(b, out var tmp))
           {
             newBlocks.Add(cce.NonNull(tmp));
             if (gotoCmdOrigins.ContainsKey(b.TransferCmd))
@@ -661,8 +710,7 @@ namespace VC
             foreach (Block p in b.Predecessors)
             {
               Contract.Assert(p != null);
-              Block tmp2;
-              if (copies.TryGetValue(p, out tmp2))
+              if (copies.TryGetValue(p, out var tmp2))
               {
                 tmp.Predecessors.Add(tmp2);
               }
@@ -670,15 +718,15 @@ namespace VC
           }
         }
 
-        return new Split(newBlocks, newGotoCmdOrigins, parent, impl);
+        return new Split(newBlocks, newGotoCmdOrigins, parent, Implementation);
       }
 
       Split SplitAt(int idx)
       {
         Contract.Ensures(Contract.Result<Split>() != null);
 
-        assert_to_assume = idx == 0;
-        doing_slice = false;
+        assertToAssume = idx == 0;
+        doingSlice = false;
         ComputeBlockSets(true);
 
         return DoSplit();
@@ -688,10 +736,10 @@ namespace VC
       {
         Contract.Ensures(Contract.Result<Split>() != null);
 
-        slice_pos = pos;
-        slice_limit = limit;
-        slice_initial_limit = limit;
-        doing_slice = true;
+        slicePos = pos;
+        sliceLimit = limit;
+        sliceInitialLimit = limit;
+        doingSlice = true;
         Split r = DoSplit();
         /*
         Console.WriteLine("split {0} / {1} -->", limit, pos);
@@ -706,11 +754,11 @@ namespace VC
 
       void Print()
       {
-        List<Block> tmp = impl.Blocks;
+        List<Block> tmp = Implementation.Blocks;
         Contract.Assert(tmp != null);
-        impl.Blocks = blocks;
-        ConditionGeneration.EmitImpl(impl, false);
-        impl.Blocks = tmp;
+        Implementation.Blocks = blocks;
+        ConditionGeneration.EmitImpl(Implementation, false);
+        Implementation.Blocks = tmp;
       }
 
       public Counterexample ToCounterexample(ProverContext context)
@@ -742,115 +790,89 @@ namespace VC
         throw new cce.UnreachableException();
       }
 
-      /// <summary>
-      /// Starting from the 0-index "split_here" annotation in begin, verifies until it reaches a subsequent "split_here" annotation
-      /// Returns a list of blocks where all code not verified has asserts converted into assumes
-      /// </summary>
-      /// <param name="blocks">Implementation's collection of blocks</param>
-      /// <param name="begin">Block containing the first split_here from which to start verifying</param>
-      /// <param name="begin_split_id">0-based ID of the "split_here" annotation within begin at which to start verifying</param>
-      /// <param name="blockInternalSplit">True if the entire split is contained within block begin</param>
-      /// <param name="endPoints">Set of all blocks containing a "split_here" annotation</param>
-      /// <returns></returns>
-      // Note: Current implementation may over report errors.
-      //       For example, if the control flow graph is a diamond (e.g., A -> B, C, B->D, C->D),
-      //       and there is a split in B and an error in D, then D will be verified twice and hence report the error twice.
-      //       Best solution may be to memoize blocks that have been fully verified and be sure not to verify them again
-      private static List<Block> DoManualSplit(List<Block> blocks, Block begin, int begin_split_id,
-        bool blockInternalSplit, IEnumerable<Block> endPoints)
+      private static void PrintSet<T> (HashSet<T> s) {
+        foreach(T i in s)
+        {
+          Console.WriteLine(i);
+        }
+      }
+
+      // Verify b with the last split in blockAssignments[b]
+      private static Dictionary<Block, Block> PickBlocksToVerify (List<Block> blocks, Dictionary<Block, int> splitPoints)
       {
-        // Compute the set of blocks reachable from begin but not included in endPoints.  These will be verified in their entirety.
-        var blocksToVerifyEntirely = new HashSet<Block>();
-        var reachableEndPoints =
-          new HashSet<Block>(); // Reachable end points will be verified up to their first split point
         var todo = new Stack<Block>();
-        todo.Push(begin);
-        while (todo.Count > 0)
+        var blockAssignments = new Dictionary<Block, Block>();
+        var immediateDominator = (Program.GraphFromBlocks(blocks)).ImmediateDominator();
+        todo.Push(blocks[0]);
+        while(todo.Count > 0)
         {
           var currentBlock = todo.Pop();
-          if (blocksToVerifyEntirely.Contains(currentBlock)) continue;
-          blocksToVerifyEntirely.Add(currentBlock);
-          var exit = currentBlock.TransferCmd as GotoCmd;
-          if (exit != null)
-            foreach (Block targetBlock in exit.labelTargets)
-            {
-              if (!endPoints.Contains(targetBlock))
-              {
-                todo.Push(targetBlock);
-              }
-              else
-              {
-                reachableEndPoints.Add(targetBlock);
-              }
-            }
+          if (blockAssignments.Keys.Contains(currentBlock))
+          {
+            continue;
+          }
+          else if (immediateDominator[currentBlock] == currentBlock) // if the currentBlock doesn't have a predecessor.
+          {
+            blockAssignments[currentBlock] = currentBlock;
+          }
+          else if (splitPoints.Keys.Contains(immediateDominator[currentBlock])) // if the currentBlock's dominator has a split then it will be associated with that split
+          {
+            blockAssignments[currentBlock] = immediateDominator[currentBlock];
+          }
+          else
+          {
+            Contract.Assert(blockAssignments.Keys.Contains(immediateDominator[currentBlock]));
+            blockAssignments[currentBlock] = blockAssignments[immediateDominator[currentBlock]];
+          }
+          if (currentBlock.TransferCmd is GotoCmd exit)
+          {
+            exit.labelTargets.ForEach(blk => todo.Push(blk));
+          }
         }
-
-        blocksToVerifyEntirely.Remove(begin);
-
-        // Convert assumes to asserts in "unreachable" blocks, including portions of blocks containing "split_here"
+        return blockAssignments;
+      }
+      private static List<Block> DoPreAssignedManualSplit(List<Block> blocks, Dictionary<Block, Block> blockAssignments, int splitNumberWithinBlock,
+        Block containingBlock, bool lastSplitInBlock, bool splitOnEveryAssert)
+      {
         var newBlocks = new List<Block>(blocks.Count()); // Copies of the original blocks
         var duplicator = new Duplicator();
-        var oldToNewBlockMap =
-          new Dictionary<Block, Block>(blocks.Count()); // Maps original blocks to their new copies in newBlocks
-
+        var oldToNewBlockMap = new Dictionary<Block, Block>(blocks.Count()); // Maps original blocks to their new copies in newBlocks
         foreach (var currentBlock in blocks)
         {
-          var newBlock = (Block) duplicator.VisitBlock(currentBlock);
+          var newBlock = (Block)duplicator.VisitBlock(currentBlock);
           oldToNewBlockMap[currentBlock] = newBlock;
           newBlocks.Add(newBlock);
-
-          if (!blockInternalSplit && blocksToVerifyEntirely.Contains(currentBlock))
-            continue; // All reachable blocks must be checked in their entirety, so don't change anything
-          // Otherwise, we only verify a portion of the current block, so we'll need to look at each of its commands                 
-
-          // !verify -> convert assert to assume
-          var verify =
-            (currentBlock == begin &&
-             begin_split_id == -1
-            ) // -1 tells us to start verifying from the very beginning (i.e., there is no split in the begin block)
-            || (
-              reachableEndPoints
-                .Contains(currentBlock) // This endpoint is reachable from begin, so we verify until we hit the first split point
-              && !blockInternalSplit); // Don't bother verifying if all of the splitting is within the begin block
-          var newCmds = new List<Cmd>();
-          var split_here_count = 0;
-
-          foreach (Cmd c in currentBlock.Cmds)
+          if (currentBlock == containingBlock)
           {
-            var p = c as PredicateCmd;
-            if (p != null && QKeyValue.FindBoolAttribute(p.Attributes, "split_here"))
+            var newCmds = new List<Cmd>();
+            var splitCount = -1;
+            var verify = splitCount == splitNumberWithinBlock;
+            foreach (Cmd c in currentBlock.Cmds)
             {
-              if (currentBlock == begin)
+              if (ShouldSplitHere(c, splitOnEveryAssert))
               {
-                // Verify everything between the begin_split_id we were given and the next split
-                if (split_here_count == begin_split_id)
-                {
-                  verify = true;
-                }
-                else if (split_here_count == begin_split_id + 1)
-                {
-                  verify = false;
-                }
+                splitCount++;
+                verify = splitCount == splitNumberWithinBlock;
               }
-              else
-              {
-                // We're in an endPoint so we stop verifying as soon as we hit a "split_here"
-                verify = false;
-              }
-
-              split_here_count++;
+              newCmds.Add(verify ? c : Split.AssertIntoAssume(c));
             }
-
-            var asrt = c as AssertCmd;
-            if (verify || asrt == null)
-              newCmds.Add(c);
-            else
-              newCmds.Add(VCGen.AssertTurnedIntoAssume(asrt));
+            newBlock.Cmds = newCmds;
           }
-
-          newBlock.Cmds = newCmds;
+          else if (lastSplitInBlock && blockAssignments[currentBlock] == containingBlock)
+          {
+            var verify = true;
+            var newCmds = new List<Cmd>();
+            foreach(Cmd c in currentBlock.Cmds) {
+              verify = ShouldSplitHere(c, splitOnEveryAssert) ? false : verify;
+              newCmds.Add(verify ? c : Split.AssertIntoAssume(c));
+            }
+            newBlock.Cmds = newCmds;
+          }
+          else
+          {
+            newBlock.Cmds = currentBlock.Cmds.Select<Cmd, Cmd>(c => Split.AssertIntoAssume(c)).ToList();
+          }
         }
-
         // Patch the edges between the new blocks
         foreach (var oldBlock in blocks)
         {
@@ -859,7 +881,7 @@ namespace VC
             continue;
           }
 
-          var gotoCmd = (GotoCmd) oldBlock.TransferCmd;
+          var gotoCmd = (GotoCmd)oldBlock.TransferCmd;
           var newLabelTargets = new List<Block>(gotoCmd.labelTargets.Count());
           var newLabelNames = new List<string>(gotoCmd.labelTargets.Count());
           foreach (var target in gotoCmd.labelTargets)
@@ -870,101 +892,276 @@ namespace VC
 
           oldToNewBlockMap[oldBlock].TransferCmd = new GotoCmd(gotoCmd.tok, newLabelNames, newLabelTargets);
         }
-
         return newBlocks;
       }
 
-      public static List<Split /*!*/> FindManualSplits(Implementation /*!*/ impl,
-        Dictionary<TransferCmd, ReturnCmd> /*!*/ gotoCmdOrigins, VCGen /*!*/ par)
+      private static List<Block> PostProcess(List<Block> blocks)
       {
-        Contract.Requires(impl != null);
+        void DeleteFalseGotos (Block b)
+        {
+          bool isAssumeFalse (Cmd c) { return c is AssumeCmd ac && ac.Expr is LiteralExpr le && !le.asBool; }
+          var firstFalseIdx = b.Cmds.FindIndex(c => isAssumeFalse(c));
+          if (firstFalseIdx != -1)
+          {
+            b.Cmds = b.Cmds.Take(firstFalseIdx + 1).ToList();
+            b.TransferCmd = (b.TransferCmd is GotoCmd) ? new ReturnCmd(b.tok) : b.TransferCmd;
+          }
+        }
+
+        bool ContainsAssert(Block b)
+        {
+          bool isNonTrivialAssert (Cmd c) { return c is AssertCmd ac && !(ac.Expr is LiteralExpr le && le.asBool); }
+          return b.Cmds.Exists(cmd => isNonTrivialAssert(cmd));
+        }
+
+        blocks.ForEach(b => DeleteFalseGotos(b)); // make blocks ending in assume false leaves of the CFG-DAG -- this is probably unnecessary, may have been done previously
+        var todo = new Stack<Block>();
+        var peeked = new HashSet<Block>();
+        var interestingBlocks = new HashSet<Block>();
+        todo.Push(blocks[0]);
+        while(todo.Count() > 0)
+        {
+          var currentBlock = todo.Peek();
+          var pop = peeked.Contains(currentBlock);
+          peeked.Add(currentBlock);
+          var interesting = false;
+          var exit = currentBlock.TransferCmd as GotoCmd;
+          if (exit != null && !pop) {
+            exit.labelTargets.ForEach(b => todo.Push(b));
+          } else if (exit != null) {
+            Contract.Assert(pop);
+            var gtc = new GotoCmd(exit.tok, exit.labelTargets.Where(l => interestingBlocks.Contains(l)).ToList());
+            currentBlock.TransferCmd = gtc;
+            interesting = interesting || gtc.labelTargets.Count() != 0;
+          }
+          if (pop)
+          {
+            interesting = interesting || ContainsAssert(currentBlock);
+            if (interesting) {
+              interestingBlocks.Add(currentBlock);
+            }
+            todo.Pop();
+          }
+        }
+        interestingBlocks.Add(blocks[0]); // must not be empty
+        return blocks.Where(b => interestingBlocks.Contains(b)).ToList(); // this is not the same as interestingBlocks.ToList() because the resulting lists will have different orders.
+      }
+
+      private static bool ShouldSplitHere(Cmd c, bool splitOnEveryAssert) {
+        return c is PredicateCmd p && QKeyValue.FindBoolAttribute(p.Attributes, "split_here")
+               || c is AssertCmd && splitOnEveryAssert;
+      }
+      
+      public static List<Split /*!*/> FindManualSplits(Split s, bool splitOnEveryAssert)
+      {
+        Contract.Requires(s.Implementation != null);
         Contract.Ensures(Contract.Result<List<Split>>() == null || cce.NonNullElements(Contract.Result<List<Split>>()));
 
         var splitPoints = new Dictionary<Block, int>();
-        foreach (var b in impl.Blocks)
+        foreach (var b in s.blocks)
         {
           foreach (Cmd c in b.Cmds)
           {
             var p = c as PredicateCmd;
-            if (p != null && QKeyValue.FindBoolAttribute(p.Attributes, "split_here"))
+            if (ShouldSplitHere(c, splitOnEveryAssert))
             {
-              int count;
-              splitPoints.TryGetValue(b, out count);
+              splitPoints.TryGetValue(b, out var count);
               splitPoints[b] = count + 1;
             }
           }
         }
-
+        List<Split> splits = new List<Split>();
         if (splitPoints.Count() == 0)
         {
-          // No manual split points here
-          return null;
+          splits.Add(s);
         }
-
-        List<Split> splits = new List<Split>();
-        Block entryPoint = impl.Blocks[0];
-        var newEntryBlocks = DoManualSplit(impl.Blocks, entryPoint, -1, splitPoints.Keys.Contains(entryPoint),
-          splitPoints.Keys);
-        splits.Add(new Split(newEntryBlocks, gotoCmdOrigins, par,
-          impl)); // REVIEW: Does gotoCmdOrigins need to be changed at all?        
-
-        foreach (KeyValuePair<Block, int> pair in splitPoints)
+        else
         {
-          for (int i = 0; i < pair.Value; i++)
+          Block entryPoint = s.blocks[0];
+          var blockAssignments = PickBlocksToVerify(s.blocks, splitPoints);
+          var entryBlockHasSplit = splitPoints.Keys.Contains(entryPoint);
+          var baseSplitBlocks = PostProcess(DoPreAssignedManualSplit(s.blocks, blockAssignments, -1, entryPoint, !entryBlockHasSplit, splitOnEveryAssert));
+          splits.Add(new Split(baseSplitBlocks, s.gotoCmdOrigins, s.parent, s.Implementation));
+          foreach (KeyValuePair<Block, int> pair in splitPoints)
           {
-            bool blockInternalSplit =
-              i < pair.Value - 1; // There's at least one more split, after this one, in the current block
-            var newBlocks = DoManualSplit(impl.Blocks, pair.Key, i, blockInternalSplit, splitPoints.Keys);
-            Split s = new Split(newBlocks, gotoCmdOrigins, par,
-              impl); // REVIEW: Does gotoCmdOrigins need to be changed at all?
-            splits.Add(s);
+            for (int i = 0; i < pair.Value; i++)
+            {
+              bool lastSplitInBlock = i == pair.Value - 1;
+              var newBlocks = DoPreAssignedManualSplit(s.blocks, blockAssignments, i, pair.Key, lastSplitInBlock, splitOnEveryAssert);
+              splits.Add(new Split(PostProcess(newBlocks), s.gotoCmdOrigins, s.parent, s.Implementation)); // REVIEW: Does gotoCmdOrigins need to be changed at all?
+            }
           }
         }
-
         return splits;
       }
 
-      public static List<Split /*!*/> /*!*/ DoSplit(Split initial, double max_cost, int max)
+      public static List<Split> FocusImpl(Implementation impl, Dictionary<TransferCmd, ReturnCmd> gotoCmdOrigins, VCGen par)
+      {
+        bool IsFocusCmd(Cmd c) {
+          return c is PredicateCmd p && QKeyValue.FindBoolAttribute(p.Attributes, "focus");
+        }
+
+        List<Block> GetFocusBlocks(List<Block> blocks) {
+          return blocks.Where(blk => blk.Cmds.Where(c => IsFocusCmd(c)).Any()).ToList();
+        }
+
+        var dag = Program.GraphFromImpl(impl);
+        var topoSorted = dag.TopologicalSort().ToList();
+        // By default, we process the foci in a top-down fashion, i.e., in the topological order.
+        // If the user sets the RelaxFocus flag, we use the reverse (topological) order.
+        var focusBlocks = GetFocusBlocks(topoSorted);
+        if (CommandLineOptions.Clo.RelaxFocus) {
+          focusBlocks.Reverse();
+        }
+        if (!focusBlocks.Any()) {
+          var f = new List<Split>();
+          f.Add(new Split(impl.Blocks, gotoCmdOrigins, par, impl));
+          return f;
+        }
+        // finds all the blocks dominated by focusBlock in the subgraph
+        // which only contains vertices of subgraph.
+        HashSet<Block> DominatedBlocks(Block focusBlock, IEnumerable<Block> subgraph)
+        {
+          var dominators = new Dictionary<Block, HashSet<Block>>();
+          var todo = new Queue<Block>();
+          foreach (var b in topoSorted.Where(blk => subgraph.Contains(blk)))
+          {
+            var s = new HashSet<Block>();
+            var pred = b.Predecessors.Where(blk => subgraph.Contains(blk)).ToList();
+            if (pred.Count != 0)
+            {
+              s.UnionWith(dominators[pred[0]]);
+              pred.ForEach(blk => s.IntersectWith(dominators[blk]));
+            }
+            s.Add(b);
+            dominators[b] = s;
+          }
+          return subgraph.Where(blk => dominators[blk].Contains(focusBlock)).ToHashSet();
+        }
+
+        Cmd DisableSplits(Cmd c)
+        {
+          if (c is PredicateCmd pc)
+          {
+            for (var kv = pc.Attributes; kv != null; kv = kv.Next)
+            {
+              if (kv.Key == "split")
+              {
+                kv.AddParam(new LiteralExpr(Token.NoToken, false));
+              }
+            }
+          }
+          return c;
+        }
+
+        var Ancestors = new Dictionary<Block, HashSet<Block>>();
+        var Descendants = new Dictionary<Block, HashSet<Block>>();
+        focusBlocks.ForEach(fb => Ancestors[fb] = dag.ComputeReachability(fb, false).ToHashSet());
+        focusBlocks.ForEach(fb => Descendants[fb] = dag.ComputeReachability(fb, true).ToHashSet());
+        var s = new List<Split>();
+        var duplicator = new Duplicator();
+        void FocusRec(int focusIdx, IEnumerable<Block> blocks, IEnumerable<Block> freeBlocks)
+        {
+          if (focusIdx == focusBlocks.Count())
+          {
+            // it is important for l to be consistent with reverse topological order.
+            var l = dag.TopologicalSort().Where(blk => blocks.Contains(blk)).Reverse();
+            // assert that the root block, impl.Blocks[0], is in l
+            Contract.Assert(l.ElementAt(l.Count() - 1) == impl.Blocks[0]);
+            var newBlocks = new List<Block>();
+            var oldToNewBlockMap = new Dictionary<Block, Block>(blocks.Count());
+            foreach (Block b in l)
+            {
+              var newBlock = (Block)duplicator.Visit(b);
+              newBlocks.Add(newBlock);
+              oldToNewBlockMap[b] = newBlock;
+              // freeBlocks consist of the predecessors of the relevant foci.
+              // Their assertions turn into assumes and any splits inside them are disabled.
+              if(freeBlocks.Contains(b))
+              {
+                newBlock.Cmds = b.Cmds.Select(c => Split.AssertIntoAssume(c)).Select(c => DisableSplits(c)).ToList();
+              }
+              if (b.TransferCmd is GotoCmd gtc)
+              {
+                var targets = gtc.labelTargets.Where(blk => blocks.Contains(blk));
+                newBlock.TransferCmd = new GotoCmd(gtc.tok,
+                                              targets.Select(blk => oldToNewBlockMap[blk].Label).ToList(),
+                                              targets.Select(blk => oldToNewBlockMap[blk]).ToList());
+              }
+            }
+            newBlocks.Reverse();
+            Contract.Assert(newBlocks[0] == oldToNewBlockMap[impl.Blocks[0]]);
+            s.Add(new Split(PostProcess(newBlocks), gotoCmdOrigins, par, impl));
+          }
+          else if (!blocks.Contains(focusBlocks[focusIdx])
+                    || freeBlocks.Contains(focusBlocks[focusIdx]))
+          {
+            FocusRec(focusIdx + 1, blocks, freeBlocks);
+          }
+          else
+          {
+            var b = focusBlocks[focusIdx]; // assert b in blocks
+            var dominatedBlocks = DominatedBlocks(b, blocks);
+            // the first part takes all blocks except the ones dominated by the focus block
+            FocusRec(focusIdx + 1, blocks.Where(blk => !dominatedBlocks.Contains(blk)), freeBlocks);
+            var ancestors = Ancestors[b];
+            ancestors.Remove(b);
+            var descendants = Descendants[b];
+            // the other part takes all the ancestors, the focus block, and the descendants.
+            FocusRec(focusIdx + 1, ancestors.Union(descendants).Intersect(blocks), ancestors.Union(freeBlocks));
+          }
+        }
+
+        FocusRec(0, impl.Blocks, new List<Block>());
+        return s;
+      }
+
+      public static List<Split> FocusAndSplit(Implementation impl, Dictionary<TransferCmd, ReturnCmd> gotoCmdOrigins, VCGen par, bool splitOnEveryAssert)
+      {
+        List<Split> focussedImpl = FocusImpl(impl, gotoCmdOrigins, par);
+        var splits = focussedImpl.Select(s => FindManualSplits(s, splitOnEveryAssert)).SelectMany(x => x).ToList();
+        return splits;
+      }
+
+      public static List<Split /*!*/> /*!*/ DoSplit(Split initial, double splitThreshold, int maxSplits)
       {
         Contract.Requires(initial != null);
         Contract.Ensures(cce.NonNullElements(Contract.Result<List<Split>>()));
 
-        List<Split> res = new List<Split>();
-        res.Add(initial);
+        var result = new List<Split> { initial };
 
-        while (res.Count < max)
+        while (result.Count < maxSplits)
         {
           Split best = null;
-          int best_idx = 0, pos = 0;
-          foreach (Split s in res)
-          {
-            Contract.Assert(s != null);
-            s.ComputeBestSplit(); // TODO check total_cost first
-            if (s.total_cost > max_cost &&
-                (best == null || best.total_cost < s.total_cost) &&
-                (s.assertion_count > 1 || s.split_block != null))
-            {
-              best = s;
-              best_idx = pos;
+          int bestIndex = 0;
+          for (var index = 0; index < result.Count; index++) {
+            var split = result[index];
+            Contract.Assert(split != null);
+            split.ComputeBestSplit(); // TODO check totalCost first
+            if (split.totalCost > splitThreshold &&
+                (best == null || best.totalCost < split.totalCost) &&
+                (split.assertionCount > 1 || split.splitBlock != null)) {
+              best = split;
+              bestIndex = index;
             }
-
-            pos++;
           }
 
           if (best == null)
+          {
             break; // no split found
+          }
 
           Split s0, s1;
 
-          bool split_stats = CommandLineOptions.Clo.TraceVerify;
+          bool splitStats = CommandLineOptions.Clo.TraceVerify;
 
-          if (split_stats)
+          if (splitStats)
           {
-            Console.WriteLine("{0} {1} -->", best.split_block == null ? "SLICE" : ("SPLIT@" + best.split_block.Label),
+            Console.WriteLine("{0} {1} -->", best.splitBlock == null ? "SLICE" : ("SPLIT@" + best.splitBlock.Label),
               best.Stats);
-            if (best.split_block != null)
+            if (best.splitBlock != null)
             {
-              GotoCmd g = best.split_block.TransferCmd as GotoCmd;
+              GotoCmd g = best.splitBlock.TransferCmd as GotoCmd;
               if (g != null)
               {
                 Console.Write("    exits: ");
@@ -976,7 +1173,7 @@ namespace VC
 
                 Console.WriteLine("");
                 Console.Write("    assumized: ");
-                foreach (Block b in best.assumized_branches)
+                foreach (Block b in best.assumizedBranches)
                 {
                   Contract.Assert(b != null);
                   Console.Write("{0} ", b.Label);
@@ -987,23 +1184,25 @@ namespace VC
             }
           }
 
-          if (best.split_block != null)
+          if (best.splitBlock != null)
           {
             s0 = best.SplitAt(0);
             s1 = best.SplitAt(1);
           }
           else
           {
-            best.split_block = null;
-            s0 = best.SliceAsserts(best.assertion_cost / 2, true);
-            s1 = best.SliceAsserts(best.assertion_cost / 2, false);
+            best.splitBlock = null;
+            s0 = best.SliceAsserts(best.assertionCost / 2, true);
+            s1 = best.SliceAsserts(best.assertionCost / 2, false);
           }
 
           if (true)
           {
-            List<Block> ss = new List<Block>();
-            ss.Add(s0.blocks[0]);
-            ss.Add(s1.blocks[0]);
+            var ss = new List<Block>
+            {
+              s0.blocks[0],
+              s1.blocks[0]
+            };
             try
             {
               best.SoundnessCheck(new HashSet<List<Block>>(new BlockListComparer()), best.blocks[0], ss);
@@ -1019,7 +1218,7 @@ namespace VC
             }
           }
 
-          if (split_stats)
+          if (splitStats)
           {
             s0.ComputeBestSplit();
             s1.ComputeBestSplit();
@@ -1032,11 +1231,11 @@ namespace VC
             best.Print();
           }
 
-          res[best_idx] = s0;
-          res.Add(s1);
+          result[bestIndex] = s0;
+          result.Add(s1);
         }
 
-        return res;
+        return result;
       }
 
       class BlockListComparer : IEqualityComparer<List<Block>>
@@ -1082,49 +1281,68 @@ namespace VC
         }
       }
 
-      public void ReadOutcome(ref ConditionGeneration.Outcome cur_outcome, out bool prover_failed)
+      public void ReadOutcome(ref ConditionGeneration.Outcome curOutcome, out bool proverFailed, ref int totalResourceCount)
       {
         Contract.EnsuresOnThrow<UnexpectedProverOutputException>(true);
         ProverInterface.Outcome outcome = cce.NonNull(checker).ReadOutcome();
 
-        if (CommandLineOptions.Clo.Trace && splitNo >= 0)
+        if (CommandLineOptions.Clo.Trace && splitNum >= 0)
         {
-          System.Console.WriteLine("      --> split #{0} done,  [{1} s] {2}", splitNo,
+          System.Console.WriteLine("      --> split #{0} done,  [{1} s] {2}", splitNum + 1,
             checker.ProverRunTime.TotalSeconds, outcome);
+        }
+
+        if (CommandLineOptions.Clo.XmlSink != null && splitNum >= 0) {
+          CommandLineOptions.Clo.XmlSink.WriteEndSplit(outcome.ToString().ToLowerInvariant(), 
+            TimeSpan.FromSeconds(checker.ProverRunTime.TotalSeconds));
         }
 
         if (CommandLineOptions.Clo.VcsDumpSplits)
         {
-          DumpDot(splitNo);
+          DumpDot(splitNum);
         }
 
-        prover_failed = false;
+        totalResourceCount += checker.ProverResourceCount;
+
+        proverFailed = false;
 
         switch (outcome)
         {
           case ProverInterface.Outcome.Valid:
             return;
           case ProverInterface.Outcome.Invalid:
-            cur_outcome = ConditionGeneration.Outcome.Errors;
+            curOutcome = ConditionGeneration.Outcome.Errors;
             return;
           case ProverInterface.Outcome.OutOfMemory:
-            prover_failed = true;
-            if (cur_outcome != ConditionGeneration.Outcome.Errors && cur_outcome != ConditionGeneration.Outcome.Inconclusive)
-              cur_outcome = ConditionGeneration.Outcome.OutOfMemory;
+            proverFailed = true;
+            if (curOutcome != ConditionGeneration.Outcome.Errors && curOutcome != ConditionGeneration.Outcome.Inconclusive)
+            {
+              curOutcome = ConditionGeneration.Outcome.OutOfMemory;
+            }
+
             return;
           case ProverInterface.Outcome.TimeOut:
-            prover_failed = true;
-            if (cur_outcome != ConditionGeneration.Outcome.Errors && cur_outcome != ConditionGeneration.Outcome.Inconclusive)
-              cur_outcome = ConditionGeneration.Outcome.TimedOut;
+            proverFailed = true;
+            if (curOutcome != ConditionGeneration.Outcome.Errors && curOutcome != ConditionGeneration.Outcome.Inconclusive)
+            {
+              curOutcome = ConditionGeneration.Outcome.TimedOut;
+            }
+
             return;
           case ProverInterface.Outcome.OutOfResource:
-            prover_failed = true;
-            if (cur_outcome != ConditionGeneration.Outcome.Errors && cur_outcome != ConditionGeneration.Outcome.Inconclusive)
-              cur_outcome = ConditionGeneration.Outcome.OutOfResource;
+            proverFailed = true;
+            if (curOutcome != ConditionGeneration.Outcome.Errors && curOutcome != ConditionGeneration.Outcome.Inconclusive)
+            {
+              curOutcome = ConditionGeneration.Outcome.OutOfResource;
+            }
+
             return;
           case ProverInterface.Outcome.Undetermined:
-            if (cur_outcome != ConditionGeneration.Outcome.Errors)
-              cur_outcome = ConditionGeneration.Outcome.Inconclusive;
+            if (curOutcome != ConditionGeneration.Outcome.Errors)
+            {
+              curOutcome = ConditionGeneration.Outcome.Inconclusive;
+            }
+
             return;
           default:
             Contract.Assert(false);
@@ -1135,100 +1353,117 @@ namespace VC
       /// <summary>
       /// As a side effect, updates "this.parent.CumulativeAssertionCount".
       /// </summary>
-      public void BeginCheck(Checker checker, VerifierCallback callback, ModelViewInfo mvInfo, int no, int timeout, int rlimit)
+      public void BeginCheck(Checker checker, VerifierCallback callback, ModelViewInfo mvInfo, int no, uint timeout, uint rlimit)
       {
         Contract.Requires(checker != null);
         Contract.Requires(callback != null);
 
-        splitNo = no;
+        splitNum = no;
 
-        impl.Blocks = blocks;
+        // Lock impl since we're setting impl.Blocks that is used to generate the VC.
+        lock (Implementation) {
+          Implementation.Blocks = blocks;
 
-        this.checker = checker;
+          this.checker = checker;
 
-        Dictionary<int, Absy> label2absy = new Dictionary<int, Absy>();
+          var absyIds = new ControlFlowIdMap<Absy>();
 
-        ProverContext ctx = checker.TheoremProver.Context;
-        Boogie2VCExprTranslator bet = ctx.BoogieExprTranslator;
-        var cc = new VCGen.CodeExprConversionClosure(label2absy, ctx);
-        bet.SetCodeExprConverter(cc.CodeExprToVerificationCondition);
+          ProverContext ctx = checker.TheoremProver.Context;
+          Boogie2VCExprTranslator bet = ctx.BoogieExprTranslator;
+          var cc = new VCGen.CodeExprConversionClosure(absyIds, ctx);
+          bet.SetCodeExprConverter(cc.CodeExprToVerificationCondition);
 
-        var exprGen = ctx.ExprGen;
-        VCExpr controlFlowVariableExpr = exprGen.Integer(BigNum.ZERO);
-
+          var exprGen = ctx.ExprGen;
+          VCExpr controlFlowVariableExpr = exprGen.Integer(BigNum.ZERO);
         #region proofgen
-        TypePremiseEraserFactory typePremiseEraserFactory;
-        switch (CommandLineOptions.Clo.TypeEncodingMethod)
-        {
-          case CommandLineOptions.TypeEncoding.Predicates:
-            typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet, true); 
-            break;
-          case CommandLineOptions.TypeEncoding.Monomorphic:
-            typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet, false);
-            break;
-          default:
-            throw new NotImplementedException();
-        } 
-        ProofGenerationLayer.SetTypeEraserFactory(typePremiseEraserFactory);
-        #endregion
+          TypePremiseEraserFactory typePremiseEraserFactory;
+          switch (CommandLineOptions.Clo.TypeEncodingMethod)
+          {
+            case CommandLineOptions.TypeEncoding.Predicates:
+              typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet, true); 
+              break;
+            case CommandLineOptions.TypeEncoding.Monomorphic:
+              typePremiseEraserFactory = new TypePremiseEraserFactory(checker.VCExprGen, bet, false);
+              break;
+            default:
+              throw new NotImplementedException();
+          } 
+          ProofGenerationLayer.SetTypeEraserFactory(typePremiseEraserFactory);
+          #endregion
         
         /* PROOF GEN: we pass "null" as the control flow variable expression, such that labels are not produced as they are
          * not relevant for proof generation of programs that verify */
-        VCExpr vc = parent.GenerateVCAux(impl, null, label2absy, checker.TheoremProver.Context);
-        Contract.Assert(vc != null);
+          VCExpr vc = parent.GenerateVCAux(Implementation, null, absyIds, checker.TheoremProver.Context);
+          Contract.Assert(vc != null);
         
-        #region proofgen
-        if(!(ctx is DeclFreeProverContext))
-        { 
-          throw new NotImplementedException("Proof Generation only supports DeclFreeProverContext as context.");
+          vc = QuantifierInstantiationEngine.Instantiate(Implementation, exprGen, bet, vc);
+
+          #region proofgen
+          if(!(ctx is DeclFreeProverContext))
+          { 
+            throw new NotImplementedException("Proof Generation only supports DeclFreeProverContext as context.");
+          }
+
+          var declFreeProverContext = ctx as DeclFreeProverContext;
+          var premiseEraserProvider = typePremiseEraserFactory?.NewEraser();
+
+          VCExpr eraseVC (VCExpr vc, int polarity) 
+          {
+            return !premiseEraserProvider.ProgramIsPolymorphic ? vc : premiseEraserProvider.EraseAndSortLet(vc, polarity);
+          }
+
+          VCExpr erasedVC = eraseVC(vc, 1);
+          VCExpr erasedAxioms = eraseVC(declFreeProverContext.Axioms, -1);
+
+          VCExpr typeAxioms = null;
+          List<VCAxiomInfo> vcAxiomsInfo = null;
+          if (premiseEraserProvider.ProgramIsPolymorphic) {
+            typeAxioms = premiseEraserProvider.AxiomBuilder.GetNewAxiomsAndInfo(out vcAxiomsInfo);
+          }
+
+          ProofGenerationLayer.VCGenerateAllProofs(
+            erasedVC, 
+            erasedAxioms, 
+            typeAxioms,
+            vcAxiomsInfo,
+            checker.TheoremProver.VCExprGen, 
+            checker.TheoremProver.Context.BoogieExprTranslator,
+            premiseEraserProvider?.AxiomBuilder);
+          #endregion
+
+          /* PROOF GEN: comment out label specific parts
+            VCExpr controlFlowFunctionAppl =
+              exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
+            VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(absyIds.GetId(Implementation.Blocks[0]))));
+            vc = exprGen.Implies(eqExpr, vc);
+          */
+          reporter = new VCGen.ErrorReporter(gotoCmdOrigins, absyIds, Implementation.Blocks, parent.debugInfos, callback,
+            mvInfo, this.Checker.TheoremProver.Context, parent.program);
+          
+          if (CommandLineOptions.Clo.TraceVerify && no >= 0)
+          {
+            Console.WriteLine("-- after split #{0}", no);
+            Print();
+          }
+
+          string desc = cce.NonNull(Implementation.Name);
+          if (no >= 0)
+          {
+            desc += "_split" + no;
+          }
+
+          checker.BeginCheck(desc, vc, reporter, timeout, rlimit);
         }
+      }
 
-        var declFreeProverContext = ctx as DeclFreeProverContext;
-        var premiseEraserProvider = typePremiseEraserFactory?.NewEraser();
-
-        VCExpr eraseVC (VCExpr vc, int polarity) 
+      private static Cmd AssertIntoAssume(Cmd c)
+      {
+        if (c is AssertCmd assrt)
         {
-          return !premiseEraserProvider.ProgramIsPolymorphic ? vc : premiseEraserProvider.EraseAndSortLet(vc, polarity);
+          return VCGen.AssertTurnedIntoAssume(assrt);
         }
 
-        VCExpr erasedVC = eraseVC(vc, 1);
-        VCExpr erasedAxioms = eraseVC(declFreeProverContext.Axioms, -1);
-
-        VCExpr typeAxioms = null;
-        List<VCAxiomInfo> vcAxiomsInfo = null;
-        if (premiseEraserProvider.ProgramIsPolymorphic) {
-          typeAxioms = premiseEraserProvider.AxiomBuilder.GetNewAxiomsAndInfo(out vcAxiomsInfo);
-        }
-
-        ProofGenerationLayer.VCGenerateAllProofs(
-          erasedVC, 
-          erasedAxioms, 
-          typeAxioms,
-          vcAxiomsInfo,
-          checker.TheoremProver.VCExprGen, 
-          checker.TheoremProver.Context.BoogieExprTranslator,
-          premiseEraserProvider?.AxiomBuilder);
-        #endregion
-
-        /* PROOF GEN: comment out label specific parts
-        VCExpr controlFlowFunctionAppl =
-          exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
-        VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(impl.Blocks[0].UniqueId)));
-        vc = exprGen.Implies(eqExpr, vc);
-        */
-        reporter = new VCGen.ErrorReporter(gotoCmdOrigins, label2absy, impl.Blocks, parent.debugInfos, callback,
-          mvInfo, this.Checker.TheoremProver.Context, parent.program);
-
-        if (CommandLineOptions.Clo.TraceVerify && no >= 0)
-        {
-          Console.WriteLine("-- after split #{0}", no);
-          Print();
-        }
-
-        string desc = cce.NonNull(impl.Name);
-        if (no >= 0)
-          desc += "_split" + no;
-        checker.BeginCheck(desc, vc, reporter, timeout, rlimit, impl.RandomSeed);
+        return c;
       }
 
       private void SoundnessCheck(HashSet<List<Block> /*!*/> /*!*/ cache, Block /*!*/ orig,
@@ -1298,6 +1533,12 @@ namespace VC
 
           SoundnessCheck(cache, exit, newcopies);
         }
+      }
+
+      public void ReleaseChecker()
+      {
+        Checker.GoBackToIdle();
+        checker = null;
       }
     }
 }

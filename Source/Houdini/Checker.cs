@@ -65,9 +65,10 @@ namespace Microsoft.Boogie.Houdini
 
     private void AddHoudiniConstant(AssertCmd assertCmd)
     {
-      Variable houdiniConstant;
-      if (houdini.MatchCandidate(assertCmd.Expr, out houdiniConstant))
+      if (houdini.MatchCandidate(assertCmd.Expr, out Variable houdiniConstant))
+      {
         houdiniAssertConstants.Add(houdiniConstant);
+      }
 
       if (houdiniConstant != null && CommandLineOptions.Clo.ExplainHoudini &&
           !constToControl.ContainsKey(houdiniConstant.Name))
@@ -85,9 +86,10 @@ namespace Microsoft.Boogie.Houdini
 
     private void AddHoudiniConstant(AssumeCmd assumeCmd)
     {
-      Variable houdiniConstant;
-      if (houdini.MatchCandidate(assumeCmd.Expr, out houdiniConstant))
+      if (houdini.MatchCandidate(assumeCmd.Expr, out Variable houdiniConstant))
+      {
         houdiniAssumeConstants.Add(houdiniConstant);
+      }
     }
 
     private Tuple<Variable, Variable> createNewExplainConstants(Variable v)
@@ -135,9 +137,15 @@ namespace Microsoft.Boogie.Houdini
     public bool InUnsatCore(Variable constant)
     {
       if (unsatCoreSet == null)
+      {
         return true;
+      }
+
       if (unsatCoreSet.Contains(constant))
+      {
         return true;
+      }
+
       stats.numUnsatCorePrunings++;
       return false;
     }
@@ -148,14 +156,12 @@ namespace Microsoft.Boogie.Houdini
       this.descriptiveName = impl.Name;
       this.stats = stats;
       collector = new ConditionGeneration.CounterexampleCollector();
-      collector.OnProgress("HdnVCGen", 0, 0, 0.0);
+      collector.OnProgress?.Invoke("HdnVCGen", 0, 0, 0.0);
 
       vcgen.ConvertCFG2DAG(impl, taskID: taskID);
-      ModelViewInfo mvInfo;
-      var gotoCmdOrigins = vcgen.PassifyImpl(impl, out mvInfo);
+      var gotoCmdOrigins = vcgen.PassifyImpl(impl, out var mvInfo);
 
-      ExistentialConstantCollector ecollector;
-      ExistentialConstantCollector.CollectHoudiniConstants(houdini, impl, out ecollector);
+      ExistentialConstantCollector.CollectHoudiniConstants(houdini, impl, out var ecollector);
       this.houdiniAssertConstants = ecollector.houdiniAssertConstants;
       this.houdiniAssumeConstants = ecollector.houdiniAssumeConstants;
       this.explainConstantsNegative = ecollector.explainNegative;
@@ -169,19 +175,19 @@ namespace Microsoft.Boogie.Houdini
       var exprGen = proverInterface.Context.ExprGen;
       VCExpr controlFlowVariableExpr = exprGen.Integer(BigNum.ZERO);
 
-      Dictionary<int, Absy> label2absy;
-      conjecture = vcgen.GenerateVC(impl, controlFlowVariableExpr, out label2absy, proverInterface.Context);
+      var absyIds = new ControlFlowIdMap<Absy>();
+      conjecture = vcgen.GenerateVC(impl, controlFlowVariableExpr, absyIds, proverInterface.Context);
 
       VCExpr controlFlowFunctionAppl =
         exprGen.ControlFlowFunctionApplication(exprGen.Integer(BigNum.ZERO), exprGen.Integer(BigNum.ZERO));
-      VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(impl.Blocks[0].UniqueId)));
+      VCExpr eqExpr = exprGen.Eq(controlFlowFunctionAppl, exprGen.Integer(BigNum.FromInt(absyIds.GetId(impl.Blocks[0]))));
       conjecture = exprGen.Implies(eqExpr, conjecture);
 
       Macro macro = new Macro(Token.NoToken, descriptiveName, new List<Variable>(),
         new Formal(Token.NoToken, new TypedIdent(Token.NoToken, "", Type.Bool), false));
       proverInterface.DefineMacro(macro, conjecture);
       conjecture = exprGen.Function(macro);
-      handler = new VCGen.ErrorReporter(gotoCmdOrigins, label2absy, impl.Blocks, vcgen.debugInfos, collector,
+      handler = new VCGen.ErrorReporter(gotoCmdOrigins, absyIds, impl.Blocks, vcgen.debugInfos, collector,
         mvInfo, proverInterface.Context, program);
     }
 
@@ -237,7 +243,7 @@ namespace Microsoft.Boogie.Houdini
     }
 
     public ProverInterface.Outcome Verify(ProverInterface proverInterface, Dictionary<Variable, bool> assignment,
-      out List<Counterexample> errors, int taskID = -1)
+      out List<Counterexample> errors, int errorLimit)
     {
       collector.examples.Clear();
 
@@ -250,7 +256,7 @@ namespace Microsoft.Boogie.Houdini
 
       VCExpr vc = proverInterface.VCExprGen.Implies(BuildAxiom(proverInterface, assignment), conjecture);
       proverInterface.BeginCheck(descriptiveName, vc, handler);
-      ProverInterface.Outcome proverOutcome = proverInterface.CheckOutcome(handler, taskID: taskID);
+      ProverInterface.Outcome proverOutcome = proverInterface.CheckOutcome(handler, errorLimit);
 
       double queryTime = (DateTime.UtcNow - now).TotalSeconds;
       stats.proverTime += queryTime;
@@ -295,24 +301,36 @@ namespace Microsoft.Boogie.Houdini
         if (houdiniAssumeConstants.Contains(constant))
         {
           if (tup.Value)
+          {
             hardAssumptions.Add(exprVar);
+          }
           else
+          {
             // Previously removed assumed candidates are the soft constraints
             softAssumptions.Add(exprVar);
+          }
         }
         else if (houdiniAssertConstants.Contains(constant))
         {
           if (constant == refutedConstant)
+          {
             hardAssumptions.Add(exprVar);
+          }
           else
+          {
             hardAssumptions.Add(exprGen.Not(exprVar));
+          }
         }
         else
         {
           if (tup.Value)
+          {
             hardAssumptions.Add(exprVar);
+          }
           else
+          {
             hardAssumptions.Add(exprGen.Not(exprVar));
+          }
         }
 
         // For an asserted condition (c ==> \phi), 
@@ -369,16 +387,16 @@ namespace Microsoft.Boogie.Houdini
 
       do
       {
-        List<int> unsatisfiedSoftAssumptions;
-
         hardAssumptions.Add(controlExprNoop);
-        outcome = proverInterface.CheckAssumptions(hardAssumptions, softAssumptions, out unsatisfiedSoftAssumptions,
+        outcome = proverInterface.CheckAssumptions(hardAssumptions, softAssumptions, out var unsatisfiedSoftAssumptions,
           handler);
         hardAssumptions.RemoveAt(hardAssumptions.Count - 1);
 
         if (outcome == ProverInterface.Outcome.TimeOut || outcome == ProverInterface.Outcome.OutOfMemory ||
             outcome == ProverInterface.Outcome.OutOfResource || outcome == ProverInterface.Outcome.Undetermined)
+        {
           break;
+        }
 
         var reason = new HashSet<string>();
         unsatisfiedSoftAssumptions.Iter(i => reason.Add(softAssumptions[i].ToString()));
@@ -411,7 +429,9 @@ namespace Microsoft.Boogie.Houdini
 
         if (outcome == ProverInterface.Outcome.TimeOut || outcome == ProverInterface.Outcome.OutOfMemory ||
             outcome == ProverInterface.Outcome.OutOfResource || outcome == ProverInterface.Outcome.Undetermined)
+        {
           break;
+        }
 
         unsatisfiedSoftAssumptions2.Iter(i => reason.Remove(softAssumptions2[i].ToString()));
         var reason1 = new HashSet<string>(); //these are the reasons for inconsistency
@@ -465,7 +485,11 @@ namespace Microsoft.Boogie.Houdini
       proverInterface.Assert(conjecture, false);
       foreach (var v in assignment.Keys)
       {
-        if (assignment[v]) continue;
+        if (assignment[v])
+        {
+          continue;
+        }
+
         proverInterface.Assert(exprTranslator.LookupVariable(v), false);
       }
 
@@ -473,17 +497,23 @@ namespace Microsoft.Boogie.Houdini
       List<VCExpr> assumptionExprs = new List<VCExpr>();
       foreach (var v in assignment.Keys)
       {
-        if (!assignment[v]) continue;
+        if (!assignment[v])
+        {
+          continue;
+        }
+
         assumptionVars.Add(v);
         assumptionExprs.Add(exprTranslator.LookupVariable(v));
       }
 
-      List<int> unsatCore;
-      ProverInterface.Outcome tmp = proverInterface.CheckAssumptions(assumptionExprs, out unsatCore, handler);
+      ProverInterface.Outcome tmp = proverInterface.CheckAssumptions(assumptionExprs, out var unsatCore, handler);
       System.Diagnostics.Debug.Assert(tmp == ProverInterface.Outcome.Valid);
       unsatCoreSet = new HashSet<Variable>();
       foreach (int i in unsatCore)
+      {
         unsatCoreSet.Add(assumptionVars[i]);
+      }
+
       proverInterface.Pop();
 
       double unsatCoreQueryTime = (DateTime.UtcNow - now).TotalSeconds;

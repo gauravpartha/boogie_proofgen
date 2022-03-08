@@ -2,11 +2,13 @@ procedure {:atomic}{:layer 2} A_Paxos({:linear_in "perm"} rs: [Round]bool)
 returns ({:pending_async "A_StartRound"} PAs:[PA]int)
 modifies pendingAsyncs;
 {
-  var numRounds: int;
-  assert Init(rs, joinedNodes, voteInfo, decision, pendingAsyncs);
-  assert triggerRound(0);
-  assume 0 <= numRounds;
-  assume triggerRound(numRounds);
+  var {:pool "NumRounds"} numRounds: int;
+  assert
+    {:add_to_pool "Round", 0, numRounds}
+    Init(rs, joinedNodes, voteInfo, decision, pendingAsyncs);
+  assume
+    {:add_to_pool "NumRounds", numRounds}
+    0 <= numRounds;
   PAs := (lambda pa: PA :: if is#A_StartRound(pa) && round#A_StartRound(pa) == round_lin#A_StartRound(pa) && Round(round#A_StartRound(pa)) && round#A_StartRound(pa) <= numRounds then 1 else 0);
   pendingAsyncs := PAs;
 }
@@ -143,7 +145,6 @@ ensures {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVo
 {
   var count: int;
   var joinResponse: JoinResponse;
-  var maxNode: Node;
   var {:layer 1}{:linear "perm"} receivedPermissions: [Permission]bool;
   var {:layer 1}{:linear "perm"} receivedPermission: Permission;
 
@@ -168,7 +169,6 @@ ensures {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVo
     call receivedPermissions := AddPermission(receivedPermissions, receivedPermission);
     count := count + 1;
     if (lastVoteRound#JoinResponse(joinResponse) > maxRound) {
-      maxNode := from#JoinResponse(joinResponse);
       maxRound := lastVoteRound#JoinResponse(joinResponse);
       maxValue := lastVoteValue#JoinResponse(joinResponse);
     }
@@ -183,7 +183,7 @@ requires {:layer 1} Round(r) && ps == ProposePermissions(r);
 requires {:layer 1} InvChannels(joinChannel, permJoinChannel, voteChannel, permVoteChannel);
 requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, permVoteChannel);
 {
-  var maxRound: Round;
+  var {:layer 1} maxRound: Round;
   var maxValue: Value;
   var {:layer 1} ns: NodeSet;
   var n: int;
@@ -269,7 +269,7 @@ requires {:layer 1} Inv(joinedNodes, voteInfo, acceptorState, permJoinChannel, p
 {
   var doVote:bool;
 
-  call doVote := VoteRoundUpdate(r, n, v);
+  call doVote := VoteUpdate(r, n, v);
   if (doVote) {
     call SendVoteResponse(r, n);
     call SendVoteResponseIntro(r, n, p);
@@ -312,9 +312,6 @@ modifies pendingAsyncs;
 }
 
 // Trusted lemmas for the proof of Propose and Conclude
-procedure {:lemma} InitializeQuorum() returns (q: NodeSet);
-ensures q == NoNodes();
-
 procedure {:lemma} AddToQuorum(q: NodeSet, n: Node) returns (q': NodeSet);
 requires !q[n];
 ensures q' == q[n := true];
@@ -351,7 +348,7 @@ modifies acceptorState;
   }
 }
 
-procedure {:atomic}{:layer 1} A_VoteRoundUpdate(r: Round, n: Node, v: Value)
+procedure {:atomic}{:layer 1} A_VoteUpdate(r: Round, n: Node, v: Value)
 returns (vote:bool)
 modifies acceptorState;
 {
@@ -367,7 +364,7 @@ modifies acceptorState;
 
 procedure {:yields}{:layer 0}{:refines "A_SetDecision"} SetDecision(round: Round, value: Value);
 procedure {:yields}{:layer 0}{:refines "A_JoinUpdate"} JoinUpdate(r: Round, n: Node) returns (join:bool, lastVoteRound: Round, lastVoteValue: Value);
-procedure {:yields}{:layer 0}{:refines "A_VoteRoundUpdate"} VoteRoundUpdate(r: Round, n: Node, v: Value) returns (vote:bool);
+procedure {:yields}{:layer 0}{:refines "A_VoteUpdate"} VoteUpdate(r: Round, n: Node, v: Value) returns (vote:bool);
 
 //// Channel send/receive actions
 
@@ -410,6 +407,11 @@ SendVoteResponse(round: Round, from: Node);
 
 procedure {:yields}{:layer 0}{:refines "A_ReceiveVoteResponse"}
 ReceiveVoteResponse(round: Round) returns (voteResponse: VoteResponse);
+
+//// Introduction procedure for quorum
+procedure {:intro}{:layer 1} InitializeQuorum() returns (q: NodeSet) {
+  q := NoNodes();
+}
 
 //// Introduction procedures to make send/receive more abstract
 

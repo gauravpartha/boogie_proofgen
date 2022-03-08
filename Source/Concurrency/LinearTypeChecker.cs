@@ -89,7 +89,7 @@ namespace Microsoft.Boogie
   ///    and their union.
   /// 3) Generation of linearity-invariant checker procedures for atomic actions.
   /// 4) Erasure procedure to remove all linearity attributes
-  ///    (invoked after all other CIVL transformations).
+  ///    (invoked after all other Civl transformations).
   /// </summary>
   public class LinearTypeChecker : ReadOnlyVisitor
   {
@@ -130,28 +130,51 @@ namespace Microsoft.Boogie
     public string FindDomainName(Variable v)
     {
       if (globalVarToDomainName.ContainsKey(v))
+      {
         return globalVarToDomainName[v];
+      }
+
       if (inParamToLinearQualifier.ContainsKey(v))
+      {
         return inParamToLinearQualifier[v].domainName;
+      }
+
       if (outParamToDomainName.ContainsKey(v))
+      {
         return outParamToDomainName[v];
+      }
+
       string domainName = QKeyValue.FindStringAttribute(v.Attributes, CivlAttributes.LINEAR);
       if (domainName != null)
+      {
         return domainName;
+      }
+
       domainName = QKeyValue.FindStringAttribute(v.Attributes, CivlAttributes.LINEAR_IN);
       if (domainName != null)
+      {
         return domainName;
+      }
+
       return QKeyValue.FindStringAttribute(v.Attributes, CivlAttributes.LINEAR_OUT);
     }
 
     public LinearKind FindLinearKind(Variable v)
     {
       if (globalVarToDomainName.ContainsKey(v))
+      {
         return LinearKind.LINEAR;
+      }
+
       if (inParamToLinearQualifier.ContainsKey(v))
+      {
         return inParamToLinearQualifier[v].kind;
+      }
+
       if (outParamToDomainName.ContainsKey(v))
+      {
         return LinearKind.LINEAR;
+      }
 
       if (QKeyValue.FindStringAttribute(v.Attributes, CivlAttributes.LINEAR) != null)
       {
@@ -186,7 +209,11 @@ namespace Microsoft.Boogie
       List<string> domains = new List<string>();
       for (; kv != null; kv = kv.Next)
       {
-        if (kv.Key != CivlAttributes.LINEAR) continue;
+        if (kv.Key != CivlAttributes.LINEAR)
+        {
+          continue;
+        }
+
         foreach (var o in kv.Params)
         {
           if (o is string s)
@@ -350,7 +377,9 @@ namespace Microsoft.Boogie
       if (civlTypeChecker.procToAtomicAction.ContainsKey(node.Proc) ||
           civlTypeChecker.procToIntroductionAction.ContainsKey(node.Proc) ||
           civlTypeChecker.procToLemmaProc.ContainsKey(node.Proc))
+      {
         return node;
+      }
 
       node.PruneUnreachableBlocks();
       node.ComputePredecessorsForBlocks();
@@ -385,7 +414,9 @@ namespace Microsoft.Boogie
       var oldErrorCount = checkingContext.ErrorCount;
       var impl = base.VisitImplementation(node);
       if (oldErrorCount < checkingContext.ErrorCount)
+      {
         return impl;
+      }
 
       Stack<Block> dfsStack = new Stack<Block>();
       HashSet<Block> dfsStackAsSet = new HashSet<Block>();
@@ -406,13 +437,21 @@ namespace Microsoft.Boogie
 
           foreach (Variable v in node.InParams)
           {
-            if (FindDomainName(v) == null || FindLinearKind(v) == LinearKind.LINEAR_IN || end.Contains(v)) continue;
+            if (FindDomainName(v) == null || FindLinearKind(v) == LinearKind.LINEAR_IN || end.Contains(v))
+            {
+              continue;
+            }
+
             Error(b.TransferCmd, $"Input variable {v.Name} must be available at a return");
           }
 
           foreach (Variable v in node.OutParams)
           {
-            if (FindDomainName(v) == null || end.Contains(v)) continue;
+            if (FindDomainName(v) == null || end.Contains(v))
+            {
+              continue;
+            }
+
             Error(b.TransferCmd, $"Output variable {v.Name} must be available at a return");
           }
 
@@ -459,7 +498,11 @@ namespace Microsoft.Boogie
     {
       foreach (IdentifierExpr ie in callCmd.Outs)
       {
-        if (FindDomainName(ie.Decl) == null) continue;
+        if (FindDomainName(ie.Decl) == null)
+        {
+          continue;
+        }
+
         start.Add(ie.Decl);
       }
 
@@ -468,7 +511,11 @@ namespace Microsoft.Boogie
         if (callCmd.Ins[i] is IdentifierExpr ie)
         {
           Variable v = callCmd.Proc.InParams[i];
-          if (FindDomainName(v) == null) continue;
+          if (FindDomainName(v) == null)
+          {
+            continue;
+          }
+
           if (FindLinearKind(v) == LinearKind.LINEAR_OUT)
           {
             start.Add(ie.Decl);
@@ -494,7 +541,11 @@ namespace Microsoft.Boogie
         {
           for (int i = 0; i < assignCmd.Lhss.Count; i++)
           {
-            if (FindDomainName(assignCmd.Lhss[i].DeepAssignedVariable) == null) continue;
+            if (FindDomainName(assignCmd.Lhss[i].DeepAssignedVariable) == null)
+            {
+              continue;
+            }
+
             IdentifierExpr ie = assignCmd.Rhss[i] as IdentifierExpr;
             if (!start.Contains(ie.Decl))
             {
@@ -508,7 +559,11 @@ namespace Microsoft.Boogie
 
           foreach (AssignLhs assignLhs in assignCmd.Lhss)
           {
-            if (FindDomainName(assignLhs.DeepAssignedVariable) == null) continue;
+            if (FindDomainName(assignLhs.DeepAssignedVariable) == null)
+            {
+              continue;
+            }
+
             start.Add(assignLhs.DeepAssignedVariable);
           }
         }
@@ -522,7 +577,11 @@ namespace Microsoft.Boogie
           for (int i = 0; i < callCmd.Proc.InParams.Count; i++)
           {
             Variable param = callCmd.Proc.InParams[i];
-            if (FindDomainName(param) == null) continue;
+            if (FindDomainName(param) == null)
+            {
+              continue;
+            }
+
             IdentifierExpr ie = callCmd.Ins[i] as IdentifierExpr;
             LinearKind paramKind = FindLinearKind(param);
             if (start.Contains(ie.Decl))
@@ -560,7 +619,11 @@ namespace Microsoft.Boogie
             for (int i = 0; i < parCallCallCmd.Proc.InParams.Count; i++)
             {
               Variable param = parCallCallCmd.Proc.InParams[i];
-              if (FindDomainName(param) == null) continue;
+              if (FindDomainName(param) == null)
+              {
+                continue;
+              }
+
               IdentifierExpr ie = parCallCallCmd.Ins[i] as IdentifierExpr;
               LinearKind paramKind = FindLinearKind(param);
               if (start.Contains(ie.Decl))
@@ -591,7 +654,11 @@ namespace Microsoft.Boogie
         {
           foreach (IdentifierExpr ie in havocCmd.Vars)
           {
-            if (FindDomainName(ie.Decl) == null) continue;
+            if (FindDomainName(ie.Decl) == null)
+            {
+              continue;
+            }
+
             start.Remove(ie.Decl);
           }
         }
@@ -636,7 +703,11 @@ namespace Microsoft.Boogie
         AssignLhs lhs = node.Lhss[i];
         Variable lhsVar = lhs.DeepAssignedVariable;
         string domainName = FindDomainName(lhsVar);
-        if (domainName == null) continue;
+        if (domainName == null)
+        {
+          continue;
+        }
+
         if (!(lhs is SimpleAssignLhs))
         {
           Error(node, $"Only simple assignment allowed on linear variable {lhsVar.Name}");
@@ -683,7 +754,11 @@ namespace Microsoft.Boogie
       {
         Variable formal = node.Proc.InParams[i];
         string domainName = FindDomainName(formal);
-        if (domainName == null) continue;
+        if (domainName == null)
+        {
+          continue;
+        }
+
         IdentifierExpr actual = node.Ins[i] as IdentifierExpr;
         if (actual == null)
         {
@@ -723,7 +798,11 @@ namespace Microsoft.Boogie
       {
         IdentifierExpr actual = node.Outs[i];
         string actualDomainName = FindDomainName(actual.Decl);
-        if (actualDomainName == null) continue;
+        if (actualDomainName == null)
+        {
+          continue;
+        }
+
         Variable formal = node.Proc.OutParams[i];
         string domainName = FindDomainName(formal);
         if (domainName == null)
@@ -753,12 +832,20 @@ namespace Microsoft.Boogie
       HashSet<Variable> parallelCallInvars = new HashSet<Variable>();
       foreach (CallCmd callCmd in node.CallCmds)
       {
-        if (civlTypeChecker.procToYieldInvariant.ContainsKey(callCmd.Proc)) continue;
+        if (civlTypeChecker.procToYieldInvariant.ContainsKey(callCmd.Proc))
+        {
+          continue;
+        }
+
         for (int i = 0; i < callCmd.Proc.InParams.Count; i++)
         {
           Variable formal = callCmd.Proc.InParams[i];
           string domainName = FindDomainName(formal);
-          if (domainName == null) continue;
+          if (domainName == null)
+          {
+            continue;
+          }
+
           IdentifierExpr actual = callCmd.Ins[i] as IdentifierExpr;
           if (parallelCallInvars.Contains(actual.Decl))
           {
@@ -774,12 +861,20 @@ namespace Microsoft.Boogie
 
       foreach (CallCmd callCmd in node.CallCmds)
       {
-        if (!civlTypeChecker.procToYieldInvariant.ContainsKey(callCmd.Proc)) continue;
+        if (!civlTypeChecker.procToYieldInvariant.ContainsKey(callCmd.Proc))
+        {
+          continue;
+        }
+
         for (int i = 0; i < callCmd.Proc.InParams.Count; i++)
         {
           Variable formal = callCmd.Proc.InParams[i];
           string domainName = FindDomainName(formal);
-          if (domainName == null) continue;
+          if (domainName == null)
+          {
+            continue;
+          }
+
           IdentifierExpr actual = callCmd.Ins[i] as IdentifierExpr;
           if (parallelCallInvars.Contains(actual.Decl))
           {
@@ -828,7 +923,11 @@ namespace Microsoft.Boogie
       foreach (Variable v in scope)
       {
         var domainName = FindDomainName(v);
-        if (domainName == null) continue;
+        if (domainName == null)
+        {
+          continue;
+        }
+
         domainNameToScope[domainName].Add(v);
       }
 
@@ -916,17 +1015,19 @@ namespace Microsoft.Boogie
 
     private class LinearityCheck
     {
+      public string domainName;
       public Expr assume;
       public Expr assert;
       public string message;
-      public string name;
+      public string checkName;
 
-      public LinearityCheck(Expr assume, Expr assert, string message, string name)
+      public LinearityCheck(string domainName, Expr assume, Expr assert, string message, string checkName)
       {
+        this.domainName = domainName;
         this.assume = assume;
         this.assert = assert;
         this.message = message;
-        this.name = name;
+        this.checkName = checkName;
       }
     }
 
@@ -975,6 +1076,7 @@ namespace Microsoft.Boogie
         if (outVars.Count > 0)
         {
           linearityChecks.Add(new LinearityCheck(
+            domain.domainName,
             null,
             OutPermsSubsetInPerms(domain, inVars, outVars),
             $"Potential linearity violation in outputs for domain {domain.domainName}.",
@@ -989,7 +1091,10 @@ namespace Microsoft.Boogie
           {
             var pendingAsyncLinearParams = PendingAsyncLinearParams(linearTypeChecker, domain, pendingAsync, pa1);
 
-            if (pendingAsyncLinearParams.Count == 0) continue;
+            if (pendingAsyncLinearParams.Count == 0)
+            {
+              continue;
+            }
 
             // Second kind
             // Permissions in linear output variables + linear inputs of a single pending async
@@ -999,6 +1104,7 @@ namespace Microsoft.Boogie
               Expr.Eq(Expr.Select(PAs, pa1), Expr.Literal(1)));
             var outSubsetInExpr = OutPermsSubsetInPerms(domain, inVars, pendingAsyncLinearParams.Union(outVars));
             linearityChecks.Add(new LinearityCheck(
+              domain.domainName,
               exactlyOnePA,
               outSubsetInExpr,
               $"Potential linearity violation in outputs and pending async of {pendingAsync.proc.Name} for domain {domain.domainName}.",
@@ -1011,6 +1117,7 @@ namespace Microsoft.Boogie
               Expr.Ge(Expr.Select(PAs, pa1), Expr.Literal(2)));
             var emptyPerms = OutPermsSubsetInPerms(domain, Enumerable.Empty<Expr>(), pendingAsyncLinearParams);
             linearityChecks.Add(new LinearityCheck(
+              domain.domainName,
               twoIdenticalPAs,
               emptyPerms,
               $"Potential linearity violation in identical pending asyncs of {pendingAsync.proc.Name} for domain {domain.domainName}.",
@@ -1028,7 +1135,10 @@ namespace Microsoft.Boogie
               var pendingAsyncLinearParams1 = PendingAsyncLinearParams(linearTypeChecker, domain, pendingAsync1, pa1);
               var pendingAsyncLinearParams2 = PendingAsyncLinearParams(linearTypeChecker, domain, pendingAsync2, pa2);
               
-              if (pendingAsyncLinearParams1.Count == 0 || pendingAsyncLinearParams2.Count == 0) continue;
+              if (pendingAsyncLinearParams1.Count == 0 || pendingAsyncLinearParams2.Count == 0)
+              {
+                continue;
+              }
 
               // Fourth kind
               // Input permissions of two non-identical pending asyncs (possibly of the same action)
@@ -1046,6 +1156,7 @@ namespace Microsoft.Boogie
               var noDuplication = OutPermsSubsetInPerms(domain, inVars, pendingAsyncLinearParams1.Union(pendingAsyncLinearParams2));
 
               linearityChecks.Add(new LinearityCheck(
+                domain.domainName,
                 Expr.And(membership, existing),
                 noDuplication,
                 $"Potential lnearity violation in pending asyncs of {pendingAsync1.proc.Name} and {pendingAsync2.proc.Name} for domain {domain.domainName}.",
@@ -1055,7 +1166,10 @@ namespace Microsoft.Boogie
         }
       }
 
-      if (linearityChecks.Count == 0) return;
+      if (linearityChecks.Count == 0)
+      {
+        return;
+      }
 
       // Create checker blocks
       List<Block> checkerBlocks = new List<Block>(linearityChecks.Count);
@@ -1067,7 +1181,7 @@ namespace Microsoft.Boogie
           cmds.Add(CmdHelper.AssumeCmd(lc.assume));
         }
         cmds.Add(CmdHelper.AssertCmd(action.proc.tok, lc.assert, lc.message));
-        var block = BlockHelper.Block(lc.name, cmds);
+        var block = BlockHelper.Block($"{lc.domainName}_{lc.checkName}", cmds);
         CivlUtil.ResolveAndTypecheck(block, ResolutionContext.State.Two);
         checkerBlocks.Add(block);
       }
@@ -1125,7 +1239,10 @@ namespace Microsoft.Boogie
           domain.MapConstInt(0))).ToList<Expr>();
 
       if (terms.Count == 0)
+      {
         return domain.MapConstInt(0);
+      }
+
       return terms.Aggregate((x, y) => ExprHelper.FunctionCall(domain.mapAdd, x, y));
     }
 
@@ -1150,6 +1267,18 @@ namespace Microsoft.Boogie
       {
         CivlAttributes.RemoveLinearAttributes(node);
         return base.VisitFunction(node);
+      }
+
+      public override Declaration VisitTypeCtorDecl(TypeCtorDecl node)
+      {
+        CivlAttributes.RemoveLinearAttributes(node);
+        return base.VisitTypeCtorDecl(node);
+      }
+
+      public override Declaration VisitTypeSynonymDecl(TypeSynonymDecl node)
+      {
+        CivlAttributes.RemoveLinearAttributes(node);
+        return base.VisitTypeSynonymDecl(node);
       }
     }
 

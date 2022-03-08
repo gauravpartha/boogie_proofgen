@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Boogie;
 using Microsoft.Boogie.ProofGen;
@@ -10,67 +11,68 @@ namespace ProofGeneration.ProgramToVCProof
     public class AxiomHandler
     {
         public static IEnumerable<VCExpr> AxiomInfo(bool programIsPolymorphic, IEnumerable<Axiom> axioms,
-            VCExpr vcAxioms, VCExpr typeAxioms, List<VCAxiomInfo> typeAxiomInfo,
-            out List<VCAxiomInfo> allAxiomsInfo)
+          VCExpr vcAxioms, VCExpr typeAxioms, List<VCAxiomInfo> typeAxiomInfo,
+          out List<VCAxiomInfo> allAxiomsInfo)
         {
-            var vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
-            var nAxioms = axioms.Count();
+          var vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
+          var nAxioms = axioms.Count();
 
-            List<VCExpr> consideredVCBoogieAxioms;
+          List<VCExpr> consideredVCBoogieAxioms;
 
-            if (programIsPolymorphic)
+          if (programIsPolymorphic)
+          {
+            if (vcBoogieAxioms.Count() == 1 && nAxioms == 0 &&
+                vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
             {
-                if (vcBoogieAxioms.Count() == 1 && nAxioms == 0 &&
-                    vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
-                {
-                    consideredVCBoogieAxioms = new List<VCExpr>();
-                }
-                else
-                {
-                    if (vcBoogieAxioms.Count != nAxioms)
-                        //+3, since we currently ignore the three type ordering axioms
-                        throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
-                            "vc axioms not in-sync with Boogie axioms");
-
-                    consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(0, nAxioms);
-                }
+              consideredVCBoogieAxioms = new List<VCExpr>();
             }
             else
             {
-                if (nAxioms == 0)
-                {
-                    if (vcBoogieAxioms.Count != 1 || !vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
-                        throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
-                            "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
+              if (vcBoogieAxioms.Count != nAxioms)
+                //+3, since we currently ignore the three type ordering axioms
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                  "vc axioms not in-sync with Boogie axioms");
 
-                    consideredVCBoogieAxioms = new List<VCExpr>();
-                }
-                else
-                {
-                    if (vcBoogieAxioms.Count != nAxioms)
-                        throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
-                            "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
-
-                    consideredVCBoogieAxioms = new List<VCExpr>(vcBoogieAxioms);
-                }
+              consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(0, nAxioms);
             }
-
-
-            var typeAxiomInfoPruned = new List<VCAxiomInfo>();
-            var vcTypeAxioms = new List<VCExpr>();
-            if (programIsPolymorphic)
+          }
+          else
+          {
+            if (nAxioms == 0)
             {
-                typeAxiomInfoPruned = typeAxiomInfo.Where(a => !a.Expr.Equals(VCExpressionGenerator.True)).ToList();
-                vcTypeAxioms = DeconstructAxiomsNoChecks(typeAxioms).ToList();
-                if (vcTypeAxioms.Count != typeAxiomInfoPruned.Count)
-                    throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
-                        "type axiom info not in-sync with actual type axioms");
-            }
+              if (vcBoogieAxioms.Count != 1 || !vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                  "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
 
-            //TODO: make sure code that relies on axioms being unique still work (maps that take axioms as keys can be problematic)
-            //don't use union, otherwise duplicates will be pruned, but want to keep each one
-            allAxiomsInfo = GetBoogieAxiomInfo(axioms, consideredVCBoogieAxioms).Concat(typeAxiomInfoPruned).ToList();
-            return consideredVCBoogieAxioms.Concat(vcTypeAxioms);
+              consideredVCBoogieAxioms = new List<VCExpr>();
+            }
+            else
+            {
+              if (vcBoogieAxioms.Count != nAxioms)
+                throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                  "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
+
+              consideredVCBoogieAxioms = new List<VCExpr>(vcBoogieAxioms);
+            }
+          }
+
+
+          var typeAxiomInfoPruned = new List<VCAxiomInfo>();
+          var vcTypeAxioms = new List<VCExpr>();
+          if (programIsPolymorphic)
+          {
+            typeAxiomInfoPruned = typeAxiomInfo.Where(a => !a.Expr.Equals(VCExpressionGenerator.True)).ToList();
+            vcTypeAxioms = DeconstructAxiomsNoChecks(typeAxioms).ToList();
+            if (vcTypeAxioms.Count != typeAxiomInfoPruned.Count)
+              throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
+                "type axiom info not in-sync with actual type axioms");
+          }
+
+          //TODO: make sure code that relies on axioms being unique still work (maps that take axioms as keys can be problematic)
+          //don't use union, otherwise duplicates will be pruned, but want to keep each one
+          IEnumerable<Axiom> reorderedBoogieAxioms = GetReorderedDeclarations(axioms);
+          allAxiomsInfo = GetBoogieAxiomInfo(reorderedBoogieAxioms, consideredVCBoogieAxioms).Concat(typeAxiomInfoPruned).ToList();
+          return consideredVCBoogieAxioms.Concat(vcTypeAxioms);
         }
 
         private static IEnumerable<VCExpr> DeconstructAxiomsNoChecks(VCExpr vcAxioms)
@@ -87,7 +89,27 @@ namespace ProofGeneration.ProgramToVCProof
             result.Reverse();
             return result;
         }
-
+      
+        //Copied from Checker.cs. TODO: find better way of getting reordered declarations
+        private static IEnumerable<Axiom> GetReorderedDeclarations(IEnumerable<Axiom> declarations)
+        {
+          var seed = CommandLineOptions.Clo.RandomSeed;
+          var random = seed != null ? new Random(seed.Value) : null;
+          return GetReorderedDeclarations(declarations, random);
+        }
+      
+        private static IEnumerable<Axiom> GetReorderedDeclarations(IEnumerable<Axiom> declarations, Random random)
+        {
+          if (random == null) {
+            // By ordering the declarations based on their content and naming them based on order, the solver input stays content under reordering and renaming.
+            return CommandLineOptions.Clo.NormalizeDeclarationOrder
+              ? declarations.OrderBy(d => d.ContentHash)
+              : declarations;
+          }
+          var copy = declarations.ToList();
+          Microsoft.Boogie.Util.Shuffle(random, copy);
+          return copy;
+        }
 
         private static IEnumerable<VCExpr> DeconstructAxioms(IEnumerable<Axiom> axioms, VCExpr vcAxioms)
         {

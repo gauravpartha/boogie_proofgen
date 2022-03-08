@@ -1,3 +1,4 @@
+// We use boogie instead of parallel-boogie here to fix the order of the output from /printNecessaryAssumes
 // RUN: %boogie /printNecessaryAssumes "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 

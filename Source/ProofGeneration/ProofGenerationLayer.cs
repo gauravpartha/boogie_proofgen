@@ -343,6 +343,15 @@ namespace ProofGeneration
                 return;
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
+        
+
+        /// <summary>
+        /// Boogie transforms VC used for current procedure to "true", since there are no assertions. 
+        /// </summary>
+        public static void VcIsTrivial()
+        {
+          vcHintManager.TransformHintsToTrivialVc();
+        }
 
         /// <summary>
         /// Provide a hint that passification of the non-passive command <paramref name="cmd"/> in block

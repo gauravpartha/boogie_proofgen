@@ -1,4 +1,4 @@
-// RUN: %boogie "%s" > "%t"
+// RUN: %parallel-boogie "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
 type {:linear "tid"} Tid;
@@ -11,8 +11,8 @@ var {:layer 0,2} seq:int;
 var {:layer 0,3} x:int;
 var {:layer 0,3} y:int;
 
-function {:inline 1} isEven (x:int) : bool { x mod 2 == 0 }
-function {:inline 1} isOdd (x:int) : bool { x mod 2 != 0 }
+function {:inline} isEven (x:int) : bool { x mod 2 == 0 }
+function {:inline} isOdd (x:int) : bool { x mod 2 != 0 }
 
 // =============================================================================
 // Implementation of atomic read and write operations (to variables x and y)
