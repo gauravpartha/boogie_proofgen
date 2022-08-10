@@ -501,10 +501,24 @@ namespace Microsoft.Boogie
           CommandLineOptions.Clo.PrettyPrint);
         CommandLineOptions.Clo.PrintUnstructured = oldPrintUnstructured;
       }
+      
+      #region proofgen
+
+      foreach (var tuple in ProofGenInfoManager.GetMapFromImplementationToProofGenInfo())
+      {
+        Implementation impl = tuple.Key;
+        ProofGenInfo proofGenInfo = tuple.Value;
+        
+        var predecessorMap = proofGenInfo.ComputePredecessors(impl.Blocks);
+        var unoptimizedBlockCopies = proofGenInfo.CopyBlocks(impl.Blocks , predecessorMap, true, cmd => false, out var newVarsAfterDesugaring);
+        proofGenInfo.SetUnoptimizedBlocks(unoptimizedBlockCopies);
+        proofGenInfo.SetNewVarsCFG(newVarsAfterDesugaring);
+      }
+      #endregion
 
       EliminateDeadVariables(program);
 
-      CoalesceBlocks(program);
+      //CoalesceBlocks(program);
 
       Inline(program);
         

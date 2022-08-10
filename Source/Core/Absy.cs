@@ -4469,6 +4469,13 @@ namespace Microsoft.Boogie
       StructuredStmts = structuredStmts;
       BigBlocksResolutionContext ctx = new BigBlocksResolutionContext(structuredStmts, errorHandler);
       Blocks = ctx.Blocks;
+
+      #region proofgen
+      IDictionary<Implementation, ProofGenInfo> mapFromImplementationToProofGenInfo = ProofGenInfoManager.GetMapFromImplementationToProofGenInfo();
+      ProofGenInfo correspondingProofGenInfo = ProofGenInfoManager.GetCurrentProofGenInfo();
+      mapFromImplementationToProofGenInfo.Add(this, correspondingProofGenInfo);
+      #endregion
+      
       BlockPredecessorsComputed = false;
       scc = null;
       Attributes = kv;

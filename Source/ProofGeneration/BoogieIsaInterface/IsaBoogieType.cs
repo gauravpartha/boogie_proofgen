@@ -86,7 +86,12 @@ namespace ProofGeneration
 
         public static TypeIsa ProcedureType()
         {
-            return new DataType("procedure");
+            return new DataType("mbodyCFG procedure");
+        }
+        
+        public static TypeIsa AstProcedureType()
+        {
+          return new DataType("ast procedure");
         }
 
         public static TypeIsa GetBlockType()
@@ -119,7 +124,7 @@ namespace ProofGeneration
 
         public static TypeIsa ProcContextType()
         {
-            return new DataType("proc_context", new List<TypeIsa>());
+            return new DataType("mbodyCFG proc_context", new List<TypeIsa>());
         }
 
         public static TypeIsa FunInterpType(TypeIsa absValType)

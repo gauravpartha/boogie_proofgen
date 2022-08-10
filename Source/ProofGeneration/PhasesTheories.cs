@@ -6,9 +6,11 @@
         {
             Vc,
             Passification,
-            CfgToDag
+            CfgToDag,
+            AstToCfg
         }
 
+        private readonly string astToCfgTheoryName;
         private readonly string cfgToDagTheoryName;
         private readonly string passificationTheoryName;
 
@@ -20,6 +22,7 @@
             vcPhaseTheoryName = prefix + "_vcphase_proof";
             passificationTheoryName = prefix + "_passification_proof";
             cfgToDagTheoryName = prefix + "_cfgtodag_proof";
+            astToCfgTheoryName = prefix + "_asttocfg_proof";
         }
 
         public string TheoryName(Phase phase)
@@ -32,6 +35,8 @@
                     return passificationTheoryName;
                 case Phase.CfgToDag:
                     return cfgToDagTheoryName;
+                case Phase.AstToCfg:
+                    return astToCfgTheoryName;
                 default:
                     throw new ProofGenUnexpectedStateException("unknown phase");
             }

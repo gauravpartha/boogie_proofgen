@@ -46,6 +46,14 @@ namespace ProofGeneration.BoogieIsaInterface.VariableTranslation
 
         public int VariableId(Variable variable)
         {
+            foreach (var id in paramsAndLocalMapping.Keys)
+            {
+              if (variable.ToString() == id.ToString())
+              {
+                variable = id;
+              }
+            }
+          
             if (paramsAndLocalMapping.TryGetValue(variable, out var localResult)) return localResult;
 
             if (globalsMapping.TryGetValue(variable, out var globalResult)) return globalResult;
