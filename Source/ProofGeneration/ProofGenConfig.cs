@@ -18,7 +18,7 @@
             GenerateVcE2E = generateVcE2E;
         }
         
-        public bool GenerateAstToCfg { get; }
+        public bool GenerateAstToCfg { get; set; }
         public bool GenerateCfgDagE2E { get; }
         public bool GeneratePassifE2E { get; }
         public bool GenerateVcE2E { get; }
