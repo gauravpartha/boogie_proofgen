@@ -1004,7 +1004,7 @@ namespace ProofGeneration.ProgramToVCProof
                     else
                         throw new ProofGenUnexpectedStateException("unexpected state corres kind");
 
-                    sb.AppendLine("by (fastforce dest: tint_intv tbool_boolv)");
+                    sb.AppendLine("by (fastforce dest: tint_intv tbool_boolv treal_realv)");
                 }
                 else
                 {

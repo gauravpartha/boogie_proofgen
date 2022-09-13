@@ -278,6 +278,9 @@ namespace ProofGeneration
                 case BinaryOperator.Opcode.Div:
                     bopIsa = "Div";
                     break;
+                case BinaryOperator.Opcode.RealDiv:
+                    bopIsa = "RealDiv";
+                    break;
                 case BinaryOperator.Opcode.Mod:
                     bopIsa = "Mod";
                     break;

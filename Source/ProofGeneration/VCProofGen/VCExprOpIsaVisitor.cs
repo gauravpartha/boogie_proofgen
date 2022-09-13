@@ -209,7 +209,8 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitRealDivOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            Contract.Assert(arg.Count == 2);
+            return new TermApp(IsaCommonTerms.TermIdentFromName("smt_real_div"), arg[0], arg[1]);
         }
 
         public Term VisitSelectOp(VCExprNAry node, List<Term> arg)
@@ -244,7 +245,8 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitToRealOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+            Contract.Assert(arg.Count == 1);
+            return new TermApp(IsaCommonTerms.RealOfInt, arg[0]);
         }
 
         public void setFunctionNamer(IsaUniqueNamer functionNamer)

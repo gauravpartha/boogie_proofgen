@@ -39,6 +39,8 @@ namespace Isabelle.IsaPrettyPrint
                     return "nat";
                 case SimpleType.String:
                     return "string";
+                case SimpleType.Real:
+                    return "real";
                 default:
                     throw new NotImplementedException();
             }
