@@ -53,12 +53,10 @@ namespace ProofGeneration
                 ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.BoolType(), usedClosedConstructors));
             else if (node.IsInt)
                 ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType(), usedClosedConstructors));
+            else if (node.IsReal)
+                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.RealType(), usedClosedConstructors));
             else
-            {
-                //TODO: change to actual reals once formalization has been updated
-                Console.Error.WriteLine("Representing reals as integers");
-                ReturnResult(IsaBoogieType.PrimType(IsaBoogieType.IntType(), usedClosedConstructors));
-            }
+                throw new NotImplementedException();
 
             return node;
         }

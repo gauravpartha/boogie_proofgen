@@ -105,6 +105,8 @@ namespace ProofGeneration.BoogieIsaInterface
                 ReturnResult(PrimitiveType.CreateBoolType());
             else if (node.IsInt)
                 ReturnResult(PrimitiveType.CreateIntType());
+            else if (node.IsReal)
+                ReturnResult(PrimitiveType.CreateRealType());
             else
                 throw new ProofGenUnexpectedStateException("unexpected pure basic type");
 

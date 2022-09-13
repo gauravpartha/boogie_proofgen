@@ -67,6 +67,8 @@ namespace Isabelle.Ast
         public abstract R VisitNatConst(NatConst t);
 
         public abstract R VisitIntConst(IntConst t);
+        
+        public abstract R VisitRealConst(RealConst t);
 
         public abstract R VisitStringConst(StringConst t);
     }

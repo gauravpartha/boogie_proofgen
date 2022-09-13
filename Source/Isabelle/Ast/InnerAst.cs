@@ -397,6 +397,21 @@ namespace Isabelle.Ast
         }
     }
 
+    public class RealConst : Term
+    {
+        public RealConst(BigDec val)
+        {
+            Val = val;
+        }
+        
+        public BigDec Val { get; }
+
+        public override T Dispatch<T>(TermVisitor<T> visitor)
+        {
+            return visitor.VisitRealConst(this);
+        }
+    }
+
     public class StringConst : Term
     {
         public readonly string s;
@@ -517,6 +532,7 @@ namespace Isabelle.Ast
         Bool,
         Nat,
         Int,
+        Real,
         String
     }
 
@@ -542,6 +558,11 @@ namespace Isabelle.Ast
         public static PrimitiveType CreateIntType()
         {
             return new PrimitiveType(SimpleType.Int);
+        }
+        
+        public static PrimitiveType CreateRealType()
+        {
+            return new PrimitiveType(SimpleType.Real);
         }
 
         public static PrimitiveType CreateStringType()

@@ -37,6 +37,11 @@ namespace Isabelle.IsaPrettyPrint
             return t.Val.ToString();
         }
 
+        public override string VisitRealConst(RealConst t)
+        {
+            return t.Val.ToString();
+        }
+
         public override string VisitStringConst(StringConst t)
         {
             return "''" + t.s + "''";
