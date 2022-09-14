@@ -44,12 +44,22 @@ namespace ProofGeneration.VCProofGen
             return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(func, func.Name));
         }
 
+        public override Term U2Real(Function func)
+        {
+            return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(func, func.Name));
+        }
+
         public override Term Int2U(Function func)
         {
             return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(func, func.Name));
         }
 
         public override Term Bool2U(Function func)
+        {
+            return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(func, func.Name));
+        }
+
+        public override Term Real2U(Function func)
         {
             return IsaCommonTerms.TermIdentFromName(uniqueNamer.GetName(func, func.Name));
         }

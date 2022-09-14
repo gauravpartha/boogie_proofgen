@@ -34,6 +34,10 @@ namespace ProofGeneration.VCProofGen
             {
                 result = U2Bool(func);
             }
+            else if (name.Equals("U_2_real"))
+            {
+                result = U2Real(func);
+            }
             else if (name.Equals("int_2_U"))
             {
                 result = Int2U(func);
@@ -41,6 +45,10 @@ namespace ProofGeneration.VCProofGen
             else if (name.Equals("bool_2_U"))
             {
                 result = Bool2U(func);
+            }
+            else if (name.Equals("real_2_U"))
+            {
+                result = Real2U(func);
             }
             else if (IsTypeConstr(name, out var constrName))
             {
@@ -65,8 +73,10 @@ namespace ProofGeneration.VCProofGen
         public abstract Term BoolType(Function func);
         public abstract Term U2Int(Function func);
         public abstract Term U2Bool(Function func);
+        public abstract Term U2Real(Function func);
         public abstract Term Int2U(Function func);
         public abstract Term Bool2U(Function func);
+        public abstract Term Real2U(Function func);
         public abstract Term TypeConstructor(string constrName, Function func);
         public abstract Term TypeConstructorInverse(string constrName, int index, Function func);
 

@@ -578,9 +578,9 @@ namespace Microsoft.Boogie.TypeErasure
     }
 
     public virtual void Setup() {
-      /*PROOF GEN: only support integers and booleans */
+      /*PROOF GEN: only support integers, booleans, and reals */
       GetBasicTypeRepr(Type.Int);
-      //GetBasicTypeRepr(Type.Real);
+      GetBasicTypeRepr(Type.Real);
       GetBasicTypeRepr(Type.Bool);
       //GetBasicTypeRepr(Type.RMode);
       //GetBasicTypeRepr(Type.String);
@@ -700,9 +700,9 @@ namespace Microsoft.Boogie.TypeErasure
     {
       base.Setup();
       
-      /*PROOF GEN: only support integers and booleans */
+      /*PROOF GEN: only support integers, booleans, and reals */
       GetTypeCasts(Type.Int);
-      //GetTypeCasts(Type.Real);
+      GetTypeCasts(Type.Real);
       GetTypeCasts(Type.Bool);
       //GetTypeCasts(Type.RMode);
       //GetTypeCasts(Type.String);
