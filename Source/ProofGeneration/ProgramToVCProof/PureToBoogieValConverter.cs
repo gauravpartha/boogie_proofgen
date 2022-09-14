@@ -37,6 +37,8 @@ namespace ProofGeneration.ProgramToVCProof
                 ReturnResult(v => IsaBoogieTerm.BoolVal(v));
             else if (node.IsInt)
                 ReturnResult(v => IsaBoogieTerm.IntVal(v));
+            else if (node.IsReal)
+                ReturnResult(v => IsaBoogieTerm.RealVal(v));
             else
                 throw new NotImplementedException();
 

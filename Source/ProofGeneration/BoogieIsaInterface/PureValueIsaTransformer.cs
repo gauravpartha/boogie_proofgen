@@ -49,6 +49,13 @@ namespace ProofGeneration.BoogieIsaInterface
                     ReturnResult(IsaBoogieTerm.IntVal(arg));
                 else
                     ReturnResult(IsaBoogieTerm.ConvertValToInt(arg));
+            } 
+            else if (node.IsReal)
+            {
+                if (constructVal)    
+                    ReturnResult(IsaBoogieTerm.RealVal(arg));
+                else
+                    ReturnResult(IsaBoogieTerm.ConvertValToReal(arg));
             }
             else
             {

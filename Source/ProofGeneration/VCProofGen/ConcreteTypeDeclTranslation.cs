@@ -25,10 +25,15 @@ namespace ProofGeneration.VCProofGen
         {
             return IsaBoogieTerm.BoolValConstr();
         }
-
+        
         public override Term Int2U(Function func)
         {
             return IsaBoogieTerm.IntValConstr();
+        }
+        
+        public override Term Real2U(Function func)
+        {
+            return IsaBoogieTerm.RealValConstr();
         }
 
         public override Term U2Bool(Function func)
@@ -40,7 +45,12 @@ namespace ProofGeneration.VCProofGen
         {
             return IsaBoogieTerm.ConvertValToIntId;
         }
-
+        
+        public override Term U2Real(Function func)
+        {
+            return IsaBoogieTerm.ConvertValToRealId;
+        }
+        
         public override Term BoolType(Function func)
         {
             return IsaBoogieVC.PrimTypeClosed(IsaBoogieType.BoolType());

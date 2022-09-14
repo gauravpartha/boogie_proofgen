@@ -69,6 +69,8 @@ namespace ProofGeneration.VCProofGen
                 return new BoolConst(false);
             if (node is VCExprIntLit lit)
                 return new TermWithExplicitType(new IntConst(lit.Val), PrimitiveType.CreateIntType());
+            if (node is VCExprRealLit realLit)
+                return new TermWithExplicitType(new RealConst(realLit.Val), PrimitiveType.CreateRealType());
             throw new NotImplementedException();
         }
 

@@ -49,8 +49,8 @@ namespace ProofGeneration.Util
 
         public override Type VisitBasicType(BasicType node)
         {
-            //only support integers and booleans as basic types
-            if (node.IsReal || node.isFloat || node.IsBv || node.IsString || node.IsRMode || node.IsRegEx)
+            //only support integers, booleans, and reals as basic types
+            if (node.isFloat || node.IsBv || node.IsString || node.IsRMode || node.IsRegEx)
             {
                 problematicNode = node;
                 return node;
