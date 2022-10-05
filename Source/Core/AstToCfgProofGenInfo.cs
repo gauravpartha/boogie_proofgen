@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Reflection;
+using ProofGenUtil;
 
 using Core;
 
@@ -19,7 +20,7 @@ namespace Microsoft.Boogie
   /// <summary>
   /// A class used to collect information needed for the generation of the AST-to-CFG part of the validation certificate for a Boogie procedure.
   /// </summary>
-  public class ProofGenInfo
+  public class AstToCfgProofGenInfo
   {
     /// The original <see cref = "StmtList"/> object, which contains the original list of <see cref ="BigBlock" /> objects, which is Boogie's internal AST representation.
     private StmtList stmtList;
@@ -40,7 +41,7 @@ namespace Microsoft.Boogie
 
     //TODO: Fix this.
     /** A dictionary mapping a 'LoopHead' BigBlock to a tuple of two BigBlocks.
-      * A LoopHead is a special BigBlock that is a second copy (copy of a copy) has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>.
+      * A LoopHead is a special BigBlock that is a second copy (copy of a copy), has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>.
       * The first BigBlock in the tuple is the copied BigBlock, from which the LoopHead was created.
       * The second BigBlock in the tuple is the original BigBlock the copy corresponds to. */
     private IDictionary<BigBlock, (BigBlock, BigBlock)> mappingCopyBigblockToOrigBigblockWithTupleValue;
@@ -202,8 +203,7 @@ namespace Microsoft.Boogie
       {
         case BranchIndicator.NoGuard:
           FillEmptyElseBranches(b);
-          //injectEmptyBlockAtTheEndOfBranches(b);
-
+          
           copy = CopyBigBlock(b);
           mappingCopyBigblockToOrigBigblock.Add(copy, b);
           mappingOrigBigblockToCopyBigblock.Add(b, copy);
@@ -513,7 +513,7 @@ namespace Microsoft.Boogie
         //don't copy variables, since proof generation assumes sharing of variable identities
         Func<Cmd, Cmd> copyCmd = cmd =>
             deepCopyCmdPred(cmd)
-                ? cmd.Copy(t => t != typeof(IdentifierExpr) && t != typeof(TypeVariable) && t != typeof(QKeyValue))
+                ? ProofGenUtil.ObjectExtensions.Copy(cmd, t => t != typeof(IdentifierExpr) && t != typeof(TypeVariable) && t != typeof(QKeyValue))
                 : (Cmd) CloneMethod.Invoke(cmd, null);
 
         foreach (var b in blocks)
@@ -586,6 +586,19 @@ namespace Microsoft.Boogie
       }
 
       return predecessors;
+    }
+
+    public void CreateBlockPairingWithHints(BigBlock bigblock, Block block, BranchIndicator branchIndicator, Expr guard)
+    {
+      if (!GetMappingOrigBigBlockToOrigBlock().ContainsKey(bigblock))
+      {
+        AddBigBlockToBlockPair(bigblock, block);
+
+        if (!GetMappingCopyBigBlockToHints().ContainsKey(bigblock))
+        {
+          AddBigBlockToHintsPair(bigblock, (guard, branchIndicator)); 
+        }
+      }
     }
     
   }

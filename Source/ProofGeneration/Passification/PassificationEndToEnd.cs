@@ -253,12 +253,7 @@ namespace ProofGeneration.Passification
             {
                 ProofUtil.Apply("rule " + ProofUtil.OF("nstate_old_rel_states_helper", constsGlobalsAssmName,
                     oldGlobalEqualAssmName)),
-                ProofUtil.Apply("simp only: fst_conv snd_conv " + programAccessor.GlobalsLocalsDisjointLemma()),
-                
-                // generatedAstToCfgProof ? 
-                //   "unfolding " + beforeCfgProgramAccessor.ParamsDecl() + "_def " + beforeCfgProgramAccessor.LocalsDecl() + "_def " + 
-                //   beforeCfgProgramAccessor.GlobalsDecl() + "_def " + beforeCfgProgramAccessor.ConstsDecl() + "_def" : null,
-                // generatedAstToCfgProof ? "apply simp" : null
+                ProofUtil.Apply("simp only: fst_conv snd_conv " + programAccessor.GlobalsLocalsDisjointLemma())
             };
 
             void ConvertRelPropertyToListElems()

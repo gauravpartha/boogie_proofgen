@@ -91,8 +91,6 @@ namespace ProofGeneration
             bigBlocksDefDecls.Add(b, bb_decls);
           }
 
-          //bigBlocksDefDecls.Add(b, bb_decls);
-
           updatedNestedBlockTracker = updatedTrackerAfterStr;
           return bigblock; 
       }
@@ -209,7 +207,7 @@ namespace ProofGeneration
         return strCmdTermOption;
       }
 
-      public Term makeContinuationTerm(BigBlock b, ProofGenInfo proofGenInfo, int successorIndex)
+      public Term makeContinuationTerm(BigBlock b, AstToCfgProofGenInfo proofGenInfo, int successorIndex)
       {
         Term continuationTerm;
         Term continuationStart;

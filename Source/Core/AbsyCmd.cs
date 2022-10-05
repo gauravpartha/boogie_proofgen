@@ -437,9 +437,9 @@ namespace Microsoft.Boogie
       get
       {
         #region proofgen
-        ProofGenInfo proofGenInfo = new ProofGenInfo();
+        AstToCfgProofGenInfo proofGenInfo = new AstToCfgProofGenInfo();
         proofGenInfo.SetStmtList(stmtList);
-        ProofGenInfoManager.SetCurrentProofGenInfo(proofGenInfo);
+        AstToCfgProofGenInfoManager.SetCurrentProofGenInfo(proofGenInfo);
         #endregion
         
         Contract.Ensures(cce.NonNullElements(Contract.Result<List<Block>>()));
@@ -710,7 +710,7 @@ namespace Microsoft.Boogie
 
     // If the enclosing context is a loop, then "runOffTheEndLabel" is the loop head label;
     // otherwise, it is null.
-    void CreateBlocks(StmtList stmtList, string runOffTheEndLabel, ProofGenInfo proofGenInfo)
+    void CreateBlocks(StmtList stmtList, string runOffTheEndLabel, AstToCfgProofGenInfo proofGenInfo)
     {
       Contract.Requires(stmtList != null);
       Contract.Requires(blocks != null);
@@ -741,15 +741,7 @@ namespace Microsoft.Boogie
           Block block = new Block(b.tok, b.LabelName, theSimpleCmds, b.tc);
           
           #region proofgen
-          if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(b))
-          {
-            proofGenInfo.AddBigBlockToBlockPair(b, block);
-
-            if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(b))
-            {
-              proofGenInfo.AddBigBlockToHintsPair(b, (null, BranchIndicator.NoGuard)); 
-            }
-          }
+          proofGenInfo.CreateBlockPairingWithHints(b, block, BranchIndicator.NoGuard, null);
           #endregion
           
           blocks.Add(block);
@@ -771,14 +763,7 @@ namespace Microsoft.Boogie
           blocks.Add(block);
           
           #region proofgen
-          if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(b))
-          {
-            proofGenInfo.AddBigBlockToBlockPair(b, block);
-            if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(b))
-            {
-              proofGenInfo.AddBigBlockToHintsPair(b, (null, BranchIndicator.NoGuard)); 
-            }
-          }
+          proofGenInfo.CreateBlockPairingWithHints(b, block, BranchIndicator.NoGuard, null);
           #endregion
         }
         else if (b.ec is BreakCmd)
@@ -789,14 +774,7 @@ namespace Microsoft.Boogie
           blocks.Add(block);
           
           #region proofgen
-          if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(b))
-          {
-            proofGenInfo.AddBigBlockToBlockPair(b, block);
-            if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(b))
-            {
-              proofGenInfo.AddBigBlockToHintsPair(b, (null, BranchIndicator.NoGuard)); 
-            }
-          }
+          proofGenInfo.CreateBlockPairingWithHints(b, block, BranchIndicator.NoGuard, null);
           #endregion
         }
         else if (b.ec is WhileCmd)
@@ -830,14 +808,7 @@ namespace Microsoft.Boogie
           blocks.Add(block);
           
           #region proofgen
-          if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(b))
-          {
-            proofGenInfo.AddBigBlockToBlockPair(b, block);
-            if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(b))
-            {
-              proofGenInfo.AddBigBlockToHintsPair(b, (null, BranchIndicator.NoGuard)); 
-            }
-          }
+          proofGenInfo.CreateBlockPairingWithHints(b, block, BranchIndicator.NoGuard, null);
           #endregion
 
           // LoopHead: assert/assume loop_invariant; goto LoopDone, LoopBody;
@@ -873,14 +844,7 @@ namespace Microsoft.Boogie
             
             #region proofgen
             BigBlock loopBodyBeginning = wcmd.Body.BigBlocks[0];
-            if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(loopBodyBeginning))
-            {
-              proofGenInfo.AddBigBlockToBlockPair(loopBodyBeginning, block);
-              if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(loopBodyBeginning))
-              {
-                proofGenInfo.AddBigBlockToHintsPair(loopBodyBeginning, (wcmd.Guard, BranchIndicator.GuardHolds));
-              }
-            }
+            proofGenInfo.CreateBlockPairingWithHints(loopBodyBeginning, block, BranchIndicator.GuardHolds, wcmd.Guard);
             #endregion
           }
 
@@ -978,15 +942,8 @@ namespace Microsoft.Boogie
             blocks.Add(block);
             
             #region proofgen
-            if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(b))
-            {
-              proofGenInfo.AddBigBlockToBlockPair(b, block);
-              if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(b))
-              {
-                proofGenInfo.AddBigBlockToHintsPair(b, (null, BranchIndicator.NoGuard));
-              }
-            }
-            
+            proofGenInfo.CreateBlockPairingWithHints(b, block, BranchIndicator.NoGuard, null);
+
             proofGenInfo.AddBigBlockToHintsPair(ifcmd.thn.BigBlocks.First(), (ifcmd.Guard, BranchIndicator.GuardHolds));
 
             if (ifcmd.elseBlock != null)
@@ -1004,14 +961,7 @@ namespace Microsoft.Boogie
               
               #region proofgen
               BigBlock thnBranchBeginning = ifcmd.thn.BigBlocks[0];
-              if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(thnBranchBeginning))
-              {
-                proofGenInfo.AddBigBlockToBlockPair(thnBranchBeginning, block);
-                if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(thnBranchBeginning))
-                {
-                  proofGenInfo.AddBigBlockToHintsPair(thnBranchBeginning, (ifcmd.Guard, BranchIndicator.GuardHolds));
-                }
-              }
+              proofGenInfo.CreateBlockPairingWithHints(thnBranchBeginning, block, BranchIndicator.GuardHolds, ifcmd.Guard);
               #endregion
             }
 
@@ -1029,14 +979,7 @@ namespace Microsoft.Boogie
                 blocks.Add(block);
                 #region proofgen
                 BigBlock elseBranchBeginning = ifcmd.elseBlock.BigBlocks[0];
-                if (!proofGenInfo.GetMappingOrigBigBlockToOrigBlock().ContainsKey(elseBranchBeginning))
-                {
-                  proofGenInfo.AddBigBlockToBlockPair(elseBranchBeginning, block);
-                  if (!proofGenInfo.GetMappingCopyBigBlockToHints().ContainsKey(elseBranchBeginning))
-                  {
-                    proofGenInfo.AddBigBlockToHintsPair(elseBranchBeginning, (ifcmd.Guard, BranchIndicator.GuardFails));
-                  }
-                }
+                proofGenInfo.CreateBlockPairingWithHints(elseBranchBeginning, block, BranchIndicator.GuardFails, ifcmd.Guard);
                 #endregion
               }
 

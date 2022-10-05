@@ -118,7 +118,7 @@ namespace ProofGeneration
                     VariableDeclarationsName("locals"),
                     cfgName,
                     procDefName);
-                membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo,
+                membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo, null,
                 Tuple.Create(globalsMax, localsMin), varTranslationFactory, theoryName);
                 
                 var nodesToBlocks = GetNodeToBlocksIsa(cfg, blockInfo.BlockCmdsDefs);

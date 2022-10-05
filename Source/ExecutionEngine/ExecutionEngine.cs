@@ -504,10 +504,10 @@ namespace Microsoft.Boogie
       
       #region proofgen
 
-      foreach (var tuple in ProofGenInfoManager.GetMapFromImplementationToProofGenInfo())
+      foreach (var tuple in AstToCfgProofGenInfoManager.GetImplToProofGenInfo())
       {
         Implementation impl = tuple.Key;
-        ProofGenInfo proofGenInfo = tuple.Value;
+        AstToCfgProofGenInfo proofGenInfo = tuple.Value;
         
         var predecessorMap = proofGenInfo.ComputePredecessors(impl.Blocks);
         var unoptimizedBlockCopies = proofGenInfo.CopyBlocks(impl.Blocks , predecessorMap, true, cmd => false, out var newVarsAfterDesugaring);

@@ -108,51 +108,6 @@ namespace ProofGeneration.BoogieIsaInterface
             IsaProgramGeneratorConfig config,
             IsaProgramRepr isaProgramRepr,
             IsaBlockInfo isaBlockInfo,
-            Tuple<int, int> GlobalsMaxLocalsMin,
-            IVariableTranslationFactory factory,
-            string theoryName
-        )
-        {
-            parent = config.parentAccessor;
-            this.isaProgramRepr = isaProgramRepr;
-            this.factory = factory;
-            this.theoryName = theoryName;
-            this.config = config;
-            this.isaBlockInfo = isaBlockInfo;
-            typeIsaVisitor = new TypeIsaVisitor(factory.CreateTranslation().TypeVarTranslation);
-            basicCmdIsaVisitor = new BasicCmdIsaVisitor(factory);
-            paramsAndLocalsDefs =
-                new[] {isaProgramRepr.paramsDeclDef + "_def", isaProgramRepr.localVarsDeclDef + "_def"};
-
-            parameters = config.generateParamsAndLocals
-                ? QualifyAccessName(isaProgramRepr.paramsDeclDef)
-                : parent.ParamsDecl();
-            locals = config.generateParamsAndLocals
-                ? QualifyAccessName(isaProgramRepr.localVarsDeclDef)
-                : parent.LocalsDecl();
-            paramsAndLocalsList =
-                IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(parameters),
-                    IsaCommonTerms.TermIdentFromName(locals));
-
-            consts = config.generateGlobalsAndConstants
-                ? QualifyAccessName(isaProgramRepr.GlobalProgramRepr.constantsDeclDef)
-                : parent.ConstsDecl();
-            globals = config.generateGlobalsAndConstants
-                ? QualifyAccessName(isaProgramRepr.GlobalProgramRepr.globalsDeclDef)
-                : parent.GlobalsDecl();
-
-            constsAndGlobalsDefs =
-                new[] {consts + "_def", globals + "_def"};
-            constsAndGlobalsList =
-                IsaCommonTerms.AppendList(IsaCommonTerms.TermIdentFromName(consts),
-                    IsaCommonTerms.TermIdentFromName(globals));
-            AddDisjointnessLemmas(GlobalsMaxLocalsMin.Item1, GlobalsMaxLocalsMin.Item2);
-            AddWellFormednessLemmas();
-        }
-        
-        public MembershipLemmaManager(
-            IsaProgramGeneratorConfig config,
-            IsaProgramRepr isaProgramRepr,
             IsaBigBlockInfo isaBigBlockInfo,
             Tuple<int, int> GlobalsMaxLocalsMin,
             IVariableTranslationFactory factory,
@@ -164,6 +119,7 @@ namespace ProofGeneration.BoogieIsaInterface
             this.factory = factory;
             this.theoryName = theoryName;
             this.config = config;
+            this.isaBlockInfo = isaBlockInfo;
             this.isaBigBlockInfo = isaBigBlockInfo;
             typeIsaVisitor = new TypeIsaVisitor(factory.CreateTranslation().TypeVarTranslation);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(factory);

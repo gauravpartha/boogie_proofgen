@@ -79,6 +79,7 @@ namespace ProofGeneration
 
         public static TermIdent ConvertValToBoolId { get; } = IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
         public static TermIdent ConvertValToIntId { get; } = IsaCommonTerms.TermIdentFromName("convert_val_to_int");
+        public static TermIdent SematicsProcSpecSatisfied { get; } = IsaCommonTerms.TermIdentFromName("Semantics.proc_body_satisfies_spec");
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
@@ -523,8 +524,7 @@ namespace ProofGeneration
         {
           var beforeBigblockDefName = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(b).First();
           Term beforeBigblock = IsaCommonTerms.TermIdentFromName(beforeBigblockDefName);
-          //Term cont0 = IsaCommonTerms.TermIdentFromName("cont0");
-            
+
           IList<Term> startConfigArgs = new List<Term>();
           startConfigArgs.Add(beforeBigblock);
           startConfigArgs.Add(cont0);
@@ -603,7 +603,7 @@ namespace ProofGeneration
                     });
         }
         
-        public static Term LoopIH(BoogieContextIsa astBoogieContext, BoogieContextIsa cfgBoogieContext, Term ast, Term bigblock, Term cont, Term cfgBody, Term blockIndex, Term posts)
+        public static Term AstToCfgLoopIndHypothesis(BoogieContextIsa astBoogieContext, BoogieContextIsa cfgBoogieContext, Term ast, Term bigblock, Term cont, Term cfgBody, Term blockIndex, Term posts)
         {
           return
             new TermApp(astLoopIhId,

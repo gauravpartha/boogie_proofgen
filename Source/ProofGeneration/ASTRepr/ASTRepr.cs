@@ -39,7 +39,7 @@ namespace ProofGeneration.ASTRepresentation
           return -1;
         }
 
-        public TermList GetAstAsTermList(ProofGenInfo proofGenInfo)
+        public TermList GetAstAsTermList(AstToCfgProofGenInfo proofGenInfo)
         {
           IList<Term> terms = new List<Term>();
           for (var i = 0; i < bigblocks.Count; i++)
@@ -54,7 +54,7 @@ namespace ProofGeneration.ASTRepresentation
           return new TermList(terms);
         }
         
-        public List<string> GetMainContinuations(ProofGenInfo proofGenInfo)
+        public List<string> GetMainContinuations(AstToCfgProofGenInfo proofGenInfo)
         {
           List<string> strings = new List<string>();
           for (var i = 0; i < bigblocks.Count; i++)

@@ -16,9 +16,8 @@ namespace ProofGeneration.AstToCfg
     {
         public static Theory AstToCfgProof(
             PhasesTheories phasesTheories,
-            //bool generateEndToEndLemma,
             Term vcAssm,
-            ProofGenInfo proofGenInfo,
+            AstToCfgProofGenInfo proofGenInfo,
             ASTRepr beforeCfgAst,
             CFGRepr afterCfg,
             BoogieMethodData beforeCfgData,
@@ -31,7 +30,6 @@ namespace ProofGeneration.AstToCfg
             MultiCmdIsaVisitor multiCmdIsaVisitor)
         {
             LemmaDecl entryLemma = null;
-            //var afterToBefore = beforeToAfter.InverseDict();
 
             var varContextName = "\\<Lambda>1";
             var varContextAbbrev = new AbbreviationDecl(
@@ -73,11 +71,9 @@ namespace ProofGeneration.AstToCfg
 
             foreach (BigBlock beforeBlock in beforeCfgAst.GetBlocksBackwards())
             {
-              //BigBlock beforeBlockOrig = proofGenInfo.getMappingCopyBigblockToOrigBigblock()[beforeBlock];
               Block afterBlock = beforeToAfter[beforeBlock];
               
               int bigblockIndex = proofGenInfo.GetMappingCopyBigBlockToIndex()[beforeBlock];
-              //int blockIndex = afterCfg.GetUniqueIntLabel(afterBlock);
 
               BigBlock successorBigBlockOrig;
               BigBlock successorBigBlockCopy;
@@ -181,13 +177,6 @@ namespace ProofGeneration.AstToCfg
 
           for (var i = 0; i < bbsArray.Length; i++)
           {
-            // String test = bbsArray[i].simpleCmds.First().ToString();
-            // String test2 = b.simpleCmds.First().ToString();
-            // StructuredCmd ec1 = bbsArray[i].ec;
-            // StructuredCmd ec2 = b.ec;
-            // String name1 = bbsArray[i].LabelName;
-            // String name2 = b.LabelName;
-            
             if (bbsArray[i] == b && i != 0 && bbsArray[i - 1].ec is WhileCmd)
             {
               predecessor = bbsArray[i - 1];

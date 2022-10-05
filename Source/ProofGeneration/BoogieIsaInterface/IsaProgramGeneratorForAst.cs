@@ -15,7 +15,7 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
-  internal class IsaProgramGenerator_forAst
+  internal class IsaProgramGeneratorForAst
     {
         private MultiCmdIsaVisitor cmdIsaVisitor;
         private BoogieVariableTranslation varTranslation;
@@ -32,7 +32,7 @@ namespace ProofGeneration
             IVariableTranslationFactory varTranslationFactory,
             ASTRepr ast,
             ASTRepr originalAst,
-            ProofGenInfo proofGenInfo,
+            AstToCfgProofGenInfo proofGenInfo,
             out IList<OuterDecl> decls,
             bool generateMembershipLemmas = true,
             bool onlyGlobalData = false
@@ -72,7 +72,7 @@ namespace ProofGeneration
                     VariableDeclarationsName("locals"),
                     astName,
                     procDefName);
-                membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, bigblockInfo,
+                membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, null, bigblockInfo,
                 Tuple.Create(globalsMax, localsMin), varTranslationFactory, theoryName);
                 
                 foreach (var decl_list in bigblockInfo.BigBlockDefs.Values)
@@ -230,13 +230,10 @@ namespace ProofGeneration
             return methodDef;
         }
 
-        private IsaBigBlockInfo BigBlockToInfo(string theoryName, ASTRepr ast, ProofGenInfo proofGenInfo)
+        private IsaBigBlockInfo BigBlockToInfo(string theoryName, ASTRepr ast, AstToCfgProofGenInfo proofGenInfo)
         {
             var blockToDecl = new Dictionary<BigBlock, IList<OuterDecl>>();
             var blockToCounter = new Dictionary<BigBlock, int>();
-
-            //var astTerm = IsaCommonTerms.TermIdentFromName(astName);
-            //var astDef = astName + "_def";
 
             foreach (BigBlock b in ast.GetBlocksForwards())
             {
@@ -251,9 +248,7 @@ namespace ProofGeneration
                 var translatedBigBlock = builder.makeBigBlockTerm(b, cmdIsaVisitor, flag, 0, nameToUse, out int updatedNestedBlockTracker);
                 
                 proofGenInfo.AddBigBlockToIndexPair(b, uniqueIntLabel);
-
-                //var blockDecl = DefDecl.CreateWithoutArg("bigblock_" + ast.GetUniqueIntLabel(b), translatedBigBlock);
-
+                
                 IDictionary<BigBlock, IList<OuterDecl>> bb_defs = builder.getBigblockDefDecls();
                 foreach(KeyValuePair<BigBlock, IList<OuterDecl>> bb_def in bb_defs)
                 {
@@ -269,7 +264,7 @@ namespace ProofGeneration
             return new IsaBigBlockInfo(theoryName, blockToCounter, blockToDecl);
         }
 
-        private IList<OuterDecl> getContinuations(ASTRepr originalAst, ProofGenInfo proofGenInfo)
+        private IList<OuterDecl> getContinuations(ASTRepr originalAst, AstToCfgProofGenInfo proofGenInfo)
         {
           IList<OuterDecl> declsToReturn = new List<OuterDecl>();
           BigBlockTermBuilder builder = new BigBlockTermBuilder();
@@ -340,10 +335,7 @@ namespace ProofGeneration
 
         private DefDecl GetFunctionDeclarationsIsa(IEnumerable<Function> functions)
         {
-            //var equations = new List<Tuple<IList<Term>, Term>>();
             var fdecls = new List<Term>();
-
-
             foreach (var f in functions) fdecls.Add(IsaBoogieTerm.FunDecl(f, varTranslationFactory));
 
             return DefDecl.CreateWithoutArg(FunctionDeclarationsName(), new TermList(fdecls));

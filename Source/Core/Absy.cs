@@ -4471,8 +4471,8 @@ namespace Microsoft.Boogie
       Blocks = ctx.Blocks;
 
       #region proofgen
-      IDictionary<Implementation, ProofGenInfo> mapFromImplementationToProofGenInfo = ProofGenInfoManager.GetMapFromImplementationToProofGenInfo();
-      ProofGenInfo correspondingProofGenInfo = ProofGenInfoManager.GetCurrentProofGenInfo();
+      IDictionary<Implementation, AstToCfgProofGenInfo> mapFromImplementationToProofGenInfo = AstToCfgProofGenInfoManager.GetImplToProofGenInfo();
+      AstToCfgProofGenInfo correspondingProofGenInfo = AstToCfgProofGenInfoManager.GetCurrentProofGenInfo();
       mapFromImplementationToProofGenInfo.Add(this, correspondingProofGenInfo);
       #endregion
       

@@ -48,7 +48,7 @@ namespace ProofGeneration.AstToCfg
             IProgramAccessor beforeCfgProgramAccessor,
             IProgramAccessor afterCfgProgramAccessor,
             ASTRepr ast,
-            ProofGenInfo proofGenInfo)
+            AstToCfgProofGenInfo proofGenInfo)
         {
             this.beforeCfgProgramAccessor = beforeCfgProgramAccessor;
             //this.afterCfgProgramAccessor = afterCfgProgramAccessor;
@@ -250,7 +250,7 @@ namespace ProofGeneration.AstToCfg
         private ContextElem LemmaContext(
             ASTRepr ast,
             Term vcAssm,
-            ProofGenInfo proofGenInfo
+            AstToCfgProofGenInfo proofGenInfo
         )
         {
             BigBlock bigblock0 = ast.GetBlocksForwards().First();

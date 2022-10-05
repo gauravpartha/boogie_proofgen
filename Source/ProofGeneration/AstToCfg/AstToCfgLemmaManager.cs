@@ -56,8 +56,6 @@ namespace ProofGeneration.AstToCfg
             BoogieContextIsa cfgBoogieContext,
             CFGRepr afterCfg,
             string funContextWfName,
-            // CfgToDagHintManager hintManager,
-            // IDictionary<Block, IList<Block>> blocksToLoops,
             IDictionary<Block, Block> beforeDagOrigBlock,
             IDictionary<BigBlock, Block> beforeToAfterBlock,
             BoogieMethodData beforeCfgData,
@@ -69,8 +67,6 @@ namespace ProofGeneration.AstToCfg
             this.afterCfg = afterCfg;
             this.funContextWfName = funContextWfName;
             variableTranslation = varFactory.CreateTranslation().VarTranslation;
-            // this.hintManager = hintManager;
-            // this.blocksToLoops = blocksToLoops;
             this.beforeToAfterBlock = beforeToAfterBlock;
             this.beforeCfgData = beforeCfgData;
             
@@ -81,7 +77,6 @@ namespace ProofGeneration.AstToCfg
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(varFactory);
             mappingBigBlockToGlobalLemmaDecl = new Dictionary<BigBlock, LemmaDecl>();
             mappingBigBlockToLocalLemmaDecl = new Dictionary<BigBlock, LemmaDecl>();
-            //typingTacticGenerator = new TypingTacticGenerator(beforeCfgProgAccess, varFactory);
 
             this.beforeDagOrigBlock = beforeDagOrigBlock;
         }
@@ -192,18 +187,6 @@ namespace ProofGeneration.AstToCfg
               proofSb.AppendLine(ProofUtil.Apply("rule cfgBlockDoesntFail"));
               proofSb.AppendLine(ProofUtil.Apply( ProofUtil.Repeat("simp add: " + afterCmdsDefName + "_def " + beforeBigblockDefName + "_def")));
               proofSb.AppendLine("done");
-              
-              // proofMethods = new List<string>
-              // {
-              //   ProofUtil.Apply("rule block_local_rel_generic"),
-              //   ProofUtil.Apply("rule Rel_Main_test[of " + beforeBigblockDefName + "]"),
-              //   ProofUtil.Apply("simp add: " + beforeBigblockDefName + "_def " + afterCmdsDefName + "_def"),
-              //   ProofUtil.Apply("simp add: " + afterCmdsDefName + "_def)+",
-              //   ProofUtil.Apply("rule astStep"),
-              //   ProofUtil.Apply("rule cfgBlockDoesntFail"),
-              //   ProofUtil.Apply("simp add: " + afterCmdsDefName + "_def " + beforeBigblockDefName + "_def)+",
-              //   "done"
-              // };
             } 
             else if (indicator == BranchIndicator.GuardHolds)
             {
@@ -218,21 +201,6 @@ namespace ProofGeneration.AstToCfg
               proofSb.AppendLine(ProofUtil.Apply("simp add: " + afterCmdsDefName + "_def"));
               proofSb.AppendLine(ProofUtil.Apply(ProofUtil.Repeat("simp add: assms(3) " + beforeBigblockDefName + "_def")));
               proofSb.AppendLine("done");
-                
-              // proofMethods = new List<string>
-              // {
-              //   "unfolding " + afterCmdsDefName + "_def",
-              //   ProofUtil.Apply("rule guard_holds_push_through_assumption"),
-              //   ProofUtil.Apply("rule block_local_rel_generic"),
-              //   ProofUtil.Apply("rule Rel_Main_test[of " + beforeBigblockDefName + "]"),
-              //   ProofUtil.Apply("simp add: " + beforeBigblockDefName + "_def"),
-              //   ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
-              //   ProofUtil.Apply("rule astStep"),
-              //   ProofUtil.Apply("rule push_through_assumption_test1, rule cfgBlockDoesntFail"),
-              //   ProofUtil.Apply("simp add: " + afterCmdsDefName + "_def"),
-              //   ProofUtil.Apply("simp add: assms(3) " + beforeBigblockDefName + "_def)+",
-              //   "done"
-              // };
             }
             else if (indicator ==  BranchIndicator.GuardFails)
             {
@@ -253,27 +221,6 @@ namespace ProofGeneration.AstToCfg
               proofSb.AppendLine(ProofUtil.Apply(NegationRule(guardHint)));
               proofSb.AppendLine(ProofUtil.Apply("rule guardHint"));
               proofSb.AppendLine("done");
-              
-              // proofMethods = new List<string>
-              // {
-              //   "unfolding " + afterCmdsDefName + "_def",
-              //   ProofUtil.Apply("rule guard_fails_push_through_assumption"),
-              //   ProofUtil.Apply("rule block_local_rel_generic"),
-              //   ProofUtil.Apply("rule Rel_Main_test[of " + beforeBigblockDefName + "]"),
-              //   ProofUtil.Apply("simp add: " + beforeBigblockDefName + "_def"),
-              //   ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
-              //   ProofUtil.Apply("rule astStep"),
-              //   ProofUtil.Apply("rule cfgBlockDoesntFail"),
-              //   ProofUtil.Apply("simp add: " + afterCmdsDefName + "_def"),
-              //   ProofUtil.Apply("rule push_through_assumption1"),
-              //   ProofUtil.Apply(ProofUtil.Simp()),
-              //   ProofUtil.Apply("" + NegationRule(guardHint) + ""),
-              //   ProofUtil.Apply("rule guardHint"),
-              //   ProofUtil.Apply("simp add: " + beforeBigblockDefName + "_def)+",
-              //   ProofUtil.Apply("" + NegationRule(guardHint) + ""),
-              //   ProofUtil.Apply("rule guardHint"),
-              //   "done"
-              // };
             }
 
             List<string> assmsLabels = new List<string> {"astStep", "cfgBlockDoesntFail"};
@@ -304,7 +251,7 @@ namespace ProofGeneration.AstToCfg
           Term posts,
           (Expr, BranchIndicator) hints,
           Func<BigBlock, string> globalBlockLemmaName,
-          ProofGenInfo proofGenInfo)
+          AstToCfgProofGenInfo proofGenInfo)
         {
           var assumptions = new List<Term>();
 
@@ -445,18 +392,9 @@ namespace ProofGeneration.AstToCfg
             Block enclosingLoopCfgBlockCopy = origBlockBeforeDag[enclosingLoopCfgBlock];
 
             Term blockIndex;
-            if (true /* enclosingLoopCfgBlockCopy.cmds.Any() */ )
-            {
-              Block successorCfgBlock = afterCfg.GetSuccessorBlocks(enclosingLoopCfgBlockCopy).First();
-              //Block successorCfgBlockCopy = origBlockBeforeDag[successorCfgBlock];
-              
-              blockIndex = new NatConst(afterCfg.GetUniqueIntLabel(successorCfgBlock));
-            }
-            else
-            {
-              blockIndex = new NatConst(afterCfg.GetUniqueIntLabel(enclosingLoopCfgBlockCopy));
-            }
-            
+            Block successorCfgBlock = afterCfg.GetSuccessorBlocks(enclosingLoopCfgBlockCopy).First();
+            blockIndex = new NatConst(afterCfg.GetUniqueIntLabel(successorCfgBlock));
+
             int unwrappedEnclosingLoopBigBlockIndex = proofGenInfo.GetMappingCopyBigBlockToIndex()[enclosingLoopCopy] + 1;
 
             Term succBigBlockTermId = IsaCommonTerms.TermIdentFromName(beforeCfgProgAccess.BigBlockInfo().TheoryName + ".bigblock_" + unwrappedEnclosingLoopBigBlockIndex);
@@ -464,7 +402,7 @@ namespace ProofGeneration.AstToCfg
             Term cfgBodyId = IsaCommonTerms.TermIdentFromName(afterCfgProgAccess.BlockInfo().getTheoryName() + ".proc_body");
             //Term blockIndex = new NatConst(unwrappedEnclosingLoopBigBlockIndex);
 
-            Term loop_ih_assm = IsaBoogieTerm.LoopIH(astBoogieContext, cfgBoogieContext, astId, succBigBlockTermId, succContId, cfgBodyId, blockIndex, posts);
+            Term loop_ih_assm = IsaBoogieTerm.AstToCfgLoopIndHypothesis(astBoogieContext, cfgBoogieContext, astId, succBigBlockTermId, succContId, cfgBodyId, blockIndex, posts);
             hasLoopIH = true;
             assumptions.Add(loop_ih_assm);
           }
@@ -609,11 +547,8 @@ namespace ProofGeneration.AstToCfg
           return ProofUtil.Rule("neg_refl");
         }
 
-        private string ExpandDefinitions(string contId, BigBlock startingBigBlock, ProofGenInfo proofGenInfo, BranchIndicator branchIndicator)
+        private string ExpandDefinitions(string contId, BigBlock startingBigBlock, AstToCfgProofGenInfo proofGenInfo, BranchIndicator branchIndicator)
         {
-          //BigBlock correspondingBigBlockOrig = proofGenInfo.getMappingCopyBigblockToOrigBigblock()[startingBigBlock];
-          //IfCmd _if = (IfCmd) correspondingBigBlockOrig.ec;
-          
           IfCmd @if = (IfCmd) startingBigBlock.ec;
 
           string expansion = "apply (simp add: " + contId + "_def ";
@@ -621,7 +556,7 @@ namespace ProofGeneration.AstToCfg
           {
             foreach (var thenBb in @if.thn.BigBlocks)
             {
-              BigBlock thenBranchCopy = thenBb;  //proofGenInfo.getMappingOrigBigblockToCopyBigblock()[then_bb];
+              BigBlock thenBranchCopy = thenBb;  
               string thenBranchId = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(thenBranchCopy).First();
               string thenBranchContId = "cont_" + (proofGenInfo.GetMappingCopyBigBlockToIndex()[thenBranchCopy]);
               expansion += thenBranchId + "_def " + thenBranchContId + "_def ";
@@ -631,7 +566,7 @@ namespace ProofGeneration.AstToCfg
           {
             foreach (var elseBb in @if.elseBlock.BigBlocks)
             {
-              BigBlock elseBranchCopy = elseBb; //proofGenInfo.getMappingOrigBigblockToCopyBigblock()[else_bb];
+              BigBlock elseBranchCopy = elseBb; 
               string elseBranchId = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(elseBranchCopy).First();
               string elseBranchContId = "cont_" + (proofGenInfo.GetMappingCopyBigBlockToIndex()[elseBranchCopy]);
               expansion += elseBranchId + "_def " + elseBranchContId + "_def ";
@@ -647,7 +582,7 @@ namespace ProofGeneration.AstToCfg
           Block relatedBlock,
           Expr entryGuard,
           BranchIndicator indicator,
-          ProofGenInfo proofGenInfo)
+          AstToCfgProofGenInfo proofGenInfo)
         {
           string bigblockId = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(startingBigBlock).First();
           string blockId = afterCfgProgAccess.BlockInfo().getTheoryName() + ".block_" + afterCfg.GetUniqueIntLabel(relatedBlock);
@@ -673,11 +608,10 @@ namespace ProofGeneration.AstToCfg
             finalPartofProof = new List<string>
             {
               ProofUtil.Apply("rule " + nameLemmaLocal),
-              "apply assumption+",
-              (indicator != 0 && entryGuard != null) ? traceIsPossible : "",
-              "done",
-              "qed"
+              "apply assumption+"
             };
+            
+            if (indicator != 0 && entryGuard != null) { finalPartofProof.Add(traceIsPossible); }
           }
           else if (startingBigBlock.tc is ReturnCmd)
           {
@@ -686,9 +620,7 @@ namespace ProofGeneration.AstToCfg
             {
               ProofUtil.Apply("simp add: " + bigblockId + "_def"),
               ProofUtil.Apply("simp add: " + blockId + "_def"),
-              ProofUtil.Apply("simp add: end_return"),
-              "done",
-              "qed"
+              ProofUtil.Apply("simp add: end_return")
             };
           }
           else
@@ -697,11 +629,12 @@ namespace ProofGeneration.AstToCfg
             finalPartofProof = new List<string>
             {
               ProofUtil.Apply("simp add: " + bigblockId + "_def"),
-              ProofUtil.Apply("simp add: end_static"),
-              "done",
-              "qed"
+              ProofUtil.Apply("simp add: end_static")
             };
           }
+
+          finalPartofProof.Add("done");
+          finalPartofProof.Add("qed");
 
           if (indicator == 0 || entryGuard == null)
           {
@@ -772,14 +705,22 @@ namespace ProofGeneration.AstToCfg
             };
           }
 
-          beginningOfProof = new List<string>
+          List<string> beginningOfProofA = new List<string>
           {
-            "proof -",
-            "show ?thesis",
-            ProofUtil.Apply("rule generic_ending_block_global_rel"),
-            syntacticRel,
-            ProofUtil.Apply("simp add: " + bigblockId + "_def"),
-            mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply(ProofUtil.Simp()) : "",
+              "proof -",
+              "show ?thesis",
+              ProofUtil.Apply("rule generic_ending_block_global_rel"),
+              syntacticRel,
+              ProofUtil.Apply("simp add: " + bigblockId + "_def")
+          };
+
+          if (mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock))
+          {
+            beginningOfProofA.Add(ProofUtil.Apply(ProofUtil.Simp()));
+          } 
+          
+          List<string> beginningOfProofB = new List<string>
+          {
             ProofUtil.Apply("rule astTrace"),
             ProofUtil.Apply("simp add: " + bigblockId + "_def"),
             ProofUtil.Apply(ProofUtil.Simp()),
@@ -787,6 +728,10 @@ namespace ProofGeneration.AstToCfg
             startingBigBlock.tc is ReturnCmd ? "" : ProofUtil.Apply("rule " + contId + "_def"),
             ProofUtil.Apply("rule " + nodeId)
           };
+
+          beginningOfProof = new List<string>();
+          beginningOfProof.AddRange(beginningOfProofA);
+          beginningOfProof.AddRange(beginningOfProofB);
 
           List<string> proofMethods = new List<string>();
           proofMethods.AddRange(beginningOfProof);
@@ -800,7 +745,7 @@ namespace ProofGeneration.AstToCfg
           BigBlock startingBigBlock,
           Block relatedBlock,
           Expr personalGuard,
-          ProofGenInfo proofGenInfo)
+          AstToCfgProofGenInfo proofGenInfo)
         {
            List<string> proofMethods = new List<string>();
 
@@ -908,7 +853,7 @@ namespace ProofGeneration.AstToCfg
              #region construct proof
 
              var beginningOfProof = new List<string>
-             { 
+             {
                "using assms",
                "proof (induction j arbitrary: ns1 rule: less_induct)",
                "case (less j)",
@@ -934,17 +879,27 @@ namespace ProofGeneration.AstToCfg
                ProofUtil.Apply(ProofUtil.Repeat("simp add:" + bigblockId + "_def")),
                ProofUtil.Apply(ProofUtil.Repeat("simp add:" + blockId + "_def " + nodeId)),
                ProofUtil.Apply("rule " + contId + "_def"),
-               ProofUtil.Apply("erule disjE"),
-               
-               personalGuard == null ? ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())) : null,
-               personalGuard == null ? "apply (erule disjE)" : null,
-               //TODO: get rid of this
-               personalGuard == null ? "defer" : null,
-
+               ProofUtil.Apply("erule disjE")
+             };
+             if (personalGuard == null)
+             {
+               beginningOfProof.AddRange(new List<string>
+               {
+                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
+                 "apply (erule disjE)",
+                 //TODO: get rid of this
+                 "defer"
+               });
+             }
+             beginningOfProof.AddRange(new List<string>
+             {
                ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succ2UniqueIntLabel + "]")),
                ProofUtil.Apply(ProofUtil.Repeat("simp add:" + outEdgesId)),
-               ProofUtil.Apply("simp add:member_rec(1)"),
-               personalGuard != null ? ProofUtil.Apply("erule conjE") : null,
+               ProofUtil.Apply("simp add:member_rec(1)")
+             });
+             if (personalGuard != null) { beginningOfProof.Add(ProofUtil.Apply("erule conjE")); }
+             beginningOfProof.AddRange(new List<string>
+             {
                ProofUtil.Apply("rule " + nameLemmaSucc1 + ""),
                unfoldedLoopBodyDefinitions,
                ProofUtil.Apply(ProofUtil.Repeat("blast")),
@@ -955,13 +910,13 @@ namespace ProofGeneration.AstToCfg
                "unfolding " + contId + "_def " + bodyBigBlockContId + "_def",
                ProofUtil.Apply(ProofUtil.Simp()),
                ProofUtil.Apply("blast"),
-               ProofUtil.Apply("blast"),
-               
-               proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) &&
-               personalGuard == null
-                 ? ProofUtil.Apply("rule guardHint")
-                 : null, 
-             };
+               ProofUtil.Apply("blast")
+             });
+             if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) &&
+                 personalGuard == null)
+             {
+               beginningOfProof.Add(ProofUtil.Apply("rule guardHint"));
+             }
 
              var insideOfLoopAddition1 = new List<string>
              {
@@ -991,99 +946,150 @@ namespace ProofGeneration.AstToCfg
                ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
              };
 
-             var whileTrueEndingAfterSkippingEndBlock = new List<string>
+             var whileTrueEndingAfterSkippingEndBlock = new List<string>();
+             if (personalGuard == null && !proofGenInfo.GetMappingBigBlockToLoopBigBlock()
+                   .ContainsKey(correspondingBigBlockOrig))
              {
-               personalGuard == null && !proofGenInfo.GetMappingBigBlockToLoopBigBlock()
-                 .ContainsKey(correspondingBigBlockOrig)
-                 ? ProofUtil.Apply("rule guardHint")
-                 : null,
+               whileTrueEndingAfterSkippingEndBlock.Add(ProofUtil.Apply("rule guardHint"));
+             }
+             whileTrueEndingAfterSkippingEndBlock.AddRange(new List<string>
+             {
                ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succ1UniqueIntLabel + "]")),
                ProofUtil.Apply(ProofUtil.Repeat("simp add:" + outEdgesId)),
-               ProofUtil.Apply("simp add:member_rec(1)"),
-               personalGuard != null ? ProofUtil.Apply("erule conjE") : null,
+               ProofUtil.Apply("simp add:member_rec(1)")
+             });
+             if (personalGuard != null) { whileTrueEndingAfterSkippingEndBlock.Add(ProofUtil.Apply("erule conjE")); }
+             whileTrueEndingAfterSkippingEndBlock.AddRange(new List<string>
+             {
                ProofUtil.Apply("rule ending_after_skipping_endblock2"),
-
                //TODO: repeat is possibly redundant here!
                ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
-               ProofUtil.Apply("blast"),
-               personalGuard != null ? ProofUtil.Apply("blast") : ProofUtil.Apply(ProofUtil.Repeat("blast")),
-               personalGuard != null ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-
-               personalGuard != null && !personalGuard.Equals(Expr.True) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               personalGuard != null && !personalGuard.Equals(Expr.True)
-                 ? ProofUtil.Apply("rule " + nameLemmaSucc2 + "")
-                 : null,
-
-               //TODO: repeat is redundant here!
-               personalGuard != null && !personalGuard.Equals(Expr.True) ? ProofUtil.Apply("blast") : null,
-
-               //afterLoopBigBlockOrig.successorBigBlock != null ? "apply blast" : null,
-               personalGuard == null ? ProofUtil.Apply("rule " + nameLemmaSucc2) : null,
-               personalGuard == null ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               
                ProofUtil.Apply("blast")
-             };
-             
-             var endingAfterSkippingEndblock = new List<string>
+             });
+             whileTrueEndingAfterSkippingEndBlock.Add(personalGuard != null
+               ? ProofUtil.Apply("blast")
+               : ProofUtil.Apply(ProofUtil.Repeat("blast")));
+             if (personalGuard != null) { whileTrueEndingAfterSkippingEndBlock.Add(ProofUtil.Apply(ProofUtil.Simp())); }
+             if (personalGuard != null && !personalGuard.Equals(Expr.True))
              {
-               personalGuard == null && !proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule guardHint") : null,
+               whileTrueEndingAfterSkippingEndBlock.AddRange(new List<string>
+               {
+                 ProofUtil.Apply(ProofUtil.Simp()),
+                 ProofUtil.Apply("rule " + nameLemmaSucc2 + ""),
+                 ProofUtil.Apply("blast") 
+               });
+             }
+             if (personalGuard == null)
+             {
+               whileTrueEndingAfterSkippingEndBlock.AddRange(new List<string>
+               {
+                 ProofUtil.Apply("rule " + nameLemmaSucc2),
+                 ProofUtil.Apply(ProofUtil.Simp())
+               });
+             }
+             whileTrueEndingAfterSkippingEndBlock.Add(ProofUtil.Apply("blast"));
+
+             var endingAfterSkippingEndblock = new List<string>();
+             if (personalGuard == null &&
+                 !proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.Add(ProofUtil.Apply("rule guardHint"));
+             }
+             endingAfterSkippingEndblock.AddRange(new List<string>
+             {
                ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succ1UniqueIntLabel + "]")),
                ProofUtil.Apply(ProofUtil.Repeat("simp add:" + outEdgesId)),
-               ProofUtil.Apply("simp add:member_rec(1)"),
-               personalGuard != null ? ProofUtil.Apply("erule conjE") : null,
+               ProofUtil.Apply("simp add:member_rec(1)")
+             });
+             if (personalGuard != null) { endingAfterSkippingEndblock.Add(ProofUtil.Apply("erule conjE")); }
+             endingAfterSkippingEndblock.AddRange(new List<string>
+             {
                ProofUtil.Apply("rule ending_after_skipping_endblock2"),
-             
                //TODO: repeat is possibly redundant here!
                ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
-               ProofUtil.Apply("blast"),
-               personalGuard != null ? ProofUtil.Apply("blast") : ProofUtil.Apply(ProofUtil.Repeat("blast")),
-               personalGuard != null ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-
-               personalGuard != null && !personalGuard.Equals(Expr.True) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               personalGuard != null && !personalGuard.Equals(Expr.True) ? ProofUtil.Apply("rule " + nameLemmaSucc2 + "") : null,
-             
-               //TODO: repeat is redundant here!
-               personalGuard != null && !personalGuard.Equals(Expr.True) ? ProofUtil.Apply("blast") : null,
-             
-               //afterLoopBigBlockOrig.successorBigBlock != null ? "apply blast" : null,
-               personalGuard == null ? ProofUtil.Apply("rule " + nameLemmaSucc2) : null,
-               personalGuard == null ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               
-               proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Repeat("blast")) : null,
-               
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig)
-                 ? (personalGuard != null
-                   ? ProofUtil.Apply("rule correctness_propagates_through_assumption")
-                   : ProofUtil.Apply("rule correctness_propagates_through_empty"))
-                 : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? "apply blast" : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply("simp add: " + succNodeId1 + "") : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply("simp add: " + succBlockId1 + "_def") : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig)
-                 ? (personalGuard != null
-                   ? ProofUtil.Apply(NegationRule(personalGuard))
-                   : null)
-                 : null, 
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply("simp add: " + succOutEdgesId1 + "") : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Repeat("simp add: member_rec")) : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig)
-                 ? (personalGuard != null
-                   ? ProofUtil.Apply("rule correctness_propagates_through_assumption3")
-                   : ProofUtil.Apply("rule correctness_propagates_through_empty2"))
-                 : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? "apply blast" : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply("simp add: " + succNodeId1 + "") : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply("simp add: " + succBlockId1 + "_def") : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig)
-                 ? (personalGuard != null
-                   ? ProofUtil.Apply(NegationRule(personalGuard))
-                   : null)
-                 : null, 
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply("simp add: " + succOutEdgesId1 + "") : null,
-               !proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Repeat("simp add: member_rec")) : null
-             };
+               ProofUtil.Apply("blast")
+             });
+             endingAfterSkippingEndblock.Add(personalGuard != null
+               ? ProofUtil.Apply("blast")
+               : ProofUtil.Apply(ProofUtil.Repeat("blast")));
+             if (personalGuard != null) { endingAfterSkippingEndblock.Add(ProofUtil.Apply(ProofUtil.Simp())); }
+             if (personalGuard != null && !personalGuard.Equals(Expr.True))
+             {
+               endingAfterSkippingEndblock.AddRange(new List<string>
+               {
+                 ProofUtil.Apply(ProofUtil.Simp()), 
+                 ProofUtil.Apply("rule " + nameLemmaSucc2 + ""),
+                 ProofUtil.Apply("blast")
+               });
+             }
+             if (personalGuard == null)
+             {
+               endingAfterSkippingEndblock.AddRange(new List<string>
+               {
+                 ProofUtil.Apply("rule " + nameLemmaSucc2),
+                 ProofUtil.Apply(ProofUtil.Simp())
+               });
+             }
+             if (proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.Add(ProofUtil.Apply(ProofUtil.Repeat("blast")));
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.Add(personalGuard != null
+                 ? ProofUtil.Apply("rule correctness_propagates_through_assumption")
+                 : ProofUtil.Apply("rule correctness_propagates_through_empty"));
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.AddRange(new List<string>
+               {
+                 "apply blast",
+                 ProofUtil.Apply("simp add: " + succNodeId1 + ""),
+                 ProofUtil.Apply("simp add: " + succBlockId1 + "_def")
+               });
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) && (personalGuard != null))
+             {
+               endingAfterSkippingEndblock.Add(ProofUtil.Apply(NegationRule(personalGuard)));
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.AddRange(new List<string>
+               {
+                 ProofUtil.Apply(ProofUtil.Simp()),
+                 ProofUtil.Apply("simp add: " + succOutEdgesId1 + ""),
+                 ProofUtil.Apply(ProofUtil.Repeat("simp add: member_rec"))
+               });
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.Add(personalGuard != null
+                 ? ProofUtil.Apply("rule correctness_propagates_through_assumption3")
+                 : ProofUtil.Apply("rule correctness_propagates_through_empty2"));
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.AddRange(new List<string>
+               {
+                 "apply blast",
+                 ProofUtil.Apply("simp add: " + succNodeId1 + ""),
+                 ProofUtil.Apply("simp add: " + succBlockId1 + "_def")
+               });
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig) && (personalGuard != null))
+             {
+               endingAfterSkippingEndblock.Add(ProofUtil.Apply(NegationRule(personalGuard)));
+             }
+             if (!proofGenInfo.GetloopEndingBlocks().Contains(afterLoopBigBlockOrig))
+             {
+               endingAfterSkippingEndblock.AddRange(new List<string>
+               {
+                 ProofUtil.Apply(ProofUtil.Simp()),
+                 ProofUtil.Apply("simp add: " + succOutEdgesId1 + ""),
+                 ProofUtil.Apply(ProofUtil.Repeat("simp add: member_rec"))
+               });
+             }
 
              var endingAfterSkippingEndBlockAndUnwrapping = new List<string>
              {
@@ -1138,14 +1144,6 @@ namespace ProofGeneration.AstToCfg
              {
                proofMethods.AddRange(endingAfterSkippingEndblock);
              }
-             // if (afterLoopBigBlockOrig.ec is WhileCmd && !afterLoopBigBlockCopy.simpleCmds.Any())
-             // {
-             //   proofMethods.AddRange(endingAfterSkippingEndBlockAndUnwrapping);
-             // }
-             // else
-             // {
-             //   proofMethods.AddRange(endingAfterSkippingEndblock);
-             // }
 
              if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
              {
@@ -1171,7 +1169,7 @@ namespace ProofGeneration.AstToCfg
           Block relatedBlock,
           Expr entryGuard,
           BranchIndicator indicator,
-          ProofGenInfo proofGenInfo)
+          AstToCfgProofGenInfo proofGenInfo)
         {
           string bigblockId = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(startingBigBlock).First();
           string blockId = afterCfgProgAccess.BlockInfo().getTheoryName() + ".block_" + afterCfg.GetUniqueIntLabel(relatedBlock);
@@ -1202,21 +1200,9 @@ namespace ProofGeneration.AstToCfg
             
             Block enclosingLoopCfgBlock = proofGenInfo.GetMappingOrigBigBlockToOrigBlock()[loop];
             Block enclosingLoopCfgBlockCopy = origBlockBeforeDag[enclosingLoopCfgBlock];
-
-            if (true /* enclosingLoopCfgBlockCopy.cmds.Any() */)
-            {
-              Block successorCfgBlock = afterCfg.GetSuccessorBlocks(enclosingLoopCfgBlockCopy).First();
-              //Block successorCfgBlockCopy = origBlockBeforeDag[successorCfgBlock];
-              
-              succUniqueLoopLabel = afterCfg.GetUniqueIntLabel(successorCfgBlock);
-            }
-            else
-            {
-              succUniqueLoopLabel = afterCfg.GetUniqueIntLabel(enclosingLoopCfgBlockCopy); 
-            }
             
-            //succUniqueLoopLabel = proofGenInfo.getMappingCopyBigBlockToIndex()[loopCopy];
-            //succUniqueLoopLabel += 1;
+            Block successorCfgBlock = afterCfg.GetSuccessorBlocks(enclosingLoopCfgBlockCopy).First();
+            succUniqueLoopLabel = afterCfg.GetUniqueIntLabel(successorCfgBlock);
           }
           
           var proofMethods = new List<string>();
@@ -1239,18 +1225,28 @@ namespace ProofGeneration.AstToCfg
               nameLemmaSucc = mappingBigBlockToGlobalLemmaDecl[successorBigBlockCopy].Name; 
             }
 
-            var beginningOfProof = new List<string>
+            var beginningOfProofA = new List<string>
             {
               "proof -",
               "show ?thesis ",
               ProofUtil.Apply("rule block_global_rel_generic"),
               startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply("rule Rel_Main_test[of " + bigblockId + "]") : ProofUtil.Apply("rule Rel_Invs[of " + bigblockId + "]") ,
-              ProofUtil.Apply("simp add: " + bigblockId + "_def"),
-              startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
+              ProofUtil.Apply("simp add: " + bigblockId + "_def")
+            };
+            if (startingBigBlock.simpleCmds.Any())
+            {
+              beginningOfProofA.Add(ProofUtil.Apply(ProofUtil.Simp()));
+            }
+            var beginningOfProofB = new List<string>
+            {
               ProofUtil.Apply("rule astTrace"),
               ProofUtil.Apply("simp add: " + bigblockId + "_def"),
               ProofUtil.Apply("rule " + nodeId + "")
             };
+
+            var beginningOfProof = new List<string>();
+            beginningOfProof.AddRange(beginningOfProofA);
+            beginningOfProof.AddRange(beginningOfProofB);
 
             var middlePartOfProof = new List<string>();
             if (indicator == 0 || entryGuard == null)
@@ -1259,19 +1255,20 @@ namespace ProofGeneration.AstToCfg
               {
                 ProofUtil.Apply("rule disjI1"),
                 ProofUtil.Apply("rule " + blockId + "_def"),
-                // indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails ? ProofUtil.Apply("rule conjI") : null,
-                // indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails ? ProofUtil.Apply(ProofUtil.Simp()) : null,
                 ProofUtil.Apply("rule cfgDoesntFail"),
                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
                 ProofUtil.Apply("rule cfgSatisfiesPosts, blast"),
                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
                 ProofUtil.Apply("rule " + contId + "_def"),
-                ProofUtil.Apply("simp add: " + nodeId + ""),
-                // !startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply("rule " + nameLemmaLocal + "") : null,
-                startingBigBlock.simpleCmds.Any() ? "apply assumption" : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
+                ProofUtil.Apply("simp add: " + nodeId + "")
               };
+
+              if (startingBigBlock.simpleCmds.Any())
+              {
+                middlePartOfProof.Add(ProofUtil.Apply("rule " + nameLemmaLocal + ""));
+                middlePartOfProof.Add("apply assumption");
+                middlePartOfProof.Add(ProofUtil.Apply(ProofUtil.Simp()));
+              }
             }
             else if (indicator == BranchIndicator.GuardFails)
             {
@@ -1291,15 +1288,18 @@ namespace ProofGeneration.AstToCfg
                 ProofUtil.Apply("rule cfgSatisfiesPosts, blast"),
                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
                 ProofUtil.Apply("rule " + contId + "_def"),
-                ProofUtil.Apply("simp add: " + nodeId + ""),
-                //!startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply("rule " + nameLemmaLocal + "") : null,
-                startingBigBlock.simpleCmds.Any() ? "apply assumption" : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply("rule guardHint") : null,
+                ProofUtil.Apply("simp add: " + nodeId + "")
               };
+              
+              if (startingBigBlock.simpleCmds.Any())
+              {
+                middlePartOfProof.Add(ProofUtil.Apply("rule " + nameLemmaLocal + ""));
+                middlePartOfProof.Add("apply assumption");
+                middlePartOfProof.Add(ProofUtil.Apply(ProofUtil.Simp()));
+                middlePartOfProof.Add(ProofUtil.Apply("rule guardHint"));
+              }
             }
-            //TODO: this check isn't correct! Why?
+            //TODO: this check needs revision, I don't understand why this condition works. It might fail for complex procedures.
             else if (indicator == BranchIndicator.GuardHolds || proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
             {
               middlePartOfProof = new List<string>
@@ -1316,13 +1316,21 @@ namespace ProofGeneration.AstToCfg
                 ProofUtil.Apply("rule cfgSatisfiesPosts, blast"),
                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
                 ProofUtil.Apply("rule " + contId + "_def"),
-                ProofUtil.Apply("simp add: " + nodeId + ""),
-                //!startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply("rule " + nameLemmaLocal + "") : null,
-                startingBigBlock.simpleCmds.Any() ? "apply assumption" : null,
-                startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-                startingBigBlock.simpleCmds.Any() && indicator == BranchIndicator.GuardHolds ? ProofUtil.Apply("rule guardHint") : null,
+                ProofUtil.Apply("simp add: " + nodeId + "")
               };
+              
+              if (startingBigBlock.simpleCmds.Any())
+              {
+                middlePartOfProof.Add(ProofUtil.Apply("rule " + nameLemmaLocal + ""));
+                middlePartOfProof.Add("apply assumption");
+                middlePartOfProof.Add(ProofUtil.Apply(ProofUtil.Simp()));
+              }
+              
+              if (startingBigBlock.simpleCmds.Any() && indicator == BranchIndicator.GuardHolds)
+              {
+                middlePartOfProof.Add(ProofUtil.Apply("rule guardHint"));
+              }
+              
             }
 
             var proofEnd = new List<string>();
@@ -1346,18 +1354,27 @@ namespace ProofGeneration.AstToCfg
                 ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succUniqueIntLabel + "]")),
                 ProofUtil.Apply(ProofUtil.Repeat("simp add: " + outEdgesId)),
                 ProofUtil.Apply("simp add: member_rec(1)"),
-                ProofUtil.Apply("rule " + nameLemmaSucc + ""),
-                !proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-                "apply blast+",
-                proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_prove") : null,
-                proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_apply") : null,
-                proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule inductionHypothesis") : null,
-                proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule less_trans_inv") : null,
-                proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? "apply blast+" : null,
+                ProofUtil.Apply("rule " + nameLemmaSucc + "")
               };
-            }
 
-            //TODO: name the assumptions
+              if (!proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+              {
+                proofEnd.Add(ProofUtil.Apply(ProofUtil.Simp()));
+              }
+              
+              proofEnd.Add("apply blast+");
+              
+              if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+              {
+                proofEnd.Add(ProofUtil.Apply("rule loop_IH_prove"));
+                proofEnd.Add(ProofUtil.Apply("rule loop_IH_apply"));
+                proofEnd.Add(ProofUtil.Apply("rule inductionHypothesis"));
+                proofEnd.Add(ProofUtil.Apply("rule less_trans_inv"));
+                proofEnd.Add("apply blast+");
+              }
+              
+            }
+            
             proofMethods.AddRange(beginningOfProof);
             proofMethods.AddRange(middlePartOfProof);
             proofMethods.AddRange(proofEnd);
@@ -1377,7 +1394,7 @@ namespace ProofGeneration.AstToCfg
           Block relatedBlock,
           Expr entryGuard,
           BranchIndicator indicator,
-          ProofGenInfo proofGenInfo)
+          AstToCfgProofGenInfo proofGenInfo)
         {
           BigBlock correspondingOrigBigBlock = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[startingBigBlock];
           List<string> loopExtension = new List<string>();
@@ -1413,8 +1430,6 @@ namespace ProofGeneration.AstToCfg
 
           string contId = "cont_" + proofGenInfo.GetMappingCopyBigBlockToIndex()[startingBigBlock];
           string succContId = "cont_" + proofGenInfo.GetMappingCopyBigBlockToIndex()[unwrappedBigBlockCopy];
-
-          //string nameLemmaLocal = mappingBigBlockToLocalLemmaDecl[startingBigBlock].Name;
           string nameLemmaSuccGlobal = mappingBigBlockToGlobalLemmaDecl[unwrappedBigBlockCopy].Name;
 
           string correctnessPropagates = null;
@@ -1447,30 +1462,53 @@ namespace ProofGeneration.AstToCfg
             ProofUtil.Apply("rule cfgSatisfiesPosts, blast"),
             ProofUtil.Apply(ProofUtil.Simp()),
             ProofUtil.Apply("rule " + nameLemmaSuccGlobal + ""),
-            ProofUtil.Apply("simp add: " + succBigBlockId + "_def " + contId + "_def " + succContId + "_def"),
-            correctnessPropagates,
+            ProofUtil.Apply("simp add: " + succBigBlockId + "_def " + contId + "_def " + succContId + "_def")
+          };
+          
+          if (correctnessPropagates != null) { proofMethods.Add(correctnessPropagates); }
+          
+          proofMethods.AddRange( new List<string>
+          {
             "using assms(2)",
             "apply blast",
             ProofUtil.Apply("simp add: " + nodeId + ""),
-            ProofUtil.Apply("simp add: " + blockId + "_def"),
-            indicator != BranchIndicator.NoGuard ? rule : null,
-            (indicator != BranchIndicator.NoGuard && entryGuard != null) ? ProofUtil.Apply("rule guardHint") : null,
+            ProofUtil.Apply("simp add: " + blockId + "_def")
+          });
+          
+          if (indicator != BranchIndicator.NoGuard) { proofMethods.Add(rule); }
+          if (indicator != BranchIndicator.NoGuard && entryGuard != null) { proofMethods.Add(ProofUtil.Apply("rule guardHint")); }
+          
+          proofMethods.AddRange( new List<string>
+          {
             ProofUtil.Apply("simp add: " + outEdgesId + ""),
             ProofUtil.Apply("simp add: member_rec"),
-            ProofUtil.Apply(ProofUtil.Simp()),
-            correctnessPropagatesPosts,
+            ProofUtil.Apply(ProofUtil.Simp())
+          });
+          
+          if (correctnessPropagatesPosts != null) { proofMethods.Add(correctnessPropagatesPosts); }
+          
+          proofMethods.AddRange( new List<string>
+          {
             "using assms(3)",
             "apply blast",
             ProofUtil.Apply("simp add: " + nodeId + ""),
-            ProofUtil.Apply("simp add: " + blockId + "_def"),
-            indicator != BranchIndicator.NoGuard ? rule : null,
-            (indicator != BranchIndicator.NoGuard && entryGuard != null) ? ProofUtil.Apply("rule guardHint") : null,
+            ProofUtil.Apply("simp add: " + blockId + "_def")
+          });
+          
+          if (indicator != BranchIndicator.NoGuard) { proofMethods.Add(rule); }
+          if (indicator != BranchIndicator.NoGuard && entryGuard != null) { proofMethods.Add(ProofUtil.Apply("rule guardHint")); }
+          
+          proofMethods.AddRange( new List<string>
+          {
             ProofUtil.Apply("simp add: " + outEdgesId + ""),
             ProofUtil.Apply("simp add: member_rec"),
             ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
-          };
-          
-          proofMethods.AddRange(loopExtension);
+          });
+
+          if (loopExtension.Any())
+          {
+            proofMethods.AddRange(loopExtension);
+          }
           proofMethods.Add("done");
 
           return proofMethods;
@@ -1482,7 +1520,7 @@ namespace ProofGeneration.AstToCfg
           Expr entryGuard,
           Expr personalGuard,
           BranchIndicator indicator,
-          ProofGenInfo proofGenInfo) 
+          AstToCfgProofGenInfo proofGenInfo) 
         { 
            string bigblockId = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(startingBigBlock).First();
            string blockId = afterCfgProgAccess.BlockInfo().getTheoryName() + ".block_" + afterCfg.GetUniqueIntLabel(relatedBlock);
@@ -1523,7 +1561,7 @@ namespace ProofGeneration.AstToCfg
              {
                nameLemmaLocal = mappingBigBlockToLocalLemmaDecl[startingBigBlock].Name; 
              }
-             
+
              proofMethods = new List<string>
              {
                "proof -",
@@ -1536,51 +1574,98 @@ namespace ProofGeneration.AstToCfg
                ProofUtil.Apply("simp add: " + bigblockId + "_def " + blockId + "_def"),
                ProofUtil.Apply("simp add: " + bigblockId + "_def " + blockId + "_def"),
                ProofUtil.Apply("simp add: " + blockId + "_def"),
-               ProofUtil.Apply("rule " + nodeId + ""),
+               ProofUtil.Apply("rule " + nodeId + "")
+             };
+
+             if (entryGuard == null) { proofMethods.Add(ProofUtil.Apply("rule disjI1")); }
+             if (entryGuard != null)
+             {
+               if (indicator == BranchIndicator.NoGuard)
+               {
+                 proofMethods.Add(ProofUtil.Apply("rule disjI1"));
+               }
+               else
+               {
+                 proofMethods.Add(ProofUtil.Apply("rule disjI2"));
+               }
+             }
+             if (entryGuard != null && indicator == BranchIndicator.GuardHolds) { proofMethods.Add(ProofUtil.Apply("rule disjI1")); }
+             if (entryGuard != null && indicator == BranchIndicator.GuardFails) { proofMethods.Add(ProofUtil.Apply("rule disjI2")); }
              
-               entryGuard == null ? ProofUtil.Apply("rule disjI1") : null,
-              
-               entryGuard != null ? (indicator == BranchIndicator.NoGuard ? ProofUtil.Apply("rule disjI1") : ProofUtil.Apply("rule disjI2")) : null,
-               entryGuard != null && indicator == BranchIndicator.GuardHolds ? ProofUtil.Apply("rule disjI1") : null,
-               entryGuard != null && indicator == BranchIndicator.GuardFails ? ProofUtil.Apply("rule disjI2") : null,
-               
-               ProofUtil.Apply("simp add: " + blockId + "_def"),
-               entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule conjI") : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule conjI") : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule conjI") : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("" + NegationRule(entryGuard) + "") : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule guardHint") : null,
+             proofMethods.Add(ProofUtil.Apply("simp add: " + blockId + "_def"));
+
+             if (entryGuard != null &&
+                 (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails))
+             {
+               proofMethods.Add(ProofUtil.Apply("rule conjI"));
+               proofMethods.Add(ProofUtil.Apply(ProofUtil.Simp()));
+               proofMethods.Add(ProofUtil.Apply("rule conjI"));
+               proofMethods.Add(ProofUtil.Apply(ProofUtil.Simp()));
+             }
+
+             if (entryGuard != null && (indicator == BranchIndicator.GuardFails))
+             {
+               proofMethods.Add(ProofUtil.Apply("rule conjI"));
+               proofMethods.Add(ProofUtil.Apply("" + NegationRule(entryGuard) + ""));
+             }
+             
+             if (entryGuard != null &&
+                 (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails))
+             {
+               proofMethods.Add(ProofUtil.Apply("rule guardHint"));
+             }
+             
+             proofMethods.AddRange(new List<string>
+             {
                ProofUtil.Apply("rule cfgDoesntFail, simp"),
                ProofUtil.Apply("rule cfgSatisfiesPosts, blast"),
-               ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
-               mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply("simp add: " + nodeId + "") : null,
-               mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply("rule " + nameLemmaLocal + "") : null,
-               mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply("simp add: " + bigblockId + "_def") : null,
-               mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())) : null,
-               entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule guardHint") : null,
-               //personalGuard != null ? ProofUtil.Apply("erule disjE") : null,
-               //personalGuard == null ? ProofUtil.Apply("erule disjE, simp") : null,
-               //personalGuard == null ? ProofUtil.Apply("erule disjE, simp") : null,
-               //personalGuard == null ? ProofUtil.Apply("rule disjE, simp") : null,
+               ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+             });
+
+             if (mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock))
+             {
+               proofMethods.AddRange(new List<string>
+               {
+                 ProofUtil.Apply("simp add: " + nodeId + ""),
+                 ProofUtil.Apply("rule " + nameLemmaLocal + ""),
+                 ProofUtil.Apply("simp add: " + bigblockId + "_def"),
+                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+               });
+             }
              
+             if (entryGuard != null &&
+                 (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails))
+             {
+               proofMethods.Add(ProofUtil.Apply("rule guardHint"));
+             }
+             
+             proofMethods.AddRange(new List<string>
+             {
                ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succUniqueIntLabel + "]")),
                ProofUtil.Apply(ProofUtil.Repeat("simp add: " + outEdgesId)),
                ProofUtil.Apply("simp add: member_rec(1)"),
                ProofUtil.Apply("rule " + nameLemmaSucc + ""),
                ProofUtil.Apply("simp add: " + succBigBlockId + "_def " + contId + "_def "+ successorContId + "_def"),
-               "apply blast+",
+               "apply blast+"
+             });
+
+             if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+             {
+               proofMethods.AddRange(new List<string>
+               {
+                 ProofUtil.Apply("rule loop_IH_prove"),
+                 ProofUtil.Apply("rule loop_IH_apply"),
+                 ProofUtil.Apply("rule inductionHypothesis"),
+                 ProofUtil.Apply("rule less_trans_inv"),
+                 ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+               });
+             }
              
-               proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_prove") : null,
-               proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_apply") : null,
-               proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule inductionHypothesis") : null,
-               proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule less_trans_inv") : null,
-               proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())) : null,
-             
+             proofMethods.AddRange(new List<string>
+             {
                "done",
-               "qed",
-             };
+               "qed"
+             });
            }
            return proofMethods;
         }
@@ -1591,7 +1676,7 @@ namespace ProofGeneration.AstToCfg
           Expr personalGuard,
           Expr entryGuard,
           BranchIndicator indicator,
-          ProofGenInfo proofGenInfo)
+          AstToCfgProofGenInfo proofGenInfo)
         {
           string bigblockId = beforeCfgProgAccess.BigBlockInfo().CmdsQualifiedName(startingBigBlock).First();
           string blockId = afterCfgProgAccess.BlockInfo().getTheoryName() + ".block_" +
@@ -1646,42 +1731,76 @@ namespace ProofGeneration.AstToCfg
                 (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails ? 
                   ProofUtil.Apply("rule Rel_Main_test[of " + bigblockId + "]") : ProofUtil.Apply("rule Rel_Main_test[of " + bigblockId + " _ " + blockId + "]")) :
                 ProofUtil.Apply("rule Rel_Invs[of " + bigblockId + "]"),
-              ProofUtil.Apply("simp add: " + blockId + "_def " + bigblockId + "_def"),
-              startingBigBlock.simpleCmds.Any() ? ProofUtil.Apply("simp add: " + blockId + "_def") : null,
+              ProofUtil.Apply("simp add: " + blockId + "_def " + bigblockId + "_def")
+            };
+            if (startingBigBlock.simpleCmds.Any()) { beginningOfProof.Add(ProofUtil.Apply("simp add: " + blockId + "_def")); }
+            beginningOfProof.AddRange(new List<string>
+            {
               ProofUtil.Apply("rule astTrace"),
               ProofUtil.Apply("simp add: " + bigblockId + "_def"),
               ProofUtil.Apply("rule " + nodeId + "")
-            };
+            });
 
-            var middlePartOfProof = new List<string>
+            var middlePartOfProof = new List<string>();
+            if (entryGuard == null) { middlePartOfProof.Add(ProofUtil.Apply("rule disjI1")); }
+            if (entryGuard != null)
             {
-              entryGuard == null ? ProofUtil.Apply("rule disjI1") : null,
-              
-              entryGuard != null ? (indicator == BranchIndicator.NoGuard ? ProofUtil.Apply("rule disjI1") : ProofUtil.Apply("rule disjI2")) : null,
-              entryGuard != null && indicator == BranchIndicator.GuardHolds ? ProofUtil.Apply("rule disjI1") : null,
-              entryGuard != null && indicator == BranchIndicator.GuardFails ? ProofUtil.Apply("rule disjI2") : null,
-              ProofUtil.Apply("simp add: " + blockId + "_def"),
-              entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule conjI") : null,
-              entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-              entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule conjI") : null,
-              entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply(ProofUtil.Simp()) : null,
-              entryGuard != null && (indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule conjI") : null,
-              entryGuard != null && (indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("" + NegationRule(entryGuard) + "") : null,
-              entryGuard != null && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule guardHint") : null,
+              middlePartOfProof.Add(indicator == BranchIndicator.NoGuard
+                ? ProofUtil.Apply("rule disjI1")
+                : ProofUtil.Apply("rule disjI2"));
+            }
+            if (entryGuard != null && indicator == BranchIndicator.GuardHolds) { middlePartOfProof.Add(ProofUtil.Apply("rule disjI1")); }
+            if (entryGuard != null && indicator == BranchIndicator.GuardFails) { middlePartOfProof.Add(ProofUtil.Apply("rule disjI2")); }
+            middlePartOfProof.Add(ProofUtil.Apply("simp add: " + blockId + "_def"));
+            if (entryGuard != null &&
+                (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails))
+            {
+              middlePartOfProof.AddRange(new List<string>
+              {
+                ProofUtil.Apply("rule conjI"),
+                ProofUtil.Apply(ProofUtil.Simp()),
+                ProofUtil.Apply("rule conjI"),
+                ProofUtil.Apply(ProofUtil.Simp())
+              });
+            }
+            if (entryGuard != null && (indicator == BranchIndicator.GuardFails))
+            {
+              middlePartOfProof.AddRange(new List<string>
+              {
+                ProofUtil.Apply("rule conjI"),
+                ProofUtil.Apply("" + NegationRule(entryGuard) + "") 
+              });
+            }
+            if (entryGuard != null &&
+                (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails))
+            {
+              middlePartOfProof.Add(ProofUtil.Apply("rule guardHint"));
+            }
+            middlePartOfProof.AddRange(new List<string>
+            {
               ProofUtil.Apply("rule cfgDoesntFail, simp"),
               ProofUtil.Apply("rule cfgSatisfiesPosts, blast"),
-              ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
-              mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply("simp add: " + nodeId + "") : null,
-              mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply("rule " + nameLemmaLocal + "") : null,
-              mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply("simp add: " + bigblockId + "_def") : null,
-              mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock) ? ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())) : null,
-              entryGuard != null && startingBigBlock.simpleCmds.Any() && (indicator == BranchIndicator.GuardHolds || indicator == BranchIndicator.GuardFails) ? ProofUtil.Apply("rule guardHint") : null,
-              personalGuard != null ? ProofUtil.Apply("erule disjE") : null,
-              //personalGuard == null ? ProofUtil.Apply("erule disjE, simp") : null,
-              //personalGuard == null ? ProofUtil.Apply("erule disjE, simp") : null,
-              personalGuard == null ? ProofUtil.Apply("rule disjE, simp") : null
-            };
+              ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+            });
+            if (mappingBigBlockToLocalLemmaDecl.ContainsKey(startingBigBlock))
+            {
+              middlePartOfProof.AddRange(new List<string>
+              {
+                ProofUtil.Apply("simp add: " + nodeId + ""),
+                ProofUtil.Apply("rule " + nameLemmaLocal + ""),
+                ProofUtil.Apply("simp add: " + bigblockId + "_def"),
+                ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+              });
+            }
+            if (entryGuard != null && startingBigBlock.simpleCmds.Any() && (indicator == BranchIndicator.GuardHolds ||
+                                                                            indicator == BranchIndicator.GuardFails))
+            {
+              middlePartOfProof.Add(ProofUtil.Apply("rule guardHint"));
+            }
+            if (personalGuard != null) { middlePartOfProof.Add(ProofUtil.Apply("erule disjE")); }
+            if (personalGuard == null) { middlePartOfProof.Add(ProofUtil.Apply("rule disjE, simp")); }
 
+            
             var finalPartOfProof = new List<string>
             {
               ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succUniqueIntLabel + "]")),
@@ -1691,15 +1810,29 @@ namespace ProofGeneration.AstToCfg
               ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
               ProofUtil.Apply("rule " + nameLemmaThen + ""),
               ExpandDefinitions(contId, startingBigBlock, proofGenInfo, BranchIndicator.GuardHolds),
-              "apply blast+",
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_prove") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_apply") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule inductionHypothesis") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule less_trans_inv") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())) : null,
-              personalGuard != null && !proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? 
-                ProofUtil.Apply(ProofUtil.Simp()) : null,
+              "apply blast+"
+            };
 
+            if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+            {
+              finalPartOfProof.AddRange(new List<string>
+              {
+                ProofUtil.Apply("rule loop_IH_prove"),
+                ProofUtil.Apply("rule loop_IH_apply"),
+                ProofUtil.Apply("rule inductionHypothesis"),
+                ProofUtil.Apply("rule less_trans_inv"),
+                ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+              });
+            }
+
+            if (personalGuard != null &&
+                !proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+            {
+              finalPartOfProof.Add(ProofUtil.Apply(ProofUtil.Simp()));
+            }
+            
+            finalPartOfProof.AddRange(new List<string>
+            {
               ProofUtil.Apply(ProofUtil.Repeat("erule allE[where x = " + succUniqueIntLabel2 + "]")),
               ProofUtil.Apply(ProofUtil.Repeat("simp add: " + outEdgesId)),
               ProofUtil.Apply("simp add: member_rec(1)"),
@@ -1707,17 +1840,27 @@ namespace ProofGeneration.AstToCfg
               ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
               ProofUtil.Apply("rule " + nameLemmaElse + ""),
               ExpandDefinitions(contId, startingBigBlock, proofGenInfo, BranchIndicator.GuardFails),
-              "apply blast+",
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_prove") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule loop_IH_apply") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule inductionHypothesis") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply("rule less_trans_inv") : null,
-              proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig) ? ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())) : null,
+              "apply blast+"
+            });
 
+            if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
+            {
+              finalPartOfProof.AddRange(new List<string>
+              {
+                ProofUtil.Apply("rule loop_IH_prove"),
+                ProofUtil.Apply("rule loop_IH_apply"),
+                ProofUtil.Apply("rule inductionHypothesis"),
+                ProofUtil.Apply("rule less_trans_inv"),
+                ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp()))
+              });
+            }
+            
+            finalPartOfProof.AddRange(new List<string>
+            {
               "done",
               "qed"
-            };
-            
+            });
+
             proofMethods.AddRange(beginningOfProof);
             proofMethods.AddRange(middlePartOfProof);
             proofMethods.AddRange(finalPartOfProof);

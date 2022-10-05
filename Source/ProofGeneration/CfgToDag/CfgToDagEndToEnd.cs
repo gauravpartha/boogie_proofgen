@@ -205,21 +205,21 @@ namespace ProofGeneration.CfgToDag
             Term procedure)
         {
             var typeInterpId = new SimpleIdentifier("A");
-            return 
-                TermQuantifier.MetaAll(
-                    new List<Identifier>{ typeInterpId},
-                    null,
-                    new TermApp(
-                IsaCommonTerms.TermIdentFromName("Semantics.proc_is_correct"),
-                //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
-                new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
-                funDecls,
-                constantDecls,
-                globalDecls,
-                axioms,
-                procedure,
-                //TODO: define this elsewhere.
-                IsaCommonTerms.TermIdentFromName("Semantics.proc_body_satisfies_spec")));
+            return
+              TermQuantifier.MetaAll(
+                new List<Identifier> {typeInterpId},
+                null,
+                new TermApp(
+                  IsaCommonTerms.TermIdentFromName("Semantics.proc_is_correct"),
+                  //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
+                  new TermWithExplicitType(new TermIdent(typeInterpId), 
+                    IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
+                  funDecls,
+                  constantDecls,
+                  globalDecls,
+                  axioms,
+                  procedure,
+                  IsaBoogieTerm.SematicsProcSpecSatisfied));
         }
     }
 }

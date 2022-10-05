@@ -27,7 +27,7 @@ namespace ProofGeneration
         private static Implementation beforeCFGtoDagImpl;
 
         //private static Implementation beforeDagImpl;
-        private static ProofGenInfo proofGenInfo;
+        private static AstToCfgProofGenInfo proofGenInfo;
         
         private static MultiCmdIsaVisitor cmdIsaVisitor;
 
@@ -81,7 +81,7 @@ namespace ProofGeneration
         private static Block uniqueExitBlockOrig;
 
         private static ProofGenConfig _proofGenConfig =
-            new ProofGenConfig(false, true, true, true);
+            new ProofGenConfig(true, true, true, true);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -125,7 +125,7 @@ namespace ProofGeneration
           return _proofGenConfig.GenerateAstToCfg;
         }
 
-        private static bool AstContainsGotoOrBreak(ProofGenInfo proofGenInfo)
+        private static bool AstContainsGotoOrBreak(AstToCfgProofGenInfo proofGenInfo)
         {
           IList<BigBlock> ast = proofGenInfo.GetBigBlocks();
           foreach (var b in ast)
@@ -148,7 +148,6 @@ namespace ProofGeneration
             out beforeOptimizationsOrigBlock,
             out var newVarsFromDesugaring);
           beforeOptimizationsData = MethodDataFromImpl(impl, boogieGlobalData, newVarsFromDesugaring);
-          //uniqueExitBlockOrigBeforeOptimizations = null;
         }
 
         /// <summary>
@@ -192,7 +191,7 @@ namespace ProofGeneration
         /// <summary>
         /// Provide the generated unified exit block. If no unified exit block is created (for example, when there is only
         /// one exit block), then invoke this method with null.
-        /// </summary>Impl
+        /// </summary>
         public static void CreateUnifiedExitBlock(Block generatedExitBlock)
         {
             uniqueExitBlockOrig = generatedExitBlock;
@@ -543,7 +542,7 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
-            var map = ProofGenInfoManager.GetMapFromImplementationToProofGenInfo();
+            var map = AstToCfgProofGenInfoManager.GetImplToProofGenInfo();
             proofGenInfo = map[afterPassificationImpl];
 
             if (AstContainsGotoOrBreak(proofGenInfo))
@@ -557,8 +556,6 @@ namespace ProofGeneration
               DesugarCmdsInBigBlock(b);
             }
 
-            //TODO: test
-            
             IList<Block> unoptimizedCFGBlocks = proofGenInfo.GetUnpotimizedBlocks(); 
             var newToOldInternal = new Dictionary<Block, Block>();
             unoptimizedCFGBlocks.ZipDo(afterPassificationImpl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
@@ -640,7 +637,7 @@ namespace ProofGeneration
               var beforeAstToCfgConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true,
                 true, specsConfig_ast, true);
 
-              beforeAstToCfgProgAccess = new IsaProgramGenerator_forAst().GetIsaProgram(
+              beforeAstToCfgProgAccess = new IsaProgramGeneratorForAst().GetIsaProgram(
                 beforeAstToCfgTheoryName,
                 afterPassificationImpl.Name,
                 mainData, beforeAstToCfgConfig, varTranslationFactory2,
@@ -871,11 +868,6 @@ namespace ProofGeneration
                 var origBigBlock = pair.Key;
                 var copyBigBlock = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[origBigBlock];
                 var origBlock = pair.Value;
-
-                if (!mappingOrigBlockToCopyBlock.ContainsKey(origBlock))
-                {
-                  int debug = 5;
-                }
                 var copyBlock = mappingOrigBlockToCopyBlock[origBlock];
                 var hints = mappingBigBlockToHints[origBigBlock];
 
@@ -885,19 +877,13 @@ namespace ProofGeneration
 
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
                 phasesTheories,
-                //_proofGenConfig.GenerateCfgDagE2E,
                 vcAssm,
                 proofGenInfo,
                 beforeCfgAst,
-                //beforeOptimizationsCFG,
                 beforeDagCfg,
-                //uniqueExitBlock,
-                //beforeOptimizationsData,
                 beforeDagData,
-                //beforeOptimizationsOrigBlock,
                 beforeDagOrigBlock,
                 mappingWithHints,
-                //cfgToDagHintManager,
                 beforeCfgAfterCfgBlock,
                 beforeAstToCfgProgAccess,
                 beforeCfgToDagProgAccess,
