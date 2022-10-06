@@ -887,7 +887,10 @@ namespace Microsoft.Boogie
             loopDone = new BigBlock(Token.NoToken, null, new List<Cmd>(), null, null);;
             b.successorBigBlock = loopDone;
             
+            //Record loop done as a successor big block in the AST to 'b'.
             proofGenInfo.RecordLoopDoneBlock(loopDone);
+            
+            //Add it to to all necessary mappings, in which it will be used when generating a proof.
             proofGenInfo.AddBigBlockBeforeNamingAnonymous(loopDone, true, parent, parentCopy,  BranchIndicator.NoGuard);
             proofGenInfo.AddBigBlockToBlockPair(loopDone, block);
             

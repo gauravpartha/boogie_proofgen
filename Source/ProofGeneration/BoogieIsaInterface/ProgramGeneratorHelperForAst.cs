@@ -220,13 +220,16 @@ namespace ProofGeneration
         }
         
         BigBlock successorBigBlockOrig = correspondingBigBlockOrig.successorBigBlock;
-
+        
+        //if the big block has no successors of any kind, make a 'KStop' continuation.
         if (successorBigBlockOrig == null)
         {
           continuationTerm = IsaCommonTerms.TermIdentFromName("KStop");
           return continuationTerm;
         }
         
+        //if the big block is the last one in the body of a loop,
+        //update the successor index needed for the continuation and make a 'KSeq' continuation. 
         if (successorBigBlockOrig.ec is WhileCmd)
         {
           WhileCmd wcmd = (WhileCmd) successorBigBlockOrig.ec;
@@ -241,6 +244,7 @@ namespace ProofGeneration
           }
         }
 
+        //if the big block is the special, artificially made, 'unwrapped' loop head big block, make a 'KEndBlock' continuation.
         if (b.ec is WhileCmd && proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().Keys.Contains(b))
         {
           continuationStart = IsaCommonTerms.TermIdentFromName("KEndBlock (KSeq bigblock_" + successorIndex);
@@ -249,6 +253,7 @@ namespace ProofGeneration
           return continuationTerm;
         }
 
+        //in any other case, make a standard 'KSeq' continuation.
         continuationStart = IsaCommonTerms.TermIdentFromName("KSeq bigblock_" + successorIndex);
         continuationTerm = new TermApp(continuationStart, IsaCommonTerms.TermIdentFromName("cont_" + successorIndex));
 

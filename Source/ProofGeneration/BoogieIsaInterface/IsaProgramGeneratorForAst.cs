@@ -269,7 +269,9 @@ namespace ProofGeneration
           IList<OuterDecl> declsToReturn = new List<OuterDecl>();
           BigBlockTermBuilder builder = new BigBlockTermBuilder();
 
-          //TODO: document this properly
+          //Loop through the big blocks in 'original AST' backwards.
+          //The name 'original AST' refers to the fact that the AST is in its original form, as constructed, i.e, it's not 'unrolled'.
+          //However, the big blocks inside it are copies. 
           foreach (BigBlock b in originalAst.GetBlocksBackwards())
           {
             BigBlock correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[b];
@@ -282,15 +284,18 @@ namespace ProofGeneration
               successorIndex = proofGenInfo.GetMappingCopyBigBlockToIndex()[successorBigBlockCopy];
             }
 
+            //This should be the same as big block 'b'? 
             BigBlock correspondingBigBlockCopy = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[correspondingBigBlockOrig];
             
+            //Construct the continuation term, which corresponds to 'b' and which is to be used in the Isabelle proofs later. 
             Term continuation = builder.makeContinuationTerm(correspondingBigBlockCopy, proofGenInfo, successorIndex);
             int bigblockIndex = proofGenInfo.GetMappingCopyBigBlockToIndex()[correspondingBigBlockCopy];
             DefDecl continuationDecl = DefDecl.CreateWithoutArg("cont_" + bigblockIndex, continuation);
             declsToReturn.Add(continuationDecl);
 
+            //Special continuation term, which is used if 'b' contains a WhileCmd.
             DefDecl continuationDeclForUnwrappedBigBlock = null;
-
+            
             if (b.ec is WhileCmd)
             {
               foreach (var pair in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
@@ -312,7 +317,8 @@ namespace ProofGeneration
               
               WhileCmd wcmd = (WhileCmd) b.ec;
               ASTRepr body = new ASTRepr(wcmd.Body.BigBlocks);
-
+              
+              //recursively construct continuation terms for the body of the while-loop (again from the end to the beginning).
               IList<OuterDecl> bodyConts = getContinuations(body, proofGenInfo);
               declsToReturn.AddRange(bodyConts);
             }
@@ -320,11 +326,15 @@ namespace ProofGeneration
             {
               IfCmd ifcmd = (IfCmd) b.ec;
               ASTRepr thn = new ASTRepr(ifcmd.thn.BigBlocks);
+              
+              //recursively construct continuation terms for the body of the thn-branch of the if-statement.
               declsToReturn.AddRange(getContinuations(thn, proofGenInfo));
 
               if (ifcmd.elseBlock != null)
               {
                 ASTRepr elseBlock = new ASTRepr(ifcmd.elseBlock.BigBlocks);
+                
+                //recursively construct continuation terms for the body of the else-branch of the if-statement.
                 declsToReturn.AddRange(getContinuations(elseBlock, proofGenInfo)); 
               }
             }

@@ -43,6 +43,9 @@ namespace ProofGeneration.CfgToDag
             IProgramAccessor beforeCfgProgramAccessor,
             CFGRepr cfg)
         {
+            // both program accessors are needed because the End-to-End lemmas for the CFG-to-VC part 
+            // need to have access to the 'before AST-to-CFG' program as well as the 'before CFG-to-DAG' program, 
+            // so that the AST-to-VC End-to-End lemma can be composed.
             this.programAccessor = programAccessor;
             this.beforeCfgProgramAccessor = beforeCfgProgramAccessor;
             

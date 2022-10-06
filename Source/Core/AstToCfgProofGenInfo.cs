@@ -38,31 +38,31 @@ namespace Microsoft.Boogie
     private IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock;
     private IDictionary<BigBlock, BigBlock> mappingCopyBigblockToOrigBigblock;
     private IDictionary<BigBlock, BigBlock> mappingOrigBigblockToCopyBigblock;
-
-    //TODO: Fix this.
+    
+    
     /** A dictionary mapping a 'LoopHead' BigBlock to a tuple of two BigBlocks.
       * A LoopHead is a special BigBlock that is a second copy (copy of a copy), has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>.
       * The first BigBlock in the tuple is the copied BigBlock, from which the LoopHead was created.
-      * The second BigBlock in the tuple is the original BigBlock the copy corresponds to. */
+      * The second BigBlock in the tuple is the original BigBlock the copy corresponds to.
+      */
     private IDictionary<BigBlock, (BigBlock, BigBlock)> mappingCopyBigblockToOrigBigblockWithTupleValue;
-
-    //TODO: Consider changing to a set.
+    
     // A marker set to false indicates that a BigBlock is nested in another BigBlock.
     private IDictionary<BigBlock, bool> mappingCopyBigBlockToMarker;
-
-    //TODO: This mapping uses Original BigBlocks, not copies. Fix.
+    
     /** The first hint is a guard (possibly null) that needs to be taken care of in the global lemma that's to be generated.
       * The second hint is a BranchIndicator that indicates how that needs to be done. */
-    private IDictionary<BigBlock, (Expr, BranchIndicator)> mappingCopyBigBlockToHints;
+    private IDictionary<BigBlock, (Expr, BranchIndicator)> mappingBigBlockToHints;
 
     // Map a BigBlock (copy) to the unique integer label (index) of its corresponding Term object (in InnerAst.cs).
     private IDictionary<BigBlock, int> mappingCopyBigBlockToIndex;
 
     // Map a BigBlock (original) to the Loop BigBlock (original) it's nested into.
     private IDictionary<BigBlock, BigBlock> mappingBigBlockToOrigLoopBigBlock;
-
-    // TODO: This doesn't need to be a list.
-    // List of BigBlocks added after a loop if that loop is the end of the procedure.
+    
+    // List of BigBlocks added after a loop if that loop is the end of the procedure or if that loop has no successors.
+    // I've never encountered an instance where this list contains more than one element, i.e, this doesn't need to be a list.
+    // However, this depends on the when successor Big Blocks are computed, so using a list is not wrong.
     private IList<BigBlock> loopEndingBlocks;
 
     private List<Variable> newVarsFromDesugaring;
@@ -79,7 +79,7 @@ namespace Microsoft.Boogie
       mappingOrigBigblockToCopyBigblock = new Dictionary<BigBlock, BigBlock>();
       mappingCopyBigblockToOrigBigblockWithTupleValue = new Dictionary<BigBlock, (BigBlock, BigBlock)>();
 
-      mappingCopyBigBlockToHints = new Dictionary<BigBlock, (Expr, BranchIndicator)>();
+      mappingBigBlockToHints = new Dictionary<BigBlock, (Expr, BranchIndicator)>();
       mappingCopyBigBlockToIndex = new Dictionary<BigBlock, int>();
 
       mappingBigBlockToOrigLoopBigBlock = new Dictionary<BigBlock, BigBlock>();
@@ -155,7 +155,7 @@ namespace Microsoft.Boogie
 
     public IDictionary<BigBlock, (Expr, BranchIndicator)> GetMappingCopyBigBlockToHints()
     {
-      return mappingCopyBigBlockToHints;
+      return mappingBigBlockToHints;
     }
 
     public IDictionary<BigBlock, BigBlock> GetMappingBigBlockToLoopBigBlock()
@@ -202,6 +202,8 @@ namespace Microsoft.Boogie
       switch (branchIndicator)
       {
         case BranchIndicator.NoGuard:
+          
+          //If the elseBlock field of an <see cref="IfCmd"/> is null, initialize it to a <see cref="StmtList"/> with one 'empty' BigBlock.
           FillEmptyElseBranches(b);
           
           copy = CopyBigBlock(b);
@@ -283,8 +285,10 @@ namespace Microsoft.Boogie
       else if (b.ec is WhileCmd)
       {
         BigBlock simpleCmdsRemoved = new BigBlock(copy.tok, copy.LabelName, new List<Cmd>(), copy.ec, copy.tc);
-        //simpleCmdsRemoved.successorBigBlock = b.successorBigBlock;
         BigBlock copy1 = simpleCmdsRemoved;
+        
+        //copy1 is a special loop head BigBlock
+        //that is a second copy (copy of a copy), has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>. 
         mappingCopyBigblockToOrigBigblock.Add(copy1, simpleCmdsRemoved);
         mappingCopyBigblockToOrigBigblockWithTupleValue.Add(copy1, (simpleCmdsRemoved, b));
         mappingOrigBigblockToCopyBigblock.Add(simpleCmdsRemoved, copy1);
@@ -327,7 +331,7 @@ namespace Microsoft.Boogie
 
     public void AddBigBlockToHintsPair(BigBlock b, (Expr, BranchIndicator) tuple)
     {
-      mappingCopyBigBlockToHints.Add(b, (tuple.Item1, tuple.Item2));
+      mappingBigBlockToHints.Add(b, (tuple.Item1, tuple.Item2));
     }
 
     public void AddBigBlockToIndexPair(BigBlock b, int index)

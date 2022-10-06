@@ -126,8 +126,7 @@ namespace ProofGeneration.AstToCfg
             var localLemmas = new List<LemmaDecl>();
 
             #region local block lemma
-
-            //TODO: write the proofs using ProofUtil
+            
             var assumptions = new List<Term>
             {
                 IsaBoogieTerm.RedBigBlock(astBoogieContext, startConfig, endConfig, astId)
@@ -1135,7 +1134,7 @@ namespace ProofGeneration.AstToCfg
                proofMethods.AddRange(insideOfLoopAddition1);
              }
 
-             //TODO: do the second check if BlockCoalescing is activated, otherwise keep as is
+             //TODO: do the second check if BlockCoalescing is activated, otherwise keep as is. 
              if (personalGuard != null && personalGuard.Equals(Expr.True))
              {
                proofMethods.AddRange(whileTrueEndingAfterSkippingEndBlock); 

@@ -854,8 +854,8 @@ namespace ProofGeneration
               IDictionary<BigBlock, (Block, Expr, BranchIndicator)> mappingWithHints =
                 new Dictionary<BigBlock, (Block, Expr, BranchIndicator)>();
 
-              IDictionary<BigBlock, BigBlock> mappingCopyBigblockToOrigBigblock =
-                proofGenInfo.GetMappingCopyBigblockToOrigBigblock();
+              //IDictionary<BigBlock, BigBlock> mappingCopyBigblockToOrigBigblock =
+                //proofGenInfo.GetMappingCopyBigblockToOrigBigblock();
               IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock =
                 proofGenInfo.GetMappingOrigBigBlockToOrigBlock();
               
