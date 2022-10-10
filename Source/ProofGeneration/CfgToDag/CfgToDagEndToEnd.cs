@@ -144,7 +144,13 @@ namespace ProofGeneration.CfgToDag
                                              programAccessor.PreconditionsDeclName() + "_def " + programAccessor.PostconditionsDeclName() + "_def " +
                                              programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
                                              beforeCfgProgramAccessor.PreconditionsDeclName() + "_def " + beforeCfgProgramAccessor.PostconditionsDeclName() + "_def " +
-                                             beforeCfgProgramAccessor.ParamsDecl() + "_def " + beforeCfgProgramAccessor.LocalsDecl() + "_def")
+                                             beforeCfgProgramAccessor.ParamsDecl() + "_def " + beforeCfgProgramAccessor.LocalsDecl() + "_def " +
+                                             
+                                             beforeCfgProgramAccessor.FunctionsDecl() + "_def " + programAccessor.FunctionsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.AxiomsDecl() + "_def " + programAccessor.AxiomsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.ConstsDecl() + "_def " + programAccessor.ConstsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.GlobalsDecl() + "_def " + programAccessor.GlobalsDecl() + "_def " +
+                                             "exprs_to_only_checked_spec_def")
                         }
                     ) );
 

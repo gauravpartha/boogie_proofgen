@@ -546,8 +546,8 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
-            _proofGenConfig.GeneratePassifE2E = generateVCProof && _proofGenConfig.GenerateVcE2E && generatePassifProof;
-            _proofGenConfig.GenerateCfgDagE2E = generatePassifProof && _proofGenConfig.GeneratePassifE2E && generateCfgDagProof;
+            //_proofGenConfig.GeneratePassifE2E = generateVCProof && _proofGenConfig.GenerateVcE2E && generatePassifProof;
+            //_proofGenConfig.GenerateCfgDagE2E = generatePassifProof && _proofGenConfig.GeneratePassifE2E && generateCfgDagProof;
 
             var map = AstToCfgProofGenInfoManager.GetImplToProofGenInfo();
             proofGenInfo = map[afterPassificationImpl];

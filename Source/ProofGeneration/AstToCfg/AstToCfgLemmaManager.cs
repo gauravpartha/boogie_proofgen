@@ -409,8 +409,7 @@ namespace ProofGeneration.AstToCfg
           #endregion
           
           Term conclusion = IsaBoogieTerm.AstValidConfiguration(astBoogieContext, posts);
-
-          //TODO: Document the cases for the proofs
+          
           #region proof
           var proofMethods = new List<string>();
           
@@ -419,7 +418,6 @@ namespace ProofGeneration.AstToCfg
           {
             proofMethods = GenerateFinalBlockProof(startingBigBlock, relatedBlock, hints.Item1, hints.Item2, proofGenInfo);
           }
-          //TODO: Fix this.
           //A BigBlock is a LoopHead if it is a key in this dictionary.
           else if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().ContainsKey(startingBigBlock))
           {

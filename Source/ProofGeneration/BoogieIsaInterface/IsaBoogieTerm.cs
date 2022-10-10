@@ -612,7 +612,7 @@ namespace ProofGeneration
                 IsaCommonTerms.TermIdentFromName("j"),
                 astBoogieContext.absValTyMap,
                 astBoogieContext.methodContext,
-                cfgBoogieContext.methodContext,
+                //cfgBoogieContext.methodContext,
                 astBoogieContext.varContext,
                 astBoogieContext.funContext,
                 astBoogieContext.rtypeEnv,
