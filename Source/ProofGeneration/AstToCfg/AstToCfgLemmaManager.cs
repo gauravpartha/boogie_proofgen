@@ -337,7 +337,7 @@ namespace ProofGeneration.AstToCfg
             guardSemantics = true;
             assumptions.Add(traceIsPossible);
           }
-          else if (proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().ContainsKey(startingBigBlock))
+          else if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().ContainsKey(startingBigBlock))
           {
             WhileCmd wcmd = (WhileCmd) startingBigBlock.ec;
             if (wcmd.Guard == null)
@@ -372,9 +372,9 @@ namespace ProofGeneration.AstToCfg
           #endregion
           
           BigBlock correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[startingBigBlock];
-          if (proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().ContainsKey(startingBigBlock))
+          if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().ContainsKey(startingBigBlock))
           {
-            correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue()[startingBigBlock].Item2;
+            correspondingBigBlockOrig = proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock()[startingBigBlock];
           }
           BigBlock successorBigBlockOrig = correspondingBigBlockOrig.successorBigBlock;
 
@@ -421,7 +421,7 @@ namespace ProofGeneration.AstToCfg
           }
           //TODO: Fix this.
           //A BigBlock is a LoopHead if it is a key in this dictionary.
-          else if (proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().ContainsKey(startingBigBlock))
+          else if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().ContainsKey(startingBigBlock))
           {
             WhileCmd wcmd = (WhileCmd) startingBigBlock.ec;
             Expr guard = wcmd.Guard;
@@ -749,9 +749,9 @@ namespace ProofGeneration.AstToCfg
            List<string> proofMethods = new List<string>();
 
            BigBlock correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[startingBigBlock];
-           if (proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().Keys.Contains(startingBigBlock))
+           if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().Keys.Contains(startingBigBlock))
            {
-             correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue()[startingBigBlock].Item2;
+             correspondingBigBlockOrig = proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock()[startingBigBlock];
            }
            
            //Get the BigBlock that comes after the loop.
@@ -759,9 +759,9 @@ namespace ProofGeneration.AstToCfg
            BigBlock afterLoopBigBlockCopy = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[afterLoopBigBlockOrig];
            
            BigBlock unwrappedAfterLoopBigBlockCopy = null;
-           foreach (var tuple in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
+           foreach (var tuple in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
            {
-             if (tuple.Value.Item2 == afterLoopBigBlockOrig)
+             if (tuple.Value == afterLoopBigBlockOrig)
              {
                unwrappedAfterLoopBigBlockCopy = tuple.Key;
                break;
@@ -805,9 +805,9 @@ namespace ProofGeneration.AstToCfg
                }
                else
                {
-                 foreach (var tuple in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
+                 foreach (var tuple in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
                  {
-                   if (tuple.Value.Item2 == bodyBb)
+                   if (tuple.Value == bodyBb)
                    {
                      bodyBbCopy = tuple.Key;
                      break;
@@ -1180,9 +1180,9 @@ namespace ProofGeneration.AstToCfg
           BigBlock successorBigBlockOrig = correspondingBigBlockOrig.successorBigBlock;
           BigBlock successorBigBlockCopy = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[successorBigBlockOrig];
 
-          foreach (var kvPair in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
+          foreach (var kvPair in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
           {
-            if (kvPair.Value.Item2 == successorBigBlockOrig)
+            if (kvPair.Value == successorBigBlockOrig)
             {
               successorBigBlockCopy = kvPair.Key;
               break;
@@ -1416,9 +1416,9 @@ namespace ProofGeneration.AstToCfg
           
           BigBlock correspondingOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[startingBigBlock];
           BigBlock unwrappedBigBlockCopy = null;
-          foreach (var tuple in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
+          foreach (var tuple in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
           {
-            if (tuple.Value.Item2 == correspondingOrig)
+            if (tuple.Value == correspondingOrig)
             {
               unwrappedBigBlockCopy = tuple.Key;
               break;
@@ -1528,9 +1528,9 @@ namespace ProofGeneration.AstToCfg
 
            BigBlock correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[startingBigBlock];
            BigBlock successorBigBlockCopy = null;
-           foreach (var tuple in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
+           foreach (var tuple in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
            {
-             if (correspondingBigBlockOrig == tuple.Value.Item2)
+             if (correspondingBigBlockOrig == tuple.Value)
              {
                successorBigBlockCopy = tuple.Key;
                break;

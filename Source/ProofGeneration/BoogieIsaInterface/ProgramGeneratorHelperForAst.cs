@@ -213,10 +213,14 @@ namespace ProofGeneration
         Term continuationStart;
         Term continuationEnd;
 
-        BigBlock correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[b];
-        if (proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().Keys.Contains(b))
+        BigBlock correspondingBigBlockOrig;
+        if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().Keys.Contains(b))
         {
-          correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue()[b].Item2;
+          correspondingBigBlockOrig = proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock()[b];
+        }
+        else
+        {
+          correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[b];
         }
         
         BigBlock successorBigBlockOrig = correspondingBigBlockOrig.successorBigBlock;
@@ -245,7 +249,7 @@ namespace ProofGeneration
         }
 
         //if the big block is the special, artificially made, 'unwrapped' loop head big block, make a 'KEndBlock' continuation.
-        if (b.ec is WhileCmd && proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().Keys.Contains(b))
+        if (b.ec is WhileCmd && proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().Keys.Contains(b))
         {
           continuationStart = IsaCommonTerms.TermIdentFromName("KEndBlock (KSeq bigblock_" + successorIndex);
           continuationEnd = IsaCommonTerms.TermIdentFromName(")");

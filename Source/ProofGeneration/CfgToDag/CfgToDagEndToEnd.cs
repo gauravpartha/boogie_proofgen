@@ -148,7 +148,7 @@ namespace ProofGeneration.CfgToDag
                         }
                     ) );
 
-            if (!ProofGenerationLayer.GenerateASTToCFGProof())
+            if (!ProofGenerationLayer.GenerateAstCfgE2E())
             {
               result.Add(endToEndLemma);
             }

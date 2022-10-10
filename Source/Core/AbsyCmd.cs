@@ -823,11 +823,11 @@ namespace Microsoft.Boogie
           blocks.Add(block);
 
           #region proofgen
-          foreach (var tuple in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().Values)
+          foreach (var tuple in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
           {
-            if (tuple.Item2 == b)
+            if (tuple.Value == b)
             {
-              BigBlock simpleCmdsRemoved = tuple.Item1;
+              BigBlock simpleCmdsRemoved = tuple.Key;
               proofGenInfo.AddBigBlockToBlockPair(simpleCmdsRemoved, block);
               proofGenInfo.AddBigBlockToHintsPair(simpleCmdsRemoved, (null, BranchIndicator.NoGuard));
               break;

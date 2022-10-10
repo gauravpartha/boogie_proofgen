@@ -4475,7 +4475,7 @@ namespace Microsoft.Boogie
       AstToCfgProofGenInfo correspondingProofGenInfo = AstToCfgProofGenInfoManager.GetCurrentProofGenInfo();
       mapFromImplementationToProofGenInfo.Add(this, correspondingProofGenInfo);
       #endregion
-      
+
       BlockPredecessorsComputed = false;
       scc = null;
       Attributes = kv;

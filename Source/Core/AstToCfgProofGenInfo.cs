@@ -34,18 +34,19 @@ namespace Microsoft.Boogie
     /// A list containing the same <see cref ="BigBlock"/> objects, which are in <see cref ="originalAst"/> with all nested BigBlocks explicitly added.
     private IList<BigBlock> bigblocksBeforeNamingAnonymous;
 
+    private IDictionary<Block, Block> mappingOrigBlocktoUnoptimizedCopy;
+
     // Dictionaries used to keep track of relations between different kinds of blocks. 
     private IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock;
     private IDictionary<BigBlock, BigBlock> mappingCopyBigblockToOrigBigblock;
     private IDictionary<BigBlock, BigBlock> mappingOrigBigblockToCopyBigblock;
     
-    
     /** A dictionary mapping a 'LoopHead' BigBlock to a tuple of two BigBlocks.
-      * A LoopHead is a special BigBlock that is a second copy (copy of a copy), has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>.
-      * The first BigBlock in the tuple is the copied BigBlock, from which the LoopHead was created.
-      * The second BigBlock in the tuple is the original BigBlock the copy corresponds to.
+      * A LoopHead is a special BigBlock that is a copy, has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>.
+      * The key is the LoopHead.
+      * The value is the original BigBlock the LoopHead Big Block was created from.
       */
-    private IDictionary<BigBlock, (BigBlock, BigBlock)> mappingCopyBigblockToOrigBigblockWithTupleValue;
+    private IDictionary<BigBlock, BigBlock> mappingLoopHeadBigBlocktoOrigLoopBigBlock;
     
     // A marker set to false indicates that a BigBlock is nested in another BigBlock.
     private IDictionary<BigBlock, bool> mappingCopyBigBlockToMarker;
@@ -77,7 +78,7 @@ namespace Microsoft.Boogie
       mappingOrigBigBlockToOrigBlock = new Dictionary<BigBlock, Block>();
       mappingCopyBigblockToOrigBigblock = new Dictionary<BigBlock, BigBlock>();
       mappingOrigBigblockToCopyBigblock = new Dictionary<BigBlock, BigBlock>();
-      mappingCopyBigblockToOrigBigblockWithTupleValue = new Dictionary<BigBlock, (BigBlock, BigBlock)>();
+      mappingLoopHeadBigBlocktoOrigLoopBigBlock = new Dictionary<BigBlock, BigBlock>();
 
       mappingBigBlockToHints = new Dictionary<BigBlock, (Expr, BranchIndicator)>();
       mappingCopyBigBlockToIndex = new Dictionary<BigBlock, int>();
@@ -128,6 +129,11 @@ namespace Microsoft.Boogie
       return originalAst;
     }
 
+    public IDictionary<Block, Block> GetMappingOrigBlockToUnoptimizedCopy()
+    {
+      return mappingOrigBlocktoUnoptimizedCopy;
+    }
+
     public IDictionary<BigBlock, bool> GetMappingCopyBigBlockToMarker()
     {
       return mappingCopyBigBlockToMarker;
@@ -148,9 +154,9 @@ namespace Microsoft.Boogie
       return mappingOrigBigblockToCopyBigblock;
     }
 
-    public IDictionary<BigBlock, (BigBlock, BigBlock)> GetMappingCopyBigblockToOrigBigblockWithTupleValue()
+    public IDictionary<BigBlock, BigBlock> GetMappingLoopHeadBigBlocktoOrigLoopBigBlock()
     {
-      return mappingCopyBigblockToOrigBigblockWithTupleValue;
+      return mappingLoopHeadBigBlocktoOrigLoopBigBlock;
     }
 
     public IDictionary<BigBlock, (Expr, BranchIndicator)> GetMappingCopyBigBlockToHints()
@@ -285,15 +291,14 @@ namespace Microsoft.Boogie
       else if (b.ec is WhileCmd)
       {
         BigBlock simpleCmdsRemoved = new BigBlock(copy.tok, copy.LabelName, new List<Cmd>(), copy.ec, copy.tc);
-        BigBlock copy1 = simpleCmdsRemoved;
+
+        //This is bad.
+        mappingCopyBigblockToOrigBigblock.Add(simpleCmdsRemoved, simpleCmdsRemoved);
+        mappingOrigBigblockToCopyBigblock.Add(simpleCmdsRemoved, simpleCmdsRemoved);
         
-        //copy1 is a special loop head BigBlock
-        //that is a second copy (copy of a copy), has an empty list of simpleCmds and a <see cref="WhileCmd"/> as a <see cref="StructuredCmd"/>. 
-        mappingCopyBigblockToOrigBigblock.Add(copy1, simpleCmdsRemoved);
-        mappingCopyBigblockToOrigBigblockWithTupleValue.Add(copy1, (simpleCmdsRemoved, b));
-        mappingOrigBigblockToCopyBigblock.Add(simpleCmdsRemoved, copy1);
-        bigblocksBeforeNamingAnonymous.Add(copy1);
-        mappingCopyBigBlockToMarker.Add(copy1, false);
+        mappingLoopHeadBigBlocktoOrigLoopBigBlock.Add(simpleCmdsRemoved, b);
+        bigblocksBeforeNamingAnonymous.Add(simpleCmdsRemoved);
+        mappingCopyBigBlockToMarker.Add(simpleCmdsRemoved, false);
 
         WhileCmd whilecmd = (WhileCmd) b.ec;
         foreach (BigBlock bb in whilecmd.Body.BigBlocks)
@@ -562,6 +567,7 @@ namespace Microsoft.Boogie
                 copyBlock.Predecessors = copyBlock.Predecessors.Select(succ => oldToNewBlock[succ]).ToList();
         }
 
+        mappingOrigBlocktoUnoptimizedCopy = oldToNewBlock;
         return copyBlocks;
     }
     

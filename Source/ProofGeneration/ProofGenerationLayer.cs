@@ -80,9 +80,13 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig =
-            new ProofGenConfig(true, true, true, true);
+        private static ProofGenConfig _proofGenConfig = new(false, true, true, true);
 
+        private static bool generateVCProof = true;
+        private static bool generatePassifProof = true;
+        private static bool generateCfgDagProof = true;
+        private static bool generateAstCfgProof = true;
+        
         private static IProgramAccessor globalDataProgAccess;
 
         private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
@@ -118,11 +122,6 @@ namespace ProofGeneration
                     declsGlobalData);
                 ProofGenerationOutput.StoreTheoriesTopLevel(new List<Theory> { globalDataTheory });
             }
-        }
-
-        public static bool GenerateASTToCFGProof()
-        {
-          return _proofGenConfig.GenerateAstToCfg;
         }
 
         private static bool AstContainsGotoOrBreak(AstToCfgProofGenInfo proofGenInfo)
@@ -519,6 +518,11 @@ namespace ProofGeneration
           }
         }
 
+        public static bool GenerateAstCfgE2E()
+        {
+          return _proofGenConfig.GenerateAstCfgE2E;
+        }
+
         /// <summary>
         /// Generate all proofs for the current procedure. 
         /// </summary>
@@ -542,12 +546,15 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
+            _proofGenConfig.GeneratePassifE2E = generateVCProof && _proofGenConfig.GenerateVcE2E && generatePassifProof;
+            _proofGenConfig.GenerateCfgDagE2E = generatePassifProof && _proofGenConfig.GeneratePassifE2E && generateCfgDagProof;
+
             var map = AstToCfgProofGenInfoManager.GetImplToProofGenInfo();
             proofGenInfo = map[afterPassificationImpl];
 
             if (AstContainsGotoOrBreak(proofGenInfo))
             {
-              _proofGenConfig.GenerateAstToCfg = false;
+              generateAstCfgProof = false;
             }
 
             IList<BigBlock> bigBlocks = proofGenInfo.GetBigBlocks();
@@ -621,7 +628,9 @@ namespace ProofGeneration
             cmdIsaVisitor = new MultiCmdIsaVisitor(varTranslationFactory2);
 
             IProgramAccessor beforeAstToCfgProgAccess = null;
-            if (_proofGenConfig.GenerateAstToCfg)
+            IProgramAccessor unoptimizedCfgProgAccess = null;
+            
+            if (generateAstCfgProof)
             {
               #region before ast to cfg program
 
@@ -669,7 +678,7 @@ namespace ProofGeneration
                 : SpecsConfig.AllPreCheckedPost;
               var unoptimizedCfgConfig =
                 new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true, true, _specsConfig, true);
-              var unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
+              unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 unoptimizedCfgTheoryName,
                 afterPassificationImpl.Name,
                 mainData, unoptimizedCfgConfig, varTranslationFactory2,
@@ -719,7 +728,7 @@ namespace ProofGeneration
 
             #region before passive program
 
-            IProgramAccessor parentProgramAccessorForPassification = _proofGenConfig.GenerateAstToCfg ? beforeAstToCfgProgAccess : beforeCfgToDagProgAccess;
+            IProgramAccessor parentProgramAccessorForPassification = generateAstCfgProof ? beforeAstToCfgProgAccess : beforeCfgToDagProgAccess;
             
             var beforePassiveProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
             var beforePassiveConfig =
@@ -772,7 +781,7 @@ namespace ProofGeneration
                 out var programDecls,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
-            var theoryNameForParentImport = _proofGenConfig.GenerateAstToCfg ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
+            var theoryNameForParentImport = generateAstCfgProof ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
             
             var finalProgTheory =
                 new Theory(finalProgTheoryName,
@@ -824,7 +833,7 @@ namespace ProofGeneration
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             */
 
-            IProgramAccessor beforePhaseProgramAccess = !_proofGenConfig.GenerateAstToCfg ? beforePassiveProgAccess : beforeAstToCfgProgAccess;
+            IProgramAccessor beforePhaseProgramAccess = !generateAstCfgProof ? beforePassiveProgAccess : beforeAstToCfgProgAccess;
 
             var passificationProofTheory = PassificationManager.PassificationProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
@@ -846,7 +855,7 @@ namespace ProofGeneration
 
             #endregion
 
-            if (_proofGenConfig.GenerateAstToCfg)
+            if (generateAstCfgProof)
             {
               #region ast to cfg
 
@@ -858,8 +867,13 @@ namespace ProofGeneration
                 //proofGenInfo.GetMappingCopyBigblockToOrigBigblock();
               IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock =
                 proofGenInfo.GetMappingOrigBigBlockToOrigBlock();
-              
-              IDictionary<Block, Block> mappingOrigBlockToCopyBlock = beforeDagOrigBlock.InverseDict();
+
+              IDictionary<Block, Block> mappingOrigBlockToUnoptimizedCopy =
+                proofGenInfo.GetMappingOrigBlockToUnoptimizedCopy();
+              IDictionary<Block, Block> mappingUnoptimizedCopyToOrigBlock =
+                mappingOrigBlockToUnoptimizedCopy.InverseDict();
+
+              // IDictionary<Block, Block> mappingOrigBlockToCopyBlock = beforeDagOrigBlock.InverseDict();
 
               IDictionary<BigBlock, (Expr, BranchIndicator)> mappingBigBlockToHints =
                 proofGenInfo.GetMappingCopyBigBlockToHints();
@@ -868,7 +882,7 @@ namespace ProofGeneration
                 var origBigBlock = pair.Key;
                 var copyBigBlock = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[origBigBlock];
                 var origBlock = pair.Value;
-                var copyBlock = mappingOrigBlockToCopyBlock[origBlock];
+                var copyBlock = mappingOrigBlockToUnoptimizedCopy[origBlock];  // mappingOrigBlockToCopyBlock[origBlock];
                 var hints = mappingBigBlockToHints[origBigBlock];
 
                 beforeCfgAfterCfgBlock.Add(copyBigBlock, copyBlock);
@@ -877,16 +891,17 @@ namespace ProofGeneration
 
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
                 phasesTheories,
+                _proofGenConfig.GenerateAstCfgE2E,
                 vcAssm,
                 proofGenInfo,
                 beforeCfgAst,
-                beforeDagCfg,
-                beforeDagData,
-                beforeDagOrigBlock,
+                beforeOptimizationsCFG,
+                beforeOptimizationsData,
+                mappingUnoptimizedCopyToOrigBlock,
                 mappingWithHints,
                 beforeCfgAfterCfgBlock,
                 beforeAstToCfgProgAccess,
-                beforeCfgToDagProgAccess,
+                unoptimizedCfgProgAccess,
                 varTranslationFactory2,
                 cmdIsaVisitor);
               theories.Add(astToCfgProofTheory);
@@ -905,7 +920,7 @@ namespace ProofGeneration
             var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
                 _proofGenConfig.GenerateCfgDagE2E,
-                _proofGenConfig.GenerateAstToCfg,
+                generateAstCfgProof,
                 vcAssm,
                 beforeDagCfg,
                 beforePassificationCfg,

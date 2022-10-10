@@ -16,6 +16,7 @@ namespace ProofGeneration.AstToCfg
     {
         public static Theory AstToCfgProof(
             PhasesTheories phasesTheories,
+            bool generateEndtoEnd,
             Term vcAssm,
             AstToCfgProofGenInfo proofGenInfo,
             ASTRepr beforeCfgAst,
@@ -46,7 +47,7 @@ namespace ProofGeneration.AstToCfg
                 IsaCommonTerms.EmptyList);
             var cfgBoogieContext = new BoogieContextIsa(
               IsaCommonTerms.TermIdentFromName("A"),
-              IsaCommonTerms.TermIdentFromName("M'"),
+              IsaCommonTerms.TermIdentFromName("M"),
               IsaCommonTerms.TermIdentFromName(varContextName),
               IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
               IsaCommonTerms.EmptyList);
@@ -144,17 +145,20 @@ namespace ProofGeneration.AstToCfg
             var theoryOuterDecls = new List<OuterDecl>();
             theoryOuterDecls.Add(cfgToDagLemmasLocale);
 
-            var endToEndManager = new AstToCfgEndToEnd();
-            var endToEndDecls = endToEndManager.EndToEndProof(
-              entryLemma.Name,
-              phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.CfgToDag, false) + "_theorem_aux",
-              vcAssm,
-              beforeCfgProgAccess,
-              afterCfgProgAccess,
-              beforeCfgAst,
-              proofGenInfo
-            );
-            theoryOuterDecls.AddRange(endToEndDecls);
+            if (generateEndtoEnd)
+            {
+              var endToEndManager = new AstToCfgEndToEnd();
+              var endToEndDecls = endToEndManager.EndToEndProof(
+                entryLemma.Name,
+                phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.CfgToDag, false) + "_theorem_aux",
+                vcAssm,
+                beforeCfgProgAccess,
+                afterCfgProgAccess,
+                beforeCfgAst,
+                proofGenInfo
+              );
+              theoryOuterDecls.AddRange(endToEndDecls);
+            }
 
             return new Theory(
               phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg),

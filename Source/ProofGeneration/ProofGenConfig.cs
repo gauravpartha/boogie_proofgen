@@ -6,21 +6,21 @@
     public class ProofGenConfig
     {
         public ProofGenConfig(
-            bool generateAstToCfg,
+            bool generateAstCfgE2E,
             bool generateCfgDagE2E,
             bool generatePassifE2E,
             bool generateVcE2E
         )
         {
-            GenerateAstToCfg = generateAstToCfg;
+            GenerateAstCfgE2E = generateAstCfgE2E;
             GenerateCfgDagE2E = generateCfgDagE2E;
             GeneratePassifE2E = generatePassifE2E;
             GenerateVcE2E = generateVcE2E;
         }
         
-        public bool GenerateAstToCfg { get; set; }
-        public bool GenerateCfgDagE2E { get; }
-        public bool GeneratePassifE2E { get; }
+        public bool GenerateAstCfgE2E { get; set;  }
+        public bool GenerateCfgDagE2E { get; set;  }
+        public bool GeneratePassifE2E { get; set; }
         public bool GenerateVcE2E { get; }
     }
 }

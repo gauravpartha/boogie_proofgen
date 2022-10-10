@@ -480,11 +480,24 @@ namespace Microsoft.Boogie
       if (CommandLineOptions.Clo.PrintFile != null) {
         PrintBplFile(CommandLineOptions.Clo.PrintFile, program, false, true, CommandLineOptions.Clo.PrettyPrint);
       }
-        
+
       PipelineOutcome oc = ResolveAndTypecheck(program, bplFileName, out var civlTypeChecker);
       if (oc != PipelineOutcome.ResolvedAndTypeChecked) {
         return true;
       }
+      
+      #region proofgen
+      foreach (var tuple in AstToCfgProofGenInfoManager.GetImplToProofGenInfo())
+      {
+        Implementation impl = tuple.Key;
+        AstToCfgProofGenInfo proofGenInfo = tuple.Value;
+        
+        var predecessorMap = proofGenInfo.ComputePredecessors(impl.Blocks);
+        var unoptimizedBlockCopies = proofGenInfo.CopyBlocks(impl.Blocks , predecessorMap, true, cmd => false, out var newVarsAfterDesugaring);
+        proofGenInfo.SetUnoptimizedBlocks(unoptimizedBlockCopies);
+        proofGenInfo.SetNewVarsCFG(newVarsAfterDesugaring);
+      }
+      #endregion
 
       if (CommandLineOptions.Clo.PrintCFGPrefix != null) {
         foreach (var impl in program.Implementations) {
@@ -501,24 +514,10 @@ namespace Microsoft.Boogie
           CommandLineOptions.Clo.PrettyPrint);
         CommandLineOptions.Clo.PrintUnstructured = oldPrintUnstructured;
       }
-      
-      #region proofgen
-
-      foreach (var tuple in AstToCfgProofGenInfoManager.GetImplToProofGenInfo())
-      {
-        Implementation impl = tuple.Key;
-        AstToCfgProofGenInfo proofGenInfo = tuple.Value;
-        
-        var predecessorMap = proofGenInfo.ComputePredecessors(impl.Blocks);
-        var unoptimizedBlockCopies = proofGenInfo.CopyBlocks(impl.Blocks , predecessorMap, true, cmd => false, out var newVarsAfterDesugaring);
-        proofGenInfo.SetUnoptimizedBlocks(unoptimizedBlockCopies);
-        proofGenInfo.SetNewVarsCFG(newVarsAfterDesugaring);
-      }
-      #endregion
 
       EliminateDeadVariables(program);
 
-      //CoalesceBlocks(program);
+      CoalesceBlocks(program);
 
       Inline(program);
         

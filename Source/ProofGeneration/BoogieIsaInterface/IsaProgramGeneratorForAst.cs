@@ -238,7 +238,7 @@ namespace ProofGeneration
             foreach (BigBlock b in ast.GetBlocksForwards())
             {
                 int flag = 0;
-                if (proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue().Keys.Contains(b))
+                if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().Keys.Contains(b))
                 {
                   flag = 1;
                 }
@@ -298,9 +298,9 @@ namespace ProofGeneration
             
             if (b.ec is WhileCmd)
             {
-              foreach (var pair in proofGenInfo.GetMappingCopyBigblockToOrigBigblockWithTupleValue())
+              foreach (var pair in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
               {
-                if (pair.Value.Item2 == correspondingBigBlockOrig)
+                if (pair.Value == correspondingBigBlockOrig)
                 {
                   BigBlock unwrapped = pair.Key;
                   
