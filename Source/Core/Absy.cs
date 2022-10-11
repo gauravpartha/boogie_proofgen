@@ -4108,7 +4108,11 @@ namespace Microsoft.Boogie
     [Rep] public StmtList StructuredStmts;
     [Rep] public List<Block /*!*/> /*!*/ Blocks;
     public Procedure Proc;
-
+    
+    #region proofgen
+    public bool unreachableBlocksPruned;
+    #endregion
+    
     // Blocks before applying passification etc.
     // Both are used only when /inline is set.
     public List<Block /*!*/> OriginalBlocks;
@@ -4993,6 +4997,11 @@ namespace Microsoft.Boogie
                   {
                     // This statement sequence will never reach the end, because of this "assume false" or "assert false".
                     // Hence, it does not reach its successors.
+
+                    #region proofgen
+                    unreachableBlocksPruned = true;
+                    #endregion
+
                     b.TransferCmd = new ReturnCmd(b.TransferCmd.tok);
                     goto NEXT_BLOCK;
                   }

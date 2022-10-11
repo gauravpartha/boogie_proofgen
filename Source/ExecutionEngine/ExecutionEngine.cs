@@ -507,6 +507,37 @@ namespace Microsoft.Boogie
       CoalesceBlocks(program);
 
       Inline(program);
+
+      #region proofgen
+      foreach (var tuple in AstToCfgProofGenInfoManager.GetImplToProofGenInfo())
+      {
+        Implementation impl = tuple.Key;
+        AstToCfgProofGenInfo proofGenInfo = tuple.Value;
+      
+        IList<Block> unoptimizedBlocksCopies = proofGenInfo.GetUnpotimizedBlocks();
+        IList<Block> optimizedBlocksOriginal = impl.Blocks;
+
+        int totalNumberOfCommandsA = 0;
+        int totalNumberOfCommandsB = 0;
+
+        foreach (var block in unoptimizedBlocksCopies)
+        {
+          totalNumberOfCommandsA += block.cmds.Count;
+        }
+
+        foreach (var block in optimizedBlocksOriginal)
+        {
+          totalNumberOfCommandsB += block.cmds.Count;
+        }
+
+        if (impl.unreachableBlocksPruned ||
+            totalNumberOfCommandsA != totalNumberOfCommandsB ||
+            unoptimizedBlocksCopies.Count != optimizedBlocksOriginal.Count)
+        {
+          proofGenInfo.SetOptimizationsFlag();
+        }
+      }
+      #endregion
         
 
       #region check if proof gen potentially supports input program

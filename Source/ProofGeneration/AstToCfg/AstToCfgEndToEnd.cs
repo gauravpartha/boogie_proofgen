@@ -55,7 +55,7 @@ namespace ProofGeneration.AstToCfg
             
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
-                IsaCommonTerms.TermIdentFromName("M"),
+                IsaCommonTerms.TermIdentFromName("(M::mbodyCFG proc_context)"),
                 IsaCommonTerms.TermIdentFromName(varContextName),
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
                 IsaCommonTerms.EmptyList
@@ -316,8 +316,7 @@ namespace ProofGeneration.AstToCfg
                 globalDecls,
                 axioms,
                 procedure,
-                //TODO: define this elsewhere
-                IsaCommonTerms.TermIdentFromName("Ast.proc_body_satisfies_spec")));
+                IsaCommonTerms.TermIdentFromName("(Ast.proc_body_satisfies_spec :: 'a absval_ty_fun ⇒ mbodyCFG proc_context ⇒ var_context ⇒ 'a fun_interp ⇒ rtype_env ⇒ expr list ⇒ expr list ⇒ ast ⇒ 'a nstate ⇒ bool)")));
         }
     }
 }

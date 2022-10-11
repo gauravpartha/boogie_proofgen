@@ -145,7 +145,7 @@ namespace ProofGeneration.AstToCfg
             var theoryOuterDecls = new List<OuterDecl>();
             theoryOuterDecls.Add(cfgToDagLemmasLocale);
 
-            if (generateEndtoEnd)
+            if (generateEndtoEnd && !proofGenInfo.GetOptimizationsFlag())
             {
               var endToEndManager = new AstToCfgEndToEnd();
               var endToEndDecls = endToEndManager.EndToEndProof(

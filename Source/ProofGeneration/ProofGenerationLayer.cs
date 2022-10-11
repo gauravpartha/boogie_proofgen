@@ -80,7 +80,7 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig = new(false, true, true, true);
+        private static ProofGenConfig _proofGenConfig = new(true, true, true, true);
 
         private static bool generateVCProof = true;
         private static bool generatePassifProof = true;
@@ -667,37 +667,40 @@ namespace ProofGeneration
               theories.Add(beforeAstToCfgProgTheory);
 
               #endregion
+              
+              if (proofGenInfo.GetOptimizationsFlag())
+              {
+                #region unoptimized cfg program
 
+                var unoptimizedCfgTheoryName =
+                  uniqueNamer.GetName(afterPassificationImpl.Name + "_unoptimized_cfg_prog");
+                //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
+                var _specsConfig = CommandLineOptions.Clo.GenerateIsaProgNoProofs
+                  ? SpecsConfig.All
+                  : SpecsConfig.AllPreCheckedPost;
+                var unoptimizedCfgConfig =
+                  new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true, true, _specsConfig, true);
+                unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
+                  unoptimizedCfgTheoryName,
+                  afterPassificationImpl.Name,
+                  mainData, unoptimizedCfgConfig, varTranslationFactory2,
+                  beforeOptimizationsCFG,
+                  out var programDeclsUnoptimizedCfg,
+                  !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized",
+                  unoptimizedCfgProgAccess);
 
-              #region unoptimized cfg program
+                var unoptimizedCfgProgTheory = new Theory(unoptimizedCfgTheoryName,
+                  new List<string>
+                  {
+                    "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
+                    "\"../" + globalDataProgAccess.TheoryName() + "\""
+                  },
+                  programDeclsUnoptimizedCfg);
+                theories.Add(unoptimizedCfgProgTheory);
 
-              var unoptimizedCfgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_unoptimized_cfg_prog");
-              //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
-              var _specsConfig = CommandLineOptions.Clo.GenerateIsaProgNoProofs
-                ? SpecsConfig.All
-                : SpecsConfig.AllPreCheckedPost;
-              var unoptimizedCfgConfig =
-                new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true, true, _specsConfig, true);
-              unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
-                unoptimizedCfgTheoryName,
-                afterPassificationImpl.Name,
-                mainData, unoptimizedCfgConfig, varTranslationFactory2,
-                beforeOptimizationsCFG,
-                out var programDeclsUnoptimizedCfg,
-                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
-              procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized",
-                unoptimizedCfgProgAccess);
-
-              var unoptimizedCfgProgTheory = new Theory(unoptimizedCfgTheoryName,
-                new List<string>
-                {
-                  "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
-                  "\"../" + globalDataProgAccess.TheoryName() + "\""
-                },
-                programDeclsUnoptimizedCfg);
-              theories.Add(unoptimizedCfgProgTheory);
-
-              #endregion
+                #endregion
+              }
             }
 
             #region before cfg to dag program
@@ -873,7 +876,7 @@ namespace ProofGeneration
               IDictionary<Block, Block> mappingUnoptimizedCopyToOrigBlock =
                 mappingOrigBlockToUnoptimizedCopy.InverseDict();
 
-              // IDictionary<Block, Block> mappingOrigBlockToCopyBlock = beforeDagOrigBlock.InverseDict();
+              IDictionary<Block, Block> mappingOrigBlockToCopyBlock = beforeDagOrigBlock.InverseDict();
 
               IDictionary<BigBlock, (Expr, BranchIndicator)> mappingBigBlockToHints =
                 proofGenInfo.GetMappingCopyBigBlockToHints();
@@ -882,26 +885,50 @@ namespace ProofGeneration
                 var origBigBlock = pair.Key;
                 var copyBigBlock = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[origBigBlock];
                 var origBlock = pair.Value;
-                var copyBlock = mappingOrigBlockToUnoptimizedCopy[origBlock];  // mappingOrigBlockToCopyBlock[origBlock];
+
+                var blockToBlockMapToReferTo = proofGenInfo.GetOptimizationsFlag() ? mappingOrigBlockToUnoptimizedCopy : mappingOrigBlockToCopyBlock;
+
+                var copyBlock = blockToBlockMapToReferTo[origBlock];
                 var hints = mappingBigBlockToHints[origBigBlock];
 
                 beforeCfgAfterCfgBlock.Add(copyBigBlock, copyBlock);
                 mappingWithHints.Add(copyBigBlock, (copyBlock, hints.Item1, hints.Item2));
               }
 
+              CFGRepr astCfgReprInput;
+              BoogieMethodData astCfgDataInput;
+              IDictionary<Block, Block> blockToBlockMapInput;
+              IProgramAccessor beforeCfgToDagProgAccessInput;
+
+              if (!proofGenInfo.GetOptimizationsFlag())
+              {
+                astCfgReprInput = beforeDagCfg;
+                astCfgDataInput = beforeDagData;
+                blockToBlockMapInput = beforeDagOrigBlock;
+                beforeCfgToDagProgAccessInput = beforeCfgToDagProgAccess;
+
+              }
+              else
+              {
+                astCfgReprInput = beforeOptimizationsCFG;
+                astCfgDataInput = beforeOptimizationsData;
+                blockToBlockMapInput = mappingUnoptimizedCopyToOrigBlock;
+                beforeCfgToDagProgAccessInput = unoptimizedCfgProgAccess;
+              }
+              
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
                 phasesTheories,
                 _proofGenConfig.GenerateAstCfgE2E,
                 vcAssm,
                 proofGenInfo,
                 beforeCfgAst,
-                beforeOptimizationsCFG,
-                beforeOptimizationsData,
-                mappingUnoptimizedCopyToOrigBlock,
+                astCfgReprInput,
+                astCfgDataInput,
+                blockToBlockMapInput,
                 mappingWithHints,
                 beforeCfgAfterCfgBlock,
                 beforeAstToCfgProgAccess,
-                unoptimizedCfgProgAccess,
+                beforeCfgToDagProgAccessInput,
                 varTranslationFactory2,
                 cmdIsaVisitor);
               theories.Add(astToCfgProofTheory);

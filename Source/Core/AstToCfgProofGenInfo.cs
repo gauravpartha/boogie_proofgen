@@ -68,6 +68,8 @@ namespace Microsoft.Boogie
 
     private List<Variable> newVarsFromDesugaring;
 
+    private bool optimizationsDone;
+
     public void InstantiateVars()
     {
       originalAst = new List<BigBlock>();
@@ -102,6 +104,16 @@ namespace Microsoft.Boogie
     public void SetUnoptimizedBlocks(IList<Block> blocks)
     {
       unoptimizedBlocks = blocks;
+    }
+
+    public void SetOptimizationsFlag()
+    {
+      optimizationsDone = true;
+    }
+
+    public bool GetOptimizationsFlag()
+    {
+      return optimizationsDone;
     }
     
     public IList<Block> GetUnpotimizedBlocks()
