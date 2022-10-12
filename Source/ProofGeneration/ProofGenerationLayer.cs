@@ -80,13 +80,9 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig = new(true, true, true, true);
+        private static ProofGenConfig _proofGenConfig = new(true, true, true, true, 
+                                                            true, true, true, true);
 
-        private static bool generateVCProof = true;
-        private static bool generatePassifProof = true;
-        private static bool generateCfgDagProof = true;
-        private static bool generateAstCfgProof = true;
-        
         private static IProgramAccessor globalDataProgAccess;
 
         private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
@@ -546,15 +542,12 @@ namespace ProofGeneration
             Boogie2VCExprTranslator translator,
             TypeAxiomBuilderPremisses axiomBuilder)
         {
-            //_proofGenConfig.GeneratePassifE2E = generateVCProof && _proofGenConfig.GenerateVcE2E && generatePassifProof;
-            //_proofGenConfig.GenerateCfgDagE2E = generatePassifProof && _proofGenConfig.GeneratePassifE2E && generateCfgDagProof;
-
             var map = AstToCfgProofGenInfoManager.GetImplToProofGenInfo();
             proofGenInfo = map[afterPassificationImpl];
 
             if (AstContainsGotoOrBreak(proofGenInfo))
             {
-              generateAstCfgProof = false;
+              _proofGenConfig.GenerateAstCfgProof = false;
             }
 
             IList<BigBlock> bigBlocks = proofGenInfo.GetBigBlocks();
@@ -562,6 +555,10 @@ namespace ProofGeneration
             {
               DesugarCmdsInBigBlock(b);
             }
+            
+            _proofGenConfig.GeneratePassifE2E = _proofGenConfig.GenerateVcProof && _proofGenConfig.GenerateVcE2E && _proofGenConfig.GeneratePassifProof;
+            _proofGenConfig.GenerateCfgDagE2E = _proofGenConfig.GeneratePassifProof && _proofGenConfig.GeneratePassifE2E && _proofGenConfig.GenerateCfgDagProof;
+            _proofGenConfig.GenerateAstCfgE2E = _proofGenConfig.GenerateCfgDagProof && _proofGenConfig.GenerateCfgDagE2E && _proofGenConfig.GenerateAstCfgProof;
 
             IList<Block> unoptimizedCFGBlocks = proofGenInfo.GetUnpotimizedBlocks(); 
             var newToOldInternal = new Dictionary<Block, Block>();
@@ -630,7 +627,7 @@ namespace ProofGeneration
             IProgramAccessor beforeAstToCfgProgAccess = null;
             IProgramAccessor unoptimizedCfgProgAccess = null;
             
-            if (generateAstCfgProof)
+            if (_proofGenConfig.GenerateAstCfgProof)
             {
               #region before ast to cfg program
 
@@ -731,7 +728,7 @@ namespace ProofGeneration
 
             #region before passive program
 
-            IProgramAccessor parentProgramAccessorForPassification = generateAstCfgProof ? beforeAstToCfgProgAccess : beforeCfgToDagProgAccess;
+            IProgramAccessor parentProgramAccessorForPassification = _proofGenConfig.GenerateAstCfgProof ? beforeAstToCfgProgAccess : beforeCfgToDagProgAccess;
             
             var beforePassiveProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
             var beforePassiveConfig =
@@ -784,7 +781,7 @@ namespace ProofGeneration
                 out var programDecls,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
-            var theoryNameForParentImport = generateAstCfgProof ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
+            var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
             
             var finalProgTheory =
                 new Theory(finalProgTheoryName,
@@ -836,7 +833,7 @@ namespace ProofGeneration
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             */
 
-            IProgramAccessor beforePhaseProgramAccess = !generateAstCfgProof ? beforePassiveProgAccess : beforeAstToCfgProgAccess;
+            IProgramAccessor beforePhaseProgramAccess = !_proofGenConfig.GenerateAstCfgProof ? beforePassiveProgAccess : beforeAstToCfgProgAccess;
 
             var passificationProofTheory = PassificationManager.PassificationProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
@@ -858,7 +855,7 @@ namespace ProofGeneration
 
             #endregion
 
-            if (generateAstCfgProof)
+            if (_proofGenConfig.GenerateAstCfgProof)
             {
               #region ast to cfg
 
@@ -947,7 +944,7 @@ namespace ProofGeneration
             var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
                 _proofGenConfig.GenerateCfgDagE2E,
-                generateAstCfgProof,
+                _proofGenConfig.GenerateAstCfgProof,
                 vcAssm,
                 beforeDagCfg,
                 beforePassificationCfg,
