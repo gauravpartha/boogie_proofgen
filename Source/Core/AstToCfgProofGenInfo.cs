@@ -304,7 +304,12 @@ namespace Microsoft.Boogie
       {
         BigBlock simpleCmdsRemoved = new BigBlock(copy.tok, copy.LabelName, new List<Cmd>(), copy.ec, copy.tc);
 
-        //This is bad.
+        /*
+         * This is a special case where the newly created LoopHead BigBlock is mapped to itself.
+         * One could alternatively store the 'simpleCmdsRemoved' BigBlocks in a separate list but
+         * then one would need an additional if-statement or a for-loop to access that list during the creation of continuations
+         * and later on proofs.
+         */
         mappingCopyBigblockToOrigBigblock.Add(simpleCmdsRemoved, simpleCmdsRemoved);
         mappingOrigBigblockToCopyBigblock.Add(simpleCmdsRemoved, simpleCmdsRemoved);
         
