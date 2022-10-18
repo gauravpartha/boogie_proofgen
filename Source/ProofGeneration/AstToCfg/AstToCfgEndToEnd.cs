@@ -309,14 +309,19 @@ namespace ProofGeneration.AstToCfg
                     new List<Identifier>{typeInterpId},
                     null,
                     new TermApp(
-                IsaCommonTerms.TermIdentFromName("proc_is_correct"),
-                new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
-                funDecls,
-                constantDecls,
-                globalDecls,
-                axioms,
-                procedure,
-                IsaCommonTerms.TermIdentFromName("(Ast.proc_body_satisfies_spec :: 'a absval_ty_fun ⇒ mbodyCFG proc_context ⇒ var_context ⇒ 'a fun_interp ⇒ rtype_env ⇒ expr list ⇒ expr list ⇒ ast ⇒ 'a nstate ⇒ bool)")));
+                      IsaCommonTerms.TermIdentFromName("proc_is_correct"),
+                      new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
+                      funDecls,
+                      constantDecls,
+                      globalDecls,
+                      axioms,
+                      procedure,
+                      new TermWithExplicitType(
+                        IsaCommonTerms.TermIdentFromName("Ast.proc_body_satisfies_spec"), 
+                        new DataType("satisfies_spec_func_type", new VarType("a"))
+                      )
+                    )
+                );
         }
     }
 }
