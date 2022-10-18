@@ -10,6 +10,7 @@ namespace ProofGeneration
         private static readonly TermIdent tprimClosedId = IsaCommonTerms.TermIdentFromName("TPrimC");
         private static readonly TermIdent tboolId = IsaCommonTerms.TermIdentFromName("TBool");
         private static readonly TermIdent tintId = IsaCommonTerms.TermIdentFromName("TInt");
+        private static readonly TermIdent trealId = IsaCommonTerms.TermIdentFromName("TReal");
         private static readonly TermIdent tvarId = IsaCommonTerms.TermIdentFromName("TVar");
         private static readonly TermIdent tconId = IsaCommonTerms.TermIdentFromName("TCon");
         private static readonly TermIdent tconClosedId = IsaCommonTerms.TermIdentFromName("TConC");
@@ -40,6 +41,11 @@ namespace ProofGeneration
         public static Term IntType()
         {
             return tintId;
+        }
+        
+        public static Term RealType()
+        {
+            return trealId;
         }
 
         public static Term TConType(string constructorName, List<Term> constructorArgs,

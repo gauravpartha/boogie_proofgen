@@ -18,8 +18,10 @@ namespace ProofGeneration
     {
         private static readonly TermIdent intVId = IsaCommonTerms.TermIdentFromName("IntV");
         private static readonly TermIdent boolVId = IsaCommonTerms.TermIdentFromName("BoolV");
+        private static readonly TermIdent realVId = IsaCommonTerms.TermIdentFromName("RealV");
         private static readonly TermIdent intLitId = IsaCommonTerms.TermIdentFromName("LInt");
         private static readonly TermIdent boolLitId = IsaCommonTerms.TermIdentFromName("LBool");
+        private static readonly TermIdent realLitId = IsaCommonTerms.TermIdentFromName("LReal");
 
         private static readonly TermIdent varId = IsaCommonTerms.TermIdentFromName("Var");
         private static readonly TermIdent bvarId = IsaCommonTerms.TermIdentFromName("BVar");
@@ -80,6 +82,7 @@ namespace ProofGeneration
         public static TermIdent ConvertValToBoolId { get; } = IsaCommonTerms.TermIdentFromName("convert_val_to_bool");
         public static TermIdent ConvertValToIntId { get; } = IsaCommonTerms.TermIdentFromName("convert_val_to_int");
         public static TermIdent SematicsProcSpecSatisfied { get; } = IsaCommonTerms.TermIdentFromName("Semantics.proc_body_satisfies_spec");
+        public static TermIdent ConvertValToRealId { get; } = IsaCommonTerms.TermIdentFromName("convert_val_to_real");
 
         //TODO initialize all the default constructors, so that they only need to be allocated once (Val, Var, etc...)
 
@@ -122,6 +125,8 @@ namespace ProofGeneration
                 return BoolLiteral(node.asBool);
             if (node.Type.IsInt)
                 return IntLiteral(node.asBigNum);
+            if (node.Type.IsReal)
+                return RealLiteral(node.asBigDec);
             throw new NotImplementedException();
         }
 
@@ -165,6 +170,27 @@ namespace ProofGeneration
         public static Term BoolVal(Term b)
         {
             return new TermApp(boolVId, b);
+        }
+        
+        public static Term RealLiteral(BigDec dec)
+        {
+            return new TermApp(realLitId, new RealConst(dec));
+        }
+
+        public static Term RealValConstr()
+        {
+            return realVId;
+        }
+
+        public static Term RealVal(BigDec num)
+        {
+            Term realConst = new RealConst(num);
+            return RealVal(realConst);
+        }
+
+        public static Term RealVal(Term r)
+        {
+            return new TermApp(realVId, new List<Term> {r});
         }
 
         public static Term LookupVar(Term varContext, Term normalState, Term var)
@@ -258,6 +284,9 @@ namespace ProofGeneration
                     break;
                 case BinaryOperator.Opcode.Div:
                     bopIsa = "Div";
+                    break;
+                case BinaryOperator.Opcode.RealDiv:
+                    bopIsa = "RealDiv";
                     break;
                 case BinaryOperator.Opcode.Mod:
                     bopIsa = "Mod";
@@ -719,6 +748,11 @@ namespace ProofGeneration
         public static Term ConvertValToInt(Term val)
         {
             return new TermApp(ConvertValToIntId, val);
+        }
+        
+        public static Term ConvertValToReal(Term val)
+        {
+            return new TermApp(ConvertValToRealId, val);
         }
 
         public static Term TypeToVal(Term absValTyMap, Term value)

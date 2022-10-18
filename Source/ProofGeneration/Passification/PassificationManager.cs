@@ -110,6 +110,12 @@ namespace ProofGeneration.Passification
             {
                 var endToEnd = new PassificationEndToEnd();
 
+                /* We need to add the accessed old global variables to the live variable subset at entry. This is because
+                   we have a proof obligation requiring that the old global relation must be contained in the initial 
+                   relation used to construct the initial passive state set in the end-to-end proof. */
+                var oldGlobals = GetOldGlobalVariables(beforePassificationCfg);
+                var liveVarsBefore = relationGen.LiveVarsBeforeBlock(beforePassificationCfg.entry).Union(oldGlobals);
+                
                 passificationProofDecls.AddRange(endToEnd.EndToEndProof(
                     GetCfgLemmaName(beforePassificationCfg.entry, lemmaNamer),
                     boogieToVcTheoryName + "." + boogieToVcLemma.Name,
@@ -120,7 +126,7 @@ namespace ProofGeneration.Passification
                     varContextNonPassivePassive,
                     oldRelationData,
                     beforePassificationCfg,
-                    relationGen.LiveVarsBeforeBlock(beforePassificationCfg.entry),
+                    liveVarsBefore,
                     passiveFactory.CreateTranslation().VarTranslation
                 ));
             }

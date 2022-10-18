@@ -37,6 +37,14 @@ namespace Isabelle.IsaPrettyPrint
             return t.Val.ToString();
         }
 
+        public override string VisitRealConst(RealConst t)
+        {
+            if (t.Val.IsNegative)
+                return $"-{t.Val.Abs.ToDecimalString()}";
+            
+            return t.Val.ToDecimalString();
+        }
+
         public override string VisitStringConst(StringConst t)
         {
             return "''" + t.s + "''";

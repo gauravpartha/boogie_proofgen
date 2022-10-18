@@ -429,6 +429,7 @@ namespace ProofGeneration.ProgramToVCProof
                 "  apply (erule allE[where ?x=" + IsaPrettyPrinterHelper.Inner(boogieValueParamsList.ToString()) +
                 "])?",
                 (outputType.IsBool ? "using tbool_boolv" : "") + (outputType.IsInt ? "using tint_intv" : "") +
+                (outputType.IsReal ? "using treal_realv" : "") +
                 " by auto"
             };
 
@@ -607,6 +608,14 @@ namespace ProofGeneration.ProgramToVCProof
                             new IntConst(ctorBasicAxInfo.CtorValue)));
                         lemmas.Add(basicTypeLemma(ctorBasicAxInfo.Type,
                             IsaBoogieType.PrimType(IsaBoogieType.BoolType(), true), ctorBasicAxInfo.CtorValue));
+                    } 
+                    else if (ctorBasicAxInfo.Type.IsReal)
+                    {
+                        funEquations.Add(new Tuple<IList<Term>, Term>(
+                            new List<Term> {IsaBoogieType.PrimType(IsaBoogieType.RealType(), true)},
+                            new IntConst(ctorBasicAxInfo.CtorValue)));
+                        lemmas.Add(basicTypeLemma(ctorBasicAxInfo.Type,
+                            IsaBoogieType.PrimType(IsaBoogieType.RealType(), true), ctorBasicAxInfo.CtorValue));
                     }
                     else
                     {
@@ -900,29 +909,38 @@ namespace ProofGeneration.ProgramToVCProof
                 else if (vcAx is BasicTypeCastAxiomInfo castAxiomInfo)
                 {
                     var isBool = castAxiomInfo.Type.IsBool;
-                    if (!isBool && !castAxiomInfo.Type.IsInt)
+                    var isInt = castAxiomInfo.Type.IsInt;
+                    var isReal = castAxiomInfo.Type.IsReal;
+                    
+                    if (!isBool && !isInt && !isReal)
                         throw new ProofGenUnexpectedStateException(GetType(),
-                            "only support int and bools as built-in types");
+                            "only support int, bool, and reals as built-in types");
 
                     switch (castAxiomInfo.CastKind)
                     {
                         case TypeCastKind.BoxedOfUnboxed:
                             if (isBool)
                                 sb.AppendLine(ProofUtil.Apply("rule bool_inverse_1"));
-                            else
+                            else if (isInt)
                                 sb.AppendLine(ProofUtil.Apply("rule int_inverse_1"));
+                            else
+                                sb.AppendLine(ProofUtil.Apply("rule real_inverse_1"));
                             break;
                         case TypeCastKind.UnboxedOfBoxed:
                             if (isBool)
                                 sb.AppendLine(ProofUtil.Apply("rule bool_inverse_2"));
-                            else
+                            else if (isInt)
                                 sb.AppendLine(ProofUtil.Apply("rule int_inverse_2"));
+                            else
+                                sb.AppendLine(ProofUtil.Apply("rule real_inverse_2"));
                             break;
                         case TypeCastKind.TypeOfBoxed:
                             if (isBool)
                                 sb.AppendLine(ProofUtil.Apply("rule bool_type"));
-                            else
+                            else if(isInt)
                                 sb.AppendLine(ProofUtil.Apply("rule int_type"));
+                            else
+                                sb.AppendLine(ProofUtil.Apply("rule real_type"));
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -986,7 +1004,7 @@ namespace ProofGeneration.ProgramToVCProof
                     else
                         throw new ProofGenUnexpectedStateException("unexpected state corres kind");
 
-                    sb.AppendLine("by (fastforce dest: tint_intv tbool_boolv)");
+                    sb.AppendLine("by (fastforce dest: tint_intv tbool_boolv treal_realv)");
                 }
                 else
                 {
