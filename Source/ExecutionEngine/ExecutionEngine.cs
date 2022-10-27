@@ -547,7 +547,8 @@ namespace Microsoft.Boogie
         if(!CommandLineOptions.Clo.OnlyCheckProofGenSupport)
           Console.WriteLine("Proof generation does not support this program, because of node " + resultNode);
         
-        Environment.Exit(0);
+        //temporarily set to 1
+        Environment.Exit(1);
       } else if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
       {
         Console.WriteLine("Success:" + bplFileName);

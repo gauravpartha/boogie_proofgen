@@ -80,8 +80,8 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig = new(true, true, true, true, 
-                                                            true, true, true, true);
+        private static ProofGenConfig _proofGenConfig = new(false, false, false, false, 
+                                                            true, false, false, false);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -606,8 +606,6 @@ namespace ProofGeneration
             
             beforeOptimizationsCFG = new CFGRepr(outgoingBlocks, labeling, entryBlock);
 
-            //
-
             var uniqueNamer = new IsaUniqueNamer();
             var theories = new List<Theory>();
             if (axiomBuilder == null && typeAxioms != null)
@@ -722,7 +720,7 @@ namespace ProofGeneration
 
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
             {
-                StoreResult("program_" + afterPassificationImpl.Proc.Name, theories);
+                StoreResult(uniqueNamer.GetName("program_" + afterPassificationImpl.Proc.Name), theories);
                 return;
             }
 
@@ -741,8 +739,53 @@ namespace ProofGeneration
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
             #endregion
+            
+            #region after passification program
+            
+            //use global version map for translation 
+            var fixedVarTranslation = new SimpleFixedVarTranslation(globalVersionMap);
+            var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
+            varTranslationFactory =
+              new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
-            var vcAllAxioms = AxiomHandler.AxiomInfo(
+            var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
+            var passiveProgConfig =
+              new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, SpecsConfig.None, false);
+            var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
+              afterPassificationImpl.Name,
+              finalProgData, passiveProgConfig, varTranslationFactory,
+              //we use the CFG before the peep-hole transformations, so that we can directly use the VC to program proof in the passification phase
+              afterPassificationCfg,
+              out var programDecls,
+              !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+
+            var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
+            
+            var afterPassificationProgTheory =
+              new Theory(finalProgTheoryName,
+                new List<string>
+                  {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
+                programDecls);
+            theories.Add(afterPassificationProgTheory);
+            
+            #endregion
+            
+            #region before passive program (completion of theory construction)
+
+            var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
+              new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
+              programDeclsBeforePassive);
+            theories.Add(beforePassificationProgTheory);
+
+            #endregion
+            
+            var phasesTheories = new PhasesTheories(afterPassificationImpl.Name);
+            Term vcAssm = null;
+            LemmaDecl endToEndLemma = null;
+
+            if (_proofGenConfig.GenerateVcProof)
+            {
+              var vcAllAxioms = AxiomHandler.AxiomInfo(
                 axiomBuilder != null,
                 boogieGlobalData.Axioms,
                 vcAxioms,
@@ -750,7 +793,7 @@ namespace ProofGeneration
                 typeAxiomInfo,
                 out var allAxiomsInfo);
 
-            var vcLocale = VCToIsaInterface.ConvertVC(
+              var vcLocale = VCToIsaInterface.ConvertVC(
                 "vc",
                 vc,
                 vcAllAxioms,
@@ -764,45 +807,19 @@ namespace ProofGeneration
                 out var vcTranslator,
                 out var vcFunctions);
 
-            //use global version map for translation 
-            var fixedVarTranslation = new SimpleFixedVarTranslation(globalVersionMap);
-            var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
-            varTranslationFactory =
-                new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
+              var vcBoogieInfo = new VcBoogieInfo(vcinst, vcinstAxiom, vcAllAxioms, allAxiomsInfo);
 
-            var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
-            var passiveProgConfig =
-                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, SpecsConfig.None, false);
-            var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
-                afterPassificationImpl.Name,
-                finalProgData, passiveProgConfig, varTranslationFactory,
-                //we use the CFG before the peep-hole transformations, so that we can directly use the VC to program proof in the passification phase
-                afterPassificationCfg,
-                out var programDecls,
-                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
-
-            var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
-            
-            var finalProgTheory =
-                new Theory(finalProgTheoryName,
-                    new List<string>
-                        {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
-                    programDecls);
-            theories.Add(finalProgTheory);
-
-            var vcBoogieInfo = new VcBoogieInfo(vcinst, vcinstAxiom, vcAllAxioms, allAxiomsInfo);
-
-            var vcProofData = new ProgramVcProofData(
+              var vcProofData = new ProgramVcProofData(
                 vcFunctions,
                 vcBoogieInfo,
                 vcHintManager,
                 vcLocale,
                 vcTranslator
-            );
+              );
 
-            var phasesTheories = new PhasesTheories(afterPassificationImpl.Name);
+              #region VC phase proof
 
-            var theoryPassive = VcPhaseManager.ProgramToVcProof(
+              var vcPhaseProofTheory = VcPhaseManager.ProgramToVcProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Vc),
                 _proofGenConfig.GenerateVcE2E,
                 afterUnreachablePruningCfg,
@@ -816,28 +833,34 @@ namespace ProofGeneration
                 varTranslationFactory,
                 typePremiseEraserFactory,
                 gen,
-                out var vcAssm,
-                out var endToEndLemma
-            );
-            theories.Add(theoryPassive);
+                out var vcAssmPrelim,
+                out var endToEndLemmaPrelim
+              );
 
-            #region before passive
+              vcAssm = vcAssmPrelim;
+              endToEndLemma = endToEndLemmaPrelim;
+              
+              theories.Add(vcPhaseProofTheory);
 
-            var passificationProgTheory = new Theory(beforePassiveProgTheoryName,
-                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
-                programDeclsBeforePassive);
-            theories.Add(passificationProgTheory);
-
+              #endregion
+            }
+            
             /*
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             */
 
-            IProgramAccessor beforePhaseProgramAccess = !_proofGenConfig.GenerateAstCfgProof ? beforePassiveProgAccess : beforeAstToCfgProgAccess;
+            if (_proofGenConfig.GeneratePassifProof)
+            {
+              #region passification proof
 
-            var passificationProofTheory = PassificationManager.PassificationProof(
+              IProgramAccessor beforePhaseProgramAccess = !_proofGenConfig.GenerateAstCfgProof
+                ? beforePassiveProgAccess
+                : beforeAstToCfgProgAccess;
+
+              var passificationProofTheory = PassificationManager.PassificationProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
-                theoryPassive.TheoryName,
+                phasesTheories.TheoryName(PhasesTheories.Phase.Vc),
                 _proofGenConfig.GeneratePassifE2E,
                 endToEndLemma,
                 vcAssm,
@@ -850,10 +873,41 @@ namespace ProofGeneration
                 mainData,
                 varTranslationFactory2,
                 varTranslationFactory
-            );
-            theories.Add(passificationProofTheory);
+              );
+              theories.Add(passificationProofTheory);
 
-            #endregion
+              #endregion
+            }
+
+            if (_proofGenConfig.GenerateCfgDagProof)
+            {
+              #region cfg to dag
+
+              var uniqueExitBlock =
+                uniqueExitBlockOrig != null
+                  ? beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key
+                  : null;
+
+
+              var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
+                phasesTheories,
+                _proofGenConfig.GenerateCfgDagE2E,
+                _proofGenConfig.GenerateAstCfgProof,
+                vcAssm,
+                beforeDagCfg,
+                beforePassificationCfg,
+                uniqueExitBlock,
+                beforeDagData,
+                cfgToDagHintManager,
+                beforeDagAfterDagBlock,
+                beforeAstToCfgProgAccess,
+                beforeCfgToDagProgAccess,
+                beforePassiveProgAccess,
+                varTranslationFactory2);
+              theories.Add(cfgToDagProofTheory);
+
+              #endregion
+            }
 
             if (_proofGenConfig.GenerateAstCfgProof)
             {
@@ -864,7 +918,7 @@ namespace ProofGeneration
                 new Dictionary<BigBlock, (Block, Expr, BranchIndicator)>();
 
               //IDictionary<BigBlock, BigBlock> mappingCopyBigblockToOrigBigblock =
-                //proofGenInfo.GetMappingCopyBigblockToOrigBigblock();
+              //proofGenInfo.GetMappingCopyBigblockToOrigBigblock();
               IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock =
                 proofGenInfo.GetMappingOrigBigBlockToOrigBlock();
 
@@ -883,7 +937,9 @@ namespace ProofGeneration
                 var copyBigBlock = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[origBigBlock];
                 var origBlock = pair.Value;
 
-                var blockToBlockMapToReferTo = proofGenInfo.GetOptimizationsFlag() ? mappingOrigBlockToUnoptimizedCopy : mappingOrigBlockToCopyBlock;
+                var blockToBlockMapToReferTo = proofGenInfo.GetOptimizationsFlag()
+                  ? mappingOrigBlockToUnoptimizedCopy
+                  : mappingOrigBlockToCopyBlock;
 
                 var copyBlock = blockToBlockMapToReferTo[origBlock];
                 var hints = mappingBigBlockToHints[origBigBlock];
@@ -912,8 +968,9 @@ namespace ProofGeneration
                 blockToBlockMapInput = mappingUnoptimizedCopyToOrigBlock;
                 beforeCfgToDagProgAccessInput = unoptimizedCfgProgAccess;
               }
-              
+
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
+                uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg)),
                 phasesTheories,
                 _proofGenConfig.GenerateAstCfgE2E,
                 vcAssm,
@@ -933,33 +990,7 @@ namespace ProofGeneration
               #endregion
             }
 
-            #region cfg to dag
-            
-            var uniqueExitBlock =
-                uniqueExitBlockOrig != null
-                    ? beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key
-                    : null;
-
-
-            var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
-                phasesTheories,
-                _proofGenConfig.GenerateCfgDagE2E,
-                _proofGenConfig.GenerateAstCfgProof,
-                vcAssm,
-                beforeDagCfg,
-                beforePassificationCfg,
-                uniqueExitBlock,
-                beforeDagData,
-                cfgToDagHintManager,
-                beforeDagAfterDagBlock,
-                beforeAstToCfgProgAccess,
-                beforeCfgToDagProgAccess,
-                beforePassiveProgAccess,
-                varTranslationFactory2);
-            theories.Add(cfgToDagProofTheory);
-            #endregion
-            
-            StoreResult(afterPassificationImpl.Proc.Name, theories);
+            StoreResult(uniqueNamer.GetName(afterPassificationImpl.Proc.Name), theories);
         }
 
         private static void StoreResult(string preferredDirName, IEnumerable<Theory> theories)

@@ -229,7 +229,8 @@ namespace ProofGeneration.CfgToDag
                     "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML",
                     generatedAstToCfgProof ? beforeCfgProgAccess.TheoryName() : null,
                     beforeDagProgAccess.TheoryName(),
-                    afterDagProgAccess.TheoryName(), phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
+                    afterDagProgAccess.TheoryName(), 
+                    phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
                     phasesTheories.TheoryName(PhasesTheories.Phase.Vc)
                 },
                 theoryOuterDecls

@@ -6,6 +6,7 @@ using System.Linq;
 using Isabelle.Ast;
 using Isabelle.IsaPrettyPrint;
 using Microsoft.Boogie;
+using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
@@ -15,6 +16,9 @@ namespace ProofGeneration
 
         public static void CreateMainDirectory(string fileName, bool onlyUseFileName)
         {
+            IsaUniqueNamer namer = new IsaUniqueNamer();
+            string filename_altered = namer.GetName(fileName);
+          
             if (CommandLineOptions.Clo.DontStoreProofGenFiles)
                 return;
             
@@ -22,9 +26,9 @@ namespace ProofGeneration
                 throw new ProofGenUnexpectedStateException("main directory already set");
 
             if (!onlyUseFileName)
-                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs", false);
+                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(filename_altered) + "_proofs", false);
             else
-                _mainDir = fileName;
+                _mainDir = filename_altered;
             Directory.CreateDirectory(_mainDir);
         }
         
