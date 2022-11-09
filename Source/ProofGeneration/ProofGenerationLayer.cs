@@ -85,6 +85,8 @@ namespace ProofGeneration
 
         private static IProgramAccessor globalDataProgAccess;
 
+        private static IsaUniqueNamer uniqueNamer;
+
         private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
         
         /// <summary>
@@ -92,10 +94,15 @@ namespace ProofGeneration
         /// </summary>
         public static void Program(Program p)
         {
+            if (uniqueNamer == null)
+            {
+              uniqueNamer = new IsaUniqueNamer();
+            }
+
             if (boogieGlobalData == null)
             {
                 boogieGlobalData = new BoogieGlobalData(p.Functions, p.Axioms, p.GlobalVariables, p.Constants);
-                
+
                 var methodData = BoogieMethodData.CreateOnlyGlobal(boogieGlobalData);
                 var fixedVarTranslation = new DeBruijnFixedVarTranslation(methodData);
                 var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(methodData);
@@ -108,6 +115,7 @@ namespace ProofGeneration
                     "proc",
                     methodData, globalDataConfig, factory, 
                     null,
+                    uniqueNamer,
                     out var declsGlobalData,
                     !CommandLineOptions.Clo.GenerateIsaProgNoProofs,
                     true
@@ -606,7 +614,11 @@ namespace ProofGeneration
             
             beforeOptimizationsCFG = new CFGRepr(outgoingBlocks, labeling, entryBlock);
 
-            var uniqueNamer = new IsaUniqueNamer();
+            if (uniqueNamer == null)
+            {
+              uniqueNamer = new IsaUniqueNamer();
+            }
+
             var theories = new List<Theory>();
             if (axiomBuilder == null && typeAxioms != null)
                 throw new ArgumentException("type axioms can only be null if axiom builder is null");
@@ -648,6 +660,7 @@ namespace ProofGeneration
                 beforeCfgAst,
                 originalAst,
                 proofGenInfo,
+                uniqueNamer,
                 out var programDeclsBeforeAstToCfg,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
               procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "ast", beforeAstToCfgProgAccess);
@@ -680,6 +693,7 @@ namespace ProofGeneration
                   afterPassificationImpl.Name,
                   mainData, unoptimizedCfgConfig, varTranslationFactory2,
                   beforeOptimizationsCFG,
+                  uniqueNamer,
                   out var programDeclsUnoptimizedCfg,
                   !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
                 procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized",
@@ -708,6 +722,7 @@ namespace ProofGeneration
                 afterPassificationImpl.Name,
                 mainData, beforeCfgToDagConfig, varTranslationFactory2,
                 beforeDagCfg,
+                uniqueNamer,
                 out var programDeclsBeforeCfgToDag,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
             procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name, beforeCfgToDagProgAccess);
@@ -735,6 +750,7 @@ namespace ProofGeneration
                 afterPassificationImpl.Name,
                 mainData, beforePassiveConfig, varTranslationFactory2,
                 beforePassificationCfg,
+                uniqueNamer,
                 out var programDeclsBeforePassive,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
@@ -756,6 +772,7 @@ namespace ProofGeneration
               finalProgData, passiveProgConfig, varTranslationFactory,
               //we use the CFG before the peep-hole transformations, so that we can directly use the VC to program proof in the passification phase
               afterPassificationCfg,
+              uniqueNamer,
               out var programDecls,
               !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
@@ -833,6 +850,7 @@ namespace ProofGeneration
                 varTranslationFactory,
                 typePremiseEraserFactory,
                 gen,
+                uniqueNamer,
                 out var vcAssmPrelim,
                 out var endToEndLemmaPrelim
               );
@@ -973,6 +991,7 @@ namespace ProofGeneration
                 uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg)),
                 phasesTheories,
                 _proofGenConfig.GenerateAstCfgE2E,
+                _proofGenConfig,
                 vcAssm,
                 proofGenInfo,
                 beforeCfgAst,

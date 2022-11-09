@@ -54,6 +54,7 @@ namespace ProofGeneration.ProgramToVCProof
             IVariableTranslationFactory varFactory,
             TypePremiseEraserFactory eraserFactory,
             VCExpressionGenerator gen,
+            IsaUniqueNamer namerForFunctions,
             out Term vcAssm,
             out LemmaDecl endToEndLemma)
         {
@@ -133,6 +134,7 @@ namespace ProofGeneration.ProgramToVCProof
                     varFactory,
                     vcProofData.VcTranslator,
                     eraserFactory,
+                    namerForFunctions,
                     gen);
                 passiveOuterDecls.AddRange(endToEnd.GenerateProof(out vcAssm, out endToEndLemma));
             }

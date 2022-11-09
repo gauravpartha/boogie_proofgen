@@ -18,6 +18,7 @@ namespace ProofGeneration.AstToCfg
             string uniqueTheoryName,
             PhasesTheories phasesTheories,
             bool generateEndtoEnd,
+            ProofGenConfig config,
             Term vcAssm,
             AstToCfgProofGenInfo proofGenInfo,
             ASTRepr beforeCfgAst,
@@ -161,17 +162,21 @@ namespace ProofGeneration.AstToCfg
               theoryOuterDecls.AddRange(endToEndDecls);
             }
 
+            List<string> importTheories = new List<string>
+            {
+              "Boogie_Lang.Ast", "Boogie_Lang.Ast_Cfg_Transformation", "Boogie_Lang.Semantics", "Boogie_Lang.Util",
+              "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML",
+              beforeCfgProgAccess.TheoryName(),
+              afterCfgProgAccess.TheoryName()
+            };
+            
+            if (config.GenerateCfgDagProof) importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag));
+            if (config.GeneratePassifProof) importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.Passification));
+            if (config.GenerateVcProof) importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.Vc));
+
             return new Theory(
               uniqueTheoryName,
-              new List<string>
-              {
-                  "Boogie_Lang.Ast", "Boogie_Lang.Ast_Cfg_Transformation", "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML",
-                  beforeCfgProgAccess.TheoryName(),
-                  afterCfgProgAccess.TheoryName(), 
-                  //phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag),
-                  //phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
-                  //phasesTheories.TheoryName(PhasesTheories.Phase.Vc)
-              },
+              importTheories,
               theoryOuterDecls
             );
         }

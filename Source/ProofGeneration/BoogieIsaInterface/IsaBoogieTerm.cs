@@ -688,12 +688,12 @@ namespace ProofGeneration
                     });
         }
 
-        public static Term FunDecl(Function f, IVariableTranslationFactory varTranslationFactory,
+        public static Term FunDecl(Function f, IVariableTranslationFactory varTranslationFactory, IsaUniqueNamer uniqueNamer,
             bool includeName = true)
         {
             var typeIsaVisitor = LemmaHelper.FunTypeIsaVisitor(f, varTranslationFactory);
 
-            Term fname = new StringConst(f.Name);
+            Term fname = new StringConst(uniqueNamer.RemoveApostropheInFunc(f.Name));
             Term numTypeParams = new NatConst(f.TypeParameters.Count);
             var argTypes = new TermList(f.InParams.Select(v => typeIsaVisitor.Translate(v.TypedIdent.Type)).ToList());
             var retType = typeIsaVisitor.Translate(f.OutParams.First().TypedIdent.Type);
@@ -766,9 +766,9 @@ namespace ProofGeneration
         }
 
         public static Term FunInterpSingleWf(Function f, Term absValTyMap, Term fTerm,
-            IVariableTranslationFactory factory)
+            IVariableTranslationFactory factory, IsaUniqueNamer uniqueNamer)
         {
-            return FunInterpSingleWf(absValTyMap, FunDecl(f, factory), fTerm);
+            return FunInterpSingleWf(absValTyMap, FunDecl(f, factory, uniqueNamer), fTerm);
         }
 
         public static Term FunInterpSingleWf(Term absValTyMap, Term fdecl, Term fun)

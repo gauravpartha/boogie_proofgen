@@ -375,13 +375,13 @@ namespace ProofGeneration.BoogieIsaInterface
             return result;
         }
 
-        public void AddFunctionMembershipLemmas(IEnumerable<Function> functions)
+        public void AddFunctionMembershipLemmas(IEnumerable<Function> functions, IsaUniqueNamer uniqueNamer)
         {
             AddNamedDeclsMembershipLemmas(functions,
                 IsaCommonTerms.TermIdentFromName(isaProgramRepr.GlobalProgramRepr.funcsDeclDef),
                 new[] {isaProgramRepr.GlobalProgramRepr.funcsDeclDef+ "_def"},
-                d => new StringConst(d.Name),
-                d => IsaBoogieTerm.FunDecl((Function) d, factory, false),
+                d => new StringConst(uniqueNamer.RemoveApostropheInFunc(d.Name)),
+                d => IsaBoogieTerm.FunDecl((Function) d, factory, uniqueNamer, false),
                 false
             );
         }
@@ -503,14 +503,14 @@ namespace ProofGeneration.BoogieIsaInterface
             }
         }
 
-        public void AddAxiomMembershipLemmas(IEnumerable<Axiom> axioms)
+        public void AddAxiomMembershipLemmas(IEnumerable<Axiom> axioms, IsaUniqueNamer uniqueNamer)
         {
             var axiomSet = IsaCommonTerms.SetOfList(IsaCommonTerms.TermIdentFromName(isaProgramRepr.GlobalProgramRepr.axiomsDeclDef));
             var id = 0;
             foreach (var axiom in axioms)
             {
                 var axiomTerm = basicCmdIsaVisitor.Translate(axiom.Expr);
-                var elemAssm = IsaCommonTerms.Elem(axiomTerm, axiomSet);
+                var elemAssm = IsaCommonTerms.Elem(IsaCommonTerms.TermIdentFromName(uniqueNamer.RemoveApostrophe(axiomTerm.ToString())), axiomSet);
 
                 var proof = new Proof(new List<string> {"by (simp add: " + isaProgramRepr.GlobalProgramRepr.axiomsDeclDef+ "_def)"});
                 membershipLemmas.Add(axiom, new LemmaDecl(MembershipName(axiom, id), elemAssm, proof));

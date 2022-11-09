@@ -63,6 +63,7 @@ namespace ProofGeneration
             IsaProgramGeneratorConfig config,
             IVariableTranslationFactory varTranslationFactory,
             CFGRepr cfg,
+            IsaUniqueNamer uniqueNamer,
             out IList<OuterDecl> decls,
             bool generateMembershipLemmas = true,
             bool onlyGlobalData = false
@@ -179,14 +180,14 @@ namespace ProofGeneration
 
             if (config.generateAxioms)
             {
-                decls.Add(GetAxioms(methodData.Axioms));
-                if(generateMembershipLemmas) membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms);
+                decls.Add(GetAxioms(methodData.Axioms, uniqueNamer));
+                if(generateMembershipLemmas) membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms, uniqueNamer);
             }
 
             if (config.generateFunctions)
             {
-                decls.Add(GetFunctionDeclarationsIsa(methodData.Functions));
-                if(generateMembershipLemmas) membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions);
+                decls.Add(GetFunctionDeclarationsIsa(methodData.Functions, uniqueNamer));
+                if(generateMembershipLemmas) membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions, uniqueNamer);
             }
 
             if (config.generateGlobalsAndConstants)
@@ -211,15 +212,22 @@ namespace ProofGeneration
             return membershipLemmaManager;
         }
 
-        private DefDecl GetAxioms(IEnumerable<Axiom> axioms)
+        private DefDecl GetAxioms(IEnumerable<Axiom> axioms, IsaUniqueNamer uniqueNamer)
         {
             var axiomsExpr = new List<Term>();
             foreach (var ax in axioms)
             {
                 var axTerms = cmdIsaVisitor.Translate(ax.Expr);
+
                 if (axTerms.Count != 1)
                     throw new ProofGenUnexpectedStateException(GetType(), "axiom not translated into single term");
-                axiomsExpr.Add(axTerms.First());
+                
+                if (axTerms.First().ToString().Contains("fun"))
+                {
+                  string test = axTerms.First().ToString();
+                }
+                
+                axiomsExpr.Add( IsaCommonTerms.TermIdentFromName(uniqueNamer.RemoveApostrophe(axTerms.First().ToString()) ) );
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(axiomsExpr));
@@ -362,13 +370,13 @@ namespace ProofGeneration
             return DefDecl.CreateWithoutArg(nodeToBlocksName, new TermList(nodeList));
         }
 
-        private DefDecl GetFunctionDeclarationsIsa(IEnumerable<Function> functions)
+        private DefDecl GetFunctionDeclarationsIsa(IEnumerable<Function> functions, IsaUniqueNamer uniqueNamer)
         {
             //var equations = new List<Tuple<IList<Term>, Term>>();
             var fdecls = new List<Term>();
 
 
-            foreach (var f in functions) fdecls.Add(IsaBoogieTerm.FunDecl(f, varTranslationFactory));
+            foreach (var f in functions) fdecls.Add(IsaBoogieTerm.FunDecl(f, varTranslationFactory, uniqueNamer));
 
             return DefDecl.CreateWithoutArg(FunctionDeclarationsName(), new TermList(fdecls));
         }
