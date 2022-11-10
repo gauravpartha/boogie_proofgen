@@ -650,7 +650,7 @@ namespace ProofGeneration
               var specsConfig_ast = CommandLineOptions.Clo.GenerateIsaProgNoProofs
                 ? SpecsConfig.All
                 : SpecsConfig.AllPreCheckedPost;
-              var beforeAstToCfgConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true,
+              var beforeAstToCfgConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false,
                 true, specsConfig_ast, true);
 
               beforeAstToCfgProgAccess = new IsaProgramGeneratorForAst().GetIsaProgram(
@@ -687,7 +687,7 @@ namespace ProofGeneration
                   ? SpecsConfig.All
                   : SpecsConfig.AllPreCheckedPost;
                 var unoptimizedCfgConfig =
-                  new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true, true, _specsConfig, true);
+                  new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, false, _specsConfig, false);
                 unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
                   unoptimizedCfgTheoryName,
                   afterPassificationImpl.Name,
@@ -716,7 +716,7 @@ namespace ProofGeneration
             var beforeCfgToDagTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_cfg_to_dag_prog");
             //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
             var specsConfig = CommandLineOptions.Clo.GenerateIsaProgNoProofs ? SpecsConfig.All : SpecsConfig.AllPreCheckedPost;
-            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, true, true, true, true, specsConfig, true);
+            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, false, false, false, true, specsConfig, true);
             var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
                 afterPassificationImpl.Name,
