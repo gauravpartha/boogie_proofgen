@@ -55,7 +55,7 @@ namespace Microsoft.Boogie
       * The second hint is a BranchIndicator that indicates how that needs to be done. */
     private IDictionary<BigBlock, (Expr, BranchIndicator)> mappingBigBlockToHints;
 
-    // Map a BigBlock (copy) to the unique integer label (index) of its corresponding Term object (in InnerAst.cs).
+    // Map a BigBlock (copy) to the unique integer label (index) of its corresponding Term object (Term object definition is in InnerAst.cs).
     private IDictionary<BigBlock, int> mappingCopyBigBlockToIndex;
 
     // Map a BigBlock (original) to the Loop BigBlock (original) it's nested into.

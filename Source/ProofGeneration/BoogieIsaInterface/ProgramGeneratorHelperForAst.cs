@@ -15,34 +15,26 @@ namespace ProofGeneration
 {
     internal class BigBlockTermBuilder
     {
-      private IDictionary<BigBlock, IList<OuterDecl>> bigBlocksDefDecls;
+      private IDictionary<BigBlock, IList<DefDecl>> bigBlocksDefDecls;
 
       public BigBlockTermBuilder()
       {
-        bigBlocksDefDecls = new Dictionary<BigBlock, IList<OuterDecl>>();
+        bigBlocksDefDecls = new Dictionary<BigBlock, IList<DefDecl>>();
       }
 
-      public IDictionary<BigBlock, IList<OuterDecl>> getBigblockDefDecls()
+      public IDictionary<BigBlock, IList<DefDecl>> getBigblockDefDecls()
       {
         return bigBlocksDefDecls;
       }
 
-      public Term makeBigBlockTerm(BigBlock b, MultiCmdIsaVisitor cmdIsaVisitor, int flag, int nestedBlockTracker, string nameToUse, 
+      public Term makeBigBlockTerm(BigBlock b, AstToCfgProofGenInfo proofGenInfo, MultiCmdIsaVisitor cmdIsaVisitor, int flag, int nestedBlockTracker, string nameToUse, 
                                    out int updatedNestedBlockTracker)
       {
           var bigblock_term = IsaCommonTerms.TermIdentFromName("BigBlock");
           IList<Term> bigblock_args = new List<Term>();
-          IList<Term> bigblock_args_no_cmds = new List<Term>();
 
           Term name_option;
-          if (b.LabelName == null)
-          {
-            name_option = IsaCommonTerms.NoneOption();
-          }
-          else
-          {
-            name_option = IsaCommonTerms.SomeOption(IsaCommonTerms.TermIdentFromName(b.LabelName));
-          }
+          name_option = b.LabelName == null ? IsaCommonTerms.NoneOption() : IsaCommonTerms.SomeOption(IsaCommonTerms.TermIdentFromName(b.LabelName));
           
           bigblock_args.Add(name_option);
 
@@ -51,7 +43,7 @@ namespace ProofGeneration
           
           bigblock_args.Add(cmdsList);
 
-          Term structure_option = makeStructuredCmdTerm(b, cmdIsaVisitor, nestedBlockTracker + 1, flag, nameToUse, 
+          Term structure_option = makeStructuredCmdTerm(b, proofGenInfo, cmdIsaVisitor, nestedBlockTracker + 1, flag, nameToUse, 
                                                         out int updatedTrackerAfterStr);
           bigblock_args.Add(structure_option);
 
@@ -81,12 +73,12 @@ namespace ProofGeneration
           }
           bigblock_args.Add(transfer_option);
 
-          IList<OuterDecl> bb_decls = new List<OuterDecl>();
+          IList<DefDecl> bb_decls = new List<DefDecl>();
           Term bigblock = new TermApp(bigblock_term, bigblock_args);
 
           if (nestedBlockTracker == 0)
           {
-            OuterDecl bigblock_def = DefDecl.CreateWithoutArg(nameToUse, bigblock);
+            DefDecl bigblock_def = DefDecl.CreateWithoutArg(nameToUse, bigblock);
             bb_decls.Add(bigblock_def);
             bigBlocksDefDecls.Add(b, bb_decls);
           }
@@ -95,7 +87,7 @@ namespace ProofGeneration
           return bigblock; 
       }
 
-      public Term makeStructuredCmdTerm(BigBlock b, MultiCmdIsaVisitor cmdIsaVisitor, int nestedBlockTracker, int flag, string nameToUse, 
+      public Term makeStructuredCmdTerm(BigBlock b, AstToCfgProofGenInfo proofGenInfo, MultiCmdIsaVisitor cmdIsaVisitor, int nestedBlockTracker, int flag, string nameToUse, 
                                         out int updatedNestedBlockTracker)
       {
         Term strCmdTermOption = null;
@@ -123,8 +115,19 @@ namespace ProofGeneration
           IList<Term> then_branch_bigblock_terms = new List<Term>();
           foreach (BigBlock bb in then_branch)
           {
-            Term translated_bb = makeBigBlockTerm(bb, cmdIsaVisitor, 0, nestedBlockTracker, nameToUse, 
+            Term translated_bb = makeBigBlockTerm(bb, proofGenInfo, cmdIsaVisitor, 0, nestedBlockTracker, nameToUse, 
                                                   out int updatedTrackerAfterBlock);
+            
+            foreach (var pair in bigBlocksDefDecls)
+            {
+              if (pair.Value.First().Equation.Item2.ToString() == translated_bb.ToString() && 
+                  proofGenInfo.GetMappingCopyBigBlockToIndex()[pair.Key] == proofGenInfo.GetMappingCopyBigBlockToIndex()[bb])
+              {
+                translated_bb = IsaCommonTerms.TermIdentFromName(pair.Value.First().Name);
+                break;
+              }
+            }
+            
             then_branch_bigblock_terms.Add(translated_bb);
             nestedBlockTracker = updatedTrackerAfterBlock + 1;
           }
@@ -134,8 +137,19 @@ namespace ProofGeneration
           IList<Term> else_branch_bigblock_terms = new List<Term>();
           foreach (BigBlock bb in else_branch)
           {
-            Term translated_bb = makeBigBlockTerm(bb, cmdIsaVisitor, 0, nestedBlockTracker, nameToUse, 
+            Term translated_bb = makeBigBlockTerm(bb, proofGenInfo, cmdIsaVisitor, 0, nestedBlockTracker, nameToUse, 
                                                   out int updatedTrackerAfterBlock);
+
+            foreach (var pair in bigBlocksDefDecls)
+            {
+              if (pair.Value.First().Equation.Item2.ToString() == translated_bb.ToString() && 
+                  proofGenInfo.GetMappingCopyBigBlockToIndex()[pair.Key] == proofGenInfo.GetMappingCopyBigBlockToIndex()[bb])
+              {
+                translated_bb = IsaCommonTerms.TermIdentFromName(pair.Value.First().Name);
+                break;
+              }
+            }
+            
             else_branch_bigblock_terms.Add(translated_bb);
             nestedBlockTracker = updatedTrackerAfterBlock + 1;
           }
@@ -178,8 +192,19 @@ namespace ProofGeneration
           IList<Term> body_bigblock_terms = new List<Term>();
           foreach (BigBlock bb in bodyBigBlocks)
           {
-            Term translated_bb = makeBigBlockTerm(bb, cmdIsaVisitor, 0, nestedBlockTracker, nameToUse, 
+            Term translated_bb = makeBigBlockTerm(bb, proofGenInfo, cmdIsaVisitor, 0, nestedBlockTracker, nameToUse, 
                                                   out int updatedTrackerAfterBlock);
+            
+            foreach (var pair in bigBlocksDefDecls)
+            {
+              if (pair.Value.First().Equation.Item2.ToString() == translated_bb.ToString() && 
+                  proofGenInfo.GetMappingCopyBigBlockToIndex()[pair.Key] == proofGenInfo.GetMappingCopyBigBlockToIndex()[bb])
+              {
+                translated_bb = IsaCommonTerms.TermIdentFromName(pair.Value.First().Name);
+                break;
+              }
+            }
+            
             body_bigblock_terms.Add(translated_bb);
             nestedBlockTracker = updatedTrackerAfterBlock + 1;
           }

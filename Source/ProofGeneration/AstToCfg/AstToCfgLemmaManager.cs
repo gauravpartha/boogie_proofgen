@@ -1814,13 +1814,15 @@ namespace ProofGeneration.AstToCfg
               ProofUtil.Apply(ProofUtil.Repeat(ProofUtil.Simp())),
               ProofUtil.Apply("rule " + nameLemmaThen + ""),
               ExpandDefinitions(contId, startingBigBlock, proofGenInfo, BranchIndicator.GuardHolds),
-              "apply blast+"
+              "apply blast",
+              "apply blast"
             };
 
             if (proofGenInfo.GetMappingBigBlockToLoopBigBlock().ContainsKey(correspondingBigBlockOrig))
             {
               finalPartOfProof.AddRange(new List<string>
               {
+                ProofUtil.Apply(ProofUtil.Simp()),
                 ProofUtil.Apply("rule loop_IH_prove"),
                 ProofUtil.Apply("rule loop_IH_apply"),
                 ProofUtil.Apply("rule inductionHypothesis"),

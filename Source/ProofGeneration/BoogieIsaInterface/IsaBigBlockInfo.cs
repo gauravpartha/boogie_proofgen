@@ -9,7 +9,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public IsaBigBlockInfo(
           string theoryName,
           IDictionary<BigBlock, int> bigblockIds,
-          IDictionary<BigBlock, IList<OuterDecl>> bigblockDefs
+          IDictionary<BigBlock, IList<DefDecl>> bigblockDefs
         )
         {
           TheoryName = theoryName;
@@ -18,7 +18,7 @@ namespace ProofGeneration.BoogieIsaInterface
         }
 
         public IDictionary<BigBlock, int> BigBlockIds { get; }
-        public IDictionary<BigBlock, IList<OuterDecl>> BigBlockDefs { get; }
+        public IDictionary<BigBlock, IList<DefDecl>> BigBlockDefs { get; }
         public string TheoryName { get; }
 
         public IList<string> CmdsQualifiedName(BigBlock b)
@@ -26,7 +26,7 @@ namespace ProofGeneration.BoogieIsaInterface
           return QualifiedName(BigBlockDefs[b]);
         }
         
-        private IList<string> QualifiedName(IList<OuterDecl> decls)
+        private IList<string> QualifiedName(IList<DefDecl> decls)
         {
           IList<string> names = new List<string>();
           foreach (var decl in decls)

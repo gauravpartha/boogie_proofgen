@@ -65,7 +65,7 @@ namespace ProofGeneration
             CFGRepr cfg,
             IsaUniqueNamer uniqueNamer,
             out IList<OuterDecl> decls,
-            bool generateMembershipLemmas = true,
+            bool generateMembershipLemmas,
             bool onlyGlobalData = false
         )
         {
@@ -217,6 +217,7 @@ namespace ProofGeneration
             var axiomsExpr = new List<Term>();
             foreach (var ax in axioms)
             {
+                string test1 = ax.Expr.ToString();
                 var axTerms = cmdIsaVisitor.Translate(ax.Expr);
 
                 if (axTerms.Count != 1)

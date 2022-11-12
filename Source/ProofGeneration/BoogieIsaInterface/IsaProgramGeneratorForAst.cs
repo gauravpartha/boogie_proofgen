@@ -35,7 +35,7 @@ namespace ProofGeneration
             AstToCfgProofGenInfo proofGenInfo,
             IsaUniqueNamer uniqueNamer,
             out IList<OuterDecl> decls,
-            bool generateMembershipLemmas = true,
+            bool generateMembershipLemmas,
             bool onlyGlobalData = false
         )
         {
@@ -233,25 +233,27 @@ namespace ProofGeneration
 
         private IsaBigBlockInfo BigBlockToInfo(string theoryName, ASTRepr ast, AstToCfgProofGenInfo proofGenInfo)
         {
-            var blockToDecl = new Dictionary<BigBlock, IList<OuterDecl>>();
+            var blockToDecl = new Dictionary<BigBlock, IList<DefDecl>>();
             var blockToCounter = new Dictionary<BigBlock, int>();
+            
+            BigBlockTermBuilder builder = new BigBlockTermBuilder();
 
-            foreach (BigBlock b in ast.GetBlocksForwards())
+            foreach (BigBlock b in ast.GetBlocksBackwards())
             {
                 int flag = 0;
                 if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().Keys.Contains(b))
                 {
                   flag = 1;
                 }
-                BigBlockTermBuilder builder = new BigBlockTermBuilder();
+                
                 int uniqueIntLabel = ast.GetUniqueIntLabel(b);
                 string nameToUse = "bigblock_" + uniqueIntLabel;
-                var translatedBigBlock = builder.makeBigBlockTerm(b, cmdIsaVisitor, flag, 0, nameToUse, out int updatedNestedBlockTracker);
+                var translatedBigBlock = builder.makeBigBlockTerm(b, proofGenInfo, cmdIsaVisitor, flag, 0, nameToUse, out int updatedNestedBlockTracker);
                 
                 proofGenInfo.AddBigBlockToIndexPair(b, uniqueIntLabel);
                 
-                IDictionary<BigBlock, IList<OuterDecl>> bb_defs = builder.getBigblockDefDecls();
-                foreach(KeyValuePair<BigBlock, IList<OuterDecl>> bb_def in bb_defs)
+                IDictionary<BigBlock, IList<DefDecl>> bb_defs = builder.getBigblockDefDecls();
+                foreach(KeyValuePair<BigBlock, IList<DefDecl>> bb_def in bb_defs)
                 {
                   if (!blockToDecl.ContainsKey(bb_def.Key))
                   {
