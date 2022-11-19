@@ -80,8 +80,8 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig = new(false, false, false, false, 
-                                                            true, false, false, false);
+        private static ProofGenConfig _proofGenConfig = new(true, true, true, true, 
+                                                            true, true, true, true);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -721,7 +721,7 @@ namespace ProofGeneration
                   new List<string>
                   {
                     "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
-                    "\"../" + beforeAstToCfgProgAccess.TheoryName() + "\""
+                    beforeAstToCfgProgAccess.TheoryName()
                   },
                   programDeclsUnoptimizedCfg);
                 theories.Add(unoptimizedCfgProgTheory);
