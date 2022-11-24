@@ -23,8 +23,10 @@ namespace ProofGeneration.CfgToDag
          */
         public static Theory CfgToDagProof(
             PhasesTheories phasesTheories,
+            IsaUniqueNamer uniqueNamer,
             bool generateEndToEndLemma,
             bool generatedAstToCfgProof,
+            bool generateVcProof,
             Term vcAssm,
             CFGRepr beforeDagCfg,
             CFGRepr afterDagCfg,
@@ -223,15 +225,15 @@ namespace ProofGeneration.CfgToDag
             }
 
             return new Theory(
-                phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag),
+                uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag)),
                 new List<string>
                 {
                     "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML",
                     generatedAstToCfgProof ? beforeCfgProgAccess.TheoryName() : null,
                     beforeDagProgAccess.TheoryName(),
                     afterDagProgAccess.TheoryName(), 
-                    phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
-                    phasesTheories.TheoryName(PhasesTheories.Phase.Vc)
+                    uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.Passification)),
+                    generateVcProof ? phasesTheories.TheoryName(PhasesTheories.Phase.Vc) : ""
                 },
                 theoryOuterDecls
             );

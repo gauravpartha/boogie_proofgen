@@ -80,8 +80,8 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig = new(true, true, true, true, 
-                                                            true, true, true, true);
+        private static ProofGenConfig _proofGenConfig = new(false, false, false, false, 
+                                                            false, true, true, false);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -901,8 +901,8 @@ namespace ProofGeneration
                 : beforeAstToCfgProgAccess;
 
               var passificationProofTheory = PassificationManager.PassificationProof(
-                phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
-                phasesTheories.TheoryName(PhasesTheories.Phase.Vc),
+                uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.Passification)),
+                _proofGenConfig.GenerateVcProof ? phasesTheories.TheoryName(PhasesTheories.Phase.Vc) : "",
                 _proofGenConfig.GeneratePassifE2E,
                 endToEndLemma,
                 vcAssm,
@@ -933,8 +933,10 @@ namespace ProofGeneration
 
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
+                uniqueNamer,
                 _proofGenConfig.GenerateCfgDagE2E,
                 _proofGenConfig.GenerateAstCfgProof,
+                _proofGenConfig.GenerateVcProof,
                 vcAssm,
                 beforeDagCfg,
                 beforePassificationCfg,
