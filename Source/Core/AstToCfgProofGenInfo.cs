@@ -62,8 +62,10 @@ namespace Microsoft.Boogie
     private IDictionary<BigBlock, BigBlock> mappingBigBlockToOrigLoopBigBlock;
     
     // List of BigBlocks added after a loop if that loop is the end of the procedure or if that loop has no successors.
-    // I've never encountered an instance where this list contains more than one element, i.e, this doesn't need to be a list.
-    // However, this depends on the when successor Big Blocks are computed, so using a list is not wrong.
+    // I've never encountered an instance where this list contains more than one element, i.e, this doesn't need to be a list in our setting.
+    // However, this depends on when successor Big Blocks are computed.
+    // If successor BigBlocks were to be computed after the check on line 886 in AbsyCmd.cs is done,
+    // then this list will contain a BigBlock corresponding to every loop. 
     private IList<BigBlock> loopEndingBlocks;
 
     private List<Variable> newVarsFromDesugaring;

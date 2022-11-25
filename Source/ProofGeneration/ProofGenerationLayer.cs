@@ -80,8 +80,10 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
-        private static ProofGenConfig _proofGenConfig = new(false, false, false, false, 
-                                                            false, true, true, false);
+        private static ProofGenConfig _proofGenConfig = 
+          new(false, false, false, false, true,
+              false, false, false, false, 
+              true, false, false, false);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -142,6 +144,29 @@ namespace ProofGeneration
             if (b.ec is BreakCmd || b.tc is GotoCmd)
             {
               return true;
+            }
+          }
+
+          return false;
+        }
+        
+        private static bool checkForGotos(StmtList stmtList)
+        {
+          foreach (var bb in stmtList.BigBlocks)
+          {
+            if (bb.tc is GotoCmd)
+            {
+              return true;
+            }
+
+            if (bb.ec is IfCmd ifcmd)
+            {
+              checkForGotos(ifcmd.thn);
+              checkForGotos(ifcmd.elseBlock);
+            }
+            else if (bb.ec is WhileCmd whilecmd)
+            {
+              checkForGotos(whilecmd.Body);
             }
           }
 
@@ -574,6 +599,13 @@ namespace ProofGeneration
             _proofGenConfig.GenerateCfgDagE2E = _proofGenConfig.GeneratePassifProof && _proofGenConfig.GeneratePassifE2E && _proofGenConfig.GenerateCfgDagProof;
             _proofGenConfig.GenerateAstCfgE2E = _proofGenConfig.GenerateCfgDagProof && _proofGenConfig.GenerateCfgDagE2E && _proofGenConfig.GenerateAstCfgProof;
 
+            _proofGenConfig.GenerateBeforeAstCfgProg = _proofGenConfig.GenerateAstCfgProof;
+            _proofGenConfig.GenerateUnoptimizedCfgProg = proofGenInfo.GetOptimizationsFlag() && _proofGenConfig.GenerateAstCfgProof;
+            _proofGenConfig.GenerateBeforeCfgDagProg = (proofGenInfo.GetOptimizationsFlag() &&  _proofGenConfig.GenerateCfgDagProof) || 
+                                                       (!proofGenInfo.GetOptimizationsFlag() && (_proofGenConfig.GenerateAstCfgProof || _proofGenConfig.GenerateCfgDagProof));
+            _proofGenConfig.GenerateBeforePassifProg = _proofGenConfig.GenerateCfgDagProof || _proofGenConfig.GeneratePassifProof;
+            _proofGenConfig.GeneratePassifiedProg = _proofGenConfig.GeneratePassifProof || _proofGenConfig.GenerateVcProof;
+
             IList<Block> unoptimizedCFGBlocks = proofGenInfo.GetUnpotimizedBlocks(); 
             var newToOldInternal = new Dictionary<Block, Block>();
             unoptimizedCFGBlocks.ZipDo(afterPassificationImpl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
@@ -642,8 +674,11 @@ namespace ProofGeneration
 
             IProgramAccessor beforeAstToCfgProgAccess = null;
             IProgramAccessor unoptimizedCfgProgAccess = null;
-            
-            if (_proofGenConfig.GenerateAstCfgProof)
+            IProgramAccessor beforeCfgToDagProgAccess = null;
+            IProgramAccessor beforePassiveProgAccess = null;
+            IProgramAccessor passiveProgAccess = null;
+
+            if (_proofGenConfig.GenerateBeforeAstCfgProg)
             {
               #region before ast to cfg program
 
@@ -656,12 +691,12 @@ namespace ProofGeneration
               var specsConfig_ast = CommandLineOptions.Clo.GenerateIsaProgNoProofs
                 ? SpecsConfig.All
                 : SpecsConfig.AllPreCheckedPost;
-              var beforeAstToCfgConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, 
-                false, 
-                false, 
+              var beforeAstToCfgConfig = new IsaProgramGeneratorConfig(globalDataProgAccess,
                 false,
-                true, 
-                specsConfig_ast, 
+                false,
+                false,
+                true,
+                specsConfig_ast,
                 true);
 
               beforeAstToCfgProgAccess = new IsaProgramGeneratorForAst().GetIsaProgram(
@@ -686,9 +721,10 @@ namespace ProofGeneration
               theories.Add(beforeAstToCfgProgTheory);
 
               #endregion
-              
-              if (proofGenInfo.GetOptimizationsFlag())
-              {
+            }
+
+            if (_proofGenConfig.GenerateUnoptimizedCfgProg)
+            {
                 #region unoptimized cfg program
 
                 var unoptimizedCfgTheoryName =
@@ -727,21 +763,22 @@ namespace ProofGeneration
                 theories.Add(unoptimizedCfgProgTheory);
 
                 #endregion
-              }
             }
 
-            #region before cfg to dag program
-            var beforeCfgToDagTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_cfg_to_dag_prog");
-            //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
-            var specsConfig = CommandLineOptions.Clo.GenerateIsaProgNoProofs ? SpecsConfig.All : SpecsConfig.AllPreCheckedPost;
-            var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, 
-              false, 
-              false, 
-              false, 
-              true, 
-              specsConfig, 
-              true);
-            var beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
+            if (_proofGenConfig.GenerateBeforeCfgDagProg)
+            {
+              #region before cfg to dag program
+              var beforeCfgToDagTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_cfg_to_dag_prog");
+              //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
+              var specsConfig = CommandLineOptions.Clo.GenerateIsaProgNoProofs ? SpecsConfig.All : SpecsConfig.AllPreCheckedPost;
+              var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(globalDataProgAccess, 
+                false, 
+                false, 
+                false, 
+                true, 
+                specsConfig, 
+                true);
+              beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
                 afterPassificationImpl.Name,
                 mainData, beforeCfgToDagConfig, varTranslationFactory2,
@@ -749,13 +786,15 @@ namespace ProofGeneration
                 uniqueNamer,
                 out var programDeclsBeforeCfgToDag,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
-            procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name, beforeCfgToDagProgAccess);
+              procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name, beforeCfgToDagProgAccess);
             
-            var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
+              var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util", "\"../"+globalDataProgAccess.TheoryName()+"\""},
                 programDeclsBeforeCfgToDag);
-            theories.Add(beforeCfgToDagProgTheory);
-            #endregion
+              theories.Add(beforeCfgToDagProgTheory);
+              #endregion
+            }
+            
 
             if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
             {
@@ -763,14 +802,20 @@ namespace ProofGeneration
                 return;
             }
 
-            #region before passive program
+            if (_proofGenConfig.GenerateBeforePassifProg)
+            {
+              #region before passive program
 
-            IProgramAccessor parentProgramAccessorForPassification = _proofGenConfig.GenerateAstCfgProof ? beforeAstToCfgProgAccess : beforeCfgToDagProgAccess;
-            
-            var beforePassiveProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
-            var beforePassiveConfig =
-                new IsaProgramGeneratorConfig(parentProgramAccessorForPassification, false, false, false, false, SpecsConfig.None, false);
-            var beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
+              IProgramAccessor parentProgramAccessorForPassification = _proofGenConfig.GenerateAstCfgProof
+                ? beforeAstToCfgProgAccess
+                : beforeCfgToDagProgAccess;
+
+              var beforePassiveProgTheoryName =
+                uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
+              var beforePassiveConfig =
+                new IsaProgramGeneratorConfig(parentProgramAccessorForPassification, false, false, false, false,
+                  SpecsConfig.None, false);
+              beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
                 afterPassificationImpl.Name,
                 mainData, beforePassiveConfig, varTranslationFactory2,
                 beforePassificationCfg,
@@ -778,48 +823,54 @@ namespace ProofGeneration
                 out var programDeclsBeforePassive,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
-            #endregion
-            
-            #region after passification program
-            
-            //use global version map for translation 
-            var fixedVarTranslation = new SimpleFixedVarTranslation(globalVersionMap);
-            var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
-            varTranslationFactory =
-              new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
+              #endregion
+              
+              var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof
+                ? beforeAstToCfgProgAccess.TheoryName()
+                : beforeCfgToDagProgAccess.TheoryName();
 
-            var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
-            var passiveProgConfig =
-              new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, SpecsConfig.None, false);
-            var passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
-              afterPassificationImpl.Name,
-              finalProgData, passiveProgConfig, varTranslationFactory,
-              //we use the CFG before the peep-hole transformations, so that we can directly use the VC to program proof in the passification phase
-              afterPassificationCfg,
-              uniqueNamer,
-              out var programDecls,
-              !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+              if (_proofGenConfig.GeneratePassifiedProg)
+              {
+                #region after passification program
 
-            var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof ? beforeAstToCfgProgAccess.TheoryName() : beforeCfgToDagProgAccess.TheoryName();
-            
-            var afterPassificationProgTheory =
-              new Theory(finalProgTheoryName,
-                new List<string>
-                  {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
-                programDecls);
-            theories.Add(afterPassificationProgTheory);
-            
-            #endregion
-            
-            #region before passive program (completion of theory construction)
+              //use global version map for translation 
+              var fixedVarTranslation = new SimpleFixedVarTranslation(globalVersionMap);
+              var fixedTyVarTranslation = new DeBruijnFixedTVarTranslation(finalProgData);
+              varTranslationFactory =
+                new DeBruijnVarFactory(fixedVarTranslation, fixedTyVarTranslation, boogieGlobalData);
 
-            var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
-              new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
-              programDeclsBeforePassive);
-            theories.Add(beforePassificationProgTheory);
+              var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
+              var passiveProgConfig =
+                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, SpecsConfig.None, false);
+              passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
+                afterPassificationImpl.Name,
+                finalProgData, passiveProgConfig, varTranslationFactory,
+                //we use the CFG before the peep-hole transformations, so that we can directly use the VC to program proof in the passification phase
+                afterPassificationCfg,
+                uniqueNamer,
+                out var programDecls,
+                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
-            #endregion
+              var afterPassificationProgTheory =
+                new Theory(finalProgTheoryName,
+                  new List<string>
+                    {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
+                  programDecls);
+              theories.Add(afterPassificationProgTheory);
+
+              #endregion
+              }
             
+              #region before passive program (completion of theory construction)
+
+              var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
+                programDeclsBeforePassive);
+              theories.Add(beforePassificationProgTheory);
+
+              #endregion
+            }
+
             var phasesTheories = new PhasesTheories(afterPassificationImpl.Name);
             Term vcAssm = null;
             LemmaDecl endToEndLemma = null;

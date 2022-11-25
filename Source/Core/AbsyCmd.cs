@@ -211,7 +211,7 @@ namespace Microsoft.Boogie
     /// Note, to be conservative (that is, ignoring the possible optimization that this
     /// method enables), this method can do nothing and return false.
     /// </summary>
-    public bool PrefixFirstBlock([Captured] List<Cmd> prefixCmds, ref string suggestedLabel, bool containsGotos)
+    public bool PrefixFirstBlock([Captured] List<Cmd> prefixCmds, ref string suggestedLabel)
     {
       Contract.Requires(suggestedLabel != null);
       Contract.Requires(prefixCmds != null);
@@ -240,7 +240,7 @@ namespace Microsoft.Boogie
       {
         // There really is something to insert.  We can do this inline only if the first
         // block is anonymous (which implies there is no branch to it from within the block).
-        if (bb0.Anonymous || !containsGotos)
+        if (bb0.Anonymous)
         {
           PrefixCommands = prefixCmds;
           bb0.LabelName = suggestedLabel;
@@ -708,35 +708,10 @@ namespace Microsoft.Boogie
       }
     }
 
-    public bool checkForGotos(StmtList stmtList)
-    {
-      foreach (var bb in stmtList.BigBlocks)
-      {
-        if (bb.tc is GotoCmd)
-        {
-          return true;
-        }
-
-        if (bb.ec is IfCmd ifcmd)
-        {
-          checkForGotos(ifcmd.thn);
-          checkForGotos(ifcmd.elseBlock);
-        }
-        else if (bb.ec is WhileCmd whilecmd)
-        {
-          checkForGotos(whilecmd.Body);
-        }
-      }
-
-      return false;
-    }
-
     // If the enclosing context is a loop, then "runOffTheEndLabel" is the loop head label;
     // otherwise, it is null.
     void CreateBlocks(StmtList stmtList, string runOffTheEndLabel, AstToCfgProofGenInfo proofGenInfo)
     {
-
-      bool containsGotos = checkForGotos(stmtList);
       
       Contract.Requires(stmtList != null);
       Contract.Requires(blocks != null);
@@ -826,7 +801,7 @@ namespace Microsoft.Boogie
           }
 
           // Try to squeeze in ssBody into the first block of wcmd.Body
-          bool bodyGuardTakenCareOf = wcmd.Body.PrefixFirstBlock(ssBody, ref loopBodyLabel, containsGotos);
+          bool bodyGuardTakenCareOf = wcmd.Body.PrefixFirstBlock(ssBody, ref loopBodyLabel);
 
           // ... goto LoopHead;
           Block block = new Block(b.tok, b.LabelName, theSimpleCmds,
@@ -958,11 +933,11 @@ namespace Microsoft.Boogie
             }
 
             // Try to squeeze in ssThen/ssElse into the first block of ifcmd.thn/ifcmd.elseBlock
-            bool thenGuardTakenCareOf = ifcmd.thn.PrefixFirstBlock(ssThen, ref thenLabel, containsGotos);
+            bool thenGuardTakenCareOf = ifcmd.thn.PrefixFirstBlock(ssThen, ref thenLabel);
             bool elseGuardTakenCareOf = false;
             if (ifcmd.elseBlock != null)
             {
-              elseGuardTakenCareOf = ifcmd.elseBlock.PrefixFirstBlock(ssElse, ref elseLabel, containsGotos);
+              elseGuardTakenCareOf = ifcmd.elseBlock.PrefixFirstBlock(ssElse, ref elseLabel);
             }
 
             // ... goto Then, Else;
