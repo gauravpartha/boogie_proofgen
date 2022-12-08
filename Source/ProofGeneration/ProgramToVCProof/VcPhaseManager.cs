@@ -149,7 +149,8 @@ namespace ProofGeneration.ProgramToVCProof
                     new List<string>
                     {
                         "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.VCHints", "Boogie_Lang.VCPhaseML",
-                        passiveProgAccess.TheoryName(), beforePassiveProgAccess.TheoryName()
+                        passiveProgAccess.TheoryName(), 
+                        beforePassiveProgAccess != null ? beforePassiveProgAccess.TheoryName() : ""
                     },
                     passiveOuterDecls);
         }

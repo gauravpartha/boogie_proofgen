@@ -81,9 +81,9 @@ namespace ProofGeneration
         private static Block uniqueExitBlockOrig;
 
         private static ProofGenConfig _proofGenConfig = 
-          new(false, false, false, false, true,
+          new(false, false, false, false, false,
               false, false, false, false, 
-              true, false, false, true);
+              false, false, true, false);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -602,10 +602,8 @@ namespace ProofGeneration
             _proofGenConfig.GenerateBeforeAstCfgProg = _proofGenConfig.GenerateAstCfgProof;
             _proofGenConfig.GenerateUnoptimizedCfgProg = proofGenInfo.GetOptimizationsFlag() && _proofGenConfig.GenerateAstCfgProof;
             _proofGenConfig.GenerateBeforeCfgDagProg = (proofGenInfo.GetOptimizationsFlag() &&  _proofGenConfig.GenerateCfgDagProof) || 
-                                                       (!proofGenInfo.GetOptimizationsFlag() && (_proofGenConfig.GenerateAstCfgProof || _proofGenConfig.GenerateCfgDagProof)) ||
-                                                       _proofGenConfig.GeneratePassifProof ||
-                                                       _proofGenConfig.GenerateVcProof;
-            _proofGenConfig.GenerateBeforePassifProg = _proofGenConfig.GenerateCfgDagProof || _proofGenConfig.GeneratePassifProof || _proofGenConfig.GenerateVcProof;
+                                                       (!proofGenInfo.GetOptimizationsFlag() && (_proofGenConfig.GenerateAstCfgProof || _proofGenConfig.GenerateCfgDagProof));
+            _proofGenConfig.GenerateBeforePassifProg = _proofGenConfig.GenerateCfgDagProof || _proofGenConfig.GeneratePassifProof;
             _proofGenConfig.GeneratePassifiedProg = _proofGenConfig.GeneratePassifProof || _proofGenConfig.GenerateVcProof;
 
             IList<Block> unoptimizedCFGBlocks = proofGenInfo.GetUnpotimizedBlocks(); 
@@ -803,6 +801,10 @@ namespace ProofGeneration
                 StoreResult(uniqueNamer.GetName("program_" + afterPassificationImpl.Proc.Name), theories);
                 return;
             }
+            
+            var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof
+              ? beforeAstToCfgProgAccess.TheoryName()
+              : _proofGenConfig.GenerateBeforeCfgDagProg ? beforeCfgToDagProgAccess.TheoryName() : "";
 
             if (_proofGenConfig.GenerateBeforePassifProg)
             {
@@ -815,7 +817,7 @@ namespace ProofGeneration
               var beforePassiveProgTheoryName =
                 uniqueNamer.GetName(afterPassificationImpl.Name + "_before_passive_prog");
               var beforePassiveConfig =
-                new IsaProgramGeneratorConfig(parentProgramAccessorForPassification, false, false, false, false,
+                new IsaProgramGeneratorConfig(parentProgramAccessorForPassification, parentProgramAccessorForPassification == null, parentProgramAccessorForPassification == null, parentProgramAccessorForPassification == null, parentProgramAccessorForPassification == null,
                   SpecsConfig.None, false);
               beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
                 afterPassificationImpl.Name,
@@ -825,15 +827,17 @@ namespace ProofGeneration
                 out var programDeclsBeforePassive,
                 !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
 
-              #endregion
-              
-              var theoryNameForParentImport = _proofGenConfig.GenerateAstCfgProof
-                ? beforeAstToCfgProgAccess.TheoryName()
-                : beforeCfgToDagProgAccess.TheoryName();
+              var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
+                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
+                programDeclsBeforePassive);
+              theories.Add(beforePassificationProgTheory);
 
-              if (_proofGenConfig.GeneratePassifiedProg)
-              {
-                #region after passification program
+              #endregion
+            }
+            
+            if (_proofGenConfig.GeneratePassifiedProg)
+            {
+              #region after passification program
 
               //use global version map for translation 
               var fixedVarTranslation = new SimpleFixedVarTranslation(globalVersionMap);
@@ -843,7 +847,7 @@ namespace ProofGeneration
 
               var finalProgTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_passive_prog");
               var passiveProgConfig =
-                new IsaProgramGeneratorConfig(beforePassiveProgAccess, false, false, false, true, SpecsConfig.None, false);
+                new IsaProgramGeneratorConfig(beforePassiveProgAccess, beforePassiveProgAccess==null, beforePassiveProgAccess==null, beforePassiveProgAccess==null, true, SpecsConfig.None, false);
               passiveProgAccess = new IsaProgramGenerator().GetIsaProgram(finalProgTheoryName,
                 afterPassificationImpl.Name,
                 finalProgData, passiveProgConfig, varTranslationFactory,
@@ -856,19 +860,9 @@ namespace ProofGeneration
               var afterPassificationProgTheory =
                 new Theory(finalProgTheoryName,
                   new List<string>
-                    {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
+                    {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport, beforePassiveProgAccess != null ? beforePassiveProgAccess.TheoryName() : ""},
                   programDecls);
               theories.Add(afterPassificationProgTheory);
-
-              #endregion
-              }
-            
-              #region before passive program (completion of theory construction)
-
-              var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
-                new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", theoryNameForParentImport},
-                programDeclsBeforePassive);
-              theories.Add(beforePassificationProgTheory);
 
               #endregion
             }
