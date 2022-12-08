@@ -886,6 +886,8 @@ namespace Microsoft.Boogie
           if (loopDone == null)
           {
             loopDone = new BigBlock(Token.NoToken, null, new List<Cmd>(), null, null);;
+            
+            //Set new loopDone Big block as a successor to 'b' in the original AST
             b.successorBigBlock = loopDone;
             
             //Record loop done as a successor big block in the AST to 'b'.

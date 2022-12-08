@@ -26,6 +26,7 @@ namespace ProofGeneration.CfgToDag
             IsaUniqueNamer uniqueNamer,
             bool generateEndToEndLemma,
             bool generatedAstToCfgProof,
+            bool generatePassificationProof,
             bool generateVcProof,
             Term vcAssm,
             CFGRepr beforeDagCfg,
@@ -232,7 +233,7 @@ namespace ProofGeneration.CfgToDag
                     generatedAstToCfgProof ? beforeCfgProgAccess.TheoryName() : null,
                     beforeDagProgAccess.TheoryName(),
                     afterDagProgAccess.TheoryName(), 
-                    uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.Passification)),
+                    generatePassificationProof ? uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.Passification)) : "",
                     generateVcProof ? phasesTheories.TheoryName(PhasesTheories.Phase.Vc) : ""
                 },
                 theoryOuterDecls

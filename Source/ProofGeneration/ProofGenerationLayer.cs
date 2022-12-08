@@ -83,7 +83,7 @@ namespace ProofGeneration
         private static ProofGenConfig _proofGenConfig = 
           new(false, false, false, false, true,
               false, false, false, false, 
-              true, false, false, false);
+              true, false, false, true);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -602,8 +602,10 @@ namespace ProofGeneration
             _proofGenConfig.GenerateBeforeAstCfgProg = _proofGenConfig.GenerateAstCfgProof;
             _proofGenConfig.GenerateUnoptimizedCfgProg = proofGenInfo.GetOptimizationsFlag() && _proofGenConfig.GenerateAstCfgProof;
             _proofGenConfig.GenerateBeforeCfgDagProg = (proofGenInfo.GetOptimizationsFlag() &&  _proofGenConfig.GenerateCfgDagProof) || 
-                                                       (!proofGenInfo.GetOptimizationsFlag() && (_proofGenConfig.GenerateAstCfgProof || _proofGenConfig.GenerateCfgDagProof));
-            _proofGenConfig.GenerateBeforePassifProg = _proofGenConfig.GenerateCfgDagProof || _proofGenConfig.GeneratePassifProof;
+                                                       (!proofGenInfo.GetOptimizationsFlag() && (_proofGenConfig.GenerateAstCfgProof || _proofGenConfig.GenerateCfgDagProof)) ||
+                                                       _proofGenConfig.GeneratePassifProof ||
+                                                       _proofGenConfig.GenerateVcProof;
+            _proofGenConfig.GenerateBeforePassifProg = _proofGenConfig.GenerateCfgDagProof || _proofGenConfig.GeneratePassifProof || _proofGenConfig.GenerateVcProof;
             _proofGenConfig.GeneratePassifiedProg = _proofGenConfig.GeneratePassifProof || _proofGenConfig.GenerateVcProof;
 
             IList<Block> unoptimizedCFGBlocks = proofGenInfo.GetUnpotimizedBlocks(); 
@@ -987,6 +989,7 @@ namespace ProofGeneration
                 uniqueNamer,
                 _proofGenConfig.GenerateCfgDagE2E,
                 _proofGenConfig.GenerateAstCfgProof,
+                _proofGenConfig.GeneratePassifProof,
                 _proofGenConfig.GenerateVcProof,
                 vcAssm,
                 beforeDagCfg,
