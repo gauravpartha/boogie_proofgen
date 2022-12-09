@@ -31,21 +31,23 @@ namespace ProofGeneration.CfgToDag
             var funMemThms = new List<string>();
 
             foreach (var v in varCollector.usedVars)
-                try
-                {
-                    lookupTyThms.Add(programAccessor.LookupVarTyLemma(v));
-                }
-                catch
-                {
-                    //variable not found, possible if, for example, v is bound
-                }
+            {
+              try
+              {
+                lookupTyThms.Add(programAccessor.LookupVarTyLemma(v));
+              }
+              catch
+              {
+                //variable not found, possible if, for example, v is bound
+              }
+            }
 
             var usedFuncs = functionCollector.UsedFunctions(e);
             foreach (var f in usedFuncs) funMemThms.Add(programAccessor.MembershipLemma(f));
 
-            var hintLemmas = equalityHintGenerator.GetHints(e);
-
-            var hintsML = MLUtil.IsaToMLThms(hintLemmas.Select(lemma => lemma.Name));
+            var lemmasAndHints = equalityHintGenerator.GetHints(e);
+            
+            var hintsML = lemmasAndHints.Item2;
             var lookupTyML = MLUtil.IsaToMLThms(lookupTyThms);
             var funMemML = MLUtil.IsaToMLThms(funMemThms);
 
@@ -59,7 +61,7 @@ namespace ProofGeneration.CfgToDag
 
             var tactic = ProofUtil.Apply(ProofUtil.MLTactic("typing_tac " + string.Join(" ", args), 1));
 
-            return Tuple.Create(tactic, hintLemmas);
+            return Tuple.Create(tactic, lemmasAndHints.Item1);
         }
     }
 }
