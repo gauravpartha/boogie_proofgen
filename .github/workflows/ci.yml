@@ -1,0 +1,43 @@
+name: Boogie Proof Generation CI
+
+on:
+  push:
+    branches: [ master, staging, trying ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  Z3_VERSION: 4.8.8
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.6'
+
+      - name: Get Z3 
+        run: |
+          wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-x64-ubuntu-16.04.zip
+          unzip z3-*.zip
+          echo $(find $PWD/z3* -name bin -type d)>> $GITHUB_PATH
+
+      - name: Compile Boogie proof generation
+        run: |
+          dotnet build -c Release Source/Boogie.sln
+          BOOGIE_EXE=$(find . -type f -name "BoogieDriver.exe")
+          echo $BOOGIE_EXE
