@@ -39,5 +39,8 @@ jobs:
       - name: Compile Boogie proof generation
         run: |
           dotnet build -c Release Source/Boogie.sln
-          find . -type f -name bin "BoogieDriver.exe"
           echo $(find . -type f -name bin "BoogieDriver.exe") >> $GITHUB_PATH
+
+      - name: Generate proofs
+        run: |
+          BoogieDriver
