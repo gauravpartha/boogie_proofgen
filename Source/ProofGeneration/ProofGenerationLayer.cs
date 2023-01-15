@@ -867,7 +867,7 @@ namespace ProofGeneration
               #endregion
             }
 
-            var phasesTheories = new PhasesTheories(afterPassificationImpl.Name);
+            var phasesTheories = new PhasesTheories(uniqueNamer.GetName(afterPassificationImpl.Name));
             Term vcAssm = null;
             LemmaDecl endToEndLemma = null;
 
@@ -948,7 +948,7 @@ namespace ProofGeneration
                 : beforeAstToCfgProgAccess;
 
               var passificationProofTheory = PassificationManager.PassificationProof(
-                uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.Passification)),
+                phasesTheories.TheoryName(PhasesTheories.Phase.Passification),
                 _proofGenConfig.GenerateVcProof ? phasesTheories.TheoryName(PhasesTheories.Phase.Vc) : "",
                 _proofGenConfig.GeneratePassifE2E,
                 endToEndLemma,
@@ -980,7 +980,6 @@ namespace ProofGeneration
 
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
-                uniqueNamer,
                 _proofGenConfig.GenerateCfgDagE2E,
                 _proofGenConfig.GenerateAstCfgProof,
                 _proofGenConfig.GeneratePassifProof,
@@ -1062,7 +1061,7 @@ namespace ProofGeneration
               }
 
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
-                uniqueNamer.GetName(phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg)),
+                phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg),
                 phasesTheories,
                 _proofGenConfig.GenerateAstCfgE2E,
                 _proofGenConfig,
