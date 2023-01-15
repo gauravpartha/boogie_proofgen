@@ -59,6 +59,7 @@ jobs:
       # add Boogie language session to ROOTS and create heap image (option -b)
       # for the session so that it does not have to rechecked every time
       - name: Set up Isabelle Boogie language session
+        run: |
           echo "$PWD/foundational_boogie/BoogieLang" >> isabelle_dir/ROOTS
           isabelle_dir/bin/isabelle build -b -j4 -d $PWD/foundational_boogie/BoogieLang Boogie_Lang
           
