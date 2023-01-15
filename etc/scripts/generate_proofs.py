@@ -1,12 +1,8 @@
 import os
 import subprocess
-from datetime import datetime
 import argparse
 
-# The following command should point to the Boogie proof generation binary 
-boogie_proofgen_bin = "boogieproof"
-
-def generate_proofs(input_dir, output_dir):
+def generate_proofs(input_dir, output_dir, boogie_proofgen_bin):
     n_success = 0
     n_failure = 0
 
@@ -30,7 +26,7 @@ def generate_proofs(input_dir, output_dir):
                 else:
                     print("Could not generate proofs for: " + boogie_file_path)
                     n_failure += 1
-                    exit()
+                    exit(1)
                     
     print("Generated proofs for " + str(n_success) + " tests")
     print("Could not generate proofs for " + str(n_failure) + " tests")
@@ -49,6 +45,12 @@ def main():
         required=True
     )
 
+    parser.add_argument(
+        "-b", "--boogieproofExe",
+        help="path to Boogie proof generation executable",
+        default="boogieproof"
+    )
+
     args = parser.parse_args()
 
     if (not(os.path.isdir(args.inputdir))):
@@ -58,8 +60,8 @@ def main():
     if (os.path.exists(args.outputdir)):
         print("The desired path " +  args.outputdir + " for the output directory already exists")
         exit(1)
-
-    generate_proofs(args.inputdir, args.outputdir)
+    
+    generate_proofs(args.inputdir, args.outputdir, args.boogieproof)
 
 if __name__ == '__main__':
     main()

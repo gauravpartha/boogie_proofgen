@@ -39,13 +39,10 @@ jobs:
       - name: Compile Boogie proof generation
         run: |
           dotnet build -c Release Source/Boogie.sln
-      
-      - name: Path Try
-        run: |
-          echo $(find $PWD -type f -name "BoogieDriver") 
-          echo $(find $PWD -type f -name "BoogieDriver") >> $GITHUB_PATH
-          cat $GITHUB_PATH
 
       - name: Generate proofs
         run: |
-          BoogieDriver
+          BOOGIE_EXE=$(find $PWD -type f -name "BoogieDriver") 
+          python3 etc/scripts/generate_proofs.py --inputdir ProofGenerationBenchmarks/external_benchmarks/modifie
+d --outputdir table_benchmarks_proofs --boogieproofExe $BOOGIE_EXE
+          
