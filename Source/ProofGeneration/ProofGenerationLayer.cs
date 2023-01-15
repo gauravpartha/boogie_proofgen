@@ -81,9 +81,9 @@ namespace ProofGeneration
         private static Block uniqueExitBlockOrig;
 
         private static ProofGenConfig _proofGenConfig = 
-          new(false, false, false, false, false,
-              false, false, false, false, 
-              false, false, true, false);
+          new(true, true, true, true, true,
+              true, true, true, true, 
+              true, true, true, true);
 
         private static IProgramAccessor globalDataProgAccess;
 
