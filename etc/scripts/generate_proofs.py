@@ -47,7 +47,7 @@ def main():
 
     parser.add_argument(
         "-b", "--boogieproofExe",
-        help="path to Boogie proof generation executable",
+        help="Path to Boogie proof generation executable (must be an absolute path or a command that can be executed from any directory)",
         default="boogieproof"
     )
 
@@ -61,7 +61,7 @@ def main():
         print("The desired path " +  args.outputdir + " for the output directory already exists")
         exit(1)
     
-    generate_proofs(args.inputdir, args.outputdir, args.boogieproof)
+    generate_proofs(args.inputdir, args.outputdir, args.boogieproofExe)
 
 if __name__ == '__main__':
     main()
