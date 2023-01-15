@@ -513,10 +513,8 @@ namespace Microsoft.Boogie
       ProofGenSubsetChecker proofGenSubsetChecker = new ProofGenSubsetChecker();
       if (!proofGenSubsetChecker.ProofGenPotentiallySupportsSubset(program, out object resultNode))
       {
-        if(!CommandLineOptions.Clo.OnlyCheckProofGenSupport)
-          Console.WriteLine("Proof generation does not support this program, because of node " + resultNode);
-        
-        Environment.Exit(0);
+        Console.WriteLine("Proof generation does not support this program, because of node " + resultNode);
+        Environment.Exit(1);
       } else if (CommandLineOptions.Clo.OnlyCheckProofGenSupport)
       {
         Console.WriteLine("Success:" + bplFileName);

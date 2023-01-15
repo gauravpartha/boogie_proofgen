@@ -22,6 +22,16 @@ namespace Isabelle.ML
             return MLList(e, n => n);
         }
 
+        public static string MLSome(string val)
+        {
+          return "(SOME " + val+")";
+        }
+
+        public static string MLNone()
+        {
+          return "NONE";
+        }
+
         public static string MLList<T>(IEnumerable<T> e, Func<T, string> stringReprFun)
         {
             var sb = new StringBuilder();
