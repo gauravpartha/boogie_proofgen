@@ -42,8 +42,8 @@ jobs:
       
       - name: Path Try
         run: |
-          echo $(find . -type f -name "BoogieDriver.exe") 
-          echo $(find . -type f -name "BoogieDriver.exe") >> $GITHUB_PATH
+          echo $(find . -type f -name "BoogieDriver") 
+          echo $(find . -type f -name "BoogieDriver") >> $GITHUB_PATH
 
       - name: Generate proofs
         run: |
