@@ -57,11 +57,8 @@ jobs:
           isabelle_dir/bin/isabelle version
           echo isabelle_dir/bin >> $GITHUB_PATH
 
-        # add Boogie formalization session to ROOTS
           echo "$PWD/foundational_boogie/BoogieLang" >> isabelle_dir/ROOTS
 
-        # create heap image (option -b) for Boogie language formalization session
-        # so that session does not have to be re-checked every time
           isabelle_dir/bin/isabelle build -b -j4 -d $PWD/foundational_boogie/BoogieLang Boogie_Lang
           
       - name: Check external benchmark proofs
