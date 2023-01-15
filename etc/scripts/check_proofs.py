@@ -58,6 +58,9 @@ def check_proofs(input_folder, n_reps):
         print("Succeeded: " + str(n_success))
         print("Failed: " + str(n_failure))
 
+        if n_failure > 0:
+            exit(1)
+
 def main():
     parser = argparse.ArgumentParser()
 

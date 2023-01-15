@@ -1,0 +1,3 @@
+[submodule "foundational_boogie"]
+	path = foundational_boogie
+	url = https://github.com/gauravpartha/foundational_boogie

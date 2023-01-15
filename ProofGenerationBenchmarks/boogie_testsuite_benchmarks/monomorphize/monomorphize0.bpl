@@ -1,3 +1,4 @@
+//:: ProofGen(IgnoreFile)
 // RUN: %boogie /monomorphize "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 

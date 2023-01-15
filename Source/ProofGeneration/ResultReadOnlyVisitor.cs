@@ -18,7 +18,7 @@ namespace ProofGeneration
 
         protected abstract bool TranslatePrecondition(Absy node);
 
-        public T Translate(Absy node)
+        public virtual T Translate(Absy node)
         {
             if (!StateIsFresh()) throw new ProofGenUnexpectedStateException(GetType());
             Contract.Assert(TranslatePrecondition(node));
