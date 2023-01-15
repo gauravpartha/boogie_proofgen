@@ -18,7 +18,9 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'true'
 
       - name: Setup dotnet
         uses: actions/setup-dotnet@v1
@@ -32,6 +34,7 @@ jobs:
 
       - name: Get Z3 
         run: |
+          ls
           wget --quiet https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-x64-ubuntu-16.04.zip
           unzip z3-*.zip
           echo $(find $PWD/z3* -name bin -type d)>> $GITHUB_PATH
@@ -54,7 +57,12 @@ jobs:
           isabelle_dir/bin/isabelle version
           echo isabelle_dir/bin >> $GITHUB_PATH
 
+        # add Boogie formalization session to ROOTS
           echo "$PWD/foundational_boogie/BoogieLang" >> isabelle_dir/ROOTS
+
+        # create heap image (option -b) for Boogie language formalization session
+        # so that session does not have to be re-checked every time
+          isabelle_dir/bin/isabelle build -b -j4 -d $PWD/foundational_boogie/BoogieLang Boogie_Lang
           
       - name: Check external benchmark proofs
         run: |
