@@ -1,3 +1,4 @@
+//:: ProofGen(IgnoreFile)
 // Z3 4.1: /trace /proverOpt:O:smt.mbqi=true /proverOpt:O:smt.relevancy=0
 function  xor(a: bool, b: bool) returns (bool)  { (!a && b) || (a && !b) }
 

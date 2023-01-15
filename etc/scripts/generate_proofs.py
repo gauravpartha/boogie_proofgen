@@ -5,6 +5,7 @@ import argparse
 def generate_proofs(input_dir, output_dir, boogie_proofgen_bin):
     n_success = 0
     n_failure = 0
+    n_ignored = 0
 
     # turn input directory path into an absolute path, since we are going to 
     # change the working directory
@@ -17,19 +18,28 @@ def generate_proofs(input_dir, output_dir, boogie_proofgen_bin):
         for file in files:
             if file.endswith('.bpl'):
                 boogie_file_path = os.path.join(root, file)
-            
-                # check whether Boogie can produce certificates
-                errorcode = subprocess.run([boogie_proofgen_bin, boogie_file_path],stdout=subprocess.DEVNULL)
-                if(errorcode.returncode == 0):
-                    print("Generated proofs for: " + boogie_file_path)
-                    n_success += 1
-                else:
-                    print("Could not generate proofs for: " + boogie_file_path)
-                    n_failure += 1
-                    exit(1)
+
+                with open(boogie_file_path) as f:
+                    first_line = f.readline().strip('\n')
+                    if(first_line != "//:: ProofGen(IgnoreFile)"):
+                        # check whether Boogie can produce certificates
+                        errorcode = subprocess.run([boogie_proofgen_bin, boogie_file_path],stdout=subprocess.DEVNULL)
+                        if(errorcode.returncode == 0):
+                            print("Generated proofs for: " + boogie_file_path)
+                            n_success += 1
+                        else:
+                            print("Could not generate proofs for: " + boogie_file_path)
+                            n_failure += 1
+                            exit(1)
+                    else:
+                        #ignore file
+                        print("Ignored :" + boogie_file_path)
+                        n_ignored += 1
+                        pass
                     
     print("Generated proofs for " + str(n_success) + " tests")
     print("Could not generate proofs for " + str(n_failure) + " tests")
+    print("Ignored " + str(n_ignored) + " tests")
 
 def main():
     parser = argparse.ArgumentParser()
