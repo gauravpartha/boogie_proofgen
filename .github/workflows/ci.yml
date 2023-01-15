@@ -34,7 +34,6 @@ jobs:
 
       - name: Get Z3 
         run: |
-          ls
           wget --quiet https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-x64-ubuntu-16.04.zip
           unzip z3-*.zip
           echo $(find $PWD/z3* -name bin -type d)>> $GITHUB_PATH
@@ -48,7 +47,7 @@ jobs:
           BOOGIE_EXE=$(find $PWD -type f -name "BoogieDriver") 
           python3 etc/scripts/generate_proofs.py --inputdir ProofGenerationBenchmarks/external_benchmarks/modified --outputdir table_benchmarks_proofs --boogieproofExe $BOOGIE_EXE
 
-      - name: Download and install Isabelle
+      - name: Get Isabelle
         run: |
           wget --quiet https://isabelle.in.tum.de/website-Isabelle2021-1/dist/Isabelle2021-1_linux.tar.gz
           tar -xf Isabelle2021-1_linux.tar.gz
@@ -57,14 +56,21 @@ jobs:
           isabelle_dir/bin/isabelle version
           echo isabelle_dir/bin >> $GITHUB_PATH
 
+      # add Boogie language session to ROOTS and create heap image (option -b)
+      # for the session so that it does not have to rechecked every time
+      - name: Set up Isabelle Boogie language session
           echo "$PWD/foundational_boogie/BoogieLang" >> isabelle_dir/ROOTS
-
           isabelle_dir/bin/isabelle build -b -j4 -d $PWD/foundational_boogie/BoogieLang Boogie_Lang
           
       - name: Check external benchmark proofs
         run: |
-          python3 etc/scripts/check_proofs.py --inputdir table_benchmarks_proofs 
+          python3 etc/scripts/check_proofs.py --inputdir table_benchmarks_proofs --reps 1
       
       - name: Generate Boogie benchmark proofs
         run: |
-          echo "placeholder"
+          BOOGIE_EXE=$(find $PWD -type f -name "BoogieDriver") 
+          python3 etc/scripts/generate_proofs.py --inputdir ProofGenerationBenchmarks/boogie_testsuite_benchmarks --outputdir boogie_benchmarks_proofs --boogieproofExe $BOOGIE_EXE
+
+      - name: Check Boogie benchmark proofs
+        run: |
+          python3 etc/scripts/check_proofs.py --inputdir boogie_benchmarks_proofs --reps 1
