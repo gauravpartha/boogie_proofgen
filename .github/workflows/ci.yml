@@ -44,7 +44,7 @@ jobs:
         run: |
           echo $(find $PWD -type f -name "BoogieDriver") 
           echo $(find $PWD -type f -name "BoogieDriver") >> $GITHUB_PATH
-          echo $GITHUB_PATH
+          cat $GITHUB_PATH
 
       - name: Generate proofs
         run: |
