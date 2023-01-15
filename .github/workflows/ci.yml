@@ -43,6 +43,5 @@ jobs:
       - name: Generate proofs
         run: |
           BOOGIE_EXE=$(find $PWD -type f -name "BoogieDriver") 
-          python3 etc/scripts/generate_proofs.py --inputdir ProofGenerationBenchmarks/external_benchmarks/modifie
-d --outputdir table_benchmarks_proofs --boogieproofExe $BOOGIE_EXE
+          python3 etc/scripts/generate_proofs.py --inputdir ProofGenerationBenchmarks/external_benchmarks/modified --outputdir table_benchmarks_proofs --boogieproofExe $BOOGIE_EXE
           
