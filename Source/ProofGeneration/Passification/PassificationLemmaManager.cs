@@ -38,6 +38,7 @@ namespace ProofGeneration.Passification
         private readonly IVariableTranslation<Variable> passiveVarTranslation;
 
         private readonly IProgramAccessor programAccessor;
+        private readonly IProgramAccessor beforePhaseProgramAccessor;
 
         private readonly Dictionary<Block, int> smallestRequiredVersionDict = new Dictionary<Block, int>();
         private readonly TermIdent stateRel = IsaCommonTerms.TermIdentFromName("R");
@@ -49,6 +50,7 @@ namespace ProofGeneration.Passification
         public PassificationLemmaManager(
             CFGRepr cfg,
             IDictionary<Block, Block> origToPassiveBlock,
+            IProgramAccessor beforePhaseProgramAccessor,
             IProgramAccessor programAccessor,
             IProgramAccessor passiveProgramAccessor,
             Tuple<string, string> varContextNonPassivePassive,
@@ -59,6 +61,7 @@ namespace ProofGeneration.Passification
         {
             this.cfg = cfg;
             this.origToPassiveBlock = origToPassiveBlock;
+            this.beforePhaseProgramAccessor = beforePhaseProgramAccessor;
             this.programAccessor = programAccessor;
             this.passiveProgramAccessor = passiveProgramAccessor;
             _oldStateRelationData = oldStateRelationData;
@@ -113,7 +116,7 @@ namespace ProofGeneration.Passification
                              * in which case the variable is not newly constrained */
                             if (!tuple.Item3) constrainedPassiveVars.Add(passiveVarTerm);
                             lookupTyUpdatesLemmas.Add(
-                                Tuple.Create(programAccessor.LookupVarTyLemma(origVar),
+                                Tuple.Create(beforePhaseProgramAccessor.LookupVarTyLemma(origVar),
                                     passiveProgramAccessor.LookupVarTyLemma(passiveVar))
                             );
                         }

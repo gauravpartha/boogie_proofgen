@@ -43,11 +43,13 @@ namespace ProofGeneration.Passification
         private StateRelationData oldRelationData;
         private IProgramAccessor passiveProgramAccessor;
 
+        private IProgramAccessor beforePhaseProgramAccessor;
+
         private TermIdent passiveVarContext;
         private IProgramAccessor programAccessor;
         private IVariableTranslation<Variable> varTranslation;
         private Term vcAssm;
-
+        
         public PassificationEndToEnd()
         {
             stateRelList = IsaCommonTerms.TermIdentFromName(stateRelListDefName);
@@ -58,6 +60,7 @@ namespace ProofGeneration.Passification
             string entryCfgLemma,
             string boogieToVcLemma,
             Term vcAssm,
+            IProgramAccessor beforePhaseProgramAccessor,
             IProgramAccessor programAccessor,
             IProgramAccessor passiveProgramAccessor,
             Tuple<string, string> varContextNonPassivePassive,
@@ -69,6 +72,7 @@ namespace ProofGeneration.Passification
             this.entryCfgLemma = entryCfgLemma;
             this.boogieToVcLemma = boogieToVcLemma;
             this.vcAssm = vcAssm;
+            this.beforePhaseProgramAccessor = beforePhaseProgramAccessor;
             this.programAccessor = programAccessor;
             this.passiveProgramAccessor = passiveProgramAccessor;
             boogieContext = new BoogieContextIsa(
@@ -167,7 +171,7 @@ namespace ProofGeneration.Passification
 
             foreach (var idVar in varIds)
                 relWfProofMethods.Add(
-                    ProofUtil.Apply(ProofUtil.Simp(programAccessor.LookupVarTyLemma(idVar.Item2),
+                    ProofUtil.Apply(ProofUtil.Simp(beforePhaseProgramAccessor.LookupVarTyLemma(idVar.Item2),
                         passiveProgramAccessor.LookupVarTyLemma(idVar.Item2)))
                 );
 
@@ -440,7 +444,7 @@ namespace ProofGeneration.Passification
             var multiRed = IsaBoogieTerm.RedCFGMulti(
                 BoogieContextIsa.CreateWithNewVarContext(
                     boogieContext,
-                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())
+                    new TermTuple(beforePhaseProgramAccessor.ConstsAndGlobalsDecl(), beforePhaseProgramAccessor.ParamsAndLocalsDecl())
                 ),
                 programAccessor.CfgDecl(),
                 IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)),

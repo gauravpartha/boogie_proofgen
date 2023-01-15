@@ -29,7 +29,9 @@ namespace ProofGeneration.CfgToDag
         private readonly string redAssmName = "Red";
         private readonly string vcAssmName = "VC";
         private BoogieContextIsa boogieContext;
+        
         private IProgramAccessor programAccessor;
+        private IProgramAccessor beforeCfgProgramAccessor;
 
         private readonly string varContextName = "\\<Lambda>0";
 
@@ -38,9 +40,15 @@ namespace ProofGeneration.CfgToDag
             string passificationEndToEndLemma,
             Term vcAssm,
             IProgramAccessor programAccessor,
+            IProgramAccessor beforeCfgProgramAccessor,
             CFGRepr cfg)
         {
+            // both program accessors are needed because the End-to-End lemmas for the CFG-to-VC part 
+            // need to have access to the 'before AST-to-CFG' program as well as the 'before CFG-to-DAG' program, 
+            // so that the AST-to-VC End-to-End lemma can be composed.
             this.programAccessor = programAccessor;
+            this.beforeCfgProgramAccessor = beforeCfgProgramAccessor;
+            
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
                 IsaCommonTerms.TermIdentFromName("M"),
@@ -52,14 +60,14 @@ namespace ProofGeneration.CfgToDag
             var abbrev = new AbbreviationDecl(
                 varContextName,
                 new Tuple<IList<Term>, Term>(new List<Term>(),
-                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl()))
+                    new TermTuple(beforeCfgProgramAccessor.ConstsAndGlobalsDecl(), beforeCfgProgramAccessor.ParamsAndLocalsDecl()))
             );
             var result = new List<OuterDecl> {abbrev};
 
             var kStepRed = IsaBoogieTerm.RedCFGKStep(
                 BoogieContextIsa.CreateWithNewVarContext(
                     boogieContext,
-                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())
+                    new TermTuple(beforeCfgProgramAccessor.ConstsAndGlobalsDecl(), beforeCfgProgramAccessor.ParamsAndLocalsDecl())
                 ),
                 programAccessor.CfgDecl(),
                 IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)),
@@ -109,7 +117,7 @@ namespace ProofGeneration.CfgToDag
                 new LemmaDecl(
                     helperLemmaName,
                     LemmaContext(cfg, vcAssm),
-                    CfgToDagLemmaManager.CfgLemmaConclusion(boogieContext, programAccessor.PostconditionsDecl(),
+                    CfgToDagLemmaManager.CfgLemmaConclusion(boogieContext, beforeCfgProgramAccessor.PostconditionsDecl(),
                         finalNodeOrReturn, finalState),
                     new Proof(new List<string> {proofSb.ToString()})
                 );
@@ -132,12 +140,26 @@ namespace ProofGeneration.CfgToDag
                             ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util",helperLemmaName))),
                             "apply assumption " + "using VC apply simp " + " apply assumption+",
                             ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
-                                             programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def")
+                                             programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def " +
+                                             programAccessor.PreconditionsDeclName() + "_def " + programAccessor.PostconditionsDeclName() + "_def " +
+                                             programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.PreconditionsDeclName() + "_def " + beforeCfgProgramAccessor.PostconditionsDeclName() + "_def " +
+                                             beforeCfgProgramAccessor.ParamsDecl() + "_def " + beforeCfgProgramAccessor.LocalsDecl() + "_def " +
+                                             
+                                             beforeCfgProgramAccessor.FunctionsDecl() + "_def " + programAccessor.FunctionsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.AxiomsDecl() + "_def " + programAccessor.AxiomsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.ConstsDecl() + "_def " + programAccessor.ConstsDecl() + "_def " +
+                                             beforeCfgProgramAccessor.GlobalsDecl() + "_def " + programAccessor.GlobalsDecl() + "_def " +
+                                             "exprs_to_only_checked_spec_def")
                         }
                     ) );
+
+            if (!ProofGenerationLayer.GenerateAstCfgE2E())
+            {
+              result.Add(endToEndLemma);
+            }
             
-            result.Add(endToEndLemma);
-            return result;
+            return result; 
         }
 
         private ContextElem LemmaContext(
@@ -148,7 +170,7 @@ namespace ProofGeneration.CfgToDag
             var multiRed = IsaBoogieTerm.RedCFGMulti(
                 BoogieContextIsa.CreateWithNewVarContext(
                     boogieContext,
-                    new TermTuple(programAccessor.ConstsAndGlobalsDecl(), programAccessor.ParamsAndLocalsDecl())
+                    new TermTuple(beforeCfgProgramAccessor.ConstsAndGlobalsDecl(), beforeCfgProgramAccessor.ParamsAndLocalsDecl())
                 ),
                 programAccessor.CfgDecl(),
                 IsaBoogieTerm.CFGConfigNode(new NatConst(cfg.GetUniqueIntLabel(cfg.entry)),
@@ -157,14 +179,14 @@ namespace ProofGeneration.CfgToDag
             );
             var closedAssm = EndToEndAssumptions.ClosednessAssumption(boogieContext.absValTyMap);
             var nonEmptyTypesAssm = EndToEndAssumptions.NonEmptyTypesAssumption(boogieContext.absValTyMap);
-            var finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, programAccessor.FunctionsDecl(),
+            var finterpAssm = IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, beforeCfgProgramAccessor.FunctionsDecl(),
                 boogieContext.funContext);
             var absValType = new VarType("a");
             //need to explicitly give type for normal state, otherwise Isabelle won't know that the abstract value type is the same as used in the VC
-            var axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, programAccessor,
+            var axiomAssm = EndToEndAssumptions.AxiomAssumption(boogieContext, beforeCfgProgramAccessor,
                 new TermWithExplicitType(normalInitState, IsaBoogieType.NormalStateType(absValType)));
             var presAssm =
-                IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState, programAccessor.PreconditionsDecl());
+                IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState, beforeCfgProgramAccessor.PreconditionsDecl());
             var localsAssm = EndToEndAssumptions.LocalStateAssumption(boogieContext,
                 IsaCommonTerms.Snd(boogieContext.varContext), normalInitState);
             var globalsAssm = EndToEndAssumptions.GlobalStateAssumption(boogieContext,
@@ -192,19 +214,21 @@ namespace ProofGeneration.CfgToDag
             Term procedure)
         {
             var typeInterpId = new SimpleIdentifier("A");
-            return 
-                TermQuantifier.MetaAll(
-                    new List<Identifier>{ typeInterpId},
-                    null,
-                    new TermApp(
-                IsaCommonTerms.TermIdentFromName("proc_is_correct"),
-                //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
-                new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
-                funDecls,
-                constantDecls,
-                globalDecls,
-                axioms,
-                procedure));
+            return
+              TermQuantifier.MetaAll(
+                new List<Identifier> {typeInterpId},
+                null,
+                new TermApp(
+                  IsaCommonTerms.TermIdentFromName("Semantics.proc_is_correct"),
+                  //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
+                  new TermWithExplicitType(new TermIdent(typeInterpId), 
+                    IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
+                  funDecls,
+                  constantDecls,
+                  globalDecls,
+                  axioms,
+                  procedure,
+                  IsaBoogieTerm.SematicsProcSpecSatisfied));
         }
     }
 }

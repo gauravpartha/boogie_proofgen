@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Isabelle.Ast;
 using Isabelle.Util;
@@ -8,53 +10,19 @@ using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.ASTRepresentation;
 using ProofGeneration.Util;
 
 namespace ProofGeneration
 {
-    public enum SpecsConfig
-    {
-        None, AllPreCheckedPost, All
-    }
-    public class IsaProgramGeneratorConfig
-    {
-        public readonly bool generateAxioms;
-        public readonly bool generateFunctions;
-        public readonly bool generateGlobalsAndConstants;
-        public readonly bool generateParamsAndLocals;
-        public readonly SpecsConfig specsConfig;
-        public readonly bool generateVarContextWfLemma;
-        public readonly IProgramAccessor parentAccessor;
-        
-        public IsaProgramGeneratorConfig(
-            IProgramAccessor parent,
-            bool generateFunctions,
-            bool generateAxioms,
-            bool generateGlobalsAndConstants,
-            bool generateParamsAndLocals,
-            SpecsConfig specsConfig,
-            bool generateVarContextWfLemma
-        )
-        {
-            parentAccessor = parent;
-            this.generateFunctions = generateFunctions;
-            this.generateAxioms = generateAxioms;
-            this.specsConfig = specsConfig;
-            this.generateGlobalsAndConstants = generateGlobalsAndConstants;
-            this.generateParamsAndLocals = generateParamsAndLocals;
-            this.generateVarContextWfLemma = generateVarContextWfLemma;
-        }
-    }
-
-    internal class IsaProgramGenerator
+  internal class IsaProgramGeneratorForAst
     {
         private MultiCmdIsaVisitor cmdIsaVisitor;
         private BoogieVariableTranslation varTranslation;
         private IVariableTranslationFactory varTranslationFactory;
         
-        private readonly string nodeToBlocksName = "node_to_blocks";
-        private readonly string cfgName = "proc_body";
-        private readonly string procDefName = "proc";
+        private readonly string astName = "proc_body";
+        private readonly string procDefName = "ast_proc";
 
         public IProgramAccessor GetIsaProgram(
             string theoryName,
@@ -62,7 +30,9 @@ namespace ProofGeneration
             BoogieMethodData methodData,
             IsaProgramGeneratorConfig config,
             IVariableTranslationFactory varTranslationFactory,
-            CFGRepr cfg,
+            ASTRepr ast,
+            ASTRepr originalAst,
+            AstToCfgProofGenInfo proofGenInfo,
             IsaUniqueNamer uniqueNamer,
             out IList<OuterDecl> decls,
             bool generateMembershipLemmas,
@@ -72,21 +42,6 @@ namespace ProofGeneration
             this.varTranslationFactory = varTranslationFactory;
             varTranslation = varTranslationFactory.CreateTranslation();
             cmdIsaVisitor = new MultiCmdIsaVisitor(varTranslationFactory);
-
-            /*
-            Term program = IsaBoogieTerm.Program(IsaCommonTerms.TermIdentFromName(funcs.name),
-                new TermList(new List<Term>()),
-                new TermList(new List<Term>()),
-                IsaCommonTerms.TermIdentFromName(axiomsDecl.name),
-                new List<Term>() { method });
-
-            var list = new List<Tuple<IList<Term>, Term>>
-            {
-                new Tuple<IList<Term>, Term>(new List<Term>(), program)
-            };
-            */
-
-            //OuterDecl programDefinition = new DefDecl("ProgramM", new Tuple<IList<Term>, Term>(new List<Term>(), program));
 
             decls = new List<OuterDecl>();
             var isaGlobalProgramRepr = new IsaGlobalProgramRepr(
@@ -109,40 +64,47 @@ namespace ProofGeneration
             }
             else
             {
-                var outEdges = GetOutEdgesIsa(procName, cfg, out var edgeLemmas);
-                var blockInfo = BlockToInfo(theoryName, procName, cfg, edgeLemmas);
+                var bigblockInfo = BigBlockToInfo(theoryName, ast, proofGenInfo);
                 var isaProgramRepr = new IsaProgramRepr(
                     isaGlobalProgramRepr,
                     PreconditionDeclarationName(),
                     PostconditionDeclarationName(),
                     VariableDeclarationsName("params"),
                     VariableDeclarationsName("locals"),
-                    cfgName,
+                    astName,
                     procDefName);
-                membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, blockInfo, null,
+                membershipLemmaManager = new MembershipLemmaManager(config, isaProgramRepr, null, bigblockInfo,
                 Tuple.Create(globalsMax, localsMin), varTranslationFactory, theoryName);
                 
-                var nodesToBlocks = GetNodeToBlocksIsa(cfg, blockInfo.BlockCmdsDefs);
+                foreach (var decl_list in bigblockInfo.BigBlockDefs.Values)
+                {
+                  decls.AddRange(decl_list);
+                }
 
-                decls.AddRange(blockInfo.BlockCmdsDefs.Values);
-                
-                Term entry = new IntConst(BigNum.FromInt(cfg.GetUniqueIntLabel(cfg.entry)));
-                var methodBodyCFG =
-                    IsaBoogieTerm.MethodCFGBody(
-                        entry, IsaCommonTerms.TermIdentFromName(outEdges.Name),
-                        IsaCommonTerms.TermIdentFromName(nodesToBlocks.Name)
-                    );
+                IList<OuterDecl> continuations = getContinuations(originalAst, proofGenInfo);
+                decls.AddRange(continuations);
 
-                var methodBodyDecl = GetMethodBodyCFGDecl(procName, methodBodyCFG);
+                IList<Term> bigblock_terms = new List<Term>();
+                IEnumerable<BigBlock> bigblocks = ast.GetBlocksBackwards();
+                foreach (BigBlock b in bigblocks)
+                {
+                  Term b_term = IsaCommonTerms.TermIdentFromName("bigblock_" + ast.GetUniqueIntLabel(b));
+                  if (proofGenInfo.GetMappingCopyBigBlockToMarker()[b])
+                  {
+                    bigblock_terms.Add(b_term); 
+                  }
+                }
+
+                bigblock_terms = Enumerable.Reverse(bigblock_terms).ToList();
+                var methodBodyAST = IsaBoogieTerm.MethodASTBody(bigblock_terms);
+
+                var methodBodyDecl = GetMethodBodyASTDecl(procName, methodBodyAST);
                 decls.AddRange(
                     new List<OuterDecl>
                     {
-                        outEdges, nodesToBlocks, methodBodyDecl
+                       methodBodyDecl
                     });
 
-                decls.AddRange(blockInfo.BlockCmdsLemmas.Values);
-                decls.AddRange(blockInfo.BlockOutEdgesLemmas.Values);
-                
                 if (config.specsConfig != SpecsConfig.None)
                 {
                     OuterDecl preconditions;
@@ -217,18 +179,10 @@ namespace ProofGeneration
             var axiomsExpr = new List<Term>();
             foreach (var ax in axioms)
             {
-                string test1 = ax.Expr.ToString();
                 var axTerms = cmdIsaVisitor.Translate(ax.Expr);
-
                 if (axTerms.Count != 1)
                     throw new ProofGenUnexpectedStateException(GetType(), "axiom not translated into single term");
-                
-                if (axTerms.First().ToString().Contains("fun"))
-                {
-                  string test = axTerms.First().ToString();
-                }
-                
-                axiomsExpr.Add( IsaCommonTerms.TermIdentFromName(uniqueNamer.RemoveApostrophe(axTerms.First().ToString()) ) );
+                axiomsExpr.Add(IsaCommonTerms.TermIdentFromName(uniqueNamer.RemoveApostrophe(axTerms.First().ToString())));
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(axiomsExpr));
@@ -273,110 +227,128 @@ namespace ProofGeneration
             
             Term method = new TermRecord(mapping);
 
-            DefDecl methodDef = DefDecl.CreateWithoutArg(procDefName, IsaBoogieType.ProcedureType(), method);
+            DefDecl methodDef = DefDecl.CreateWithoutArg(procDefName, IsaBoogieType.AstProcedureType(), method);
             return methodDef;
         }
 
-        private IsaBlockInfo BlockToInfo(string theoryName, string methodName, CFGRepr cfg,
-            Dictionary<Block, LemmaDecl> edgeLemmas)
+        private IsaBigBlockInfo BigBlockToInfo(string theoryName, ASTRepr ast, AstToCfgProofGenInfo proofGenInfo)
         {
-            //TODO: redundant to have extra indexing map, re-use labelling map
-            var blockToCounter = new Dictionary<Block, int>();
-            var blockToDecl = new Dictionary<Block, OuterDecl>();
-            var blockToNodesLemmas = new Dictionary<Block, LemmaDecl>();
+            var blockToDecl = new Dictionary<BigBlock, IList<DefDecl>>();
+            var blockToCounter = new Dictionary<BigBlock, int>();
+            
+            BigBlockTermBuilder builder = new BigBlockTermBuilder();
 
-            var cfgTerm = IsaCommonTerms.TermIdentFromName(cfgName);
-            var cfgDef = cfgName + "_def";
-            var nodeToBlockDef = nodeToBlocksName + "_def";
-
-            foreach (var b in cfg.GetBlocksBackwards())
+            foreach (BigBlock b in ast.GetBlocksBackwards())
             {
-                //left side of equation is block number expressed using constructors
-                //right side of equation is command
-                var translatedBlocks = cmdIsaVisitor.Translate(b.Cmds);
-                var blockDecl = DefDecl.CreateWithoutArg("block_" + cfg.GetUniqueIntLabel(b),
-                    new TermList(translatedBlocks));
-                blockToDecl.Add(b, blockDecl);
-
-                var blockLabel = cfg.GetUniqueIntLabel(b);
-
-                // nodes lemma
+                int flag = 0;
+                if (proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock().Keys.Contains(b))
                 {
-                    var nodeDecl = new LemmaDecl(
-                        NodeLemmaName(blockLabel),
-                        ContextElem.CreateEmptyContext(),
-                        TermBinary.Eq(IsaBoogieTerm.NodeToBlock(cfgTerm, blockLabel),
-                            IsaCommonTerms.TermIdentFromName(blockDecl.Name)),
-                        new Proof(new List<string> {"by " + ProofUtil.Simp(cfgDef, nodeToBlockDef)}));
-
-                    blockToNodesLemmas.Add(b, nodeDecl);
+                  flag = 1;
                 }
-                blockToCounter[b] = blockLabel;
+                
+                int uniqueIntLabel = ast.GetUniqueIntLabel(b);
+                string nameToUse = "bigblock_" + uniqueIntLabel;
+                var translatedBigBlock = builder.makeBigBlockTerm(b, proofGenInfo, cmdIsaVisitor, flag, 0, nameToUse, out int updatedNestedBlockTracker);
+                
+                proofGenInfo.AddBigBlockToIndexPair(b, uniqueIntLabel);
+                
+                IDictionary<BigBlock, IList<DefDecl>> bb_defs = builder.getBigblockDefDecls();
+                foreach(KeyValuePair<BigBlock, IList<DefDecl>> bb_def in bb_defs)
+                {
+                  if (!blockToDecl.ContainsKey(bb_def.Key))
+                  {
+                    blockToDecl.Add(bb_def.Key, bb_def.Value); 
+                  }
+                }
+                
+                blockToCounter[b] = uniqueIntLabel;
             }
 
-            return new IsaBlockInfo(theoryName, blockToCounter, blockToDecl, edgeLemmas, blockToNodesLemmas);
+            return new IsaBigBlockInfo(theoryName, blockToCounter, blockToDecl);
         }
 
-        private OuterDecl GetOutEdgesIsa(string methodName, CFGRepr cfg, out Dictionary<Block, LemmaDecl> edgeLemmas)
+        private IList<OuterDecl> getContinuations(ASTRepr originalAst, AstToCfgProofGenInfo proofGenInfo)
         {
-            //var equations = new List<Tuple<IList<Term>, Term>>();
-            var edgeList = new List<Term>();
-            edgeLemmas = new Dictionary<Block, LemmaDecl>();
+          IList<OuterDecl> declsToReturn = new List<OuterDecl>();
+          BigBlockTermBuilder builder = new BigBlockTermBuilder();
 
-            var cfgTerm = IsaCommonTerms.TermIdentFromName(cfgName);
-            var cfgDef = cfgName + "_def";
-            string outEdgesDefName = "outEdges";
-            var outEdgesDef = outEdgesDefName + "_def";
+          //Loop through the big blocks in 'original AST' backwards.
+          //The name 'original AST' refers to the fact that the AST is in its original form, as constructed, i.e, it's not 'unrolled'.
+          //However, the big blocks inside it are copies. 
+          foreach (BigBlock b in originalAst.GetBlocksBackwards())
+          {
+            BigBlock correspondingBigBlockOrig = proofGenInfo.GetMappingCopyBigblockToOrigBigblock()[b];
+            BigBlock successorBigBlockOrig = correspondingBigBlockOrig.successorBigBlock;
 
-            foreach (var b in cfg.GetBlocksBackwards())
+            int successorIndex = -1;
+            if (successorBigBlockOrig != null)
             {
-                var outgoing = cfg.GetSuccessorBlocks(b);
-                Term edges = new TermList(outgoing.Select(b_succ => (Term) new NatConst(cfg.GetUniqueIntLabel(b_succ)))
-                    .ToList());
-                edgeList.Add(edges);
-                // edges lemma
-
-                var blockLabel = cfg.GetUniqueIntLabel(b);
-                var edgeDecl = new LemmaDecl(OutEdgesLemmaName(blockLabel),
-                    ContextElem.CreateEmptyContext(),
-                    TermBinary.Eq(IsaBoogieTerm.OutEdges(cfgTerm, blockLabel), edges),
-                    new Proof(new List<string> {"by " + ProofUtil.Simp(cfgDef, outEdgesDef)}));
-
-                edgeLemmas.Add(b, edgeDecl);
+              BigBlock successorBigBlockCopy = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[successorBigBlockOrig];
+              successorIndex = proofGenInfo.GetMappingCopyBigBlockToIndex()[successorBigBlockCopy];
             }
 
-            //empty set for remaining cases
-            return DefDecl.CreateWithoutArg(outEdgesDefName, new TermList(edgeList));
-        }
+            //This should be the same as big block 'b'? 
+            BigBlock correspondingBigBlockCopy = proofGenInfo.GetMappingOrigBigblockToCopyBigblock()[correspondingBigBlockOrig];
+            
+            //Construct the continuation term, which corresponds to 'b' and which is to be used in the Isabelle proofs later. 
+            Term continuation = builder.makeContinuationTerm(correspondingBigBlockCopy, proofGenInfo, successorIndex);
+            int bigblockIndex = proofGenInfo.GetMappingCopyBigBlockToIndex()[correspondingBigBlockCopy];
+            DefDecl continuationDecl = DefDecl.CreateWithoutArg("cont_" + bigblockIndex, continuation);
+            declsToReturn.Add(continuationDecl);
 
-        private string OutEdgesLemmaName(int blockId)
-        {
-            return "outEdges_" + blockId;
-        }
+            //Special continuation term, which is used if 'b' contains a WhileCmd.
+            DefDecl continuationDeclForUnwrappedBigBlock = null;
+            
+            if (b.ec is WhileCmd)
+            {
+              foreach (var pair in proofGenInfo.GetMappingLoopHeadBigBlocktoOrigLoopBigBlock())
+              {
+                if (pair.Value == correspondingBigBlockOrig)
+                {
+                  BigBlock unwrapped = pair.Key;
+                  
+                  Term continuationUnwrapped = builder.makeContinuationTerm(unwrapped, proofGenInfo, successorIndex);
+                  int bigblockIndexUnwrapped = proofGenInfo.GetMappingCopyBigBlockToIndex()[unwrapped];
+                  continuationDeclForUnwrappedBigBlock = DefDecl.CreateWithoutArg("cont_" + bigblockIndexUnwrapped, continuationUnwrapped);
+                }
+              }
+              
+              if (continuationDeclForUnwrappedBigBlock != null)
+              {
+                declsToReturn.Add(continuationDeclForUnwrappedBigBlock); 
+              }
+              
+              WhileCmd wcmd = (WhileCmd) b.ec;
+              ASTRepr body = new ASTRepr(wcmd.Body.BigBlocks);
+              
+              //recursively construct continuation terms for the body of the while-loop (again from the end to the beginning).
+              IList<OuterDecl> bodyConts = getContinuations(body, proofGenInfo);
+              declsToReturn.AddRange(bodyConts);
+            }
+            else if (b.ec is IfCmd)
+            {
+              IfCmd ifcmd = (IfCmd) b.ec;
+              ASTRepr thn = new ASTRepr(ifcmd.thn.BigBlocks);
+              
+              //recursively construct continuation terms for the body of the thn-branch of the if-statement.
+              declsToReturn.AddRange(getContinuations(thn, proofGenInfo));
 
-        private string NodeLemmaName(int blockId)
-        {
-            return "node_" + blockId;
-        }
+              if (ifcmd.elseBlock != null)
+              {
+                ASTRepr elseBlock = new ASTRepr(ifcmd.elseBlock.BigBlocks);
+                
+                //recursively construct continuation terms for the body of the else-branch of the if-statement.
+                declsToReturn.AddRange(getContinuations(elseBlock, proofGenInfo)); 
+              }
+            }
+          }
 
-        private OuterDecl GetNodeToBlocksIsa(CFGRepr cfg, IDictionary<Block, OuterDecl> blockToDecl)
-        {
-            var nodeList = new List<Term>();
-
-            foreach (var b in cfg.GetBlocksBackwards())
-                //left side of equation is block number expressed using constructors
-                //right side of equation is command
-                nodeList.Add(IsaCommonTerms.TermIdentFromName(blockToDecl[b].Name));
-
-            return DefDecl.CreateWithoutArg(nodeToBlocksName, new TermList(nodeList));
+          return declsToReturn;
         }
 
         private DefDecl GetFunctionDeclarationsIsa(IEnumerable<Function> functions, IsaUniqueNamer uniqueNamer)
         {
-            //var equations = new List<Tuple<IList<Term>, Term>>();
             var fdecls = new List<Term>();
-
-
             foreach (var f in functions) fdecls.Add(IsaBoogieTerm.FunDecl(f, varTranslationFactory, uniqueNamer));
 
             return DefDecl.CreateWithoutArg(FunctionDeclarationsName(), new TermList(fdecls));
@@ -449,9 +421,9 @@ namespace ProofGeneration
             return DefDecl.CreateWithoutArg(declName, new TermList(result));
         }
 
-        private DefDecl GetMethodBodyCFGDecl(string methodName, Term methodBodyCFG)
+        private DefDecl GetMethodBodyASTDecl(string methodName, Term methodBodyAST)
         {
-            return DefDecl.CreateWithoutArg(cfgName, methodBodyCFG);
+            return DefDecl.CreateWithoutArg(astName, methodBodyAST);
         }
 
     }

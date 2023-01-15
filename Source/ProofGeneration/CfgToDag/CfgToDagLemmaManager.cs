@@ -18,6 +18,8 @@ namespace ProofGeneration.CfgToDag
         private readonly IProgramAccessor afterDagProgAccess;
         private readonly Block afterExitBlock;
 
+        private readonly IProgramAccessor beforeCfgProgAccess;
+
         private readonly BasicCmdIsaVisitor basicCmdIsaVisitor;
 
         private readonly IProgramAccessor beforeDagProgAccess;
@@ -51,6 +53,7 @@ namespace ProofGeneration.CfgToDag
 
         //afterExitBlock is non-null iff afterExitBlock is a newly generated unique exit block after the CFG-to-DAG transformation
         public CfgToDagLemmaManager(
+            IProgramAccessor beforeCfgProgAccess,
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
             BoogieContextIsa boogieContext,
@@ -64,6 +67,7 @@ namespace ProofGeneration.CfgToDag
             IVariableTranslationFactory varFactory
         )
         {
+            this.beforeCfgProgAccess = beforeCfgProgAccess;
             this.beforeDagProgAccess = beforeDagProgAccess;
             this.afterDagProgAccess = afterDagProgAccess;
             this.afterDagCfg = afterDagCfg;
@@ -78,7 +82,7 @@ namespace ProofGeneration.CfgToDag
             initState1 = IsaBoogieTerm.Normal(normalInitState1);
             initState2 = IsaBoogieTerm.Normal(normalInitState2);
             basicCmdIsaVisitor = new BasicCmdIsaVisitor(varFactory);
-            typingTacticGenerator = new TypingTacticGenerator(beforeDagProgAccess, varFactory);
+            typingTacticGenerator = new TypingTacticGenerator(beforeCfgProgAccess, varFactory);
         }
 
         private TermList HavocedVarsTerm(IEnumerable<Variable> vars)
@@ -281,7 +285,7 @@ namespace ProofGeneration.CfgToDag
             assumptions.Add(dagVerifiesCfgAssm);
 
             var preAssm =
-                IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState2, beforeDagProgAccess.PreconditionsDecl());
+                IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState2, beforeCfgProgAccess.PreconditionsDecl());
             assumptions.Add(preAssm);
 
             var afterEntrySuccessors = afterDagCfg.GetSuccessorBlocks(afterEntryBlock);
@@ -301,10 +305,10 @@ namespace ProofGeneration.CfgToDag
                     ProofUtil.Apply("erule assms(3)"),
                     ProofUtil.Apply("rule assms(2)"),
                     "unfolding " + afterDagProgAccess.BlockInfo().CmdsQualifiedName(afterEntryBlock) + "_def",
-                    ProofUtil.Apply("rule assume_pres_normal[where ?es=" + beforeDagProgAccess.PreconditionsDeclName() +
+                    ProofUtil.Apply("rule assume_pres_normal[where ?es=" + beforeCfgProgAccess.PreconditionsDeclName() +
                                     "]"),
                     ProofUtil.Apply("rule assms(4)"),
-                    "unfolding " + beforeDagProgAccess.PreconditionsDeclName() + "_def",
+                    "unfolding " + beforeCfgProgAccess.PreconditionsDeclName() + "_def",
                     "apply simp",
                     ProofUtil.Apply("rule " + afterDagProgAccess.BlockInfo().OutEdgesMembershipLemma(afterEntryBlock)),
                     ProofUtil.Apply(ProofUtil.Simp(
@@ -341,7 +345,7 @@ namespace ProofGeneration.CfgToDag
             };
 
             var conclusion = IsaBoogieTerm.ExprAllSat(boogieContext, normalInitState2,
-                beforeDagProgAccess.PostconditionsDecl());
+                beforeCfgProgAccess.PostconditionsDecl());
 
             var typingTactics = new List<string>();
             var lemmas = new List<LemmaDecl>();
@@ -363,7 +367,7 @@ namespace ProofGeneration.CfgToDag
                     conclusion,
                     new Proof(new List<string>
                     {
-                        "unfolding expr_all_sat_def " + beforeDagProgAccess.PostconditionsDeclName() + "_def ",
+                        "unfolding expr_all_sat_def " + beforeCfgProgAccess.PostconditionsDeclName() + "_def ",
                         ProofUtil.Apply("rule cfg_dag_rel_post_invs_3"),
                         "apply (erule assms(1))",
                         ProofUtil.Apply("rule " +
@@ -522,7 +526,7 @@ namespace ProofGeneration.CfgToDag
 
             if (blockHeadHint != null)
                 foreach (var x in blockHeadHint.ModifiedVars)
-                    proofMethods.Add(ProofUtil.Apply(ProofUtil.Simp(beforeDagProgAccess.LookupVarDeclLemma(x))));
+                    proofMethods.Add(ProofUtil.Apply(ProofUtil.Simp(beforeCfgProgAccess.LookupVarDeclLemma(x))));
 
             //TODO proof that post invariants reduce to booleans
             proofMethods.Add(TypingTactics(typingTactics, null));
@@ -626,7 +630,7 @@ namespace ProofGeneration.CfgToDag
 
         private Term CfgLemmaConclusion(Term finalNode, Term finalState)
         {
-            return CfgLemmaConclusion(boogieContext, beforeDagProgAccess.PostconditionsDecl(),
+            return CfgLemmaConclusion(boogieContext, beforeCfgProgAccess.PostconditionsDecl(),
                 finalNode, finalState);
         }
 
@@ -634,7 +638,7 @@ namespace ProofGeneration.CfgToDag
             Term finalState)
         {
             return new TermApp(
-                IsaCommonTerms.TermIdentFromName("valid_configuration"),
+                IsaCommonTerms.TermIdentFromName("Semantics.valid_configuration"),
                 boogieContext.absValTyMap,
                 boogieContext.varContext,
                 boogieContext.funContext,
@@ -729,22 +733,24 @@ namespace ProofGeneration.CfgToDag
                        If so, then we need to get the invariant satisfiability from that block.
                     */
                     foreach (var afterSuc in afterDagCfg.GetSuccessorBlocks(afterBlock))
+                    {
                         if (hintManager.IsNewBackedgeBlock(afterSuc, out var loopHead, out var _) &&
                             loopHead == bSuc)
                         {
-                            //TODO separate function for this and share code with case below
-                            var afterSucId = afterDagProgAccess.BlockInfo().BlockIds[afterSuc];
-                            sb.AppendLine("(* proof strategy for new backedge block *)");
-                            sb.AppendLine("apply (erule allE[where x=" + afterSucId + "])");
-                            sb.AppendLine(ProofUtil.Apply(
-                                ProofUtil.Simp(afterDagProgAccess.BlockInfo()
-                                    .OutEdgesMembershipLemma(afterBlock))));
-                            sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
-                            sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(afterSuc)));
-                            sb.AppendLine(ProofUtil.Apply("assumption, assumption, simp"));
-                            sb.AppendLine("(* finish proof strategy for new backedge block *)");
-                            break;
+                          //TODO separate function for this and share code with case below
+                          var afterSucId = afterDagProgAccess.BlockInfo().BlockIds[afterSuc];
+                          sb.AppendLine("(* proof strategy for new backedge block *)");
+                          sb.AppendLine("apply (erule allE[where x=" + afterSucId + "])");
+                          sb.AppendLine(ProofUtil.Apply(
+                            ProofUtil.Simp(afterDagProgAccess.BlockInfo()
+                              .OutEdgesMembershipLemma(afterBlock))));
+                          sb.AppendLine(ProofUtil.Apply(ProofUtil.Simp("member_rec(1)")));
+                          sb.AppendLine(ProofUtil.Apply("erule " + cfgLemmaName(afterSuc)));
+                          sb.AppendLine(ProofUtil.Apply("assumption, assumption, simp"));
+                          sb.AppendLine("(* finish proof strategy for new backedge block *)");
+                          break;
                         }
+                    }
 
                     if (beforeBlock.Equals(bSuc))
                     {
@@ -907,8 +913,8 @@ namespace ProofGeneration.CfgToDag
                                               ProofUtil.OF("" +
                                                            "type_safety_top_level_inv",
                                                   funContextWfName,
-                                                  beforeDagProgAccess.FuncsWfTyLemma(),
-                                                  beforeDagProgAccess
+                                                  beforeCfgProgAccess.FuncsWfTyLemma(),
+                                                  beforeCfgProgAccess
                                                       .VarContextWfTyLemma())));
                 if (stateWtThm != null)
                     sb.AppendLine(ProofUtil.Apply("rule " + stateWtThm));
@@ -975,8 +981,7 @@ namespace ProofGeneration.CfgToDag
                                                   .BlockCmdsMembershipLemma(afterBlock)));
                 sb.AppendLine(ProofUtil.Apply("erule " + dagVerifiesName));
                 sb.AppendLine(ProofUtil.Apply("rule " + dagAssmsName));
-                sb.AppendLine("unfolding " + beforeDagProgAccess.PostconditionsDeclName() +
-                              "_def");
+                sb.AppendLine("unfolding " + beforeCfgProgAccess.PostconditionsDeclName() + "_def");
                 sb.AppendLine(ProofUtil.Apply("rule " + blockLemmaName(beforeBlock)));
                 sb.AppendLine("apply assumption+");
                 sb.AppendLine(
@@ -1030,7 +1035,7 @@ namespace ProofGeneration.CfgToDag
             sb.AppendLine("show ?case");
             sb.AppendLine("proof (cases j)");
             sb.AppendLine(
-                "case 0 with less.prems(1) show ?thesis unfolding valid_configuration_def by auto");
+                "case 0 with less.prems(1) show ?thesis unfolding Semantics.valid_configuration_def by auto");
             sb.AppendLine("next");
             sb.AppendLine("case (Suc j')");
             sb.Append("from less(3) have " + stateRelLoopHeadName + ":");
@@ -1152,7 +1157,7 @@ namespace ProofGeneration.CfgToDag
                 cfg,
                 modVars,
                 invs,
-                beforeDagProgAccess.PostconditionsDecl(),
+                beforeCfgProgAccess.PostconditionsDecl(),              
                 normalState,
                 finalState,
                 loopHeadNode,

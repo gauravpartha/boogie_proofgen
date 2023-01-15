@@ -20,6 +20,7 @@ using Bpl = Microsoft.Boogie;
 
 using System;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Reflection;
 
 namespace Microsoft.Boogie {
@@ -563,7 +564,7 @@ private class BvBounds : Expr {
 				Spec(pre, mods, post);
 			}
 			ImplBody(out locals, out stmtList);
-			impl = new Implementation(x, x.val, typeParams.ConvertAll(tp => new TypeVariable(tp.tok, tp.Name)),
+      impl = new Implementation(x, x.val, typeParams.ConvertAll(tp => new TypeVariable(tp.tok, tp.Name)),
 			                         Formal.StripWhereClauses(ins), Formal.StripWhereClauses(outs), locals, stmtList, kv == null ? null : (QKeyValue)kv.Clone(), this.errors);
 			
 		} else SynErr(112);
@@ -581,7 +582,7 @@ private class BvBounds : Expr {
 		Expect(35);
 		ProcSignature(false, out x, out typeParams, out ins, out outs, out kv);
 		ImplBody(out locals, out stmtList);
-		impl = new Implementation(x, x.val, typeParams, ins, outs, locals, stmtList, kv, this.errors); 
+    impl = new Implementation(x, x.val, typeParams, ins, outs, locals, stmtList, kv, this.errors); 
 	}
 
 	void Attribute(ref QKeyValue kv) {
