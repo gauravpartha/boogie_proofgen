@@ -26,6 +26,8 @@ namespace ProofGeneration
         private static readonly TermIdent varId = IsaCommonTerms.TermIdentFromName("Var");
         private static readonly TermIdent bvarId = IsaCommonTerms.TermIdentFromName("BVar");
         private static readonly TermIdent oldVarId = IsaCommonTerms.TermIdentFromName("Old");
+        
+        private static readonly TermIdent condExpId = IsaCommonTerms.TermIdentFromName("CondExp");
 
         private static readonly TermIdent lookupVarId = IsaCommonTerms.TermIdentFromName("lookup_var");
         private static readonly TermIdent lookupVarDeclId = IsaCommonTerms.TermIdentFromName("lookup_var_decl");
@@ -117,6 +119,11 @@ namespace ProofGeneration
         public static Term Old(Term body)
         {
             return new TermApp(oldVarId, body);
+        }
+
+        public static Term CondExp(Term cond, Term thn, Term els)
+        {
+          return new TermApp(condExpId, cond, thn, els);
         }
 
         public static Term Literal(LiteralExpr node)
