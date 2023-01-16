@@ -75,7 +75,9 @@ namespace ProofGeneration
 
         public Term Visit(IfThenElse ifThenElse)
         {
-            throw new NotImplementedException();
+            if (_args.Count != 3) throw new ExprArgException();
+
+            return IsaBoogieTerm.CondExp(_args[0], _args[1], _args[2]);
         }
     }
 

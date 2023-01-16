@@ -159,7 +159,13 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitIfThenElseOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+          if (arg.Count != 3)
+          {
+            throw new ProofGenUnexpectedStateException("VisitIfThenElseOp not invoked with three arguments");
+          }
+          
+          //TODO: potentially put if-then-else expressions into the InnerAST directly
+          return new TermApp(IsaCommonTerms.TermIdentFromName("ite_vc"), arg[0], arg[1], arg[2]);
         }
 
         public Term VisitImpliesOp(VCExprNAry node, List<Term> arg)
