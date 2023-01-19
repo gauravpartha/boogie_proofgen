@@ -1044,7 +1044,26 @@ namespace Microsoft.Boogie
     public string ProofOutputDir = null;
     public bool OnlyCheckProofGenSupport = false;
     public bool DontStoreProofGenFiles = false;
-    public bool GenerateIsaProgNoProofs = false;
+    
+    /*
+     * 0: disabled -> proofs are generated
+     * 1: partially enabled -> only AST program is generated but with membership lemmas
+     * 2: enabled -> only AST program is generated
+     */
+    public int GenerateIsaProgNoProofs = 0;
+
+    public bool OnlyGenerateInitialProgramIsa()
+    {
+      return GenerateIsaProgNoProofs != 0;
+    }
+
+    public bool GenerateMembershipLemmas()
+    {
+      return GenerateIsaProgNoProofs <= 1;
+    }
+    
+    
+    
     public bool DesugarMaps = false;
     #endregion
 
@@ -1821,13 +1840,9 @@ namespace Microsoft.Boogie
           return true;
         
         case "isaProgNoProofs":
-          if (ps.ConfirmArgumentCount(0))
-          {
-            GenerateIsaProgNoProofs = true;
-          }
-          
+          ps.GetNumericArgument(ref GenerateIsaProgNoProofs, 2);
           return true;
-        
+
         case "desugarMaps":
           if (ps.ConfirmArgumentCount(0))
           {
