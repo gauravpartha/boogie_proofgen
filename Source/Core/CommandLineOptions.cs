@@ -1045,6 +1045,11 @@ namespace Microsoft.Boogie
     public bool OnlyCheckProofGenSupport = false;
     public bool DontStoreProofGenFiles = false;
     
+    /* If use id-based lemma naming, then whenever lemmas are specific to an entity that is represented using an id (i.e., a natural number),
+       then the lemma name is uniquely determined by that id. For example, if variables are represented using natural numbers,
+       then the membership lemmas for those variables are uniquely determined by the corresponding natural number. */
+    public bool UseIdBasedLemmaNaming = false;
+    
     /*
      * 0: disabled -> proofs are generated
      * 1: partially enabled -> only AST program is generated but with membership lemmas
@@ -1835,6 +1840,14 @@ namespace Microsoft.Boogie
           if (ps.ConfirmArgumentCount(0))
           {
             DontStoreProofGenFiles = true;
+          }
+
+          return true;
+        
+        case "useIdBasedLemmaNaming":
+          if (ps.ConfirmArgumentCount(0))
+          {
+            UseIdBasedLemmaNaming = true;
           }
 
           return true;

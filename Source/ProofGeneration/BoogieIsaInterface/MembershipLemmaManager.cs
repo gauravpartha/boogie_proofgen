@@ -48,12 +48,12 @@ namespace ProofGeneration.BoogieIsaInterface
         private readonly string localsMinName = "locals_min";
         private readonly string localsWfName = "locals_wf";
         private readonly IDictionary<Variable, LemmaDecl> lookupVarTyLemmas = new Dictionary<Variable, LemmaDecl>();
-        private readonly IsaUniqueNamer lookupVarTyNamer = new IsaUniqueNamer();
+        private readonly IsaUniqueNamer lookupVarTyNamer = new();
 
         private readonly IDictionary<Declaration, LemmaDecl>
             membershipLemmas = new Dictionary<Declaration, LemmaDecl>();
 
-        private readonly IsaUniqueNamer membershipNamer = new IsaUniqueNamer();
+        private readonly IsaUniqueNamer membershipNamer = new();
         private readonly string parameters;
 
         private readonly string[] paramsAndLocalsDefs;
@@ -71,6 +71,12 @@ namespace ProofGeneration.BoogieIsaInterface
 
         //indicates whether this instance or any of its ancestors contains local method information (i.e., parameters, etc...)
         private readonly bool containsLocalInformation = true;
+
+        /* There are two membership lemmas for each constant. So we need two different prefixes for the corresponding names.
+           The following prefix is for the constant membership lemma that is declared first and used by the second 
+           membership lemma.
+         */
+        private readonly string separateConstantMembershipLemmaPrefix = "mconst";
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MembershipLemmaManager"/> class.
@@ -443,6 +449,18 @@ namespace ProofGeneration.BoogieIsaInterface
             }
         }
 
+        private string MembershipLemmaPrefix(NamedDeclaration d)
+        {
+          if (d is Function)
+          {
+            return "mfun";
+          }
+          else
+          {
+            return "mvar";
+          }
+        }
+
         private void AddNamedDeclsMembershipLemmas(
             IEnumerable<NamedDeclaration> decls,
             Term sourceList,
@@ -453,7 +471,8 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             foreach (var d in decls)
             {
-                Term lhs = new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), new List<Term> {sourceList, nameOf(d)});
+                var nameOfDecl = nameOf(d);
+                Term lhs = new TermApp(IsaCommonTerms.TermIdentFromName("map_of"), new List<Term> {sourceList, nameOfDecl});
                 var rhs = IsaCommonTerms.SomeOption(declOf(d));
 
                 Term statement = TermBinary.Eq(lhs, rhs);
@@ -463,12 +482,12 @@ namespace ProofGeneration.BoogieIsaInterface
                     proof = new Proof(new List<string> {"by " + ProofUtil.Simp(definitions)});
                 else
                     proof = new Proof(new List<string>
-                        {"by " + "(simp add: " + ConstantMembershipName(d) + " del: Nat.One_nat_def)"});
+                        {"by " + "(simp add: " + ConstantMembershipName(d, nameOfDecl, separateConstantMembershipLemmaPrefix) + " del: Nat.One_nat_def)"});
 
                 if (!separateConstantLemmas)
-                    membershipLemmas.Add(d, new LemmaDecl(MembershipName(d), statement, proof));
+                    membershipLemmas.Add(d, new LemmaDecl(MembershipName(d, nameOfDecl, MembershipLemmaPrefix(d)), statement, proof));
                 else
-                    constantMembershipLemmas.Add(d, new LemmaDecl(ConstantMembershipName(d), statement, proof));
+                    constantMembershipLemmas.Add(d, new LemmaDecl(ConstantMembershipName(d, nameOfDecl, separateConstantMembershipLemmaPrefix), statement, proof));
             }
         }
 
@@ -480,12 +499,13 @@ namespace ProofGeneration.BoogieIsaInterface
         {
             foreach (var v in vars)
             {
+                var nameOfDecl = nameOf(v);
                 var (ty, whereClause) = declOf(v);
-                var lookupDeclLhs = IsaBoogieTerm.LookupVarDecl(VarContext(), nameOf(v));
+                var lookupDeclLhs = IsaBoogieTerm.LookupVarDecl(VarContext(), nameOfDecl);
                 var lookupDeclRhs = IsaCommonTerms.SomeOption(new TermTuple(ty, whereClause));
                 Term lookupDeclStmt = TermBinary.Eq(lookupDeclLhs, lookupDeclRhs);
                 
-                var lookupTyLhs = IsaBoogieTerm.LookupVarTy(VarContext(), nameOf(v));
+                var lookupTyLhs = IsaBoogieTerm.LookupVarTy(VarContext(), nameOfDecl);
                 var lookupTyRhs = IsaCommonTerms.SomeOption(ty);
                 Term lookupTyStmt = TermBinary.Eq(lookupTyLhs, lookupTyRhs);
                 
@@ -496,7 +516,7 @@ namespace ProofGeneration.BoogieIsaInterface
                         "by (simp_all add: lookup_var_decl_global_2 lookup_var_decl_local lookup_var_decl_ty_Some)"
                     });
                 lookupVarTyLemmas.Add(v, new LemmaDecl(
-                    lookupVarTyNamer.GetName(v, "l_" + v.Name),
+                    MembershipName(() => lookupVarTyNamer.GetName(v, "l_" + v.Name), "lvar", nameOfDecl),
                     new List<Term> {lookupDeclStmt, lookupTyStmt},
                     proof)
                 );
@@ -517,19 +537,28 @@ namespace ProofGeneration.BoogieIsaInterface
                 id++;
             }
         }
-
-        private string MembershipName(NamedDeclaration d)
+        
+        private string MembershipName(Func<string> normalNameFunc, string membershipPrefix, Term memberTerm)
         {
-            var name = membershipNamer.GetName(d, d.Name);
-            if (d is Function)
-                return "mfun_" + name;
-            return "m_" + name;
+          if (CommandLineOptions.Clo.UseIdBasedLemmaNaming && memberTerm is NatConst natConst)
+          {
+            return membershipPrefix + natConst;
+          }
+
+          return membershipPrefix + normalNameFunc();
         }
 
-        private string ConstantMembershipName(NamedDeclaration d)
+        private string MembershipName(NamedDeclaration d, Term memberTerm, String membershipPrefix)
         {
-            var name = membershipNamer.GetName(d, d.Name);
-            return "mconst_" + name;
+          var normalNameFunc = () => membershipNamer.GetName(d, d.Name);
+
+          return MembershipName(normalNameFunc, membershipPrefix, memberTerm);
+        }
+
+        private string ConstantMembershipName(NamedDeclaration d, Term constId, String membershipPrefix)
+        {
+            var normalNameFunc = () => membershipNamer.GetName(d, d.Name);
+            return MembershipName(normalNameFunc, membershipPrefix, constId);
         }
 
         private string MembershipName(Axiom a, int id)
