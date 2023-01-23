@@ -1853,7 +1853,7 @@ namespace Microsoft.Boogie
           return true;
         
         case "isaProgNoProofs":
-          ps.GetNumericArgument(ref GenerateIsaProgNoProofs, 2);
+          ps.GetNumericArgument(ref GenerateIsaProgNoProofs, 3);
           return true;
 
         case "desugarMaps":
