@@ -446,6 +446,8 @@ namespace ProofGeneration
         /// </summary>
         public static void VcIsTrivial()
         {
+            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+                return;
           vcHintManager.TransformHintsToTrivialVc();
         }
 
