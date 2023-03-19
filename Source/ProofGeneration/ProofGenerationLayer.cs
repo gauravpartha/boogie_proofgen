@@ -735,14 +735,15 @@ namespace ProofGeneration
                 var _specsConfig = CommandLineOptions.Clo.GenerateIsaProgNoProofs
                   ? SpecsConfig.All
                   : SpecsConfig.AllPreCheckedPost;
-                var unoptimizedCfgConfig =
-                  new IsaProgramGeneratorConfig(beforeAstToCfgProgAccess, 
-                    false, 
-                    false, 
-                    false, 
-                    false, 
-                    _specsConfig, 
-                    false);
+                var unoptimizedCfgConfig = 
+                  new IsaProgramGeneratorConfig(
+                      _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess : globalDataProgAccess,
+                      false,
+                      false,
+                      false,
+                      !_proofGenConfig.GenerateBeforeAstCfgProg,
+                      _specsConfig,
+                      !_proofGenConfig.GenerateBeforeAstCfgProg);
                 
                 unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
                   unoptimizedCfgTheoryName,
@@ -759,7 +760,7 @@ namespace ProofGeneration
                   new List<string>
                   {
                     "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
-                    beforeAstToCfgProgAccess.TheoryName()
+                    _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess.TheoryName() : globalDataProgAccess.TheoryName()
                   },
                   programDeclsUnoptimizedCfg);
                 theories.Add(unoptimizedCfgProgTheory);
