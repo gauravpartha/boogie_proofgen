@@ -74,7 +74,7 @@ namespace ProofGeneration.CfgToDag
             var varContextName = "\\<Lambda>1";
             var varContextAbbrev = new AbbreviationDecl(
                 varContextName,
-                new Tuple<IList<Term>, Term>(new List<Term>(), beforeCfgProgAccess.VarContext())
+                new Tuple<IList<Term>, Term>(new List<Term>(), beforeDagProgAccess.VarContext())
             );
 
             var funContextWfName = "Wf_Fun";
@@ -218,7 +218,6 @@ namespace ProofGeneration.CfgToDag
                     phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.Passification, true),
                     vcAssm,
                     beforeDagProgAccess,
-                    beforeCfgProgAccess,
                     beforeDagCfg
                 );
                 theoryOuterDecls.AddRange(endToEndDecls);

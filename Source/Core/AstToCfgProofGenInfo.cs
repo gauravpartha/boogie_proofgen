@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices.ComTypes;
 using ProofGenUtil;
 
 using Core;
@@ -25,7 +26,24 @@ namespace Microsoft.Boogie
     /// The original <see cref = "StmtList"/> object, which contains the original list of <see cref ="BigBlock" /> objects, which is Boogie's internal AST representation.
     private StmtList stmtList;
 
+    private List<Variable> _unoptimizedLocalVars;
+
+    public List<Variable> UnoptimizedLocalVars
+    {
+      get => _unoptimizedLocalVars;
+      set => _unoptimizedLocalVars = value;
+    }
+
+    private bool _eliminatedDeadVars = false;
+
+    public bool EliminatedDeadVars
+    {
+      get => _eliminatedDeadVars;
+      set => _eliminatedDeadVars = value;
+    }
+    
     private IList<Block> unoptimizedBlocks;
+    
     private List<Variable> newVarsAfterDesugaringinCFGBlocks;
 
     /// A list of copies of the <see cref="BigBlock"/> objects in <see cref="stmtList"/>.

@@ -23,7 +23,6 @@ namespace ProofGeneration.AstToCfg
             AstToCfgProofGenInfo proofGenInfo,
             ASTRepr beforeCfgAst,
             CFGRepr afterCfg,
-            BoogieMethodData beforeCfgData,
             IDictionary<Block, Block> beforeDagOrigBlock,
             IDictionary<BigBlock, (Block,Expr,BranchIndicator)> mappingWithHints,
             IDictionary<BigBlock, Block> beforeToAfter,
@@ -63,7 +62,6 @@ namespace ProofGeneration.AstToCfg
                 funContextWfName,
                 beforeDagOrigBlock,
                 beforeToAfter,
-                beforeCfgData,
                 varFactory);
 
             var lemmaNamer = new IsaUniqueNamer();
