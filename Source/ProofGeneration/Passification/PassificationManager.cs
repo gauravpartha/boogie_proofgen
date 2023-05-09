@@ -34,7 +34,6 @@ namespace ProofGeneration.Passification
             CFGRepr beforePassificationCfg,
             IDictionary<Block, Block> nonPassiveToPassiveBlock,
             PassiveRelationGen relationGen,
-            IProgramAccessor beforePhaseProgramAccess,
             IProgramAccessor beforePassiveProgAccess,
             IProgramAccessor passiveProgAccess,
             BoogieMethodData beforePassiveData,
@@ -63,7 +62,6 @@ namespace ProofGeneration.Passification
             var beforePassiveLemmaManager = new PassificationLemmaManager(
                 beforePassificationCfg,
                 nonPassiveToPassiveBlock,
-                beforePhaseProgramAccess,
                 beforePassiveProgAccess,
                 passiveProgAccess,
                 varContextNonPassivePassive,
@@ -77,7 +75,7 @@ namespace ProofGeneration.Passification
 
             var varContextAbbrev = new AbbreviationDecl(
                 varContextName,
-                new Tuple<IList<Term>, Term>(new List<Term>(), beforePhaseProgramAccess.VarContext())
+                new Tuple<IList<Term>, Term>(new List<Term>(), beforePassiveProgAccess.VarContext())
             );
 
             var passiveVarContextAbbrev = new AbbreviationDecl(
@@ -120,7 +118,6 @@ namespace ProofGeneration.Passification
                     GetCfgLemmaName(beforePassificationCfg.entry, lemmaNamer),
                     boogieToVcTheoryName + "." + boogieToVcLemma.Name,
                     vcAssm,
-                    beforePhaseProgramAccess,
                     beforePassiveProgAccess,
                     passiveProgAccess,
                     varContextNonPassivePassive,
@@ -133,7 +130,7 @@ namespace ProofGeneration.Passification
 
             var imports = new List<string>
             {
-                "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePhaseProgramAccess.TheoryName(),
+                "Boogie_Lang.Semantics", "Boogie_Lang.Util", beforePassiveProgAccess.TheoryName(),
                 passiveProgAccess.TheoryName(), "Boogie_Lang.PassificationML",
                 boogieToVcTheoryName
             };

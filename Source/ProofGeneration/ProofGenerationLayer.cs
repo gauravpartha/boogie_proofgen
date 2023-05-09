@@ -745,9 +745,9 @@ namespace ProofGeneration
                 false, 
                 false, 
                 false, 
-                proofGenInfo.GetOptimizationsFlag(), 
+                parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag(), 
                 parentAccessorForBeforeCfgToDag != null ? SpecsConfig.None : specsConfigDefault, 
-                proofGenInfo.GetOptimizationsFlag());
+                parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag());
               
               beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
                 beforeCfgToDagTheoryName,
@@ -789,7 +789,7 @@ namespace ProofGeneration
                   false, 
                   parentProgramAccessorForPassification == null,
                   parentProgramAccessorForPassification != null ? SpecsConfig.None : specsConfigDefault, 
-                  false);
+                  parentProgramAccessorForPassification == null);
               beforePassiveProgAccess = new IsaProgramGenerator().GetIsaProgram(beforePassiveProgTheoryName,
                 afterPassificationImpl.Name,
                 afterOptimizationsData, beforePassiveConfig, afterOptimizationsVarTranslationFactory,
@@ -934,7 +934,6 @@ namespace ProofGeneration
                 beforePassificationCfg,
                 beforePassiveToAfterPassiveBlock,
                 passiveRelationGen,
-                beforePassiveProgAccess,
                 beforePassiveProgAccess,
                 passiveProgAccess,
                 afterOptimizationsData,
