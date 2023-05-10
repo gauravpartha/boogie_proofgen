@@ -582,7 +582,7 @@ namespace ProofGeneration
               DesugarCmdsInBigBlock(b);
             }
             
-            IList<Block> unoptimizedCfgBlocks = proofGenInfo.GetUnpotimizedBlocks(); 
+            IList<Block> unoptimizedCfgBlocks = proofGenInfo.GetUnoptimizedBlocks(); 
             var newToOldInternal = new Dictionary<Block, Block>();
             unoptimizedCfgBlocks.ZipDo(afterPassificationImpl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
             beforeOptimizationsOrigBlock = newToOldInternal;
@@ -958,7 +958,6 @@ namespace ProofGeneration
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
                 _proofGenConfig.GenerateCfgDagE2E,
-                _proofGenConfig.GenerateAstCfgProof,
                 _proofGenConfig.GeneratePassifProof,
                 _proofGenConfig.GenerateVcProof,
                 vcAssm,
@@ -968,7 +967,6 @@ namespace ProofGeneration
                 beforeDagData,
                 cfgToDagHintManager,
                 beforeDagAfterDagBlock,
-                beforeAstToCfgProgAccess,
                 beforeCfgToDagProgAccess,
                 beforePassiveProgAccess,
                 afterOptimizationsVarTranslationFactory);

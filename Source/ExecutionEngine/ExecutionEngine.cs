@@ -514,7 +514,7 @@ namespace Microsoft.Boogie
         Implementation impl = tuple.Key;
         AstToCfgProofGenInfo proofGenInfo = tuple.Value;
       
-        IList<Block> unoptimizedBlocksCopies = proofGenInfo.GetUnpotimizedBlocks();
+        IList<Block> unoptimizedBlocksCopies = proofGenInfo.GetUnoptimizedBlocks();
         IList<Block> optimizedBlocksOriginal = impl.Blocks;
 
         int totalNumberOfCommandsA = 0;

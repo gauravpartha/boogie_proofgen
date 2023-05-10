@@ -136,7 +136,7 @@ namespace Microsoft.Boogie
       return optimizationsDone;
     }
     
-    public IList<Block> GetUnpotimizedBlocks()
+    public IList<Block> GetUnoptimizedBlocks()
     {
       return unoptimizedBlocks;
     }

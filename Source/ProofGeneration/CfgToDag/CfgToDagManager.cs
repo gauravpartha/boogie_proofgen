@@ -24,7 +24,6 @@ namespace ProofGeneration.CfgToDag
         public static Theory CfgToDagProof(
             PhasesTheories phasesTheories,
             bool generateEndToEndLemma,
-            bool generatedAstToCfgProof,
             bool generatePassificationProof,
             bool generateVcProof,
             Term vcAssm,
@@ -34,16 +33,10 @@ namespace ProofGeneration.CfgToDag
             BoogieMethodData beforeDagData,
             CfgToDagHintManager hintManager,
             IDictionary<Block, Block> beforeToAfter,
-            IProgramAccessor beforeCfgProgAccess,
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
             IVariableTranslationFactory varFactory)
         {
-            if (!generatedAstToCfgProof)
-            {
-              beforeCfgProgAccess = beforeDagProgAccess;
-            }
-            
             var afterToBefore = beforeToAfter.InverseDict();
 
             //track mapping from blocks to loops that the block is contained in and for which it is not the loop head
@@ -85,7 +78,6 @@ namespace ProofGeneration.CfgToDag
                 IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
                 IsaCommonTerms.EmptyList);
             var lemmaManager = new CfgToDagLemmaManager(
-                beforeCfgProgAccess,
                 beforeDagProgAccess,
                 afterDagProgAccess,
                 boogieContext,
@@ -199,7 +191,7 @@ namespace ProofGeneration.CfgToDag
                     },
                     new List<Term>
                     {
-                        IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, beforeCfgProgAccess.FunctionsDecl(),
+                        IsaBoogieTerm.FunInterpWf(boogieContext.absValTyMap, beforeDagProgAccess.FunctionsDecl(),
                             boogieContext.funContext)
                     },
                     new List<string> {funContextWfName}
@@ -228,7 +220,6 @@ namespace ProofGeneration.CfgToDag
                 new List<string>
                 {
                     "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.BackedgeElim", "Boogie_Lang.TypingML",
-                    generatedAstToCfgProof ? beforeCfgProgAccess.TheoryName() : null,
                     beforeDagProgAccess.TheoryName(),
                     afterDagProgAccess.TheoryName(), 
                     generatePassificationProof ? phasesTheories.TheoryName(PhasesTheories.Phase.Passification) : "",
