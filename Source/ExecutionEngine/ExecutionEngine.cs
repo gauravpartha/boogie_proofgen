@@ -516,6 +516,7 @@ namespace Microsoft.Boogie
       
         IList<Block> unoptimizedBlocksCopies = proofGenInfo.GetUnoptimizedBlocks();
         IList<Block> optimizedBlocksOriginal = impl.Blocks;
+        // FIXME: <c>optimizedBlocksOriginal<c/> does not contain desugared commands while optimized does --> too many false positives
 
         int totalNumberOfCommandsA = 0;
         int totalNumberOfCommandsB = 0;
