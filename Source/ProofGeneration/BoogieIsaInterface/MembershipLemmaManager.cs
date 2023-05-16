@@ -298,7 +298,7 @@ namespace ProofGeneration.BoogieIsaInterface
             if (lookupVarTyLemmas.TryGetValue(v, out var result))
                 return QualifyAccessName(result.Name+"(1)"); 
 
-            return parent.LookupVarTyLemma(v);
+            return parent.LookupVarDeclLemma(v);
         }
 
         public string LookupVarTyLemma(Variable v)
