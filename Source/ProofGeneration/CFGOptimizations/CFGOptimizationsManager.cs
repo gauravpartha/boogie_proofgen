@@ -24,15 +24,15 @@ public class CfgOptimizationsManager
     CFGRepr beforeOptimizations,
     CFGRepr afterOptimizations,
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
-    IProgramAccessor afterCfgProgAccess, //before CFG optimizations
-    IProgramAccessor beforeDagProgAcces) //after CFG optimizations
+    IProgramAccessor beforeOptCfgProgAcccess, //before CFG optimizations
+    IProgramAccessor afterOptCfgProgAccess) //after CFG optimizations
     
   {
     
     var varContextName = "\\<Lambda>";
     var varContextAbbrev = new AbbreviationDecl(
       varContextName,
-      new Tuple<IList<Term>, Term>(new List<Term>(), beforeDagProgAcces.VarContext()));
+      new Tuple<IList<Term>, Term>(new List<Term>(), afterOptCfgProgAccess.VarContext()));
     
     var funContextWfName = "Wf_Fun";
 
@@ -46,8 +46,8 @@ public class CfgOptimizationsManager
     
     
     var lemmaManager = new CFGOptimizationsLemmaManager(
-      beforeDagProgAcces,
-      afterCfgProgAccess,
+      afterOptCfgProgAccess,
+      beforeOptCfgProgAcccess,
       BoogieContext,
       beforeOptimizations,
       afterOptimizations,
@@ -96,8 +96,8 @@ public class CfgOptimizationsManager
     List<string> importTheories = new List<string>
     {
       "Boogie_Lang.Ast", "Boogie_Lang.Ast_Cfg_Transformation", "Boogie_Lang.Semantics", "Boogie_Lang.Util", "CFGOptimizationsLoop",
-      beforeDagProgAcces.TheoryName(),
-      afterCfgProgAccess.TheoryName()
+      afterOptCfgProgAccess.TheoryName(),
+      beforeOptCfgProgAcccess.TheoryName()
     };
     
     return new Theory(

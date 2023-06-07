@@ -986,7 +986,7 @@ namespace ProofGeneration
                 beforeOptimizationsCFG,
                 beforeDagCfg,
                 beforeOptimizationsOrigBlock,
-                beforeAstToCfgProgAccess,
+                unoptimizedCfgProgAccess,
                 beforeCfgToDagProgAccess);
               theories.Add(cfgOptimizationsProofTheory);
               
