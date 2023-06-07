@@ -7,12 +7,14 @@
             Vc,
             Passification,
             CfgToDag,
+            CfgOptimizations,
             AstToCfg
         }
 
         private readonly string astToCfgTheoryName;
         private readonly string cfgToDagTheoryName;
         private readonly string passificationTheoryName;
+        private readonly string CfgOptimizationsTheoryName;
 
         private readonly string vcPhaseTheoryName;
 
@@ -22,6 +24,7 @@
             vcPhaseTheoryName = prefix + "_vcphase_proof";
             passificationTheoryName = prefix + "_passification_proof";
             cfgToDagTheoryName = prefix + "_cfgtodag_proof";
+            CfgOptimizationsTheoryName = prefix + "_cfgoptimizations_proof";
             astToCfgTheoryName = prefix + "_asttocfg_proof";
         }
 
@@ -35,6 +38,8 @@
                     return passificationTheoryName;
                 case Phase.CfgToDag:
                     return cfgToDagTheoryName;
+                case Phase.CfgOptimizations:
+                    return CfgOptimizationsTheoryName;
                 case Phase.AstToCfg:
                     return astToCfgTheoryName;
                 default:

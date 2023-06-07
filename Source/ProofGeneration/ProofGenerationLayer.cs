@@ -12,6 +12,7 @@ using ProofGeneration.ASTRepresentation;
 using ProofGeneration.AstToCfg;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
+using ProofGeneration.CFGOptimizations;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.CfgToDag;
 using ProofGeneration.Passification;
@@ -972,6 +973,23 @@ namespace ProofGeneration
                 afterOptimizationsVarTranslationFactory);
               theories.Add(cfgToDagProofTheory);
 
+              #endregion
+            }
+
+            //TODO: change flag to proof flag
+            if (_proofGenConfig.GenerateUnoptimizedCfgProg(proofGenInfo.GetOptimizationsFlag()))
+            {
+              #region cfg optimizations
+              
+              var cfgOptimizationsProofTheory = CfgOptimizationsManager.CfgOptProof(
+                phasesTheories,
+                beforeOptimizationsCFG,
+                beforeDagCfg,
+                beforeOptimizationsOrigBlock,
+                beforeAstToCfgProgAccess,
+                beforeCfgToDagProgAccess);
+              theories.Add(cfgOptimizationsProofTheory);
+              
               #endregion
             }
 
