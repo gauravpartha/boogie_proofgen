@@ -24,15 +24,15 @@ public class CfgOptimizationsManager
     CFGRepr beforeOptimizations,
     CFGRepr afterOptimizations,
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
-    IProgramAccessor afterCfgProgAccess, //before CFG optimizations
-    IProgramAccessor beforeDagProgAcces) //after CFG optimizations
+    IProgramAccessor beforeOptCfgProgAcccess, //before CFG optimizations
+    IProgramAccessor afterOptCfgProgAccess) //after CFG optimizations
     
   {
     
     var varContextName = "\\<Lambda>";
     var varContextAbbrev = new AbbreviationDecl(
       varContextName,
-      new Tuple<IList<Term>, Term>(new List<Term>(), beforeDagProgAcces.VarContext()));
+      new Tuple<IList<Term>, Term>(new List<Term>(), afterOptCfgProgAccess.VarContext()));
     
     var funContextWfName = "Wf_Fun";
 
@@ -46,8 +46,8 @@ public class CfgOptimizationsManager
     
     
     var lemmaManager = new CFGOptimizationsLemmaManager(
-      beforeDagProgAcces,
-      afterCfgProgAccess,
+      afterOptCfgProgAccess,
+      beforeOptCfgProgAcccess,
       BoogieContext,
       beforeOptimizations,
       afterOptimizations,
@@ -68,43 +68,38 @@ public class CfgOptimizationsManager
       Block afterBlock = beforeToAfter[beforeBlock];
       if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //If there is an assume or assert false statement in the block
       {
-        var pruning = lemmaManager.GlobalBlockLemmaPruning(beforeBlock, afterBlock, null, null);
+        var pruning = lemmaManager.GlobalBlockLemmaPruningNotCoalesced(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
         outerDecls.Add(pruning);
       }
-      else //otherwhise we just need to apply the normal global block lemma
+      else //otherwhise we just need to apply the normal global block lemma. Assumption: Global Block Lemma holds for all successors
       {
-        if (beforeBlock.succCount == 0) //if the block has no successors
-        {
-          proofMethods.Add(ProofUtil.Apply("rule loopBlock_global_block"));
-          proofMethods.Add(ProofUtil.Apply("rule p_unoptimized_cfg_prog.outEdges_" + beforeBlock.UniqueId));
-          proofMethods.Add(ProofUtil.Apply("auto[1]"));
-          proofMethods.Add(ProofUtil.Apply("auto[1]"));
-          proofMethods.Add(ProofUtil.Apply("rule p_before_cfg_to_dag_prog.node_" + afterBlock.UniqueId));
-          proofMethods.Add(ProofUtil.Apply("rule p_unoptimized_cfg_prog.node_" + beforeBlock.UniqueId));
-          proofMethods.Add(ProofUtil.Apply("unfold p_before_cfg_to_dag_prog.block_" + afterBlock.UniqueId + "_def p_unoptimized_cfg_prog.block_" + beforeBlock.UniqueId + "_def"));
-          proofMethods.Add(ProofUtil.Apply("simp"));
-          proofMethods.Add("done");
-          
-        }
-        else //Block was not coalesced and has successors. Assumption: Global Block Lemma holds for all successors
-        {
-          proofMethods.Add("");
-        }
+        var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
+        outerDecls.Add(globalBlock);
       }
     }
 
     List<string> importTheories = new List<string>
     {
-      "Boogie_Lang.Ast", "Boogie_Lang.Ast_Cfg_Transformation", "Boogie_Lang.Semantics", "Boogie_Lang.Util", "CFGOptimizationsLoop",
-      beforeDagProgAcces.TheoryName(),
-      afterCfgProgAccess.TheoryName()
+      "Boogie_Lang.Ast", "Boogie_Lang.Ast_Cfg_Transformation", "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.CFGOptimizationsLoop",
+      afterOptCfgProgAccess.TheoryName(),
+      beforeOptCfgProgAcccess.TheoryName()
     };
     
     return new Theory(
-      phasesTheories.TheoryName(PhasesTheories.Phase.CfgOptimizations), //TODO: Make sure that I did that correctly
+      phasesTheories.TheoryName(PhasesTheories.Phase.CfgOptimizations),
       importTheories,
       outerDecls
     ); 
+  }
+  
+  private static string GetGlobalBlockLemmaName(Block b, IsaUniqueNamer namer)
+  {
+    return "global_block_lemma_" + namer.GetName(b, "block_" + b.Label);
+  }
+  
+  private static string GetHybridBlockLemmaName(Block b, IsaUniqueNamer namer)
+  {
+    return "hybrid_block_lemma_" + namer.GetName(b, "block_" + b.Label);
   }
 
   

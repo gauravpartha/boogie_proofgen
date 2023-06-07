@@ -105,7 +105,7 @@
 
         public bool GenerateUnoptimizedCfgProg(bool optimizationsHaveAnEffect)
         {
-          return optimizationsHaveAnEffect && GenerateAstCfgProof;
+          return optimizationsHaveAnEffect;
         }
 
         public bool GenerateBeforeCfgDagProg(bool optimizationsHaveAnEffect)

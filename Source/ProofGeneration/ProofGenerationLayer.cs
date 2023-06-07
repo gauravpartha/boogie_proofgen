@@ -38,6 +38,7 @@ namespace ProofGeneration
         private static IDictionary<Block, Block> beforeOptimizationsOrigBlock;
         private static IDictionary<Block, Block> beforeDagOrigBlock;
         private static IDictionary<Block, Block> beforeDagAfterDagBlock;
+        private static IDictionary<Block, Block> beforeOptAfterOptBlock;
         
         private static CFGRepr beforeOptimizationsCFG;
 
@@ -240,6 +241,7 @@ namespace ProofGeneration
 
             // compute mapping between copied blocks (before dag -> after dag)
             var origToAfterDag = beforePassiveOrigBlock.InverseDict();
+            
 
             beforeDagAfterDagBlock = DictionaryComposition(beforeDagOrigBlock, origToAfterDag);
         }
@@ -981,12 +983,17 @@ namespace ProofGeneration
             {
               #region cfg optimizations
               
+              // compute mapping between copied blocks (before opt -> after opt)
+              var origToAfterOpt = beforeDagOrigBlock.InverseDict();
+              beforeOptAfterOptBlock = DictionaryComposition(beforeOptimizationsOrigBlock, origToAfterOpt);
+              
+              
               var cfgOptimizationsProofTheory = CfgOptimizationsManager.CfgOptProof(
                 phasesTheories,
                 beforeOptimizationsCFG,
                 beforeDagCfg,
-                beforeOptimizationsOrigBlock,
-                beforeAstToCfgProgAccess,
+                beforeOptAfterOptBlock, //not sure if this is correct
+                unoptimizedCfgProgAccess,
                 beforeCfgToDagProgAccess);
               theories.Add(cfgOptimizationsProofTheory);
               
