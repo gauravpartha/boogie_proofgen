@@ -46,8 +46,8 @@ public class CfgOptimizationsManager
     
     
     var lemmaManager = new CFGOptimizationsLemmaManager(
-      afterOptCfgProgAccess,
       beforeOptCfgProgAcccess,
+      afterOptCfgProgAccess,
       BoogieContext,
       beforeOptimizations,
       afterOptimizations,
@@ -65,16 +65,19 @@ public class CfgOptimizationsManager
     //In a first try I assume that there is no block coalescing and no loops
     foreach (Block beforeBlock in beforeOptimizations.GetBlocksBackwards())
     {
-      Block afterBlock = beforeToAfter[beforeBlock];
-      if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //If there is an assume or assert false statement in the block
+      if (beforeToAfter.Keys.Contains(beforeBlock))
       {
-        var pruning = lemmaManager.GlobalBlockLemmaPruningNotCoalesced(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
-        outerDecls.Add(pruning);
-      }
-      else //otherwhise we just need to apply the normal global block lemma. Assumption: Global Block Lemma holds for all successors
-      {
-        var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
-        outerDecls.Add(globalBlock);
+        Block afterBlock = beforeToAfter[beforeBlock];
+        if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //If there is an assume or assert false statement in the block
+        {
+          var pruning = lemmaManager.GlobalBlockLemmaPruningNotCoalesced(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
+          outerDecls.Add(pruning);
+        }
+        else //otherwhise we just need to apply the normal global block lemma. Assumption: Global Block Lemma holds for all successors
+        {
+          var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer));
+          outerDecls.Add(globalBlock);
+        }
       }
     }
 

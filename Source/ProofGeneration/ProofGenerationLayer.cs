@@ -588,7 +588,11 @@ namespace ProofGeneration
             IList<Block> unoptimizedCfgBlocks = proofGenInfo.GetUnoptimizedBlocks(); 
             var newToOldInternal = new Dictionary<Block, Block>();
             unoptimizedCfgBlocks.ZipDo(afterPassificationImpl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
-            beforeOptimizationsOrigBlock = newToOldInternal;
+            IDictionary<Block, Block> mappingOrigBlockToUnoptimizedCopy =
+              proofGenInfo.GetMappingOrigBlockToUnoptimizedCopy();
+            IDictionary<Block, Block> mappingUnoptimizedCopyToOrigBlock =
+              mappingOrigBlockToUnoptimizedCopy.InverseDict();
+            beforeOptimizationsOrigBlock = mappingUnoptimizedCopyToOrigBlock;
 
             BoogieMethodData beforeOptimizationsData;
 
@@ -1013,10 +1017,7 @@ namespace ProofGeneration
               IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock =
                 proofGenInfo.GetMappingOrigBigBlockToOrigBlock();
 
-              IDictionary<Block, Block> mappingOrigBlockToUnoptimizedCopy =
-                proofGenInfo.GetMappingOrigBlockToUnoptimizedCopy();
-              IDictionary<Block, Block> mappingUnoptimizedCopyToOrigBlock =
-                mappingOrigBlockToUnoptimizedCopy.InverseDict();
+              
 
               IDictionary<Block, Block> mappingOrigBlockToCopyBlock = beforeDagOrigBlock.InverseDict();
 
