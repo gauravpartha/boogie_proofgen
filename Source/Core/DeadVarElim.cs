@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.Boogie.GraphUtil;
 using System.Diagnostics.Contracts;
 
+
 namespace Microsoft.Boogie
 {
   public class UnusedVarEliminator : VariableCollector
@@ -478,14 +479,19 @@ namespace Microsoft.Boogie
 
       return multiPredBlocks;
     }
+    
+ 
 
     public override Implementation VisitImplementation(Implementation impl)
     {
+      
+      IDictionary<int, int> CoalescedBlocksToTarget = new Dictionary<int, int>();
+      IDictionary<int, List <int>> ListCoalescedBlocks = new Dictionary<int, List<int>>();
+      
       //Contract.Requires(impl != null);
       Contract.Ensures(Contract.Result<Implementation>() != null);
       //Console.WriteLine("Procedure {0}", impl.Name);
       //Console.WriteLine("Initial number of blocks = {0}", impl.Blocks.Count);
-
       HashSet<Block /*!*/> multiPredBlocks = ComputeMultiPredecessorBlocks(impl);
       Contract.Assert(cce.NonNullElements(multiPredBlocks));
       HashSet<Block /*!*/> visitedBlocks = new HashSet<Block /*!*/>();
@@ -524,8 +530,24 @@ namespace Microsoft.Boogie
         {
           Block /*!*/
             succ = cce.NonNull(gotoCmd.labelTargets[0]);
+
           if (!multiPredBlocks.Contains(succ))
           {
+            if (!ListCoalescedBlocks.ContainsKey(b.UniqueId))
+            {
+              List<int> newList = new List<int>();
+              newList.Add(b.UniqueId);
+              ListCoalescedBlocks.Add(b.UniqueId, newList);
+            }
+            ListCoalescedBlocks[b.UniqueId].Add(succ.UniqueId);
+            if (!CoalescedBlocksToTarget.ContainsKey(succ.UniqueId))
+            {
+              CoalescedBlocksToTarget.Add(succ.UniqueId, b.UniqueId);
+            }
+            if (!CoalescedBlocksToTarget.ContainsKey(b.UniqueId))
+            {
+              CoalescedBlocksToTarget.Add(b.UniqueId, b.UniqueId);
+            }
             foreach (Cmd /*!*/ cmd in succ.Cmds)
             {
               Contract.Assert(cmd != null);
@@ -579,6 +601,8 @@ namespace Microsoft.Boogie
         }
       }
 
+      impl.CoalescedBlocksToTarget = CoalescedBlocksToTarget;
+      impl.ListCoalescedBlocks = ListCoalescedBlocks;
       // Console.WriteLine("Final number of blocks = {0}", impl.Blocks.Count);
       return impl;
     }

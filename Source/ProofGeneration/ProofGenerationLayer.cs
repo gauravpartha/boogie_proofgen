@@ -38,8 +38,7 @@ namespace ProofGeneration
         private static IDictionary<Block, Block> beforeOptimizationsOrigBlock;
         private static IDictionary<Block, Block> beforeDagOrigBlock;
         private static IDictionary<Block, Block> beforeDagAfterDagBlock;
-        private static IDictionary<Block, Block> beforeOptAfterOptBlock;
-        
+
         private static CFGRepr beforeOptimizationsCFG;
 
         private static CFGRepr beforeDagCfg;
@@ -733,7 +732,7 @@ namespace ProofGeneration
                   new List<string>
                   {
                     "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
-                    _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess.TheoryName() : globalDataProgAccess.TheoryName()
+                    _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess.TheoryName() : "\"../"+globalDataProgAccess.TheoryName()+"\""
                   },
                   programDeclsUnoptimizedCfg);
                 theories.Add(unoptimizedCfgProgTheory);
@@ -989,7 +988,7 @@ namespace ProofGeneration
               
               // compute mapping between copied blocks (before opt -> after opt)
               var origToAfterOpt = beforeDagOrigBlock.InverseDict();
-              beforeOptAfterOptBlock = DictionaryComposition(beforeOptimizationsOrigBlock, origToAfterOpt);
+              IDictionary<Block, Block> beforeOptAfterOptBlock = DictionaryComposition(beforeOptimizationsOrigBlock, origToAfterOpt);
               
               
               var cfgOptimizationsProofTheory = CfgOptimizationsManager.CfgOptProof(
@@ -998,7 +997,9 @@ namespace ProofGeneration
                 beforeDagCfg,
                 beforeOptAfterOptBlock, //not sure if this is correct
                 unoptimizedCfgProgAccess,
-                beforeCfgToDagProgAccess);
+                beforeCfgToDagProgAccess,
+                afterPassificationImpl.ListCoalescedBlocks,
+                afterPassificationImpl.CoalescedBlocksToTarget);
               theories.Add(cfgOptimizationsProofTheory);
               
               #endregion

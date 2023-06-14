@@ -12,6 +12,7 @@ using ProofGeneration.CFGRepresentation;
 using ProofGeneration.Util;
 
 
+
 namespace ProofGeneration.CFGOptimizations;
 
 public class CfgOptimizationsManager
@@ -25,8 +26,9 @@ public class CfgOptimizationsManager
     CFGRepr afterOptimizations,
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
     IProgramAccessor beforeOptCfgProgAcccess, //before CFG optimizations
-    IProgramAccessor afterOptCfgProgAccess) //after CFG optimizations
-    
+    IProgramAccessor afterOptCfgProgAccess, //after CFG optimizationsList<(Block, Block)> CoalescedBlocks
+    IDictionary<int, List <int>> ListCoalescedBlocks, //TODO: Optimize CFGOptimizationsLemmaManager by using this dictionary
+    IDictionary<int, int> CoalescedBlocksToTarget)
   {
     
     var varContextName = "\\<Lambda>";
@@ -36,19 +38,10 @@ public class CfgOptimizationsManager
     
     var funContextWfName = "Wf_Fun";
 
-    
-    var BoogieContext = new BoogieContextIsa(
-      IsaCommonTerms.TermIdentFromName("A"),
-      IsaCommonTerms.TermIdentFromName("M"),
-      IsaCommonTerms.TermIdentFromName(varContextName),
-      IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
-      IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    
-    
+
     var lemmaManager = new CFGOptimizationsLemmaManager(
       beforeOptCfgProgAcccess,
       afterOptCfgProgAccess,
-      BoogieContext,
       beforeOptimizations,
       afterOptimizations,
       funContextWfName,
@@ -61,29 +54,74 @@ public class CfgOptimizationsManager
     outerDecls.Add(varContextAbbrev);
     outerDecls.Add(new DeclareDecl("Nat.One_nat_def[simp del]"));
     List<string> proofMethods = new List<string>();
-    
-    //In a first try I assume that there is no block coalescing and no loops
-    foreach (Block beforeBlock in beforeOptimizations.GetBlocksBackwards())
+    Block coalescedAfterBlock = new Block();
+    //assumption: no loops
+    foreach (Block beforeBlock in beforeOptimizations.GetBlocksForwards())
     {
-      if (beforeToAfter.Keys.Contains(beforeBlock))
+      if (CoalescedBlocksToTarget.ContainsKey(beforeBlock.UniqueId)) //in this case we have block coalescing
       {
-        Block afterBlock = beforeToAfter[beforeBlock];
-        if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //If there is an assume or assert false statement in the block
+        if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //Pruning of Unreachable Blocks Coalesced
         {
-          var pruning = lemmaManager.GlobalBlockLemmaPruningNotCoalesced(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
-          outerDecls.Add(pruning);
+          coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+          var pruningCoalesced = lemmaManager.HybridBlockLemmaPruning(beforeBlock, coalescedAfterBlock,
+            bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer));
+          outerDecls.Add(pruningCoalesced);
         }
-        else //otherwhise we just need to apply the normal global block lemma. Assumption: Global Block Lemma holds for all successors
+        else if (beforeToAfter.ContainsKey(beforeBlock)) //head
         {
-          var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer));
-          outerDecls.Add(globalBlock);
+          Block afterBlock = beforeToAfter[beforeBlock];
+          var head = lemmaManager.HybridBlockLemma(beforeBlock, afterBlock,
+            beforeOptimizations.GetSuccessorBlocks(beforeBlock).FirstOrDefault(),
+            bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
+            bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer));
+          outerDecls.Add(head);
+          var convertGlobalBlock = lemmaManager.ConvertHybridToGlobal(beforeBlock, afterBlock,
+            bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
+            bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer));
+          outerDecls.Add(convertGlobalBlock);
+        }
+        else if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() != 1 || beforeOptimizations.GetSuccessorBlocks(beforeBlock).First().Predecessors.Count() != 1) //tail
+        {
+          coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+          
+          var tail = lemmaManager.HybridBlockLemmaTail(beforeBlock, coalescedAfterBlock,
+            bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
+            bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer));
+          outerDecls.Add(tail);
+        }
+        else //in Between Block
+        {
+          coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+          var inBetweenBlock = lemmaManager.HybridBlockLemma(beforeBlock, coalescedAfterBlock,
+            beforeOptimizations.GetSuccessorBlocks(beforeBlock).FirstOrDefault(),
+            bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
+            bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer));
+          outerDecls.Add(inBetweenBlock);
         }
       }
+      else //no block coalescing
+      {
+        if (beforeToAfter.Keys.Contains(beforeBlock))
+        {
+          Block afterBlock = beforeToAfter[beforeBlock];
+          if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //If there is an assume or assert false statement in the block
+          {
+            var pruning = lemmaManager.GlobalBlockLemmaPruningNotCoalesced(beforeBlock, afterBlock, GetGlobalBlockLemmaName(beforeBlock, lemmaNamer));
+            outerDecls.Add(pruning);
+          }
+          else //otherwhise we just need to apply the normal global block lemma. Assumption: Global Block Lemma holds for all successors
+          {
+            var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer));
+            outerDecls.Add(globalBlock);
+          }
+        }
+      }
+      
     }
 
     List<string> importTheories = new List<string>
     {
-      "Boogie_Lang.Ast", "Boogie_Lang.Ast_Cfg_Transformation", "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.CFGOptimizationsLoop",
+      "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.CFGOptimizations", "Boogie_Lang.CFGOptimizationsLoop",
       afterOptCfgProgAccess.TheoryName(),
       beforeOptCfgProgAcccess.TheoryName()
     };
@@ -103,6 +141,18 @@ public class CfgOptimizationsManager
   private static string GetHybridBlockLemmaName(Block b, IsaUniqueNamer namer)
   {
     return "hybrid_block_lemma_" + namer.GetName(b, "block_" + b.Label);
+  }
+
+  private static Block GetCoalescedAfterBlock(Block b, IDictionary<Block, Block> beforeToAfter, IDictionary<int, int> CoalescedBlocksToTarget)
+  {
+    foreach (Block beforeBlockNew in beforeToAfter.Keys) //Get the Coalesced After Block
+    {
+      if (beforeToAfter[beforeBlockNew].UniqueId == CoalescedBlocksToTarget[b.UniqueId])
+      {
+        return beforeToAfter[beforeBlockNew];
+      }
+    }
+    return null;
   }
 
   
