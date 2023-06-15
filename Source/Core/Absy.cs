@@ -4116,11 +4116,16 @@ namespace Microsoft.Boogie
     // Blocks before applying passification etc.
     // Both are used only when /inline is set.
     public List<Block /*!*/> OriginalBlocks;
-    public IDictionary<int, List <int>> ListCoalescedBlocks;
-    public IDictionary<int, int> CoalescedBlocksToTarget;
+    
     public List<Variable> OriginalLocVars;
+    
 
     public readonly ISet<byte[]> AssertionChecksums = new HashSet<byte[]>(ChecksumComparer.Default);
+    
+    #region  ProofGen
+    public IDictionary<int, List <int>> ListCoalescedBlocks;
+    public IDictionary<int, int> CoalescedBlocksToTarget;
+    #endregion 
 
     public sealed class ChecksumComparer : IEqualityComparer<byte[]>
     {

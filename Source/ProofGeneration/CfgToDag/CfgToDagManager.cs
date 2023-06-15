@@ -35,7 +35,8 @@ namespace ProofGeneration.CfgToDag
             IDictionary<Block, Block> beforeToAfter,
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
-            IVariableTranslationFactory varFactory)
+            IVariableTranslationFactory varFactory,
+            out IDictionary<Block, IList<Block>> beforeDagBlockToLoops)
         {
             var afterToBefore = beforeToAfter.InverseDict();
 
@@ -63,6 +64,8 @@ namespace ProofGeneration.CfgToDag
                     var loopsList = loops.ToList();
                     blocksToLoops.Add(beforeBlock, loopsList);
                 }
+
+            beforeDagBlockToLoops = blocksToLoops;
 
             var varContextName = "\\<Lambda>1";
             var varContextAbbrev = new AbbreviationDecl(

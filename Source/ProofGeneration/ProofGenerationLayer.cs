@@ -951,6 +951,8 @@ namespace ProofGeneration
               #endregion
             }
 
+            IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = null;
+
             if (_proofGenConfig.GenerateCfgDagProof)
             {
               #region cfg to dag
@@ -975,7 +977,8 @@ namespace ProofGeneration
                 beforeDagAfterDagBlock,
                 beforeCfgToDagProgAccess,
                 beforePassiveProgAccess,
-                afterOptimizationsVarTranslationFactory);
+                afterOptimizationsVarTranslationFactory,
+                out beforeDagBlocktoLoops);
               theories.Add(cfgToDagProofTheory);
 
               #endregion
@@ -999,8 +1002,9 @@ namespace ProofGeneration
                 unoptimizedCfgProgAccess,
                 beforeCfgToDagProgAccess,
                 afterPassificationImpl.ListCoalescedBlocks,
-                afterPassificationImpl.CoalescedBlocksToTarget);
-              theories.Add(cfgOptimizationsProofTheory);
+                afterPassificationImpl.CoalescedBlocksToTarget, 
+                beforeDagBlocktoLoops);
+              theories.Add(cfgOptimizationsProofTheory); 
               
               #endregion
             }
