@@ -303,6 +303,7 @@ public class CFGOptimizationsLemmaManager
     {
       "apply (rule extend_hybrid_global_block_lemma_loop)",
       "apply (rule " + HybridblockLemmaName(succ) + ")",
+      //beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma()
       "apply (rule p_unoptimized_cfg_prog.node_" + beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock] +")",
       "apply (rule p_unoptimized_cfg_prog.outEdges_" + beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock] + ")",
       "by simp"

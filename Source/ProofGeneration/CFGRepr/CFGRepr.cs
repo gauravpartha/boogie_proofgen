@@ -1,13 +1,15 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using Microsoft.Boogie;
+using ProofGenUtil;
 
 namespace ProofGeneration.CFGRepresentation
 {
     public class CFGRepr
     {
-        private readonly Block[] blocks;
+        private Block[] blocks; //make sure that I can change that from readonly
         public readonly Block entry;
         private readonly IDictionary<Block, int> labeling;
         private readonly IDictionary<Block, IList<Block>> outgoingBlocks;
@@ -75,5 +77,99 @@ namespace ProofGeneration.CFGRepresentation
             for (var i = blocks.Length - 1; i >= 0; i--)
                 yield return blocks[i];
         }
+        
+        
+        //TODO: Check if this is correct
+        public CFGRepr(CFGRepr other)
+        {
+          // Copy blocks array
+          blocks = new Block[other.blocks.Length];
+          Array.Copy(other.blocks, blocks, other.blocks.Length);
+
+          // Copy outgoingBlocks dictionary
+          outgoingBlocks = new Dictionary<Block, IList<Block>>();
+          foreach (var kvp in other.outgoingBlocks)
+          {
+            outgoingBlocks.Add(kvp.Key, new List<Block>(kvp.Value));
+          }
+          
+        
+          // Copy labeling dictionary
+          labeling = new Dictionary<Block, int>();
+          foreach (var kvp in other.labeling)
+          {
+            labeling.Add(kvp.Key, kvp.Value);
+          }
+          
+
+          // Copy entry block
+          entry = other.entry;
+        }
+        
+        public CFGRepr Copy()
+        {
+          return new CFGRepr(this);
+        }
+        
+        public void DeleteBlock(Block block)
+        {
+          if (!ContainsBlock(block))
+          {
+            throw new ArgumentException("Block does not exist in the CFG.");
+          }
+
+          // Remove block from the blocks array
+          int index = GetUniqueIntLabel(block);
+          
+          var blocks_new = new Block[blocks.Length - 1];
+          
+          for (int i = 0, j = 0; i < blocks.Length; i++) 
+          {
+            if (i == index) 
+            {
+              continue;
+            }
+            blocks_new[j] = blocks[i];
+            j++;
+          }
+
+          blocks = blocks_new;
+
+          // Remove block from the outgoingBlocks dictionary
+          outgoingBlocks.Remove(block);
+
+          // Remove block from the labeling dictionary
+          labeling.Remove(block);
+
+          // Remove block from the successors of other blocks
+          foreach (var kvp in outgoingBlocks)
+          {
+            kvp.Value.Remove(block);
+          }
+        }
+
+        public void DeleteBackedges(IDictionary<Block, IList<Block>> BlockToLoops)
+        {
+          foreach (Block b in blocks)
+          {
+            List<Block> Backedges = new List<Block>();
+            foreach (Block succ in GetSuccessorBlocks(b))
+            {
+              if (BlockToLoops[b].Contains(succ))
+              {
+                Backedges.Add(succ);
+              } 
+            }
+            foreach (Block toRemove in Backedges)
+            {
+              outgoingBlocks[b].Remove(toRemove);
+            }
+          }
+        }
+        
+        
+
+        
+        
     }
 }
