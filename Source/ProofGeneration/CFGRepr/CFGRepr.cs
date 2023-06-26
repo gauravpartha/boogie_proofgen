@@ -110,43 +110,6 @@ namespace ProofGeneration.CFGRepresentation
         {
           return new CFGRepr(this);
         }
-        
-        public void DeleteBlock(Block block)
-        {
-          if (!ContainsBlock(block))
-          {
-            throw new ArgumentException("Block does not exist in the CFG.");
-          }
-
-          // Remove block from the blocks array
-          int index = GetUniqueIntLabel(block);
-          
-          var blocks_new = new Block[blocks.Length - 1];
-          
-          for (int i = 0, j = 0; i < blocks.Length; i++) 
-          {
-            if (i == index) 
-            {
-              continue;
-            }
-            blocks_new[j] = blocks[i];
-            j++;
-          }
-
-          blocks = blocks_new;
-
-          // Remove block from the outgoingBlocks dictionary
-          outgoingBlocks.Remove(block);
-
-          // Remove block from the labeling dictionary
-          labeling.Remove(block);
-
-          // Remove block from the successors of other blocks
-          foreach (var kvp in outgoingBlocks)
-          {
-            kvp.Value.Remove(block);
-          }
-        }
 
         public void DeleteBackedges(IDictionary<Block, IList<Block>> BlockToLoops)
         {

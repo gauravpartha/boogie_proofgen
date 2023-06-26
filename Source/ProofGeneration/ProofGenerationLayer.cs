@@ -1003,7 +1003,8 @@ namespace ProofGeneration
                 beforeCfgToDagProgAccess,
                 afterPassificationImpl.ListCoalescedBlocks,
                 afterPassificationImpl.CoalescedBlocksToTarget, 
-                beforeDagBlocktoLoops);
+                beforeDagBlocktoLoops,
+                vcAssm);
               theories.Add(cfgOptimizationsProofTheory); 
               
               #endregion
