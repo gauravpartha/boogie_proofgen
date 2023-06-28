@@ -35,38 +35,13 @@ namespace ProofGeneration.CfgToDag
             IDictionary<Block, Block> beforeToAfter,
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
-            IVariableTranslationFactory varFactory,
-            out IDictionary<Block, IList<Block>> beforeDagBlockToLoops)
+            IVariableTranslationFactory varFactory)
         {
             var afterToBefore = beforeToAfter.InverseDict();
 
             //track mapping from blocks to loops that the block is contained in and for which it is not the loop head
-            IDictionary<Block, IList<Block>> blocksToLoops = new Dictionary<Block, IList<Block>>();
-
-            foreach (var afterBlock in afterDagCfg.GetBlocksBackwards())
-                if (afterToBefore.TryGetValue(afterBlock, out var beforeBlock))
-                {
-                    var loops = new HashSet<Block>();
-                    foreach (var bSuc in beforeDagCfg.GetSuccessorBlocks(beforeBlock))
-                        if (blocksToLoops.TryGetValue(bSuc, out var loopsSuc))
-                            //if successor inside of a loop L and the block is not the loop head of L, then the block is also inside L
-                            foreach (var loopSuc in loopsSuc)
-                                if (!loopSuc.Equals(beforeBlock))
-                                    loops.Add(loopSuc);
-                    /* a node is inside all loops for which it has an out-going backedge
-                       if a node has a backedge to itself (i.e., it is also a loop head), then we do not add this loop
-                     */
-                    if (hintManager.TryIsBackedgeNode(beforeBlock, out var backedgeLoops))
-                        foreach (var backedgeLoop in backedgeLoops)
-                            if (beforeBlock != backedgeLoop)
-                                loops.Add(backedgeLoop);
-
-                    var loopsList = loops.ToList();
-                    blocksToLoops.Add(beforeBlock, loopsList);
-                }
-
-            beforeDagBlockToLoops = blocksToLoops;
-
+            IDictionary<Block, IList<Block>> blocksToLoops = ProofGenerationLayer.getBeforeDagBlockToLoops(beforeToAfter, afterDagCfg, hintManager);
+            
             var varContextName = "\\<Lambda>1";
             var varContextAbbrev = new AbbreviationDecl(
                 varContextName,

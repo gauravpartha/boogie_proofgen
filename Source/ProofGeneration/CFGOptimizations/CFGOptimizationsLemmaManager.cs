@@ -690,9 +690,13 @@ public class CFGOptimizationsLemmaManager
 
   private static bool isLoopHead(Block b, CFGRepr beforeOptimizations, IDictionary<Block, IList<Block>> beforeOptBlockToLoops, IDictionary<Block, Block> beforeToAfter)
   {
+    if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(b))
+    {
+      return false;
+    }
     foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(b))
     {
-      if (beforeOptBlockToLoops[b].Count < beforeOptBlockToLoops[succ].Count && beforeToAfter.ContainsKey(b))
+      if (beforeToAfter.ContainsKey(b) && beforeOptBlockToLoops[b].Count < beforeOptBlockToLoops[succ].Count)
       {
         return true;
       }

@@ -926,6 +926,7 @@ namespace ProofGeneration
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             */
+            //TODO: do computation
 
             if (_proofGenConfig.GeneratePassifProof)
             {
@@ -951,7 +952,7 @@ namespace ProofGeneration
               #endregion
             }
 
-            IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = null;
+            
 
             if (_proofGenConfig.GenerateCfgDagProof)
             {
@@ -977,8 +978,7 @@ namespace ProofGeneration
                 beforeDagAfterDagBlock,
                 beforeCfgToDagProgAccess,
                 beforePassiveProgAccess,
-                afterOptimizationsVarTranslationFactory,
-                out beforeDagBlocktoLoops);
+                afterOptimizationsVarTranslationFactory);
               theories.Add(cfgToDagProofTheory);
 
               #endregion
@@ -992,13 +992,12 @@ namespace ProofGeneration
               // compute mapping between copied blocks (before opt -> after opt)
               var origToAfterOpt = beforeDagOrigBlock.InverseDict();
               IDictionary<Block, Block> beforeOptAfterOptBlock = DictionaryComposition(beforeOptimizationsOrigBlock, origToAfterOpt);
-              
-              
+              IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
               var cfgOptimizationsProofTheory = CfgOptimizationsManager.CfgOptProof(
                 phasesTheories,
                 beforeOptimizationsCFG,
                 beforeDagCfg,
-                beforeOptAfterOptBlock, //not sure if this is correct
+                beforeOptAfterOptBlock,
                 unoptimizedCfgProgAccess,
                 beforeCfgToDagProgAccess,
                 afterPassificationImpl.ListCoalescedBlocks,
@@ -1139,6 +1138,49 @@ namespace ProofGeneration
         public static BoogieIsaProgInterface BoogieIsaProgInterface()
         {
             return new BoogieIsaProgInterface(new Dictionary<string, IProgramAccessor>(procNameToTopLevelPrograms), globalDataProgAccess);
+        }
+
+        public static IDictionary<Block, IList<Block>> getBeforeDagBlockToLoops(IDictionary<Block, Block> beforeToAfter, CFGRepr afterDagCfg, CfgToDagHintManager hintManager)
+        {
+          var afterToBefore = beforeToAfter.InverseDict();
+          IDictionary<Block, IList<Block>> blocksToLoops = new Dictionary<Block, IList<Block>>();
+          foreach (var afterBlock in afterDagCfg.GetBlocksBackwards())
+          {
+            if (afterToBefore.TryGetValue(afterBlock, out var beforeBlock))
+            {
+              var loops = new HashSet<Block>();
+              foreach (var bSuc in beforeDagCfg.GetSuccessorBlocks(beforeBlock))
+              {
+                if (blocksToLoops.TryGetValue(bSuc, out var loopsSuc))
+                {
+                  //if successor inside of a loop L and the block is not the loop head of L, then the block is also inside L
+                  foreach (var loopSuc in loopsSuc)
+                  {
+                    if (!loopSuc.Equals(beforeBlock))
+                    {
+                      loops.Add(loopSuc);
+                    }
+                  }
+                }
+              }
+              /* a node is inside all loops for which it has an out-going backedge
+                if a node has a backedge to itself (i.e., it is also a loop head), then we do not add this loop
+              */
+              if (hintManager.TryIsBackedgeNode(beforeBlock, out var backedgeLoops))
+              {
+                foreach (var backedgeLoop in backedgeLoops)
+                {
+                  if (beforeBlock != backedgeLoop)
+                  {
+                    loops.Add(backedgeLoop);
+                  }
+                }
+              }
+              var loopsList = loops.ToList();
+              blocksToLoops.Add(beforeBlock, loopsList);
+            }
+          }
+          return blocksToLoops;
         }
     }
 }
