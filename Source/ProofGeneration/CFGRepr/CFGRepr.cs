@@ -125,6 +125,7 @@ namespace ProofGeneration.CFGRepresentation
             }
             foreach (Block toRemove in Backedges)
             {
+              toRemove.Predecessors.Remove(b);
               outgoingBlocks[b].Remove(toRemove);
             }
           }

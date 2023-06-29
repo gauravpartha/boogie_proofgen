@@ -104,18 +104,12 @@ public class CfgOptimizationsManager
     beforeOptimizationsCopy.DeleteBackedges(beforeOptBlockToLoops);
 
     List<Block> topoOrder = new List<Block>();
-    HashSet<Block> visited = new HashSet<Block>();
-    foreach (var current in beforeOptimizationsCopy.GetBlocksForwards())
-    {
-      if (!visited.Contains(current))
-      {
-        TopologicalOrder(current, topoOrder,  visited, beforeOptimizationsCopy);
-      }
-    }
+    TopologicalOrder(topoOrder, beforeOptimizationsCopy);
+    topoOrder.Reverse();
 
     foreach (var current in topoOrder)
     {
-      Block beforeBlock = FindBlock(beforeOptimizations, current.UniqueId);
+      Block beforeBlock = current;
       if (isLoopHead(beforeBlock, beforeOptimizations, beforeOptBlockToLoops, beforeToAfter) && CoalescedBlocksToTarget.ContainsKey(beforeBlock)) //In this case we have a coalesced loop head
       {
         coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
@@ -153,7 +147,7 @@ public class CfgOptimizationsManager
             ListCoalescedBlocks);
           outerDecls.Add(convertGlobalBlock);
         }
-        else if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() != 1 || beforeOptimizations.GetSuccessorBlocks(beforeBlock).First().Predecessors.Count() != 1) //tail of coalesced blocks
+        else if (ListCoalescedBlocks[beforeBlock].Count == 1) //tail of coalesced blocks
         {
           coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
           
@@ -269,34 +263,39 @@ public class CfgOptimizationsManager
   
   
   
-  public static Block FindBlock(CFGRepr cfg, int id) //TODO: remove
-  {
-    foreach (Block curr in cfg.GetBlocksForwards())
-    {
-      if (curr.UniqueId == id)
-      {
-        return curr;
-      }
-    }
-    return null;
-  }
 
-  private static void TopologicalOrder(Block current, List<Block> topoOrder, HashSet<Block> visited, CFGRepr beforeOptimizationsCopy)
+  private static void TopologicalOrder(List<Block> topoOrder, CFGRepr beforeOptimizationsCopy)
   {
-    if (!visited.Contains(current))
+    Dictionary<Block, int> inDegree = new Dictionary<Block, int>();
+    foreach (var b in beforeOptimizationsCopy.GetBlocksForwards())
     {
-      visited.Add(current);
-    }
-
-    foreach (var succ in beforeOptimizationsCopy.GetSuccessorBlocks(current))
-    {
-      if (!visited.Contains(current))
-      {
-        TopologicalOrder(succ,topoOrder, visited, beforeOptimizationsCopy);
-      }
+      inDegree.Add(b, b.Predecessors.Count());
     }
     
-    topoOrder.Add(current);
+    Queue<Block> q = new Queue<Block>();
+    foreach (var b in beforeOptimizationsCopy.GetBlocksForwards())
+    {
+      if (inDegree[b] == 0)
+      {
+        q.Enqueue(b);
+      }
+    }
+
+    while (q.Count > 0)
+    {
+      Block u = q.Dequeue();
+      topoOrder.Add(u);
+      foreach (var b in beforeOptimizationsCopy.GetSuccessorBlocks(u))
+      {
+        if (--inDegree[b] == 0)
+        {
+          q.Enqueue(b);
+        }
+      }
+      
+    }
+    
+    
   }
 
   
