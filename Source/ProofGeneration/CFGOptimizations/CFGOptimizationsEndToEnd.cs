@@ -43,7 +43,8 @@ public class CFGOptimizationsEndToEnd
     IProgramAccessor afterOptProgAccess,
     IProgramAccessor programAccessor,
     CFGRepr afterOptCFG,
-    PhasesTheories phasesTheories)
+    PhasesTheories phasesTheories,
+    string procedureName)
   {
     this.programAccessor = programAccessor;
     boogieContext = new BoogieContextIsa(
@@ -98,9 +99,9 @@ public class CFGOptimizationsEndToEnd
         new Proof(new List<string> {proofSb.ToString()})
       );
     result.Add(helperLemma);
-
-    var defProcWithoutDeadVar = new DefDecl("p_unoptimized_without_dead_vars", new Tuple<IList<Term>, Term>(new List<Term>(), IsaCommonTerms.TermIdentFromName("proc ⦇ proc_body := (Some (" + afterOptProgAccess.BlockInfo().getTheoryName() + ".locals_vdecls," + beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body)) ⦈")));
+    var defProcWithoutDeadVar = new DefDecl(procedureName + "_unoptimized_without_dead_vars", new Tuple<IList<Term>, Term>(new List<Term>(), IsaCommonTerms.TermIdentFromName("proc \\<lparr> proc_body := (Some (" + afterOptProgAccess.BlockInfo().getTheoryName() + ".locals_vdecls," + beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body)) \\<rparr>")));
     result.Add(defProcWithoutDeadVar);
+    
     
     var endToEndLemma = 
                 new LemmaDecl(
@@ -111,7 +112,7 @@ public class CFGOptimizationsEndToEnd
                         IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
                         IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
                         programAccessor.AxiomsDecl(),
-                        programAccessor.ProcDecl()),
+                        defProcWithoutDeadVar.Name),
                     new Proof(
                         new List<string>
                         {
@@ -119,7 +120,7 @@ public class CFGOptimizationsEndToEnd
                             ProofUtil.Apply("assumption"),
                             "using VC apply simp",
                             ProofUtil.Apply("assumption+"),
-                            "apply (unfold p_unoptimized_without_dead_vars_def)",
+                            "apply (unfold " + defProcWithoutDeadVar.Name + "_def)",
                             "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".pres_def " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def exprs_to_only_checked_spec_1)",
                             "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".post_def " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def exprs_to_only_checked_spec_2)",
                             "apply simp",
@@ -202,7 +203,7 @@ public class CFGOptimizationsEndToEnd
   }
   
   public static Term ProcedureIsCorrect(Term funDecls, Term constantDecls, Term globalDecls, Term axioms,
-    Term procedure)
+    string name)
   {
     var typeInterpId = new SimpleIdentifier("A");
     return
@@ -218,7 +219,7 @@ public class CFGOptimizationsEndToEnd
           constantDecls,
           globalDecls,
           axioms,
-          IsaCommonTerms.TermIdentFromName("p_unoptimized_without_dead_vars"),
+          IsaCommonTerms.TermIdentFromName(name),
           IsaBoogieTerm.SematicsProcSpecSatisfied));
   }
 }

@@ -4123,8 +4123,8 @@ namespace Microsoft.Boogie
     public readonly ISet<byte[]> AssertionChecksums = new HashSet<byte[]>(ChecksumComparer.Default);
     
     #region  ProofGen
-    public IDictionary<int, List <int>> ListCoalescedBlocks;
-    public IDictionary<int, int> CoalescedBlocksToTarget;
+    public IDictionary<Block, Block> CoalescedBlocksToTarget;
+    public IDictionary<Block, List <Block>> ListCoalescedBlocks;
     #endregion 
 
     public sealed class ChecksumComparer : IEqualityComparer<byte[]>

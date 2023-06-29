@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
@@ -926,7 +927,6 @@ namespace ProofGeneration
             Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
             Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
             */
-            //TODO: do computation
 
             if (_proofGenConfig.GeneratePassifProof)
             {
@@ -948,11 +948,11 @@ namespace ProofGeneration
                 varTranslationFactory
               );
               theories.Add(passificationProofTheory);
-
+              
               #endregion
             }
 
-            
+            IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = null;
 
             if (_proofGenConfig.GenerateCfgDagProof)
             {
@@ -962,8 +962,7 @@ namespace ProofGeneration
                 uniqueExitBlockOrig != null
                   ? beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key
                   : null;
-
-
+              beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
                 _proofGenConfig.GenerateCfgDagE2E,
@@ -978,7 +977,8 @@ namespace ProofGeneration
                 beforeDagAfterDagBlock,
                 beforeCfgToDagProgAccess,
                 beforePassiveProgAccess,
-                afterOptimizationsVarTranslationFactory);
+                afterOptimizationsVarTranslationFactory,
+                beforeDagBlocktoLoops);
               theories.Add(cfgToDagProofTheory);
 
               #endregion
@@ -992,7 +992,26 @@ namespace ProofGeneration
               // compute mapping between copied blocks (before opt -> after opt)
               var origToAfterOpt = beforeDagOrigBlock.InverseDict();
               IDictionary<Block, Block> beforeOptAfterOptBlock = DictionaryComposition(beforeOptimizationsOrigBlock, origToAfterOpt);
-              IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
+              if (beforeDagBlocktoLoops == null)
+              {
+                beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
+              }
+              
+              IDictionary<Block, Block> CoalescedBlocksToTarget = DictionaryComposition(afterPassificationImpl.CoalescedBlocksToTarget, origToAfterOpt);
+              CoalescedBlocksToTarget = DictionaryComposition(beforeOptimizationsOrigBlock, CoalescedBlocksToTarget);
+
+              IDictionary<Block, List<Block>> ListCoalescedBlocks = new Dictionary<Block, List<Block>>();
+              foreach (var curr in afterPassificationImpl.ListCoalescedBlocks.Keys)
+              {
+                List<Block> temp = new List<Block>();
+                foreach (var next in afterPassificationImpl.ListCoalescedBlocks[curr])
+                {
+                  temp.Add(beforeOptimizationsOrigBlock.InverseDict()[next]);
+                }
+                ListCoalescedBlocks.Add(beforeOptimizationsOrigBlock.InverseDict()[curr], temp);
+              }
+              
+              
               var cfgOptimizationsProofTheory = CfgOptimizationsManager.CfgOptProof(
                 phasesTheories,
                 beforeOptimizationsCFG,
@@ -1000,10 +1019,11 @@ namespace ProofGeneration
                 beforeOptAfterOptBlock,
                 unoptimizedCfgProgAccess,
                 beforeCfgToDagProgAccess,
-                afterPassificationImpl.ListCoalescedBlocks,
-                afterPassificationImpl.CoalescedBlocksToTarget, 
+                ListCoalescedBlocks,
+                CoalescedBlocksToTarget, 
                 beforeDagBlocktoLoops,
-                vcAssm);
+                vcAssm,
+                afterPassificationImpl.Name);
               theories.Add(cfgOptimizationsProofTheory); 
               
               #endregion

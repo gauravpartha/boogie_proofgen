@@ -35,12 +35,13 @@ namespace ProofGeneration.CfgToDag
             IDictionary<Block, Block> beforeToAfter,
             IProgramAccessor beforeDagProgAccess,
             IProgramAccessor afterDagProgAccess,
-            IVariableTranslationFactory varFactory)
+            IVariableTranslationFactory varFactory,
+            IDictionary<Block, IList<Block>> blocksToLoops)
         {
             var afterToBefore = beforeToAfter.InverseDict();
 
             //track mapping from blocks to loops that the block is contained in and for which it is not the loop head
-            IDictionary<Block, IList<Block>> blocksToLoops = ProofGenerationLayer.getBeforeDagBlockToLoops(beforeToAfter, afterDagCfg, hintManager);
+            
             
             var varContextName = "\\<Lambda>1";
             var varContextAbbrev = new AbbreviationDecl(

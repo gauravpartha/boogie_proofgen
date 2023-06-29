@@ -484,9 +484,9 @@ namespace Microsoft.Boogie
 
     public override Implementation VisitImplementation(Implementation impl)
     {
-      
-      IDictionary<int, int> CoalescedBlocksToTarget = new Dictionary<int, int>();
-      IDictionary<int, List <int>> ListCoalescedBlocks = new Dictionary<int, List<int>>();
+
+      IDictionary<Block, Block> CoalescedBlocksToTarget = new Dictionary<Block, Block>();
+      IDictionary<Block, List <Block>> ListCoalescedBlocks = new Dictionary<Block, List<Block>>();
       
       //Contract.Requires(impl != null);
       Contract.Ensures(Contract.Result<Implementation>() != null);
@@ -533,20 +533,21 @@ namespace Microsoft.Boogie
 
           if (!multiPredBlocks.Contains(succ))
           {
-            if (!ListCoalescedBlocks.ContainsKey(b.UniqueId))
+            if (!ListCoalescedBlocks.ContainsKey(b))
             {
-              List<int> newList = new List<int>();
-              newList.Add(b.UniqueId);
-              ListCoalescedBlocks.Add(b.UniqueId, newList);
+              List<Block> newList = new List<Block>();
+              newList.Add(b);
+              ListCoalescedBlocks.Add(b, newList);
             }
-            ListCoalescedBlocks[b.UniqueId].Add(succ.UniqueId);
-            if (!CoalescedBlocksToTarget.ContainsKey(succ.UniqueId))
+            ListCoalescedBlocks[b].Add(succ);
+            
+            if (!CoalescedBlocksToTarget.ContainsKey(succ))
             {
-              CoalescedBlocksToTarget.Add(succ.UniqueId, b.UniqueId);
+              CoalescedBlocksToTarget.Add(succ, b);
             }
-            if (!CoalescedBlocksToTarget.ContainsKey(b.UniqueId))
+            if (!CoalescedBlocksToTarget.ContainsKey(b))
             {
-              CoalescedBlocksToTarget.Add(b.UniqueId, b.UniqueId);
+              CoalescedBlocksToTarget.Add(b, b);
             }
             foreach (Cmd /*!*/ cmd in succ.Cmds)
             {
@@ -598,6 +599,17 @@ namespace Microsoft.Boogie
         foreach (Block succ in gotoCmd.labelTargets)
         {
           gotoCmd.labelNames.Add(succ.Label);
+        }
+      }
+      
+      var ListCoalescedBlocks_old = new Dictionary<Block, List<Block>>(ListCoalescedBlocks);
+      foreach (var curr in ListCoalescedBlocks_old.Keys)
+      {
+        for (int i = 1; i < ListCoalescedBlocks[curr].Count; i++)
+        {
+          List<Block> temp = new List<Block>(ListCoalescedBlocks[curr]);
+          List<Block> subList = new List<Block>(temp.GetRange(i, temp.Count - i));
+          ListCoalescedBlocks.Add(ListCoalescedBlocks[curr][i], subList);
         }
       }
 

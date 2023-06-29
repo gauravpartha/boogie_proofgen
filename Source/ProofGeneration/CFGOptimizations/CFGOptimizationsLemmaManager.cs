@@ -58,8 +58,16 @@ public class CFGOptimizationsLemmaManager
       "apply (unfold " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock) + "_def)",
       "apply simp",
       "apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) + "_def)",
-      "by simp"
+      "apply simp"
     };
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() == 0)
+    {
+      proofMethods.Add("by (rule " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
+    }
+    else
+    {
+      proofMethods.Add("by simp");
+    }
     
     var loopHeads = new List<string>();
     foreach (Block loop in Loops)
@@ -117,7 +125,7 @@ public class CFGOptimizationsLemmaManager
     }
     var proofMethods = new List<string>
     {
-      "apply (rule loopBlock_global_block[where ?f = \"the ∘ map_of [" + string.Join(",", function) + "]\"])",
+      "apply (rule loopBlock_global_block[where ?f = \"the \\<circ> map_of [" + string.Join(",", function) + "]\"])",
       "apply (rule " + beforeOptProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock) + ")",
       "apply simp"
     };
@@ -177,7 +185,15 @@ public class CFGOptimizationsLemmaManager
     proofMethods.Add("apply (rule " + beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock) + ")");
     proofMethods.Add("apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) + "_def " +
                                      beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock) + "_def)");
-    proofMethods.Add("by simp");
+    proofMethods.Add("apply simp");
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() == 0)
+    {
+      proofMethods.Add("by (rule " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
+    }
+    else
+    {
+      proofMethods.Add("by simp");
+    }
     var varContextName = "\\<Lambda>";
     IList<Term> terms = new List<Term>();
     terms.Add(IsaCommonTerms.TermIdentFromName("A"));
@@ -226,7 +242,7 @@ public class CFGOptimizationsLemmaManager
     var proofMethods = new List<string>
     {
 
-      "apply (rule loopBlock_global_block_hybrid[where ?f = \"the ∘ map_of [" + string.Join(",", function) + "]\"])",
+      "apply (rule loopBlock_global_block_hybrid[where ?f = \"the \\<circ> map_of [" + string.Join(",", function) + "]\"])",
       "apply (rule " + beforeOptProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock) + ")",
       "apply simp"
     };
@@ -275,7 +291,15 @@ public class CFGOptimizationsLemmaManager
     proofMethods.Add("apply simp");
     
     proofMethods.Add("apply (unfold " + beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock) + " " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock) + "_def)");
-    proofMethods.Add("by simp");
+    proofMethods.Add("apply simp");
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() == 0)
+    {
+      proofMethods.Add("by (rule " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
+    }
+    else
+    {
+      proofMethods.Add("by simp");
+    }
     
     var varContextName = "\\<Lambda>";
     IList<Term> terms = new List<Term>();
@@ -304,9 +328,9 @@ public class CFGOptimizationsLemmaManager
     Block beforeBlock,
     Block afterBlock,
     Block succ,
-    Func<Block, string> GlobalblockLemmaName,
     Func<Block, string> HybridblockLemmaName,
-    IList<Block> Loops)
+    IList<Block> Loops,
+    IDictionary<Block, List <Block>> ListCoalescedBlocks)
   {
     var proofMethods = new List<string>
     {
@@ -325,16 +349,11 @@ public class CFGOptimizationsLemmaManager
     }
 
     List<String> listCoalescedBlocks = new List<String>();
-    Block curr = beforeBlock;
-    listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(curr));
-    while ((beforeOptimizations.GetSuccessorBlocks(curr).Count() == 1 &&
-            beforeOptimizations.GetSuccessorBlocks(curr).First().Predecessors.Count() == 1))
+    foreach (Block current in ListCoalescedBlocks[beforeBlock])
     {
-      curr = beforeOptimizations.GetSuccessorBlocks(curr).First();
-      listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(curr));
-      
+      listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current));
     }
-    
+
     var varContextName = "\\<Lambda>";
     IList<Term> terms = new List<Term>();
     terms.Add(IsaCommonTerms.TermIdentFromName("A"));
@@ -363,7 +382,8 @@ public class CFGOptimizationsLemmaManager
     Block afterBlock,
     Func<Block, string> GlobalblockLemmaName,
     Func<Block, string> HybridblockLemmaName,
-    IList<Block> Loops)
+    IList<Block> Loops,
+    IDictionary<Block, List <Block>> ListCoalescedBlocks)
   {
     var proofMethods = new List<string>
     {
@@ -372,15 +392,11 @@ public class CFGOptimizationsLemmaManager
     };
     
     List<String> listCoalescedBlocks = new List<String>();
-    Block curr = beforeBlock;
-    listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(curr));
-    while ((beforeOptimizations.GetSuccessorBlocks(curr).Count() == 1 &&
-            beforeOptimizations.GetSuccessorBlocks(curr).First().Predecessors.Count() == 1))
+    foreach (Block current in ListCoalescedBlocks[beforeBlock])
     {
-      curr = beforeOptimizations.GetSuccessorBlocks(curr).First();
-      listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(curr));
-      
+      listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current));
     }
+    
 
     foreach (string b in listCoalescedBlocks)
     {
@@ -430,8 +446,16 @@ public class CFGOptimizationsLemmaManager
       "apply simp",
       "apply simp",
       "apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) + "_def)",
-      "by simp"
+      "apply simp"
     };
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() == 0)
+    {
+      proofMethods.Add("by (rule " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
+    }
+    else
+    {
+      proofMethods.Add("by simp");
+    }
     var loopHeads = new List<string>();
     foreach (Block loop in Loops)
     {
@@ -486,7 +510,7 @@ public class CFGOptimizationsLemmaManager
     }
     var proofMethods = new List<string>
     {
-      "apply (rule loopHead_global_block[where ?f = \"the ∘ map_of [" + string.Join(",", function) + "]\"])",
+      "apply (rule loopHead_global_block[where ?f = \"the \\<circ> map_of [" + string.Join(",", function) + "]\"])",
       "apply (rule " + beforeOptProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock) + ")",
       "apply simp"
     };
@@ -542,7 +566,15 @@ public class CFGOptimizationsLemmaManager
     proofMethods.Add("apply (rule " + afterOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterBlock) + ")");
     proofMethods.Add("apply (rule " + beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock) + ")");
     proofMethods.Add("apply (unfold "+ afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) + "_def " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock) + "_def)");
-    proofMethods.Add("by simp");
+    proofMethods.Add("apply simp");
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() == 0)
+    {
+      proofMethods.Add("by (rule " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
+    }
+    else
+    {
+      proofMethods.Add("by simp");
+    }
     var varContextName = "\\<Lambda>";
     IList<Term> terms = new List<Term>();
     terms.Add(IsaCommonTerms.TermIdentFromName("A"));
