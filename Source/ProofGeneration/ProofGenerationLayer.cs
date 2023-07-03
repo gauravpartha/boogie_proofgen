@@ -633,6 +633,8 @@ namespace ProofGeneration
                  new DeBruijnFixedTVarTranslation(beforeOptimizationsData), 
                  boogieGlobalData);
             
+            /* Gaurav TODO: move later (see adjust_interface branch) in case not all data is initalized since options specify
+             *       that proofs should not generated */
             var afterOptimizationsVarTranslationFactory =
                 new DeBruijnVarFactory(
                  new DeBruijnFixedVarTranslation(afterOptimizationsData), 
