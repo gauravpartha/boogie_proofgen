@@ -523,14 +523,14 @@ namespace ProofGeneration.BoogieIsaInterface
             }
         }
 
-        public void AddAxiomMembershipLemmas(IEnumerable<Axiom> axioms, IsaUniqueNamer uniqueNamer)
+        public void AddAxiomMembershipLemmas(IEnumerable<Axiom> axioms)
         {
             var axiomSet = IsaCommonTerms.SetOfList(IsaCommonTerms.TermIdentFromName(isaProgramRepr.GlobalProgramRepr.axiomsDeclDef));
             var id = 0;
             foreach (var axiom in axioms)
             {
                 var axiomTerm = basicCmdIsaVisitor.Translate(axiom.Expr);
-                var elemAssm = IsaCommonTerms.Elem(IsaCommonTerms.TermIdentFromName(uniqueNamer.RemoveApostrophe(axiomTerm.ToString())), axiomSet);
+                var elemAssm = IsaCommonTerms.Elem(axiomTerm, axiomSet);
 
                 var proof = new Proof(new List<string> {"by (simp add: " + isaProgramRepr.GlobalProgramRepr.axiomsDeclDef+ "_def)"});
                 membershipLemmas.Add(axiom, new LemmaDecl(MembershipName(axiom, id), elemAssm, proof));
