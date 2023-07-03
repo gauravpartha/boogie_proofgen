@@ -514,8 +514,9 @@ namespace Microsoft.Boogie
         Implementation impl = tuple.Key;
         AstToCfgProofGenInfo proofGenInfo = tuple.Value;
       
-        IList<Block> unoptimizedBlocksCopies = proofGenInfo.GetUnpotimizedBlocks();
+        IList<Block> unoptimizedBlocksCopies = proofGenInfo.GetUnoptimizedBlocks();
         IList<Block> optimizedBlocksOriginal = impl.Blocks;
+        // FIXME: <c>optimizedBlocksOriginal<c/> does not contain desugared commands while optimized does --> too many false positives
 
         int totalNumberOfCommandsA = 0;
         int totalNumberOfCommandsB = 0;
@@ -530,9 +531,12 @@ namespace Microsoft.Boogie
           totalNumberOfCommandsB += block.cmds.Count;
         }
 
+        bool eliminatedDeadVars = impl.LocVars.Count != proofGenInfo.UnoptimizedLocalVars.Count;
+        proofGenInfo.EliminatedDeadVars = eliminatedDeadVars;
         if (impl.unreachableBlocksPruned ||
             totalNumberOfCommandsA != totalNumberOfCommandsB ||
-            unoptimizedBlocksCopies.Count != optimizedBlocksOriginal.Count)
+            unoptimizedBlocksCopies.Count != optimizedBlocksOriginal.Count ||
+            eliminatedDeadVars)
         {
           proofGenInfo.SetOptimizationsFlag();
         }
@@ -850,6 +854,8 @@ namespace Microsoft.Boogie
       {
         Implementation impl = tuple.Key;
         AstToCfgProofGenInfo proofGenInfo = tuple.Value;
+        
+        proofGenInfo.UnoptimizedLocalVars = new List<Variable>(impl.LocVars);
         
         var predecessorMap = proofGenInfo.ComputePredecessors(impl.Blocks);
         var unoptimizedBlockCopies = proofGenInfo.CopyBlocks(impl.Blocks , predecessorMap, true, cmd => false, out var newVarsAfterDesugaring);

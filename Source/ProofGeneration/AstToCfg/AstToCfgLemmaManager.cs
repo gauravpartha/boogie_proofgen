@@ -45,8 +45,6 @@ namespace ProofGeneration.AstToCfg
         //private readonly TypingTacticGenerator typingTacticGenerator;
         private readonly IVariableTranslation<Variable> variableTranslation;
 
-        private readonly BoogieMethodData beforeCfgData;
-
         private readonly IDictionary<Block, Block> beforeDagOrigBlock;
 
         public AstToCfgLemmaManager(
@@ -58,7 +56,6 @@ namespace ProofGeneration.AstToCfg
             string funContextWfName,
             IDictionary<Block, Block> beforeDagOrigBlock,
             IDictionary<BigBlock, Block> beforeToAfterBlock,
-            BoogieMethodData beforeCfgData,
             IVariableTranslationFactory varFactory
         )
         {
@@ -68,7 +65,6 @@ namespace ProofGeneration.AstToCfg
             this.funContextWfName = funContextWfName;
             variableTranslation = varFactory.CreateTranslation().VarTranslation;
             this.beforeToAfterBlock = beforeToAfterBlock;
-            this.beforeCfgData = beforeCfgData;
             
             this.astBoogieContext = astBoogieContext;
             this.cfgBoogieContext = cfgBoogieContext;

@@ -64,6 +64,7 @@ namespace ProofGeneration.Util
             var preferredNameMod = preferredName;
             foreach (var illegalChar in illegalChars) preferredNameMod = preferredNameMod.Replace(illegalChar, '_');
 
+            /* TODO: might need to replace numbers in some cases for ROOT file
             if (preferredNameMod.Contains('0')) preferredNameMod = preferredNameMod.Replace('0', 'a'); 
             if (preferredNameMod.Contains('1')) preferredNameMod = preferredNameMod.Replace('1', 'b'); 
             if (preferredNameMod.Contains('2')) preferredNameMod = preferredNameMod.Replace('2', 'c'); 
@@ -74,6 +75,7 @@ namespace ProofGeneration.Util
             if (preferredNameMod.Contains('7')) preferredNameMod = preferredNameMod.Replace('7', 'h'); 
             if (preferredNameMod.Contains('8')) preferredNameMod = preferredNameMod.Replace('8', 'i'); 
             if (preferredNameMod.Contains('9')) preferredNameMod = preferredNameMod.Replace('9', 'j');
+            */
 
             if (reservedNames.Contains(preferredNameMod)) preferredNameMod = preferredNameMod + "ZZ";
             if (preferredName.Length > 0 && preferredName.Last() == '_') preferredNameMod = preferredNameMod + "n";
