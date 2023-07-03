@@ -180,8 +180,8 @@ namespace ProofGeneration
 
             if (config.generateAxioms)
             {
-                decls.Add(GetAxioms(methodData.Axioms, uniqueNamer));
-                if(generateMembershipLemmas) membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms, uniqueNamer);
+                decls.Add(GetAxioms(methodData.Axioms));
+                if(generateMembershipLemmas) membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms);
             }
 
             if (config.generateFunctions)
@@ -212,23 +212,17 @@ namespace ProofGeneration
             return membershipLemmaManager;
         }
 
-        private DefDecl GetAxioms(IEnumerable<Axiom> axioms, IsaUniqueNamer uniqueNamer)
+        private DefDecl GetAxioms(IEnumerable<Axiom> axioms)
         {
             var axiomsExpr = new List<Term>();
             foreach (var ax in axioms)
             {
-                string test1 = ax.Expr.ToString();
                 var axTerms = cmdIsaVisitor.Translate(ax.Expr);
 
                 if (axTerms.Count != 1)
                     throw new ProofGenUnexpectedStateException(GetType(), "axiom not translated into single term");
                 
-                if (axTerms.First().ToString().Contains("fun"))
-                {
-                  string test = axTerms.First().ToString();
-                }
-                
-                axiomsExpr.Add( IsaCommonTerms.TermIdentFromName(uniqueNamer.RemoveApostrophe(axTerms.First().ToString()) ) );
+                axiomsExpr.Add(axTerms.First());
             }
 
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(axiomsExpr));

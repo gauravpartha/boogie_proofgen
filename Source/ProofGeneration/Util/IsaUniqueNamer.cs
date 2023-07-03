@@ -44,11 +44,6 @@ namespace ProofGeneration.Util
             return GetName(preferredName, preferredName);
         }
         
-        public string RemoveApostrophe(string preferredName)
-        {
-          return RemoveApostrophe(preferredName, preferredName);
-        }
-        
         public string RemoveApostropheInFunc(string preferredName)
         {
           return RemoveApostropheInFunc(preferredName, preferredName);
