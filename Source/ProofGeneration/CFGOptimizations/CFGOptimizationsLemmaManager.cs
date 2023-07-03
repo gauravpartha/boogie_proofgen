@@ -448,14 +448,10 @@ public class CFGOptimizationsLemmaManager
       "apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) + "_def)",
       "apply simp"
     };
-    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() == 0)
-    {
-      proofMethods.Add("by (rule " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
-    }
-    else
-    {
-      proofMethods.Add("by simp");
-    }
+    proofMethods.Add("apply (unfold " + afterOptProgAccess.BlockInfo().OutEdgesMembershipLemma(afterBlock) + ")");
+    proofMethods.Add("apply (unfold " + beforeOptProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock) + ")");
+    proofMethods.Add("by simp");
+    
     var loopHeads = new List<string>();
     foreach (Block loop in Loops)
     {
