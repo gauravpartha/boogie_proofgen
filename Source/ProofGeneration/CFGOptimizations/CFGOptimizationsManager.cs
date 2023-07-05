@@ -32,7 +32,8 @@ public class CfgOptimizationsManager
     IDictionary<Block, Block> CoalescedBlocksToTarget,
     IDictionary<Block, IList<Block>> beforeDagBlockToLoops,
     Term vcAssm,
-    string procedureName)
+    string procedureName,
+    bool generateEnd2EndLemma)
   {
     IDictionary<Block, Block> afterToBefore = beforeToAfter.ToDictionary(x => x.Value, x => x.Key);
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops = new Dictionary<Block, IList<Block>>();
@@ -193,20 +194,23 @@ public class CfgOptimizationsManager
       GetGlobalBlockLemmaName(beforeOptimizations.entry, lemmaNamer), beforeOptimizations.entry,
       afterOptimizations.entry);
     outerDecls.Add(entryLemma);
-
-    var endToEndManager = new CFGOptimizationsEndToEnd();
-    var endToEndDecls = endToEndManager.EndToEndProof(
-      "entry_lemma",
-      "end_to_end",
-      vcAssm,
-      beforeOptCfgProgAccess,
-      afterOptCfgProgAccess,
-      beforeOptCfgProgAccess,
-      afterOptimizations,
-      phasesTheories,
-      procedureName
-    );
-    outerDecls.AddRange(endToEndDecls);
+    if (generateEnd2EndLemma)
+    {
+      var endToEndManager = new CFGOptimizationsEndToEnd();
+      var endToEndDecls = endToEndManager.EndToEndProof(
+        "entry_lemma",
+        "end_to_end",
+        vcAssm,
+        beforeOptCfgProgAccess,
+        afterOptCfgProgAccess,
+        beforeOptCfgProgAccess,
+        afterOptimizations,
+        phasesTheories,
+        procedureName
+      );
+      outerDecls.AddRange(endToEndDecls);
+    }
+    
 
 
 

@@ -1023,7 +1023,8 @@ namespace ProofGeneration
                 CoalescedBlocksToTarget, 
                 beforeDagBlocktoLoops,
                 vcAssm,
-                afterPassificationImpl.Name);
+                afterPassificationImpl.Name,
+                _proofGenConfig.GenerateCfgDagE2E);
               theories.Add(cfgOptimizationsProofTheory); 
               
               #endregion
