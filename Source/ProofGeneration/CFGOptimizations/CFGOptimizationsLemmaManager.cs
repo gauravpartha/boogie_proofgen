@@ -137,11 +137,7 @@ public class CFGOptimizationsLemmaManager
       {
         proofMethods.Add("apply (rule " + blockLemmaName(succ) + ")");
       }
-      else if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
-      {
-        
-      }
-      else
+      else if (!(loopHeadsSet.Contains(succ) && Loops.Contains(succ)))
       {
         var loopHeadsSucc = new List<string>();
         foreach (Block loop in beforeOptBlockToLoops[succ])
@@ -152,6 +148,7 @@ public class CFGOptimizationsLemmaManager
         proofMethods.Add("apply simp");
         proofMethods.Add("apply (rule " +blockLemmaName(succ) + ")");
       }
+      
       
     }
     proofMethods.Add("apply simp");
@@ -245,11 +242,7 @@ public class CFGOptimizationsLemmaManager
       {
         proofMethods.Add("apply (rule " + GlobalblockLemmaName(succ) + ")");
       }
-      else if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
-      {
-        
-      }
-      else
+      else if (!(loopHeadsSet.Contains(succ) && Loops.Contains(succ)))
       {
         var loopHeadsSucc = new List<string>();
         foreach (Block loop in beforeOptBlockToLoops[succ])
@@ -306,7 +299,6 @@ public class CFGOptimizationsLemmaManager
     {
       "apply (rule extend_hybrid_global_block_lemma_loop)",
       "apply (rule " + HybridblockLemmaName(succ) + ")",
-      //beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma()
       "apply (rule " + beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock) + ")",
       "apply (rule " + beforeOptProgAccess.BlockInfo().OutEdgesMembershipLemma(beforeBlock) + ")",
       "by simp"
@@ -468,11 +460,7 @@ public class CFGOptimizationsLemmaManager
     }
     foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(beforeBlock))
     {
-      if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
-      {
-        
-      }
-      else
+      if (!(loopHeadsSet.Contains(succ) && Loops.Contains(succ)))
       {
         var loopHeadsSucc = new List<string>();
         foreach (Block loop in beforeOptBlockToLoops[succ])
@@ -483,7 +471,7 @@ public class CFGOptimizationsLemmaManager
         proofMethods.Add("apply simp");
         proofMethods.Add("apply (rule " + blockLemmaName(succ) + ")");
       }
-      
+
     }
     proofMethods.Add("apply simp");
     if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() > 0)
@@ -536,15 +524,7 @@ public class CFGOptimizationsLemmaManager
     {
       loopHeads.Add("(" + beforeOptProgAccess.BlockInfo().BlockIds[loop] + "," + afterOptProgAccess.BlockInfo().BlockIds[beforeToAfterBlock[loop]] + ")");
     }
-    
-    
-    foreach (Block current in ListCoalescedBlocks[beforeBlock])
-    {
-      
-    }
 
-    
-    
     var proofMethods = new List<string>
     {
       "apply (rule loopHead_global_block_hybrid)",
