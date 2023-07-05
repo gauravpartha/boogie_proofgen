@@ -74,21 +74,9 @@ public class CFGOptimizationsLemmaManager
     {
       loopHeads.Add("(" + beforeOptProgAccess.BlockInfo().BlockIds[loop] + "," + afterOptProgAccess.BlockInfo().BlockIds[beforeToAfterBlock[loop]] + ")");
     }
-    
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("global_block_lemma_loop"), terms);
+
+    Term conclusion = getConclusion(loopHeads, "global_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, false, null);
 
 
     var blockLemma = new LemmaDecl(
@@ -103,7 +91,8 @@ public class CFGOptimizationsLemmaManager
     Block afterBlock,
     Func<Block, string> blockLemmaName,
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops,
-    IList<Block> Loops)
+    IList<Block> Loops,
+    ISet<Block> loopHeadsSet)
   {
     
     
@@ -132,7 +121,7 @@ public class CFGOptimizationsLemmaManager
     int countCases = 0;
     foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(beforeBlock))
     {
-      if (isLoopHead(succ, beforeOptimizations, beforeOptBlockToLoops, beforeToAfterBlock) && Loops.Contains(succ))
+      if (loopHeadsSet.Contains(succ)  && Loops.Contains(succ))
       {
         countCases = countCases + 1;
       }
@@ -148,7 +137,7 @@ public class CFGOptimizationsLemmaManager
       {
         proofMethods.Add("apply (rule " + blockLemmaName(succ) + ")");
       }
-      else if (isLoopHead(succ, beforeOptimizations, beforeOptBlockToLoops, beforeToAfterBlock) && Loops.Contains(succ))
+      else if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
       {
         
       }
@@ -194,20 +183,9 @@ public class CFGOptimizationsLemmaManager
     {
       proofMethods.Add("by simp");
     }
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("global_block_lemma_loop"), terms);
+    
+    Term conclusion = getConclusion(loopHeads, "global_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, false, null);
       
     var blockLemma = new LemmaDecl(
       blockLemmaName(beforeBlock), 
@@ -221,7 +199,8 @@ public class CFGOptimizationsLemmaManager
     Func<Block, string> GlobalblockLemmaName,
     Func<Block, string> HybridblockLemmaName,
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops,
-    IList<Block> Loops)
+    IList<Block> Loops,
+    ISet<Block> loopHeadsSet)
   {
     var loopHeads = new List<string>();
     foreach (Block loop in Loops)
@@ -250,7 +229,7 @@ public class CFGOptimizationsLemmaManager
     
     foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(beforeBlock))
     {
-      if (isLoopHead(succ, beforeOptimizations, beforeOptBlockToLoops, beforeToAfterBlock) && Loops.Contains(succ))
+      if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
       {
         countCases++;
       }
@@ -266,7 +245,7 @@ public class CFGOptimizationsLemmaManager
       {
         proofMethods.Add("apply (rule " + GlobalblockLemmaName(succ) + ")");
       }
-      else if (isLoopHead(succ, beforeOptimizations, beforeOptBlockToLoops, beforeToAfterBlock) && Loops.Contains(succ) && Loops.Contains(succ))
+      else if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
       {
         
       }
@@ -300,22 +279,13 @@ public class CFGOptimizationsLemmaManager
     {
       proofMethods.Add("by simp");
     }
+    List<String> listCoalescedBlocks = new List<String>();
+    listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock));
     
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock)));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("hybrid_block_lemma_loop"), terms);
+    
+    Term conclusion = getConclusion(loopHeads, "hybrid_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, true, listCoalescedBlocks);
+    
     
     var blockLemma = new LemmaDecl(
       HybridblockLemmaName(beforeBlock), 
@@ -354,21 +324,10 @@ public class CFGOptimizationsLemmaManager
       listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current));
     }
 
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName("(" + string.Join("@", listCoalescedBlocks) + ")"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("hybrid_block_lemma_loop"), terms);
+    
+    
+    Term conclusion = getConclusion(loopHeads, "hybrid_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, true, listCoalescedBlocks);
     
     var blockLemma = new LemmaDecl(
       HybridblockLemmaName(beforeBlock), 
@@ -409,20 +368,10 @@ public class CFGOptimizationsLemmaManager
     {
       loopHeads.Add("(" + beforeOptProgAccess.BlockInfo().BlockIds[loop] + "," + afterOptProgAccess.BlockInfo().BlockIds[beforeToAfterBlock[loop]] + ")");
     }
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("global_block_lemma_loop"), terms);
+    
+    
+    Term conclusion = getConclusion(loopHeads, "global_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, false, null);
     
     var blockLemma = new LemmaDecl(
       GlobalblockLemmaName(beforeBlock), 
@@ -458,21 +407,12 @@ public class CFGOptimizationsLemmaManager
       loopHeads.Add("(" + beforeOptProgAccess.BlockInfo().BlockIds[loop] + "," + afterOptProgAccess.BlockInfo().BlockIds[beforeToAfterBlock[loop]] + ")");
     }
     
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock)));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("hybrid_block_lemma_loop"), terms);
+    
+    List<string> listCoalescedBlocks = new List<string>();
+    listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock));
+
+    Term conclusion = getConclusion(loopHeads, "hybrid_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, true, listCoalescedBlocks);
     
     var blockLemma = new LemmaDecl(
       blockLemmaName(beforeBlock), 
@@ -486,7 +426,8 @@ public class CFGOptimizationsLemmaManager
     Block afterBlock,
     Func<Block, string> blockLemmaName,
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops,
-    IList<Block> Loops)
+    IList<Block> Loops,
+    ISet<Block> loopHeadsSet)
   {
     
     var loopHeads = new List<string>();
@@ -515,7 +456,7 @@ public class CFGOptimizationsLemmaManager
     
     foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(beforeBlock))
     {
-      if (isLoopHead(succ, beforeOptimizations, beforeOptBlockToLoops, beforeToAfterBlock) && Loops.Contains(succ))
+      if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
       {
         countCases++;
       }
@@ -527,7 +468,7 @@ public class CFGOptimizationsLemmaManager
     }
     foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(beforeBlock))
     {
-      if (isLoopHead(succ, beforeOptimizations, beforeOptBlockToLoops, beforeToAfterBlock) && Loops.Contains(succ))
+      if (loopHeadsSet.Contains(succ) && Loops.Contains(succ))
       {
         
       }
@@ -571,20 +512,9 @@ public class CFGOptimizationsLemmaManager
     {
       proofMethods.Add("by simp");
     }
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("global_block_lemma_loop"), terms);
+    
+    Term conclusion = getConclusion(loopHeads, "global_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, false, null);
       
     var blockLemma = new LemmaDecl(
       blockLemmaName(beforeBlock), 
@@ -598,12 +528,19 @@ public class CFGOptimizationsLemmaManager
     Block afterBlock,
     Func<Block, string> GlobalblockLemmaName,
     Func<Block, string> HybridblockLemmaName,
-    IList<Block> Loops)
+    IList<Block> Loops,
+    IDictionary<Block, List <Block>> ListCoalescedBlocks)
   {
     var loopHeads = new List<string>();
     foreach (Block loop in Loops)
     {
       loopHeads.Add("(" + beforeOptProgAccess.BlockInfo().BlockIds[loop] + "," + afterOptProgAccess.BlockInfo().BlockIds[beforeToAfterBlock[loop]] + ")");
+    }
+    
+    
+    foreach (Block current in ListCoalescedBlocks[beforeBlock])
+    {
+      
     }
 
     
@@ -616,28 +553,18 @@ public class CFGOptimizationsLemmaManager
       "apply (rule " + HybridblockLemmaName(beforeOptimizations.GetSuccessorBlocks(beforeBlock).FirstOrDefault()) + ")",
       "apply (rule " + beforeOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(beforeBlock) + ")",
       "apply (rule " + afterOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterBlock) + ")",
-      "apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) +"_def)",
-      "apply (unfold " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeBlock) + "_def)",
-      "apply (unfold " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(beforeOptimizations.GetSuccessorBlocks(beforeBlock).FirstOrDefault()) + "_def)",
-      "by simp"
+      "apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) +"_def)"
     };
+    foreach (Block current in ListCoalescedBlocks[beforeBlock])
+    {
+     proofMethods.Add("apply (unfold " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current) + "_def)"); 
+    }
+    proofMethods.Add("by simp");
     
     
     
-    var varContextName = "\\<Lambda>";
-    IList<Term> terms = new List<Term>();
-    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_body"));
-    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
-    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
-    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
-    terms.Add(IsaCommonTerms.TermIdentFromName(afterOptProgAccess.BlockInfo().getTheoryName() + ".post"));
-    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName("global_block_lemma_loop"), terms);
+    Term conclusion = getConclusion(loopHeads, "global_block_lemma_loop", beforeBlock, afterBlock, beforeOptProgAccess,
+      afterOptProgAccess, false, null);
       
     var blockLemma = new LemmaDecl(
       GlobalblockLemmaName(beforeBlock), 
@@ -716,20 +643,31 @@ public class CFGOptimizationsLemmaManager
   }
 
 
-  private static bool isLoopHead(Block b, CFGRepr beforeOptimizations, IDictionary<Block, IList<Block>> beforeOptBlockToLoops, IDictionary<Block, Block> beforeToAfter)
+  
+  
+  
+  public static Term getConclusion(List<string> loopHeads, string name, Block beforeBlock, Block afterBlock, IProgramAccessor beforeOptProgAccess, IProgramAccessor afterOptProgAccess, bool isHybridBlock, List<String> listCoalescedBlocks)
   {
-    if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(b))
+    var varContextName = "\\<Lambda>";
+    IList<Term> terms = new List<Term>();
+    terms.Add(IsaCommonTerms.TermIdentFromName("A"));
+    terms.Add(IsaCommonTerms.TermIdentFromName("M"));
+    terms.Add(IsaCommonTerms.TermIdentFromName(varContextName));
+    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Gamma>"));
+    terms.Add(IsaCommonTerms.TermIdentFromName("\\<Omega>"));
+    terms.Add(beforeOptProgAccess.CfgDecl());
+    terms.Add(afterOptProgAccess.CfgDecl());
+    terms.Add(new NatConst(beforeOptProgAccess.BlockInfo().BlockIds[beforeBlock]));
+    terms.Add(new NatConst(afterOptProgAccess.BlockInfo().BlockIds[afterBlock]));
+    if (isHybridBlock)
     {
-      return false;
+      terms.Add(IsaCommonTerms.TermIdentFromName("(" + string.Join("@", listCoalescedBlocks) + ")"));
     }
-    foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(b))
-    {
-      if (beforeToAfter.ContainsKey(b) && beforeOptBlockToLoops[b].Count < beforeOptBlockToLoops[succ].Count)
-      {
-        return true;
-      }
-    }
-    return false;
+    terms.Add(IsaCommonTerms.TermIdentFromName("{" + string.Join(",", loopHeads) + "}"));
+    terms.Add(afterOptProgAccess.PostconditionsDecl());
+    Term conclusion = new TermApp(IsaCommonTerms.TermIdentFromName(name), terms);
+    return conclusion;
   }
   
 }
+

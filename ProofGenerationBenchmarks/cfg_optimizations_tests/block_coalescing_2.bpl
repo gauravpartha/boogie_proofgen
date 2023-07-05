@@ -1,4 +1,4 @@
-procedure p() {
+procedure proecdure_1() {
     var y: int;
 
     y := 1;
@@ -16,6 +16,7 @@ procedure p() {
 
     l3:
       assert y >= 0;
+      goto l4, l5;
     
     l4:
       assert y >= 0;
@@ -31,4 +32,9 @@ procedure p() {
 
     l7:
       y := y + 7;
+      assume false;
+      goto l8;
+
+    l8:
+      y := y + 8;
 }

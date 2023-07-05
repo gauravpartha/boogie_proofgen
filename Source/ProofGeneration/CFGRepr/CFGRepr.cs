@@ -118,18 +118,34 @@ namespace ProofGeneration.CFGRepresentation
             List<Block> Backedges = new List<Block>();
             if (BlockToLoops.ContainsKey(b))
             {
-              foreach (Block succ in GetSuccessorBlocks(b))
+              if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(b))
               {
-                if (BlockToLoops[b].Contains(succ))
+                foreach (Block succ in GetSuccessorBlocks(b))
                 {
                   Backedges.Add(succ);
-                } 
+                }
+                foreach (Block toRemove in Backedges)
+                {
+                  toRemove.Predecessors.Remove(b);
+                  outgoingBlocks[b].Remove(toRemove);
+                }
               }
-              foreach (Block toRemove in Backedges)
+              else
               {
-                toRemove.Predecessors.Remove(b);
-                outgoingBlocks[b].Remove(toRemove);
+                foreach (Block succ in GetSuccessorBlocks(b))
+                {
+                  if (BlockToLoops[b].Contains(succ))
+                  {
+                    Backedges.Add(succ);
+                  } 
+                }
+                foreach (Block toRemove in Backedges)
+                {
+                  toRemove.Predecessors.Remove(b);
+                  outgoingBlocks[b].Remove(toRemove);
+                }
               }
+              
             }
           }
         }

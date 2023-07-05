@@ -28,7 +28,7 @@ public class CfgOptimizationsManager
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
     IProgramAccessor beforeOptCfgProgAccess, //before CFG optimizations
     IProgramAccessor afterOptCfgProgAccess, //after CFG optimizationsList<(Block, Block)> CoalescedBlocks
-    IDictionary<Block, List <Block>> ListCoalescedBlocks, //TODO: Optimize CFGOptimizationsLemmaManager by using this dictionary
+    IDictionary<Block, List <Block>> ListCoalescedBlocks, 
     IDictionary<Block, Block> CoalescedBlocksToTarget,
     IDictionary<Block, IList<Block>> beforeDagBlockToLoops,
     Term vcAssm,
@@ -37,6 +37,7 @@ public class CfgOptimizationsManager
     IDictionary<Block, Block> afterToBefore = beforeToAfter.ToDictionary(x => x.Value, x => x.Key);
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops = new Dictionary<Block, IList<Block>>();
     Block coalescedAfterBlock = new Block();
+    ISet<Block> loopHeadsSet = new HashSet<Block>();
     
     foreach (Block beforeBlock in beforeOptimizations.GetBlocksForwards())
     {
@@ -46,16 +47,17 @@ public class CfgOptimizationsManager
         foreach (Block loopHeader in beforeDagBlockToLoops[beforeToAfter[beforeBlock]])
         {
           temp.Add(afterToBefore[loopHeader]);
+          loopHeadsSet.Add(afterToBefore[loopHeader]);
         }
         beforeOptBlockToLoops.Add(beforeBlock, temp);
       }
       else if (CoalescedBlocksToTarget.ContainsKey(beforeBlock)) {
         coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
         List<Block> temp = new List<Block>();
-        bool test = beforeDagBlockToLoops.ContainsKey(coalescedAfterBlock);
         foreach (Block loopHeader in beforeDagBlockToLoops[coalescedAfterBlock])
         {
           temp.Add(afterToBefore[loopHeader]);
+          loopHeadsSet.Add(afterToBefore[loopHeader]);
         }
 
         foreach (Block afterSucc in afterOptimizations.GetSuccessorBlocks(
@@ -64,6 +66,7 @@ public class CfgOptimizationsManager
           if (beforeDagBlockToLoops[coalescedAfterBlock].Count < beforeDagBlockToLoops[afterSucc].Count)
           {
             temp.Add(afterToBefore[GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget)]);
+            loopHeadsSet.Add(afterToBefore[GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget)]);
             break;
           }
         }
@@ -110,18 +113,18 @@ public class CfgOptimizationsManager
     foreach (var current in topoOrder)
     {
       Block beforeBlock = current;
-      if (isLoopHead(beforeBlock, beforeOptimizations, beforeOptBlockToLoops, beforeToAfter) && CoalescedBlocksToTarget.ContainsKey(beforeBlock)) //In this case we have a coalesced loop head
+      if (loopHeadsSet.Contains(beforeBlock) && CoalescedBlocksToTarget.ContainsKey(beforeBlock)) //In this case we have a coalesced loop head
       {
         coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
         var globalBlock = lemmaManager.LoopHeadCoalesced(beforeBlock, coalescedAfterBlock,
           bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
           bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer),
-          beforeOptBlockToLoops[beforeBlock]);
+          beforeOptBlockToLoops[beforeBlock], ListCoalescedBlocks);
         outerDecls.Add(globalBlock);
       } 
-      else if (isLoopHead(beforeBlock, beforeOptimizations, beforeOptBlockToLoops,beforeToAfter)) //normal Loop Head
+      else if (loopHeadsSet.Contains(beforeBlock)) //normal Loop Head
       {
-        var globalBlock = lemmaManager.LoopHeadNotCoalesced(beforeBlock, beforeToAfter[beforeBlock], bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer), beforeOptBlockToLoops, beforeOptBlockToLoops[beforeBlock]);
+        var globalBlock = lemmaManager.LoopHeadNotCoalesced(beforeBlock, beforeToAfter[beforeBlock], bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer), beforeOptBlockToLoops, beforeOptBlockToLoops[beforeBlock], loopHeadsSet);
         outerDecls.Add(globalBlock);
       }
       else if (CoalescedBlocksToTarget.ContainsKey(beforeBlock)) //in this case we have block coalescing
@@ -154,7 +157,7 @@ public class CfgOptimizationsManager
           var tail = lemmaManager.HybridBlockLemmaTail(beforeBlock, coalescedAfterBlock,
             bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
             bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer), 
-            beforeOptBlockToLoops, beforeOptBlockToLoops[beforeBlock]);
+            beforeOptBlockToLoops, beforeOptBlockToLoops[beforeBlock], loopHeadsSet);
           outerDecls.Add(tail);
         }
         else //in Between Block
@@ -179,7 +182,7 @@ public class CfgOptimizationsManager
           }
           else //otherwhise we just need to apply the normal global block lemma. Assumption: Global Block Lemma holds for all successors
           {
-            var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer), beforeOptBlockToLoops, beforeOptBlockToLoops[beforeBlock]);
+            var globalBlock = lemmaManager.GlobalBlockLemma(beforeBlock, afterBlock, bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer), beforeOptBlockToLoops, beforeOptBlockToLoops[beforeBlock], loopHeadsSet);
             outerDecls.Add(globalBlock);
           }
         }
@@ -245,21 +248,7 @@ public class CfgOptimizationsManager
     return null;
   }
   
-  private static bool isLoopHead(Block b, CFGRepr beforeOptimizations, IDictionary<Block, IList<Block>> beforeOptBlockToLoops, IDictionary<Block, Block> beforeToAfter)
-  {
-    if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(b))
-    {
-      return false;
-    }
-    foreach (Block succ in beforeOptimizations.GetSuccessorBlocks(b))
-    {
-      if (beforeToAfter.ContainsKey(b) && beforeOptBlockToLoops[b].Count < beforeOptBlockToLoops[succ].Count)
-      {
-        return true;
-      }
-    }
-    return false;
-  }
+  
   
   
   
