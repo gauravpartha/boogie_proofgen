@@ -754,7 +754,7 @@ namespace ProofGeneration
                 false, 
                 parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag(), 
                 //do not generate separate procedure if AST is going to connect directly to the CFG before the DAG
-                generateProcForBeforeCfgToDag ? specsConfigDefault : SpecsConfig.None, 
+                parentAccessorForBeforeCfgToDag == null || generateProcForBeforeCfgToDag ? specsConfigDefault : SpecsConfig.None, 
                 parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag());
               
               beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
