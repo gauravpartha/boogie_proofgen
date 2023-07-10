@@ -80,6 +80,7 @@ namespace ProofGeneration
         //private static Block uniqueExitBlockOrigBeforeOptimizations;
         private static Block uniqueExitBlockOrig;
 
+        //new ProofGenConfig().AllOptionsDisabled().SetCfgOptProof(true);
         private static ProofGenConfig _proofGenConfig = new ProofGenConfig().AllOptionsEnabled();
 
         private static IProgramAccessor globalDataProgAccess;
@@ -543,11 +544,6 @@ namespace ProofGeneration
           }
         }
 
-        public static bool GenerateAstCfgE2E()
-        {
-          return _proofGenConfig.GenerateAstCfgE2E;
-        }
-
         /// <summary>
         /// Generate all proofs for the current procedure. 
         /// </summary>
@@ -741,6 +737,10 @@ namespace ProofGeneration
                 #endregion
             }
 
+            var generateProcForBeforeCfgToDag =
+              _proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()) &&
+              proofGenInfo.GetOptimizationsFlag();
+            
             if (_proofGenConfig.GenerateBeforeCfgDagProg(proofGenInfo.GetOptimizationsFlag()))
             {
               #region before cfg to dag program
@@ -753,7 +753,8 @@ namespace ProofGeneration
                 false, 
                 false, 
                 parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag(), 
-                parentAccessorForBeforeCfgToDag != null ? SpecsConfig.None : specsConfigDefault, 
+                //do not generate separate procedure if AST is going to connect directly to the CFG before the DAG
+                generateProcForBeforeCfgToDag ? specsConfigDefault : SpecsConfig.None, 
                 parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag());
               
               beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
@@ -965,7 +966,9 @@ namespace ProofGeneration
               beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
-                _proofGenConfig.GenerateCfgDagE2E,
+                //hacky: find better solution
+                _proofGenConfig.GenerateCfgDagE2E ? (generateProcForBeforeCfgToDag ? CfgToDagEndToEndLemma.GenerateForProcedure : CfgToDagEndToEndLemma.GenerateForEntryBlock) 
+                                                  : CfgToDagEndToEndLemma.DoNotGenerate,
                 _proofGenConfig.GeneratePassifProof,
                 _proofGenConfig.GenerateVcProof,
                 vcAssm,
@@ -984,8 +987,7 @@ namespace ProofGeneration
               #endregion
             }
 
-            //TODO: change flag to proof flag
-            if (_proofGenConfig.GenerateUnoptimizedCfgProg(proofGenInfo.GetOptimizationsFlag()))
+            if (_proofGenConfig.GenerateCfgOptProof(proofGenInfo.GetOptimizationsFlag()))
             {
               #region cfg optimizations
               
@@ -1087,7 +1089,7 @@ namespace ProofGeneration
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg),
                 phasesTheories,
-                _proofGenConfig.GenerateAstCfgE2E,
+                _proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()),
                 _proofGenConfig,
                 vcAssm,
                 proofGenInfo,

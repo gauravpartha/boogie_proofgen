@@ -1,132 +1,133 @@
-﻿namespace ProofGeneration
+﻿using System;
+using System.Collections.Generic;
+
+namespace ProofGeneration
 {
     /// <summary>
     ///     Used to indicate which proofs should be generated.
     /// </summary>
     public class ProofGenConfig
     {
-        private bool _generateAstCfgE2E;
-        private bool _generateCfgDagE2E;
-        private bool _generatePassifE2E;
-        private bool _generateVcE2E;
-        private bool _generateAstCfgProof;
-        private bool _generateCfgDagProof;
-        private bool _generatePassifProof;
-        private bool _generateVcProof;
+      
+      private IDictionary<PhasesTheories.Phase, bool> generatePhaseProof;
 
-        public ProofGenConfig AllOptionsEnabled()
+      private List<PhasesTheories.Phase> phases = new List<PhasesTheories.Phase>
+      {
+        PhasesTheories.Phase.AstToCfg,
+        PhasesTheories.Phase.CfgOptimizations,
+        PhasesTheories.Phase.CfgToDag,
+        PhasesTheories.Phase.Passification,
+        PhasesTheories.Phase.Vc
+      };
+
+      private void UpdatePhaseDict<V>(IDictionary<PhasesTheories.Phase, V> dict, PhasesTheories.Phase key, V value)
+      {
+        if (!phases.Contains(key))
         {
-            _generateAstCfgE2E = true;
-            _generateCfgDagE2E = true;
-            _generatePassifE2E = true;
-            _generateVcE2E = true;
-            _generateAstCfgProof = true;
-            _generateCfgDagProof = true;
-            _generatePassifProof = true;
-            _generateVcProof = true;
-            return this;
+          throw new ArgumentException("Unexpected phase " + key);
+        }
+
+        dict[key] = value;
+      }
+      
+      private void UpdatePhaseProofFlag(PhasesTheories.Phase phase, bool flag)
+      {
+        UpdatePhaseDict(generatePhaseProof, phase, flag);
+      }
+
+      private bool GetPhaseProofFlag(PhasesTheories.Phase phase)
+      {
+        return generatePhaseProof[phase];
+      }
+
+      private ProofGenConfig AllOptions(bool enabled)
+      {
+        generatePhaseProof = new Dictionary<PhasesTheories.Phase, bool>();
+
+        foreach (var phase in phases)
+        {
+          generatePhaseProof.Add(phase, enabled);
         }
         
-        public ProofGenConfig AllOptionsDisabled()
-        {
-            _generateAstCfgE2E = false;
-            _generateCfgDagE2E = false;
-            _generatePassifE2E = false;
-            _generateVcE2E = false;
-            _generateAstCfgProof = false;
-            _generateCfgDagProof = false;
-            _generatePassifProof = false;
-            _generateVcProof = false;
-            return this;
-        }
+        return this;
+      }
+      
+      public ProofGenConfig AllOptionsEnabled()
+      {
+        return AllOptions(true);
+      }
         
-        /*
-            _proofGenConfig.GeneratePassifE2E = _proofGenConfig.GenerateVcProof && _proofGenConfig.GenerateVcE2E && _proofGenConfig.GeneratePassifProof;
-            _proofGenConfig.GenerateCfgDagE2E = _proofGenConfig.GeneratePassifE2E && _proofGenConfig.GenerateCfgDagProof;
-            _proofGenConfig.GenerateAstCfgE2E = _proofGenConfig.GenerateCfgDagE2E && _proofGenConfig.GenerateAstCfgProof;
-
-            _proofGenConfig.GenerateBeforeAstCfgProg = _proofGenConfig.GenerateAstCfgProof;
-            _proofGenConfig.GenerateUnoptimizedCfgProg = proofGenInfo.GetOptimizationsFlag() && _proofGenConfig.GenerateAstCfgProof;
-            _proofGenConfig.GenerateBeforeCfgDagProg = (proofGenInfo.GetOptimizationsFlag() &&  _proofGenConfig.GenerateCfgDagProof) || 
-                                                       (!proofGenInfo.GetOptimizationsFlag() && (_proofGenConfig.GenerateAstCfgProof || _proofGenConfig.GenerateCfgDagProof));
-            _proofGenConfig.GenerateBeforePassifProg = _proofGenConfig.GenerateCfgDagProof || _proofGenConfig.GeneratePassifProof; 
-            _proofGenConfig.GeneratePassifiedProg = _proofGenConfig.GeneratePassifProof || _proofGenConfig.GenerateVcProof;
-        */
-        public bool GenerateAstCfgE2E => _generateAstCfgE2E && GenerateAstCfgProof;
-
-        public ProofGenConfig SetAstCfgE2E(bool flag)
-        {
-          _generateAstCfgE2E = flag;
-          return this;
-        }
-
-        public bool GenerateCfgDagE2E => _generateCfgDagE2E && GenerateCfgDagProof;
-        public ProofGenConfig SetCfgDagE2E(bool flag)
-        {
-          _generateCfgDagE2E = flag;
-          return this;
-        }
-
-        public bool GeneratePassifE2E => _generatePassifE2E && GeneratePassifProof && GenerateVcE2E;
-
-        public ProofGenConfig SetPassifE2E(bool flag)
-        {
-          _generatePassifE2E = flag;
-          return this;
-        }
-
-        public bool GenerateVcE2E => _generateVcE2E && GenerateVcProof;
+      public ProofGenConfig AllOptionsDisabled()
+      {
+        return AllOptions(false);
+      }
         
-        public ProofGenConfig SetVcE2E(bool flag)
-        {
-          _generateVcE2E = flag;
-          return this;
-        }
+      public bool GenerateAstCfgE2E(bool optimizationsHaveAnEffect) => 
+        GenerateAstCfgProof && (!optimizationsHaveAnEffect && GenerateCfgDagE2E); //currently do not produce E2E if optimizations have an effect
 
-        public bool GenerateAstCfgProof => _generateAstCfgProof;
-        public ProofGenConfig SetAstCfgProof(bool flag)
-        {
-          _generateAstCfgProof = flag;
-          return this;
-        }
+      public bool GenerateCfgDagE2E => GenerateCfgDagProof && GeneratePassifE2E;
 
-        public bool GenerateCfgDagProof => _generateCfgDagProof;
-        public ProofGenConfig SetCfgDagProof(bool flag)
-        {
-          _generateCfgDagProof = flag;
-          return this;
-        }
+      public bool GeneratePassifE2E => GeneratePassifProof && GenerateVcE2E;
 
-        public bool GeneratePassifProof => _generatePassifProof;
-        public ProofGenConfig SetPassifProof(bool flag)
-        {
-          _generatePassifProof = flag;
-          return this;
-        }
+      public bool GenerateVcE2E => GenerateVcProof;
 
-        public bool GenerateVcProof => _generateVcProof;
-        
-        public ProofGenConfig SetVcProof(bool flag)
-        {
-          _generateVcProof = flag;
-          return this;
-        }
+      public bool GenerateAstCfgProof => GetPhaseProofFlag(PhasesTheories.Phase.AstToCfg);
+      public ProofGenConfig SetAstCfgProof(bool flag)
+      {
+        UpdatePhaseProofFlag(PhasesTheories.Phase.AstToCfg, flag);
+        return this;
+      }
 
-        /** Program Generation Getters */
-        
-        public bool GenerateBeforeAstCfgProg => GenerateAstCfgProof;
+      public bool GenerateCfgOptProof(bool optimizationsHaveAnEffect) =>
+        optimizationsHaveAnEffect && GetPhaseProofFlag(PhasesTheories.Phase.CfgOptimizations);
 
-        public bool GenerateUnoptimizedCfgProg(bool optimizationsHaveAnEffect)
-        {
-          return optimizationsHaveAnEffect;
-        }
+      public ProofGenConfig SetCfgOptProof(bool flag)
+      {
+        UpdatePhaseProofFlag(PhasesTheories.Phase.CfgOptimizations, flag);
+        return this;
+      }
 
-        public bool GenerateBeforeCfgDagProg(bool optimizationsHaveAnEffect)
-        {
-          return GenerateCfgDagProof || (optimizationsHaveAnEffect && GenerateAstCfgProof);
-        }
+      public bool GenerateCfgDagProof => GetPhaseProofFlag(PhasesTheories.Phase.CfgToDag);
+      public ProofGenConfig SetCfgDagProof(bool flag)
+      {
+        UpdatePhaseProofFlag(PhasesTheories.Phase.CfgToDag, flag);
+        return this;
+      }
 
-        public bool GenerateBeforePassiveProg => GenerateCfgDagProof || GeneratePassifProof;
-        public bool GeneratePassifiedProg => GeneratePassifProof || GenerateVcProof;
+      public bool GeneratePassifProof => GetPhaseProofFlag(PhasesTheories.Phase.Passification);
+      public ProofGenConfig SetPassifProof(bool flag)
+      {
+        UpdatePhaseProofFlag(PhasesTheories.Phase.Passification, flag);
+        return this;
+      }
+
+      public bool GenerateVcProof => GetPhaseProofFlag(PhasesTheories.Phase.Vc);
+      
+      public ProofGenConfig SetVcProof(bool flag)
+      {
+        UpdatePhaseProofFlag(PhasesTheories.Phase.Vc, flag);
+        return this;
+      }
+
+      /** Program Generation Getters */
+      
+      public bool GenerateBeforeAstCfgProg => GenerateAstCfgProof; 
+
+      public bool GenerateUnoptimizedCfgProg(bool optimizationsHaveAnEffect)
+      {
+        return optimizationsHaveAnEffect && GenerateAstCfgProof ||
+               GenerateCfgOptProof(optimizationsHaveAnEffect);
+      }
+
+      public bool GenerateBeforeCfgDagProg(bool optimizationsHaveAnEffect)
+      {
+        return (!optimizationsHaveAnEffect && GenerateAstCfgProof) || //directly connect AST to CFG before CfgToDag if there are no optimizations
+               GenerateCfgOptProof(optimizationsHaveAnEffect) ||  
+               GenerateCfgDagProof;
+      }
+
+      public bool GenerateBeforePassiveProg => GenerateCfgDagProof || GeneratePassifProof;
+      public bool GeneratePassifiedProg => GeneratePassifProof || GenerateVcProof;
+      
     }
 }

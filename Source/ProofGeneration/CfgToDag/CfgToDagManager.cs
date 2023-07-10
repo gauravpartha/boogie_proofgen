@@ -11,6 +11,13 @@ using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag
 {
+    public enum CfgToDagEndToEndLemma
+    {
+      DoNotGenerate,
+      GenerateForProcedure,
+      GenerateForEntryBlock
+    }
+  
     public class CfgToDagManager
     {
         /**
@@ -23,7 +30,7 @@ namespace ProofGeneration.CfgToDag
          */
         public static Theory CfgToDagProof(
             PhasesTheories phasesTheories,
-            bool generateEndToEndLemma,
+            CfgToDagEndToEndLemma generateEndToEndLemma,
             bool generatePassificationProof,
             bool generateVcProof,
             Term vcAssm,
@@ -181,10 +188,11 @@ namespace ProofGeneration.CfgToDag
             var theoryOuterDecls = new List<OuterDecl>();
             theoryOuterDecls.Add(cfgToDagLemmasLocale);
 
-            if (generateEndToEndLemma)
+            if (generateEndToEndLemma != CfgToDagEndToEndLemma.DoNotGenerate)
             {
                 var endToEndManager = new CfgToDagEndToEnd();
                 var endToEndDecls = endToEndManager.EndToEndProof(
+                    generateEndToEndLemma == CfgToDagEndToEndLemma.GenerateForProcedure,
                     cfgToDagLemmasLocale.Name + "." + entryLemma.Name,
                     phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.Passification, true),
                     vcAssm,

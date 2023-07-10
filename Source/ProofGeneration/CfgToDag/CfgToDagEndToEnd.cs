@@ -35,6 +35,7 @@ namespace ProofGeneration.CfgToDag
         private readonly string varContextName = "\\<Lambda>0";
 
         public IEnumerable<OuterDecl> EndToEndProof(
+            bool lemmaForProcedure,
             string entryCfgLemma,
             string passificationEndToEndLemma,
             Term vcAssm,
@@ -118,41 +119,44 @@ namespace ProofGeneration.CfgToDag
             result.Add(helperLemma);
             //transform end to end theorem to a compact representation
 
-            var endToEndLemma = 
-                new LemmaDecl(
-                    "end_to_end_theorem",
-                    ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
-                    ProcedureIsCorrect(
-                        programAccessor.FunctionsDecl(), 
-                        IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
-                        IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
-                        programAccessor.AxiomsDecl(),
-                        programAccessor.ProcDecl()),
-                    new Proof(
-                        new List<string>
-                        {
-                            ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util",helperLemmaName))),
-                            "apply assumption " + "using VC apply simp " + " apply assumption+",
-                            ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
-                                             programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def " +
-                                             programAccessor.PreconditionsDeclName() + "_def " + programAccessor.PostconditionsDeclName() + "_def " +
-                                             programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
-                                             programAccessor.PreconditionsDeclName() + "_def " + programAccessor.PostconditionsDeclName() + "_def " +
-                                             programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
-                                             
-                                             programAccessor.FunctionsDecl() + "_def " + programAccessor.FunctionsDecl() + "_def " +
-                                             programAccessor.AxiomsDecl() + "_def " + programAccessor.AxiomsDecl() + "_def " +
-                                             programAccessor.ConstsDecl() + "_def " + programAccessor.ConstsDecl() + "_def " +
-                                             programAccessor.GlobalsDecl() + "_def " + programAccessor.GlobalsDecl() + "_def " +
-                                             "exprs_to_only_checked_spec_def")
-                        }
-                    ) );
-
-            if (!ProofGenerationLayer.GenerateAstCfgE2E())
+            if (lemmaForProcedure)
             {
+              var endToEndLemma =
+                new LemmaDecl(
+                  "end_to_end_theorem",
+                  ContextElem.CreateWithAssumptions(new List<Term> { vcAssm }, new List<string> { "VC" }),
+                  ProcedureIsCorrect(
+                    programAccessor.FunctionsDecl(),
+                    IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
+                    IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
+                    programAccessor.AxiomsDecl(),
+                    programAccessor.ProcDecl()),
+                  new Proof(
+                    new List<string>
+                    {
+                      ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util", helperLemmaName))),
+                      "apply assumption " + "using VC apply simp " + " apply assumption+",
+                      ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
+                                   programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def " +
+                                   programAccessor.PreconditionsDeclName() + "_def " +
+                                   programAccessor.PostconditionsDeclName() + "_def " +
+                                   programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
+                                   programAccessor.PreconditionsDeclName() + "_def " +
+                                   programAccessor.PostconditionsDeclName() + "_def " +
+                                   programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
+
+                                   programAccessor.FunctionsDecl() + "_def " + programAccessor.FunctionsDecl() +
+                                   "_def " +
+                                   programAccessor.AxiomsDecl() + "_def " + programAccessor.AxiomsDecl() + "_def " +
+                                   programAccessor.ConstsDecl() + "_def " + programAccessor.ConstsDecl() + "_def " +
+                                   programAccessor.GlobalsDecl() + "_def " + programAccessor.GlobalsDecl() + "_def " +
+                                   "exprs_to_only_checked_spec_def")
+                    }
+                  ));
+
               result.Add(endToEndLemma);
             }
-            
+
             return result; 
         }
 
