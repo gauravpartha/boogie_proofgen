@@ -27,6 +27,19 @@
             return this;
         }
         
+        public ProofGenConfig AllOptionsDisabled()
+        {
+            _generateAstCfgE2E = false;
+            _generateCfgDagE2E = false;
+            _generatePassifE2E = false;
+            _generateVcE2E = false;
+            _generateAstCfgProof = false;
+            _generateCfgDagProof = false;
+            _generatePassifProof = false;
+            _generateVcProof = false;
+            return this;
+        }
+        
         /*
             _proofGenConfig.GeneratePassifE2E = _proofGenConfig.GenerateVcProof && _proofGenConfig.GenerateVcE2E && _proofGenConfig.GeneratePassifProof;
             _proofGenConfig.GenerateCfgDagE2E = _proofGenConfig.GeneratePassifE2E && _proofGenConfig.GenerateCfgDagProof;
