@@ -82,6 +82,7 @@ namespace ProofGeneration
 
         //new ProofGenConfig().AllOptionsDisabled().SetCfgOptProof(true);
         private static ProofGenConfig _proofGenConfig = new ProofGenConfig().AllOptionsEnabled();
+        //private static ProofGenConfig _proofGenConfig = new ProofGenConfig().AllOptionsDisabled().SetCfgOptProof(true);
 
         private static IProgramAccessor globalDataProgAccess;
 
@@ -1026,7 +1027,8 @@ namespace ProofGeneration
                 beforeDagBlocktoLoops,
                 vcAssm,
                 afterPassificationImpl.Name,
-                _proofGenConfig.GenerateCfgDagE2E);
+                _proofGenConfig.GenerateCfgDagE2E,
+                _proofGenConfig.GenerateCfgDagProof);
               theories.Add(cfgOptimizationsProofTheory); 
               
               #endregion

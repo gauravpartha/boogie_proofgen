@@ -33,7 +33,8 @@ public class CfgOptimizationsManager
     IDictionary<Block, IList<Block>> beforeDagBlockToLoops,
     Term vcAssm,
     string procedureName,
-    bool generateEnd2EndLemma)
+    bool generateEnd2EndLemma,
+    bool generateCfgDagProof)
   {
     IDictionary<Block, Block> afterToBefore = beforeToAfter.ToDictionary(x => x.Value, x => x.Key);
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops = new Dictionary<Block, IList<Block>>();
@@ -210,18 +211,19 @@ public class CfgOptimizationsManager
       );
       outerDecls.AddRange(endToEndDecls);
     }
-    
-
 
 
     List<string> importTheories = new List<string>
     {
       "Boogie_Lang.Semantics", "Boogie_Lang.Util", "Boogie_Lang.CFGOptimizationsLoop",
       afterOptCfgProgAccess.TheoryName(),
-      beforeOptCfgProgAccess.TheoryName(),
-      phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag)
-      
+      beforeOptCfgProgAccess.TheoryName()
     };
+    if (generateCfgDagProof)
+    {
+      importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag));
+    }
+    
     
     return new Theory(
       phasesTheories.TheoryName(PhasesTheories.Phase.CfgOptimizations),
