@@ -739,7 +739,7 @@ namespace ProofGeneration
             }
 
             var generateProcForBeforeCfgToDag =
-              _proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()) &&
+              //_proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()) &&
               proofGenInfo.GetOptimizationsFlag();
             
             if (_proofGenConfig.GenerateBeforeCfgDagProg(proofGenInfo.GetOptimizationsFlag()))
