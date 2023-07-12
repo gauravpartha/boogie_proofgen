@@ -111,7 +111,7 @@ namespace ProofGeneration.CFGRepresentation
           return new CFGRepr(this);
         }
 
-        public void DeleteBackedges(IDictionary<Block, IList<Block>> BlockToLoops)
+        public void DeleteBackedges(IDictionary<Block, IList<Block>> BlockToLoops, IDictionary<Block, Block> selfLoops)
         {
           foreach (Block b in blocks)
           {
@@ -144,8 +144,15 @@ namespace ProofGeneration.CFGRepresentation
                   toRemove.Predecessors.Remove(b);
                   outgoingBlocks[b].Remove(toRemove);
                 }
+                
               }
-              
+
+            }
+
+            if (selfLoops.ContainsKey(b))
+            {
+              outgoingBlocks[b].Remove(b);
+              b.Predecessors.Remove(b);
             }
           }
         }

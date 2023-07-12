@@ -955,7 +955,7 @@ namespace ProofGeneration
             }
 
             IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = null;
-
+            IDictionary<Block, Block> selfLoops = null;
             if (_proofGenConfig.GenerateCfgDagProof)
             {
               #region cfg to dag
@@ -964,7 +964,7 @@ namespace ProofGeneration
                 uniqueExitBlockOrig != null
                   ? beforePassiveOrigBlock.First(kv => kv.Value == uniqueExitBlockOrig).Key
                   : null;
-              beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
+              beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager, out selfLoops);
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
                 //hacky: find better solution
@@ -997,8 +997,10 @@ namespace ProofGeneration
               IDictionary<Block, Block> beforeOptAfterOptBlock = DictionaryComposition(beforeOptimizationsOrigBlock, origToAfterOpt);
               if (beforeDagBlocktoLoops == null)
               {
-                beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager);
+                beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager, out selfLoops);
               }
+              
+              
               
               IDictionary<Block, Block> CoalescedBlocksToTarget = DictionaryComposition(afterPassificationImpl.CoalescedBlocksToTarget, origToAfterOpt);
               CoalescedBlocksToTarget = DictionaryComposition(beforeOptimizationsOrigBlock, CoalescedBlocksToTarget);
@@ -1028,7 +1030,8 @@ namespace ProofGeneration
                 vcAssm,
                 afterPassificationImpl.Name,
                 _proofGenConfig.GenerateCfgDagE2E,
-                _proofGenConfig.GenerateCfgDagProof);
+                _proofGenConfig.GenerateCfgDagProof,
+                selfLoops);
               theories.Add(cfgOptimizationsProofTheory); 
               
               #endregion
@@ -1165,8 +1168,9 @@ namespace ProofGeneration
             return new BoogieIsaProgInterface(new Dictionary<string, IProgramAccessor>(procNameToTopLevelPrograms), globalDataProgAccess);
         }
 
-        public static IDictionary<Block, IList<Block>> getBeforeDagBlockToLoops(IDictionary<Block, Block> beforeToAfter, CFGRepr afterDagCfg, CfgToDagHintManager hintManager)
+        public static IDictionary<Block, IList<Block>> getBeforeDagBlockToLoops(IDictionary<Block, Block> beforeToAfter, CFGRepr afterDagCfg, CfgToDagHintManager hintManager, out IDictionary<Block, Block> selfLoops)
         {
+          selfLoops = new Dictionary<Block, Block>();
           var afterToBefore = beforeToAfter.InverseDict();
           IDictionary<Block, IList<Block>> blocksToLoops = new Dictionary<Block, IList<Block>>();
           foreach (var afterBlock in afterDagCfg.GetBlocksBackwards())
@@ -1198,6 +1202,10 @@ namespace ProofGeneration
                   if (beforeBlock != backedgeLoop)
                   {
                     loops.Add(backedgeLoop);
+                  }
+                  else
+                  {
+                    selfLoops.Add(beforeBlock, backedgeLoop);
                   }
                 }
               }

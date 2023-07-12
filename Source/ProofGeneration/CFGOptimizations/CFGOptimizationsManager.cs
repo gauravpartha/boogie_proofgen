@@ -34,12 +34,15 @@ public class CfgOptimizationsManager
     Term vcAssm,
     string procedureName,
     bool generateEnd2EndLemma,
-    bool generateCfgDagProof)
+    bool generateCfgDagProof,
+    IDictionary<Block, Block> selfLoops)
   {
     IDictionary<Block, Block> afterToBefore = beforeToAfter.ToDictionary(x => x.Value, x => x.Key);
     IDictionary<Block, IList<Block>> beforeOptBlockToLoops = new Dictionary<Block, IList<Block>>();
     Block coalescedAfterBlock = new Block();
     ISet<Block> loopHeadsSet = new HashSet<Block>();
+    IDictionary<Block, Block> selfLoopsNew = new Dictionary<Block, Block>();
+    
     
     foreach (Block beforeBlock in beforeOptimizations.GetBlocksForwards())
     {
@@ -52,6 +55,11 @@ public class CfgOptimizationsManager
           loopHeadsSet.Add(afterToBefore[loopHeader]);
         }
         beforeOptBlockToLoops.Add(beforeBlock, temp);
+        if (selfLoops.ContainsKey(beforeToAfter[beforeBlock]))
+        {
+          selfLoopsNew.Add(beforeBlock, beforeBlock);
+          loopHeadsSet.Add(beforeBlock);
+        }
       }
       else if (CoalescedBlocksToTarget.ContainsKey(beforeBlock)) {
         coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
@@ -72,7 +80,13 @@ public class CfgOptimizationsManager
             break;
           }
         }
+        if (selfLoops.ContainsKey(coalescedAfterBlock))
+        {
+          temp.Add(afterToBefore[coalescedAfterBlock]);
+          loopHeadsSet.Add(afterToBefore[coalescedAfterBlock]);
+        }
         beforeOptBlockToLoops.Add(beforeBlock, temp);
+
       }
     }
     
@@ -106,7 +120,7 @@ public class CfgOptimizationsManager
 
 
     CFGRepr beforeOptimizationsCopy = beforeOptimizations.Copy();
-    beforeOptimizationsCopy.DeleteBackedges(beforeOptBlockToLoops);
+    beforeOptimizationsCopy.DeleteBackedges(beforeOptBlockToLoops, selfLoopsNew);
 
     List<Block> topoOrder = new List<Block>();
     TopologicalOrder(topoOrder, beforeOptimizationsCopy);

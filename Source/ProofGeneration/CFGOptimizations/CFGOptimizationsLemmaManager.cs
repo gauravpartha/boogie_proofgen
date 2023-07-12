@@ -232,7 +232,7 @@ public class CFGOptimizationsLemmaManager
       }
     }
 
-    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() > 1 && beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() - countCases > 0) 
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() > 1 && beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() - countCases > 1) 
     {
       proofMethods.Add("apply (intro conjI)");
     }
@@ -454,7 +454,7 @@ public class CFGOptimizationsLemmaManager
       }
     }
 
-    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() > 1 && beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() - countCases > 0) 
+    if (beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() > 1 && beforeOptimizations.GetSuccessorBlocks(beforeBlock).Count() - countCases > 1) 
     {
       proofMethods.Add("apply (intro conjI)");
     }
