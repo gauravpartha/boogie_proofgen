@@ -18,16 +18,14 @@ namespace ProofGeneration.CFGOptimizations;
 
 public class CfgOptimizationsManager
 {
-
-  //string uniqueTheoryName,
-  //PhasesTheories phasesTheories,
+  
   public static Theory CfgOptProof(
     PhasesTheories phasesTheories,
     CFGRepr beforeOptimizations,
     CFGRepr afterOptimizations,
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
     IProgramAccessor beforeOptCfgProgAccess, //before CFG optimizations
-    IProgramAccessor afterOptCfgProgAccess, //after CFG optimizationsList<(Block, Block)> CoalescedBlocks
+    IProgramAccessor afterOptCfgProgAccess, //after CFG optimizationsList
     IDictionary<Block, List <Block>> ListCoalescedBlocks, 
     IDictionary<Block, Block> CoalescedBlocksToTarget,
     IDictionary<Block, IList<Block>> beforeDagBlockToLoops,
@@ -71,12 +69,12 @@ public class CfgOptimizationsManager
         }
 
         foreach (Block afterSucc in afterOptimizations.GetSuccessorBlocks(
-                   GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget)))
+                   CoalescedBlocksToTarget[beforeBlock]))
         {
           if (beforeDagBlockToLoops[coalescedAfterBlock].Count < beforeDagBlockToLoops[afterSucc].Count)
           {
-            temp.Add(afterToBefore[GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget)]);
-            loopHeadsSet.Add(afterToBefore[GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget)]);
+            temp.Add(afterToBefore[CoalescedBlocksToTarget[beforeBlock]]);
+            loopHeadsSet.Add(afterToBefore[CoalescedBlocksToTarget[beforeBlock]]);
             break;
           }
         }
@@ -131,7 +129,7 @@ public class CfgOptimizationsManager
       Block beforeBlock = current;
       if (loopHeadsSet.Contains(beforeBlock) && CoalescedBlocksToTarget.ContainsKey(beforeBlock)) //In this case we have a coalesced loop head
       {
-        coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+        coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
         var globalBlock = lemmaManager.LoopHeadCoalesced(beforeBlock, coalescedAfterBlock,
           bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
           bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer),
@@ -147,7 +145,7 @@ public class CfgOptimizationsManager
       {
         if (ProgramToVCProof.LemmaHelper.FinalStateIsMagic(beforeBlock)) //Pruning of Unreachable Blocks Coalesced
         {
-          coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+          coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
           var pruningCoalesced = lemmaManager.HybridBlockLemmaPruning(beforeBlock, coalescedAfterBlock,
             bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer), beforeOptBlockToLoops[beforeBlock]);
           outerDecls.Add(pruningCoalesced);
@@ -168,7 +166,7 @@ public class CfgOptimizationsManager
         }
         else if (ListCoalescedBlocks[beforeBlock].Count == 1) //tail of coalesced blocks
         {
-          coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+          coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
           
           var tail = lemmaManager.HybridBlockLemmaTail(beforeBlock, coalescedAfterBlock,
             bigblock => GetGlobalBlockLemmaName(bigblock, lemmaNamer),
@@ -178,7 +176,7 @@ public class CfgOptimizationsManager
         }
         else //in Between Block
         {
-          coalescedAfterBlock = GetCoalescedAfterBlock(beforeBlock, beforeToAfter, CoalescedBlocksToTarget);
+          coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
           var inBetweenBlock = lemmaManager.HybridBlockLemma(beforeBlock, coalescedAfterBlock,
             beforeOptimizations.GetSuccessorBlocks(beforeBlock).FirstOrDefault(),
             bigblock => GetHybridBlockLemmaName(bigblock, lemmaNamer), beforeOptBlockToLoops[beforeBlock],
@@ -256,17 +254,7 @@ public class CfgOptimizationsManager
     return "hybrid_block_lemma_" + namer.GetName(b, "block_" + b.Label);
   }
 
-  private static Block GetCoalescedAfterBlock(Block b, IDictionary<Block, Block> beforeToAfter, IDictionary<Block, Block> CoalescedBlocksToTarget)
-  {
-    foreach (Block beforeBlockNew in beforeToAfter.Keys) //Get the Coalesced After Block
-    {
-      if (beforeToAfter[beforeBlockNew] == CoalescedBlocksToTarget[b])
-      {
-        return beforeToAfter[beforeBlockNew];
-      }
-    }
-    return null;
-  }
+  
   
   
   
