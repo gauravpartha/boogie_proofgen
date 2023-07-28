@@ -26,7 +26,7 @@ public class CfgOptimizationsManager
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
     IProgramAccessor beforeOptCfgProgAccess, //before CFG optimizations
     IProgramAccessor afterOptCfgProgAccess, //after CFG optimizationsList
-    IDictionary<Block, List <Block>> ListCoalescedBlocks, 
+    IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks, 
     IDictionary<Block, Block> CoalescedBlocksToTarget,
     IDictionary<Block, IList<Block>> beforeDagBlockToLoops,
     Term vcAssm,
@@ -124,9 +124,9 @@ public class CfgOptimizationsManager
     TopologicalOrder(topoOrder, beforeOptimizationsCopy);
     topoOrder.Reverse();
 
-    foreach (var current in topoOrder)
+    foreach (var beforeBlock in topoOrder)
     {
-      Block beforeBlock = current;
+
       if (loopHeadsSet.Contains(beforeBlock) && CoalescedBlocksToTarget.ContainsKey(beforeBlock)) //In this case we have a coalesced loop head
       {
         coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
@@ -164,7 +164,7 @@ public class CfgOptimizationsManager
             ListCoalescedBlocks);
           outerDecls.Add(convertGlobalBlock);
         }
-        else if (ListCoalescedBlocks[beforeBlock].Count == 1) //tail of coalesced blocks
+        else if (ListCoalescedBlocks[beforeBlock].coalescedBlocks.Count == ListCoalescedBlocks[beforeBlock].idx + 1) //tail of coalesced blocks
         {
           coalescedAfterBlock = CoalescedBlocksToTarget[beforeBlock];
           

@@ -1005,15 +1005,18 @@ namespace ProofGeneration
               IDictionary<Block, Block> CoalescedBlocksToTarget = DictionaryComposition(afterPassificationImpl.CoalescedBlocksToTarget, origToAfterOpt);
               CoalescedBlocksToTarget = DictionaryComposition(beforeOptimizationsOrigBlock, CoalescedBlocksToTarget);
 
-              IDictionary<Block, List<Block>> ListCoalescedBlocks = new Dictionary<Block, List<Block>>();
+              IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks = new Dictionary<Block, BlockCoalescingInfo>();
               foreach (var curr in afterPassificationImpl.ListCoalescedBlocks.Keys)
               {
                 List<Block> temp = new List<Block>();
-                foreach (var next in afterPassificationImpl.ListCoalescedBlocks[curr])
+                foreach (var next in afterPassificationImpl.ListCoalescedBlocks[curr].coalescedBlocks)
                 {
                   temp.Add(beforeOptimizationsOrigBlock.InverseDict()[next]);
                 }
-                ListCoalescedBlocks.Add(beforeOptimizationsOrigBlock.InverseDict()[curr], temp);
+
+                BlockCoalescingInfo currInfo =
+                  new BlockCoalescingInfo(temp, afterPassificationImpl.ListCoalescedBlocks[curr].idx);
+                ListCoalescedBlocks.Add(beforeOptimizationsOrigBlock.InverseDict()[curr], currInfo);
               }
               
               

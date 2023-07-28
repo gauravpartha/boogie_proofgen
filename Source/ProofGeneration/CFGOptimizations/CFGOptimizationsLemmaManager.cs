@@ -293,7 +293,7 @@ public class CFGOptimizationsLemmaManager
     Block succ,
     Func<Block, string> HybridblockLemmaName,
     IList<Block> Loops,
-    IDictionary<Block, List <Block>> ListCoalescedBlocks)
+    IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks)
   {
     var proofMethods = new List<string>
     {
@@ -309,9 +309,11 @@ public class CFGOptimizationsLemmaManager
     {
       loopHeads.Add("(" + beforeOptProgAccess.BlockInfo().BlockIds[loop] + "," + afterOptProgAccess.BlockInfo().BlockIds[beforeToAfterBlock[loop]] + ")");
     }
+    int i = ListCoalescedBlocks[beforeBlock].idx;
+    List<Block> coalescedBlocks = ListCoalescedBlocks[beforeBlock].coalescedBlocks;
 
     List<String> listCoalescedBlocks = new List<String>();
-    foreach (Block current in ListCoalescedBlocks[beforeBlock])
+    foreach (Block current in coalescedBlocks.GetRange(i, coalescedBlocks.Count - i))
     {
       listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current));
     }
@@ -334,7 +336,7 @@ public class CFGOptimizationsLemmaManager
     Func<Block, string> GlobalblockLemmaName,
     Func<Block, string> HybridblockLemmaName,
     IList<Block> Loops,
-    IDictionary<Block, List <Block>> ListCoalescedBlocks)
+    IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks)
   {
     var proofMethods = new List<string>
     {
@@ -342,8 +344,10 @@ public class CFGOptimizationsLemmaManager
       "apply (rule " + HybridblockLemmaName(beforeBlock) + ")"
     };
     
+    int i = ListCoalescedBlocks[beforeBlock].idx;
+    List<Block> coalescedBlocks = ListCoalescedBlocks[beforeBlock].coalescedBlocks;
     List<String> listCoalescedBlocks = new List<String>();
-    foreach (Block current in ListCoalescedBlocks[beforeBlock])
+    foreach (Block current in coalescedBlocks.GetRange(i, coalescedBlocks.Count - i))
     {
       listCoalescedBlocks.Add(beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current));
     }
@@ -517,7 +521,7 @@ public class CFGOptimizationsLemmaManager
     Func<Block, string> GlobalblockLemmaName,
     Func<Block, string> HybridblockLemmaName,
     IList<Block> Loops,
-    IDictionary<Block, List <Block>> ListCoalescedBlocks)
+    IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks)
   {
     var loopHeads = new List<string>();
     foreach (Block loop in Loops)
@@ -535,7 +539,10 @@ public class CFGOptimizationsLemmaManager
       "apply (rule " + afterOptProgAccess.BlockInfo().BlockCmdsMembershipLemma(afterBlock) + ")",
       "apply (unfold " + afterOptProgAccess.BlockInfo().CmdsQualifiedName(afterBlock) +"_def)"
     };
-    foreach (Block current in ListCoalescedBlocks[beforeBlock])
+
+    int i = ListCoalescedBlocks[beforeBlock].idx;
+    List<Block> coalescedBlocks = ListCoalescedBlocks[beforeBlock].coalescedBlocks;
+    foreach (Block current in coalescedBlocks.GetRange(i, coalescedBlocks.Count - i))
     {
      proofMethods.Add("apply (unfold " + beforeOptProgAccess.BlockInfo().CmdsQualifiedName(current) + "_def)"); 
     }

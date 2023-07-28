@@ -4124,7 +4124,7 @@ namespace Microsoft.Boogie
     
     #region  ProofGen
     public IDictionary<Block, Block> CoalescedBlocksToTarget;
-    public IDictionary<Block, List <Block>> ListCoalescedBlocks;
+    public IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks;
     #endregion 
 
     public sealed class ChecksumComparer : IEqualityComparer<byte[]>

@@ -486,7 +486,7 @@ namespace Microsoft.Boogie
     {
 
       IDictionary<Block, Block> CoalescedBlocksToTarget = new Dictionary<Block, Block>();
-      IDictionary<Block, List <Block>> ListCoalescedBlocks = new Dictionary<Block, List<Block>>();
+      IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks = new Dictionary<Block, BlockCoalescingInfo>();
       
       //Contract.Requires(impl != null);
       Contract.Ensures(Contract.Result<Implementation>() != null);
@@ -537,9 +537,13 @@ namespace Microsoft.Boogie
             {
               List<Block> newList = new List<Block>();
               newList.Add(b);
-              ListCoalescedBlocks.Add(b, newList);
+              BlockCoalescingInfo coalescedHead = new BlockCoalescingInfo(newList, 0);
+              ListCoalescedBlocks.Add(b, coalescedHead);
             }
-            ListCoalescedBlocks[b].Add(succ);
+            ListCoalescedBlocks[b].coalescedBlocks.Add(succ);
+            
+            BlockCoalescingInfo curr = new BlockCoalescingInfo(ListCoalescedBlocks[b].coalescedBlocks, ListCoalescedBlocks[b].coalescedBlocks.Count - 1);
+            ListCoalescedBlocks.Add(succ, curr);
             
             if (!CoalescedBlocksToTarget.ContainsKey(succ))
             {
@@ -599,17 +603,6 @@ namespace Microsoft.Boogie
         foreach (Block succ in gotoCmd.labelTargets)
         {
           gotoCmd.labelNames.Add(succ.Label);
-        }
-      }
-      
-      var ListCoalescedBlocks_old = new Dictionary<Block, List<Block>>(ListCoalescedBlocks);
-      foreach (var curr in ListCoalescedBlocks_old.Keys)
-      {
-        for (int i = 1; i < ListCoalescedBlocks[curr].Count; i++)
-        {
-          List<Block> temp = new List<Block>(ListCoalescedBlocks[curr]);
-          List<Block> subList = new List<Block>(temp.GetRange(i, temp.Count - i));
-          ListCoalescedBlocks.Add(ListCoalescedBlocks[curr][i], subList);
         }
       }
 
@@ -2352,4 +2345,18 @@ b.liveVarsBefore = procICFG[mainImpl.Name].liveVarsAfter[b];
       return base.VisitBlock(node);
     }
   }
+  #region proofgen
+  public class BlockCoalescingInfo
+  {
+
+    public List<Block> coalescedBlocks;
+    public int idx;
+
+    public BlockCoalescingInfo(List<Block> coalescedBlocks, int idx)
+    {
+      this.coalescedBlocks = coalescedBlocks;
+      this.idx = idx;
+    }
+  }
+  #endregion
 }
