@@ -1064,7 +1064,7 @@ namespace VC
 
     public void ConvertCFG2DAG(Implementation impl, Dictionary<Block, List<Block>> edgesCut = null, int taskID = -1)
     {
-      Contract.Requires(impl != null);
+      Contract.Requires(impl != null);  
       impl.PruneUnreachableBlocks(); // This is needed for VCVariety.BlockNested, and is otherwise just an optimization
       
       #region proofgen

@@ -40,6 +40,7 @@ namespace ProofGeneration.Passification
             IVariableTranslationFactory beforePassiveFactory,
             IVariableTranslationFactory passiveFactory)
         {
+            
             var varContextName = "\\<Lambda>1";
             var passiveVarContextName = "\\<Lambda>2";
             var varContextNonPassivePassive = Tuple.Create(varContextName, passiveVarContextName);

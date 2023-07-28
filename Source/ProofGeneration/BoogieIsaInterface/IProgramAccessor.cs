@@ -43,6 +43,8 @@ namespace ProofGeneration.BoogieIsaInterface
         public Term VarContext();
 
         public IsaBlockInfo BlockInfo();
+
+        public IsaBigBlockInfo BigBlockInfo();
         
         public string MembershipLemma(Declaration d);
 

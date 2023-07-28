@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Isabelle.Ast;
 using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
+using ProofGeneration.Util;
 
 namespace ProofGeneration
 {

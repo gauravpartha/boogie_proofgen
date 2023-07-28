@@ -29,11 +29,13 @@ namespace ProofGeneration.CfgToDag
         private readonly string redAssmName = "Red";
         private readonly string vcAssmName = "VC";
         private BoogieContextIsa boogieContext;
+        
         private IProgramAccessor programAccessor;
 
         private readonly string varContextName = "\\<Lambda>0";
 
         public IEnumerable<OuterDecl> EndToEndProof(
+            bool lemmaForProcedure,
             string entryCfgLemma,
             string passificationEndToEndLemma,
             Term vcAssm,
@@ -41,6 +43,7 @@ namespace ProofGeneration.CfgToDag
             CFGRepr cfg)
         {
             this.programAccessor = programAccessor;
+            
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
                 IsaCommonTerms.TermIdentFromName("M"),
@@ -116,28 +119,45 @@ namespace ProofGeneration.CfgToDag
             result.Add(helperLemma);
             //transform end to end theorem to a compact representation
 
-            var endToEndLemma = 
+            if (lemmaForProcedure)
+            {
+              var endToEndLemma =
                 new LemmaDecl(
-                    "end_to_end_theorem",
-                    ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
-                    ProcedureIsCorrect(
-                        programAccessor.FunctionsDecl(), 
-                        IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
-                        IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
-                        programAccessor.AxiomsDecl(),
-                        programAccessor.ProcDecl()),
-                    new Proof(
-                        new List<string>
-                        {
-                            ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util",helperLemmaName))),
-                            "apply assumption " + "using VC apply simp " + " apply assumption+",
-                            ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
-                                             programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def")
-                        }
-                    ) );
-            
-            result.Add(endToEndLemma);
-            return result;
+                  "end_to_end_theorem",
+                  ContextElem.CreateWithAssumptions(new List<Term> { vcAssm }, new List<string> { "VC" }),
+                  ProcedureIsCorrect(
+                    programAccessor.FunctionsDecl(),
+                    IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
+                    IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
+                    programAccessor.AxiomsDecl(),
+                    programAccessor.ProcDecl()),
+                  new Proof(
+                    new List<string>
+                    {
+                      ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util", helperLemmaName))),
+                      "apply assumption " + "using VC apply simp " + " apply assumption+",
+                      ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
+                                   programAccessor.ProcDeclName() + "_def " + programAccessor.CfgDeclName() + "_def " +
+                                   programAccessor.PreconditionsDeclName() + "_def " +
+                                   programAccessor.PostconditionsDeclName() + "_def " +
+                                   programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
+                                   programAccessor.PreconditionsDeclName() + "_def " +
+                                   programAccessor.PostconditionsDeclName() + "_def " +
+                                   programAccessor.ParamsDecl() + "_def " + programAccessor.LocalsDecl() + "_def " +
+
+                                   programAccessor.FunctionsDecl() + "_def " + programAccessor.FunctionsDecl() +
+                                   "_def " +
+                                   programAccessor.AxiomsDecl() + "_def " + programAccessor.AxiomsDecl() + "_def " +
+                                   programAccessor.ConstsDecl() + "_def " + programAccessor.ConstsDecl() + "_def " +
+                                   programAccessor.GlobalsDecl() + "_def " + programAccessor.GlobalsDecl() + "_def " +
+                                   "exprs_to_only_checked_spec_def")
+                    }
+                  ));
+
+              result.Add(endToEndLemma);
+            }
+
+            return result; 
         }
 
         private ContextElem LemmaContext(
@@ -192,19 +212,21 @@ namespace ProofGeneration.CfgToDag
             Term procedure)
         {
             var typeInterpId = new SimpleIdentifier("A");
-            return 
-                TermQuantifier.MetaAll(
-                    new List<Identifier>{ typeInterpId},
-                    null,
-                    new TermApp(
-                IsaCommonTerms.TermIdentFromName("proc_is_correct"),
-                //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
-                new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
-                funDecls,
-                constantDecls,
-                globalDecls,
-                axioms,
-                procedure));
+            return
+              TermQuantifier.MetaAll(
+                new List<Identifier> {typeInterpId},
+                null,
+                new TermApp(
+                  IsaCommonTerms.TermIdentFromName("Semantics.proc_is_correct"),
+                  //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
+                  new TermWithExplicitType(new TermIdent(typeInterpId), 
+                    IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
+                  funDecls,
+                  constantDecls,
+                  globalDecls,
+                  axioms,
+                  procedure,
+                  IsaBoogieTerm.SematicsProcSpecSatisfied));
         }
     }
 }
