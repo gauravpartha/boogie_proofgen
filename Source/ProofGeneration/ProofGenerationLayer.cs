@@ -250,8 +250,7 @@ namespace ProofGeneration
             List<Variable> overrideLocals = null
         )
         {
-            //add out params to local variables for now
-            var locals = new List<Variable>(overrideLocals ?? impl.LocVars).Union(impl.OutParams);
+            IEnumerable<Variable> locals = (overrideLocals ?? impl.LocVars);
             if (extraLocalVariables != null)
                 locals = locals.Union(extraLocalVariables);
 
@@ -278,9 +277,10 @@ namespace ProofGeneration
             return new BoogieMethodData(
                 globalData,
                 new List<TypeVariable>(impl.TypeParameters),
-                new List<Variable>(impl.InParams),
+                new List<Variable>(impl.InParams).Union(impl.OutParams), //add out parameters to in parameters for now
                 locals,
-                null,
+                new List<Variable>(),
+            //new List<Variable>(impl.OutParams),
                 new List<IdentifierExpr>(impl.Proc.Modifies),
                 preconditions,
                 postconditions);
