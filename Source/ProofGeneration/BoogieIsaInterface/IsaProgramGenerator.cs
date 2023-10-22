@@ -194,6 +194,7 @@ namespace ProofGeneration
             {
                 decls.Add(GetVariableDeclarationsIsa("globals", methodData.GlobalVars));
                 decls.Add(GetVariableDeclarationsIsa("constants", methodData.Constants));
+                decls.Add(GetUniqueConstants("unique_consts", methodData.Constants));
             }
 
             if (generateMembershipLemmas)
@@ -412,6 +413,31 @@ namespace ProofGeneration
             var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(vdecls));
             return new DefDecl(VariableDeclarationsName(varKind), IsaBoogieType.VariableDeclsType,
                 equation);
+        }
+
+        private DefDecl GetUniqueConstants(String defName, IEnumerable<Constant> constants)
+        {
+          var uniqueConstNames = new List<Term>();
+          
+          foreach (var c in constants)
+          {
+            if (!c.Unique)
+            {
+              continue;
+            }
+            
+            if (varTranslation.VarTranslation.TryTranslateVariableId(c, out var resId, out _))
+            {
+              uniqueConstNames.Add(resId);
+            }
+            else
+            {
+              throw new ProofGenUnexpectedStateException(GetType(), "Cannot translate constant " + c.Name);
+            }
+          }
+          
+          var equation = new Tuple<IList<Term>, Term>(new List<Term>(), new TermList(uniqueConstNames));
+          return new DefDecl(defName, IsaCommonTypes.GetListType(IsaBoogieType.VnameType()), equation);
         }
 
         private string VariableDeclarationsName(string varKind)
