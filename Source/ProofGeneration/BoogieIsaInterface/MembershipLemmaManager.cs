@@ -634,8 +634,8 @@ namespace ProofGeneration.BoogieIsaInterface
             else
                 proofMethods = new List<string>
                 {
-                    "using " + LocalsAtLeastMin() + " " + GlobalsAtMostMax(),
-                    "by fastforce"
+                    "using " + ProofUtil.OF("max_min_disjoint_2", GlobalsAtMostMax(), LocalsAtLeastMin()),
+                    "by linarith"
                 };
             helperLemmas.Add(
                 new LemmaDecl(globalsLocalsDisjName, statement, new Proof(proofMethods))
