@@ -1061,13 +1061,6 @@ namespace Microsoft.Boogie
     {
       return GenerateIsaProgNoProofs != 0;
     }
-
-    public bool GenerateMembershipLemmas()
-    {
-      return GenerateIsaProgNoProofs <= 1;
-    }
-    
-    
     
     public bool DesugarMaps = false;
     #endregion

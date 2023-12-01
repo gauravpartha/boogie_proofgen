@@ -85,6 +85,17 @@ namespace ProofGeneration
         private static IsaUniqueNamer uniqueNamer;
 
         private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
+
+        private static MembershipLemmaConfig MembershipLemmaConfig()
+        {
+          switch (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+          {
+            case 0: return new MembershipLemmaConfig(true, true, true);
+            // axiom membership lemmas are required only if proofs are generated for the Boogie program
+            case 1: return new MembershipLemmaConfig(false, true, true);
+            default: return new MembershipLemmaConfig(false, false, false);
+          }
+        }
         
         /// <summary>
         /// Provide program for the next procedure (for the global declarations).
@@ -120,7 +131,7 @@ namespace ProofGeneration
                     null,
                     uniqueNamer,
                     out var declsGlobalData,
-                    CommandLineOptions.Clo.GenerateMembershipLemmas(),
+                    MembershipLemmaConfig(),
                     true
                 );
                 
@@ -647,6 +658,8 @@ namespace ProofGeneration
               ? SpecsConfig.All
               : SpecsConfig.AllPreCheckedPost;
 
+            var membershipLemmaConfig = MembershipLemmaConfig();
+
             if (_proofGenConfig.GenerateBeforeAstCfgProg || CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
             {
               #region before ast to cfg program
@@ -673,7 +686,7 @@ namespace ProofGeneration
                 proofGenInfo,
                 uniqueNamer,
                 out var programDeclsBeforeAstToCfg,
-                CommandLineOptions.Clo.GenerateMembershipLemmas());
+                membershipLemmaConfig);
               procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "ast", beforeAstToCfgProgAccess);
 
               var beforeAstToCfgProgTheory = new Theory(beforeAstToCfgTheoryName,
@@ -718,7 +731,7 @@ namespace ProofGeneration
                   beforeOptimizationsCFG,
                   uniqueNamer,
                   out var programDeclsUnoptimizedCfg,
-                  CommandLineOptions.Clo.GenerateMembershipLemmas());
+                  membershipLemmaConfig);
                 procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized",
                   unoptimizedCfgProgAccess);
 
@@ -767,7 +780,7 @@ namespace ProofGeneration
                 beforeDagCfg,
                 uniqueNamer,
                 out var programDeclsBeforeCfgToDag,
-                CommandLineOptions.Clo.GenerateMembershipLemmas());
+                membershipLemmaConfig);
               procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name, beforeCfgToDagProgAccess);
             
               var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
@@ -801,7 +814,7 @@ namespace ProofGeneration
                 beforePassificationCfg,
                 uniqueNamer,
                 out var programDeclsBeforePassive,
-                CommandLineOptions.Clo.GenerateMembershipLemmas());
+                membershipLemmaConfig);
 
               var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", 
@@ -842,7 +855,7 @@ namespace ProofGeneration
                 afterPassificationCfg,
                 uniqueNamer,
                 out var programDecls,
-                CommandLineOptions.Clo.GenerateMembershipLemmas());
+                membershipLemmaConfig);
 
               var afterPassificationProgTheory =
                 new Theory(finalProgTheoryName,

@@ -35,7 +35,7 @@ namespace ProofGeneration
             AstToCfgProofGenInfo proofGenInfo,
             IsaUniqueNamer uniqueNamer,
             out IList<OuterDecl> decls,
-            bool generateMembershipLemmas,
+            MembershipLemmaConfig membershipLemmaConfig,
             bool onlyGlobalData = false
         )
         {
@@ -133,7 +133,7 @@ namespace ProofGeneration
                 /* membership lemmas might still be added even if the parameter and local variable definitions are not generated
                  * at this point (since the variable context may still be different, which requires other lookup lemmas)
                  */
-                if (generateMembershipLemmas)
+                if (membershipLemmaConfig.GenerateVariableMembershipLemmas)
                 {
                     membershipLemmaManager.AddVariableMembershipLemmas(methodData.InParams, VarKind.ParamOrLocal);
                     membershipLemmaManager.AddVariableMembershipLemmas(methodData.Locals, VarKind.ParamOrLocal);
@@ -143,13 +143,19 @@ namespace ProofGeneration
             if (config.generateAxioms)
             {
                 decls.Add(GetAxioms(methodData.Axioms));
-                if(generateMembershipLemmas) membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms);
+                if (membershipLemmaConfig.GenerateAxiomMembershipLemmas)
+                {
+                  membershipLemmaManager.AddAxiomMembershipLemmas(methodData.Axioms);
+                }
             }
 
             if (config.generateFunctions)
             {
                 decls.Add(GetFunctionDeclarationsIsa(methodData.Functions, uniqueNamer));
-                if(generateMembershipLemmas) membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions, uniqueNamer);
+                if (membershipLemmaConfig.GenerateFunctionMembershipLemmas)
+                {
+                  membershipLemmaManager.AddFunctionMembershipLemmas(methodData.Functions, uniqueNamer);
+                }
             }
 
             if (config.generateGlobalsAndConstants)
@@ -158,7 +164,7 @@ namespace ProofGeneration
                 decls.Add(GetVariableDeclarationsIsa("constants", methodData.Constants));
             }
 
-            if (generateMembershipLemmas)
+            if (membershipLemmaConfig.GenerateVariableMembershipLemmas)
             {
                 membershipLemmaManager.AddVariableMembershipLemmas(methodData.GlobalVars, VarKind.Global);
                 membershipLemmaManager.AddVariableMembershipLemmas(methodData.Constants, VarKind.Constant);
