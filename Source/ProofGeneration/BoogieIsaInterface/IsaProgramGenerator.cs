@@ -92,8 +92,9 @@ namespace ProofGeneration
             var isaGlobalProgramRepr = new IsaGlobalProgramRepr(
                 FunctionDeclarationsName(),
                 AxiomDeclarationsName(),
-                VariableDeclarationsName("globals"),
-                VariableDeclarationsName("constants")
+                VariableDeclarationsName(globalsName),
+                VariableDeclarationsName(constantsName),
+                uniqueConstantsName
                 );
             var globalsMax = methodData.Constants.Count() + methodData.GlobalVars.Count() - 1;
             // assume single versioning and order on constants, globals, params, locals
@@ -199,8 +200,8 @@ namespace ProofGeneration
             if (config.generateGlobalsAndConstants)
             {
                 decls.Add(GetVariableDeclarationsIsa("globals", methodData.GlobalVars));
-                decls.Add(GetVariableDeclarationsIsa("constants", methodData.Constants));
-                decls.Add(GetUniqueConstants("unique_consts", methodData.Constants));
+                decls.Add(GetVariableDeclarationsIsa(constantsName, methodData.Constants));
+                decls.Add(GetUniqueConstants(uniqueConstantsName, methodData.Constants));
             }
 
             if (membershipLemmaConfig.GenerateVariableMembershipLemmas)
@@ -397,6 +398,10 @@ namespace ProofGeneration
         {
             return "post";
         }
+
+        private string globalsName = "globals";
+        private string constantsName = "constants";
+        private string uniqueConstantsName = "unique_consts";
 
         private DefDecl GetVariableDeclarationsIsa(string varKind, IEnumerable<Variable> variables)
         {

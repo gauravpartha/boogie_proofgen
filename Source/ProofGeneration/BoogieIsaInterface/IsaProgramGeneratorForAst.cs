@@ -48,7 +48,8 @@ namespace ProofGeneration
                 FunctionDeclarationsName(),
                 AxiomDeclarationsName(),
                 VariableDeclarationsName("globals"),
-                VariableDeclarationsName("constants")
+                VariableDeclarationsName("constants"),
+                "unique_consts"
                 );
             var globalsMax = methodData.Constants.Count() + methodData.GlobalVars.Count() - 1;
             // assume single versioning and order on constants, globals, params, locals

@@ -850,5 +850,28 @@ namespace ProofGeneration
         {
             return new TermApp(instTypeId, rtypeEnv, ty);
         }
+        
+        public static Term ProcedureIsCorrectCfg(Term funDecls, Term constantDecls, Term uniqueConstants, Term globalDecls, Term axioms,
+            Term procedure)
+        {
+            var typeInterpId = new SimpleIdentifier("A");
+            return
+              TermQuantifier.MetaAll(
+                new List<Identifier> {typeInterpId},
+                null,
+                new TermApp(
+                  IsaCommonTerms.TermIdentFromName("Semantics.proc_is_correct"),
+                  //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
+                  new TermWithExplicitType(new TermIdent(typeInterpId), 
+                    IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
+                  funDecls,
+                  constantDecls,
+                  uniqueConstants,
+                  globalDecls,
+                  axioms,
+                  procedure,
+                  IsaBoogieTerm.SematicsProcSpecSatisfied));
+        }
+        
     }
 }

@@ -28,6 +28,7 @@ namespace ProofGeneration.BoogieIsaInterface
             new Dictionary<Declaration, LemmaDecl>();
 
         private readonly string consts;
+        private readonly string uniqueConsts;
         private readonly string[] constsAndGlobalsDefs;
         private readonly Term constsAndGlobalsList;
         private readonly string constsWfName = "consts_wf";
@@ -98,6 +99,7 @@ namespace ProofGeneration.BoogieIsaInterface
             config = new IsaProgramGeneratorConfig(null, true, true, true, false, SpecsConfig.None, false);
 
             consts = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.constantsDeclDef);
+            uniqueConsts = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.uniqueConstantsDeclDef);
             globals = QualifyAccessName(isaProgramRepr.GlobalProgramRepr.globalsDeclDef);
 
             constsAndGlobalsDefs =
@@ -145,6 +147,9 @@ namespace ProofGeneration.BoogieIsaInterface
             consts = config.generateGlobalsAndConstants
                 ? QualifyAccessName(isaProgramRepr.GlobalProgramRepr.constantsDeclDef)
                 : parent.ConstsDecl();
+            uniqueConsts = config.generateGlobalsAndConstants
+              ? QualifyAccessName(isaProgramRepr.GlobalProgramRepr.uniqueConstantsDeclDef)
+              : parent.UniqueConstsDecl();
             globals = config.generateGlobalsAndConstants
                 ? QualifyAccessName(isaProgramRepr.GlobalProgramRepr.globalsDeclDef)
                 : parent.GlobalsDecl();
@@ -254,6 +259,11 @@ namespace ProofGeneration.BoogieIsaInterface
         public string ConstsDecl()
         {
             return consts;
+        }
+
+        public string UniqueConstsDecl()
+        { 
+          return uniqueConsts;
         }
 
         public string GlobalsDecl()
