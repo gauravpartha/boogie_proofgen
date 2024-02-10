@@ -122,11 +122,6 @@ namespace ProofGeneration
         {
             return new TermApp(oldVarId, body);
         }
-        
-        public static Term CondExp(Term cond, Term thn, Term els)
-        {
-          return new TermApp(condExpId, cond, thn, els);
-        }
 
         public static Term CondExp(Term cond, Term thn, Term els)
         {
