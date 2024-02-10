@@ -23,6 +23,8 @@ namespace ProofGeneration
         private static readonly TermIdent boolLitId = IsaCommonTerms.TermIdentFromName("LBool");
         private static readonly TermIdent realLitId = IsaCommonTerms.TermIdentFromName("LReal");
 
+        private static readonly TermIdent intToRealId = IsaCommonTerms.TermIdentFromName("IntToReal");
+        
         private static readonly TermIdent varId = IsaCommonTerms.TermIdentFromName("Var");
         private static readonly TermIdent bvarId = IsaCommonTerms.TermIdentFromName("BVar");
         private static readonly TermIdent oldVarId = IsaCommonTerms.TermIdentFromName("Old");
@@ -115,10 +117,15 @@ namespace ProofGeneration
             Term natConst = new NatConst(i);
             return new TermApp(bvarId, natConst);
         }
-
+        
         public static Term Old(Term body)
         {
             return new TermApp(oldVarId, body);
+        }
+        
+        public static Term CondExp(Term cond, Term thn, Term els)
+        {
+          return new TermApp(condExpId, cond, thn, els);
         }
 
         public static Term CondExp(Term cond, Term thn, Term els)
@@ -329,27 +336,37 @@ namespace ProofGeneration
             var list = new List<Term> {arg1, IsaCommonTerms.TermIdentFromName(bopIsa), arg2};
             return new TermApp(IsaCommonTerms.TermIdentFromName("BinOp"), list);
         }
-
-        public static Term Unop(UnaryOperator.Opcode opcode, Term arg)
+        
+        private static Term Unop(Term unop, Term arg)
         {
-            string uopIsa;
-
-            switch (opcode)
-            {
-                case UnaryOperator.Opcode.Not:
-                    uopIsa = "Not";
-                    break;
-                case UnaryOperator.Opcode.Neg:
-                    uopIsa = "UMinus";
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            var list = new List<Term> {IsaCommonTerms.TermIdentFromName(uopIsa), arg};
+            var list = new List<Term> {unop, arg};
             return new TermApp(IsaCommonTerms.TermIdentFromName("UnOp"), list);
         }
 
+        public static Term Unop(UnaryOperator.Opcode opcode, Term arg)
+        {
+          string uopIsa;
+
+          switch (opcode)
+          {
+            case UnaryOperator.Opcode.Not:
+              uopIsa = "Not";
+              break;
+            case UnaryOperator.Opcode.Neg:
+              uopIsa = "UMinus";
+              break;
+            default:
+              throw new NotImplementedException();
+          }
+
+          return Unop(IsaCommonTerms.TermIdentFromName(uopIsa), arg);
+        }
+        
+        public static Term IntToReal(Term intTerm)
+        {
+          return Unop(intToRealId, intTerm);
+        }
+        
         //value quantification
 
         /*

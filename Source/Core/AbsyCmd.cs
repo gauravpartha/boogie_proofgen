@@ -436,6 +436,7 @@ namespace Microsoft.Boogie
     {
       get
       {
+        /** Gaurav: TODO move this part to unique caller, too brittle here */
         #region proofgen
         AstToCfgProofGenInfo proofGenInfo = new AstToCfgProofGenInfo();
         proofGenInfo.SetStmtList(stmtList);

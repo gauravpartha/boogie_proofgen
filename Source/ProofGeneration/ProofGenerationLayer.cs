@@ -89,6 +89,17 @@ namespace ProofGeneration
         private static IsaUniqueNamer uniqueNamer;
 
         private static IDictionary<string, IProgramAccessor> procNameToTopLevelPrograms = new Dictionary<string, IProgramAccessor>();
+
+        private static MembershipLemmaConfig MembershipLemmaConfig()
+        {
+          switch (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+          {
+            case 0: return new MembershipLemmaConfig(true, true, true);
+            // axiom membership lemmas are required only if proofs are generated for the Boogie program
+            case 1: return new MembershipLemmaConfig(false, true, true);
+            default: return new MembershipLemmaConfig(false, false, false);
+          }
+        }
         
         /// <summary>
         /// Provide program for the next procedure (for the global declarations).
@@ -124,7 +135,7 @@ namespace ProofGeneration
                     null,
                     uniqueNamer,
                     out var declsGlobalData,
-                    !CommandLineOptions.Clo.GenerateIsaProgNoProofs,
+                    MembershipLemmaConfig(),
                     true
                 );
                 
@@ -225,7 +236,7 @@ namespace ProofGeneration
         /// </summary>
         public static void BeforePassification(Implementation impl)
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             
             var config = new CFGReprConfigBuilder().SetIsAcyclic(true).SetBlockCopy(true).SetDesugarCalls(true)
@@ -255,8 +266,7 @@ namespace ProofGeneration
             List<Variable> overrideLocals = null
         )
         {
-            //add out params to local variables for now
-            var locals = new List<Variable>(overrideLocals ?? impl.LocVars).Union(impl.OutParams);
+            IEnumerable<Variable> locals = (overrideLocals ?? impl.LocVars);
             if (extraLocalVariables != null)
                 locals = locals.Union(extraLocalVariables);
 
@@ -283,9 +293,10 @@ namespace ProofGeneration
             return new BoogieMethodData(
                 globalData,
                 new List<TypeVariable>(impl.TypeParameters),
-                new List<Variable>(impl.InParams),
+                new List<Variable>(impl.InParams).Union(impl.OutParams), //add out parameters to in parameters for now
                 locals,
-                null,
+                new List<Variable>(),
+            //new List<Variable>(impl.OutParams),
                 new List<IdentifierExpr>(impl.Proc.Modifies),
                 preconditions,
                 postconditions);
@@ -299,7 +310,7 @@ namespace ProofGeneration
         {
             Contract.Requires(b != null);
             Contract.Requires(variableToExpr != null);
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             
             initialVarMapping.Add(b, new Dictionary<Variable, Expr>(variableToExpr));
@@ -329,7 +340,7 @@ namespace ProofGeneration
         public static void AfterPassificationCheckGlobalMap(Implementation impl)
         {
             afterPassificationImpl = impl;
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             
             finalProgData = MethodDataFromImpl(impl, boogieGlobalData);
@@ -396,7 +407,7 @@ namespace ProofGeneration
         /// </summary>
         public static void AfterUnreachablePruning(Implementation impl)
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             
             var config = new CFGReprConfigBuilder().SetIsAcyclic(true).SetBlockCopy(true).SetDesugarCalls(false)
@@ -425,7 +436,7 @@ namespace ProofGeneration
             CommandLineOptions.SubsumptionOption subsumptionOption
         )
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             vcHintManager.NextHintForBlock(cmd, block, exprVC, postVC, resultVC, subsumptionOption);
         }
@@ -436,7 +447,7 @@ namespace ProofGeneration
         /// </summary>
         public static void VcIsTrivial()
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
           vcHintManager.TransformHintsToTrivialVc();
         }
@@ -448,7 +459,7 @@ namespace ProofGeneration
         /// </summary>
         public static void NextPassificationHint(Block block, Cmd cmd, Variable origVar, Expr passiveExpr)
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             passificationHintManager.AddHint(block, cmd, origVar, passiveExpr);
         }
@@ -459,7 +470,7 @@ namespace ProofGeneration
         /// </summary>
         public static void LoopHeadHint(Block block, IEnumerable<Variable> varsToHavoc, IEnumerable<Expr> invariants)
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             cfgToDagHintManager.AddHint(block, new LoopHeadHint(varsToHavoc, invariants));
         }
@@ -470,14 +481,14 @@ namespace ProofGeneration
         /// </summary>
         public static void NewBackedgeBlock(Block oldBackedgeBlock, Block newBackedgeBlock, Block loopHead)
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             cfgToDagHintManager.AddNewBackedgeBlock(newBackedgeBlock, loopHead);
         }
 
         public static void SetTypeEraserFactory(TypePremiseEraserFactory factory)
         {
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
                 return;
             typePremiseEraserFactory = factory;
             var uniqueNamer = new IsaUniqueNamer();
@@ -593,7 +604,7 @@ namespace ProofGeneration
 
             BoogieMethodData beforeOptimizationsData;
 
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs) 
+            if (CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa()) 
             {
               beforeOptimizationsData = MethodDataFromImpl(
                 afterPassificationImpl,
@@ -637,14 +648,8 @@ namespace ProofGeneration
                  new DeBruijnFixedTVarTranslation(beforeOptimizationsData), 
                  boogieGlobalData);
             
-            var afterOptimizationsVarTranslationFactory =
-                new DeBruijnVarFactory(
-                 new DeBruijnFixedVarTranslation(afterOptimizationsData), 
-                 new DeBruijnFixedTVarTranslation(afterOptimizationsData), 
-                 boogieGlobalData);
-            
-            cmdIsaVisitor = new MultiCmdIsaVisitor(afterOptimizationsVarTranslationFactory);
-
+            /* Gaurav TODO: move later (see adjust_interface branch) in case not all data is initalized since options specify
+             *       that proofs should not generated */
             IProgramAccessor beforeAstToCfgProgAccess = null;
             IProgramAccessor unoptimizedCfgProgAccess = null;
             IProgramAccessor beforeCfgToDagProgAccess = null;
@@ -653,11 +658,13 @@ namespace ProofGeneration
             
               //Hack: specs config used to distinguish between all (free + checks) (--> expression tuples) or just checked (no tuples)
             var specsConfigDefault = 
-              CommandLineOptions.Clo.GenerateIsaProgNoProofs
+              CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa()
               ? SpecsConfig.All
               : SpecsConfig.AllPreCheckedPost;
 
-            if (_proofGenConfig.GenerateBeforeAstCfgProg)
+            var membershipLemmaConfig = MembershipLemmaConfig();
+
+            if (_proofGenConfig.GenerateBeforeAstCfgProg || CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
             {
               #region before ast to cfg program
 
@@ -683,7 +690,7 @@ namespace ProofGeneration
                 proofGenInfo,
                 uniqueNamer,
                 out var programDeclsBeforeAstToCfg,
-                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                membershipLemmaConfig);
               procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "ast", beforeAstToCfgProgAccess);
 
               var beforeAstToCfgProgTheory = new Theory(beforeAstToCfgTheoryName,
@@ -694,10 +701,16 @@ namespace ProofGeneration
                 },
                 programDeclsBeforeAstToCfg);
               theories.Add(beforeAstToCfgProgTheory);
+              
+              if(CommandLineOptions.Clo.OnlyGenerateInitialProgramIsa())
+              {
+                StoreResult(uniqueNamer.GetName(afterPassificationImpl.Proc.Name), theories);
+                return;
+              }
 
               #endregion
             }
-
+            
             if (_proofGenConfig.GenerateUnoptimizedCfgProg(proofGenInfo.GetOptimizationsFlag()))
             {
                 #region unoptimized cfg program
@@ -722,7 +735,7 @@ namespace ProofGeneration
                   beforeOptimizationsCFG,
                   uniqueNamer,
                   out var programDeclsUnoptimizedCfg,
-                  !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                  membershipLemmaConfig);
                 procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized",
                   unoptimizedCfgProgAccess);
 
@@ -737,6 +750,17 @@ namespace ProofGeneration
 
                 #endregion
             }
+            
+            /* do this computation as late as possible to make sure that computation is needed (otherwise
+               afterOptimizationsData may not be correctly initialized
+               */
+            var afterOptimizationsVarTranslationFactory =
+                new DeBruijnVarFactory(
+                 new DeBruijnFixedVarTranslation(afterOptimizationsData), 
+                 new DeBruijnFixedTVarTranslation(afterOptimizationsData), 
+                 boogieGlobalData);
+            
+            cmdIsaVisitor = new MultiCmdIsaVisitor(afterOptimizationsVarTranslationFactory);
 
             var generateProcForBeforeCfgToDag =
               //_proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()) &&
@@ -765,7 +789,7 @@ namespace ProofGeneration
                 beforeDagCfg,
                 uniqueNamer,
                 out var programDeclsBeforeCfgToDag,
-                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                membershipLemmaConfig);
               procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name, beforeCfgToDagProgAccess);
             
               var beforeCfgToDagProgTheory = new Theory(beforeCfgToDagTheoryName,
@@ -776,12 +800,6 @@ namespace ProofGeneration
               #endregion
             }
 
-            if (CommandLineOptions.Clo.GenerateIsaProgNoProofs)
-            {
-                StoreResult(uniqueNamer.GetName("program_" + afterPassificationImpl.Proc.Name), theories);
-                return;
-            }
-            
             if (_proofGenConfig.GenerateBeforePassiveProg)
             {
               #region before passive program
@@ -805,7 +823,7 @@ namespace ProofGeneration
                 beforePassificationCfg,
                 uniqueNamer,
                 out var programDeclsBeforePassive,
-                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                membershipLemmaConfig);
 
               var beforePassificationProgTheory = new Theory(beforePassiveProgTheoryName,
                 new List<string> {"Boogie_Lang.Semantics", "Boogie_Lang.Util", 
@@ -846,7 +864,7 @@ namespace ProofGeneration
                 afterPassificationCfg,
                 uniqueNamer,
                 out var programDecls,
-                !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                membershipLemmaConfig);
 
               var afterPassificationProgTheory =
                 new Theory(finalProgTheoryName,
