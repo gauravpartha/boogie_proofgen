@@ -884,6 +884,7 @@ namespace ProofGeneration
             {
               var vcAllAxioms = AxiomHandler.AxiomInfo(
                 axiomBuilder != null,
+                boogieGlobalData.Constants.Where(c => c.Unique),
                 boogieGlobalData.Axioms,
                 vcAxioms,
                 typeAxioms,

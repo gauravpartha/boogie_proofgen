@@ -21,6 +21,7 @@ namespace Isabelle.Util
         private static readonly TermIdent SetInterId = TermIdentFromName("Set.inter");
         private static readonly TermIdent Nth = TermIdentFromName("nth");
         private static readonly TermIdent CompositionId = TermIdentFromName("comp");
+        private static readonly TermIdent DistinctId = TermIdentFromName("distinct");
         public static TermIdent FstId { get; } = TermIdentFromName("fst");
         public static TermIdent SndId { get; } = TermIdentFromName("snd");
 
@@ -143,6 +144,11 @@ namespace Isabelle.Util
         public static Term SetMin(Term set)
         {
             return new TermApp(SetMinId, set);
+        }
+
+        public static Term Distinct(List<Term> args)
+        {
+          return new TermApp(DistinctId, new TermList(args));
         }
 
         public static TermIdent TermIdentFromName(string name)

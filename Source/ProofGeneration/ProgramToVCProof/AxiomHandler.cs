@@ -10,12 +10,17 @@ namespace ProofGeneration.ProgramToVCProof
 {
     public class AxiomHandler
     {
-        public static IEnumerable<VCExpr> AxiomInfo(bool programIsPolymorphic, IEnumerable<Axiom> axioms,
+        public static IEnumerable<VCExpr> AxiomInfo(bool programIsPolymorphic, IEnumerable<Constant> uniqueConsts, IEnumerable<Axiom> axioms,
           VCExpr vcAxioms, VCExpr typeAxioms, List<VCAxiomInfo> typeAxiomInfo,
           out List<VCAxiomInfo> allAxiomsInfo)
         {
           var vcBoogieAxioms = DeconstructAxiomsNoChecks(vcAxioms).ToList();
           var nAxioms = axioms.Count();
+          
+          //there is one axiom for each subset S of unique constants with the same type if S has at least two elements
+          int nConstDistinctAxioms =
+            //uniqueConsts.GroupBy(e => e.TypedIdent.Type).Count(g => Enumerable.Count<Constant>(g) > 1);
+            uniqueConsts.Count() > 1 ? 1 : 0;
 
           List<VCExpr> consideredVCBoogieAxioms;
 
@@ -28,17 +33,17 @@ namespace ProofGeneration.ProgramToVCProof
             }
             else
             {
-              if (vcBoogieAxioms.Count != nAxioms)
+              if (vcBoogieAxioms.Count != nAxioms+nConstDistinctAxioms)
                 //+3, since we currently ignore the three type ordering axioms
                 throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
                   "vc axioms not in-sync with Boogie axioms");
 
-              consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(0, nAxioms);
+              consideredVCBoogieAxioms = vcBoogieAxioms.GetRange(0, nAxioms+nConstDistinctAxioms);
             }
           }
           else
           {
-            if (nAxioms == 0)
+            if (nAxioms + nConstDistinctAxioms == 0)
             {
               if (vcBoogieAxioms.Count != 1 || !vcBoogieAxioms.First().Equals(VCExpressionGenerator.True))
                 throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
@@ -48,7 +53,7 @@ namespace ProofGeneration.ProgramToVCProof
             }
             else
             {
-              if (vcBoogieAxioms.Count != nAxioms)
+              if (vcBoogieAxioms.Count != nAxioms + nConstDistinctAxioms)
                 throw new ProofGenUnexpectedStateException(typeof(ProofGenerationLayer),
                   "no axioms and no polymorphism, but vc axioms are not (syntactically) equivalent to True");
 

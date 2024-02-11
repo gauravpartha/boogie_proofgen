@@ -83,7 +83,27 @@ namespace ProofGeneration.VCProofGen
 
         public Term VisitDistinctOp(VCExprNAry node, List<Term> arg)
         {
-            throw new NotImplementedException();
+          Contract.Assert(arg.Count > 0);
+          
+          /* Since the arguments may have different types, we use a separate distinct term for each type (containing
+             all elements that have that type). Since elements from different types are different, this accurately 
+             reflects a distinct operator on all elements. */
+          
+          var argsWithTerm = node.Arguments.Zip(arg);
+          var groupings =
+            argsWithTerm.GroupBy(e => e.First.Type).ToArray();
+
+          List<Term> distinctArgs = new List<Term>();
+
+          foreach(var g in groupings)
+          {
+            var terms = g.ToList().Select(a => a.Second);
+            distinctArgs.Add(IsaCommonTerms.Distinct(terms.ToList()));
+          }
+
+          var result = distinctArgs.Aggregate((result, term) => TermBinary.And(result, term));
+          
+          return result;
         }
 
         public Term VisitDivOp(VCExprNAry node, List<Term> arg)
