@@ -1,4 +1,4 @@
-procedure proecdure_1() {
+procedure procedure_1() {
     var i: int;
     i := 0;
 
