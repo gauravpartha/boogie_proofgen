@@ -36,7 +36,6 @@ namespace ProofGeneration.Passification
             PassiveRelationGen relationGen,
             IProgramAccessor beforePassiveProgAccess,
             IProgramAccessor passiveProgAccess,
-            BoogieMethodData beforePassiveData,
             IVariableTranslationFactory beforePassiveFactory,
             IVariableTranslationFactory passiveFactory)
         {

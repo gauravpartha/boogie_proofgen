@@ -940,7 +940,6 @@ namespace ProofGeneration
                 passiveRelationGen,
                 beforePassiveProgAccess,
                 passiveProgAccess,
-                afterOptimizationsData,
                 afterOptimizationsVarTranslationFactory,
                 varTranslationFactory
               );
