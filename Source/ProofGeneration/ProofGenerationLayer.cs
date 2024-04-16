@@ -583,8 +583,6 @@ namespace ProofGeneration
             }
             
             IList<Block> unoptimizedCfgBlocks = proofGenInfo.GetUnoptimizedBlocks(); 
-            var newToOldInternal = new Dictionary<Block, Block>();
-            unoptimizedCfgBlocks.ZipDo(afterPassificationImpl.Blocks, (bNew, bOld) => newToOldInternal.Add(bNew, bOld));
             IDictionary<Block, Block> mappingOrigBlockToUnoptimizedCopy =
               proofGenInfo.GetMappingOrigBlockToUnoptimizedCopy();
             IDictionary<Block, Block> mappingUnoptimizedCopyToOrigBlock =
