@@ -924,11 +924,6 @@ namespace ProofGeneration
 
               #endregion
             }
-            
-            /*
-            Console.WriteLine("Passive prog mapping: " + fixedVarTranslation.OutputMapping());
-            Console.WriteLine("Before passive prog mapping: " + fixedVarTranslation2.OutputMapping());
-            */
 
             if (_proofGenConfig.GeneratePassifProof)
             {
@@ -999,8 +994,6 @@ namespace ProofGeneration
               {
                 beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager, out selfLoops);
               }
-              
-              
               
               IDictionary<Block, Block> CoalescedBlocksToTarget = DictionaryComposition(afterPassificationImpl.CoalescedBlocksToTarget, origToAfterOpt);
               CoalescedBlocksToTarget = DictionaryComposition(beforeOptimizationsOrigBlock, CoalescedBlocksToTarget);
