@@ -99,9 +99,6 @@ public class CFGOptimizationsEndToEnd
         new Proof(new List<string> {proofSb.ToString()})
       );
     result.Add(helperLemma);
-    var defProcWithoutDeadVar = new DefDecl(procedureName + "_unoptimized_without_dead_vars", new Tuple<IList<Term>, Term>(new List<Term>(), IsaCommonTerms.TermIdentFromName("proc \\<lparr> proc_body := (Some (" + afterOptProgAccess.BlockInfo().getTheoryName() + ".locals_vdecls," + beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body)) \\<rparr>")));
-    result.Add(defProcWithoutDeadVar);
-    
     
     var endToEndLemma = 
                 new LemmaDecl(
@@ -112,7 +109,7 @@ public class CFGOptimizationsEndToEnd
                         IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
                         IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
                         programAccessor.AxiomsDecl(),
-                        defProcWithoutDeadVar.Name),
+                        programAccessor.ProcDeclName()),
                     new Proof(
                         new List<string>
                         {
@@ -120,14 +117,18 @@ public class CFGOptimizationsEndToEnd
                             ProofUtil.Apply("assumption"),
                             "using VC apply simp",
                             ProofUtil.Apply("assumption+"),
-                            "apply (unfold " + defProcWithoutDeadVar.Name + "_def)",
-                            "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".pres_def " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def exprs_to_only_checked_spec_1)",
-                            "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".post_def " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def exprs_to_only_checked_spec_2)",
-                            "apply simp",
-                            "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def)",
-                            "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def)",
-                            "apply (simp add: " + afterOptProgAccess.BlockInfo().getTheoryName() + ".proc_def)",
-                            "apply (simp add: " + beforeOptProgAccess.BlockInfo().getTheoryName() + ".proc_body_def)",
+                            ProofUtil.Apply($"unfold {programAccessor.ProcDeclName()}_def"),
+                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.PreconditionsDeclName()+"_def", 
+                                                             beforeOptProgAccess.ProcDeclName()+"_def",
+                                                             "exprs_to_only_checked_spec_1")),
+                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.PostconditionsDeclName()+"_def  ", 
+                                                             beforeOptProgAccess.ProcDeclName()+"_def",
+                                                             "exprs_to_only_checked_spec_2")),
+                            ProofUtil.Apply(ProofUtil.Simp()),
+                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
+                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
+                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
+                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.CfgDeclName() + "_def")),
                             "done"
                         }
                     ) );

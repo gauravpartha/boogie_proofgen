@@ -203,8 +203,11 @@ namespace ProofGeneration
                 decls.AddRange(membershipLemmaManager.OuterDecls());
             }
 
-            if (config.specsConfig != SpecsConfig.None)
-            {
+            /* always add procedure definition even if it is potentially not used
+               (easier than having conditions here, especially since cost is small)
+             */
+            if (!onlyGlobalData)
+            { 
                 DefDecl methodDef = MethodDefinition(membershipLemmaManager, methodData, config.specsConfig);
                 decls.Add(methodDef);
             }
@@ -258,8 +261,10 @@ namespace ProofGeneration
                     //TODO: incorporate return values and modified variables
                     Tuple.Create("proc_rets", (Term) IsaCommonTerms.EmptyList),
                     Tuple.Create("proc_modifs", (Term) modifiedVarsTerm),
-                    Tuple.Create("proc_pres", specConfig == SpecsConfig.All ?  programAccessor.PreconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PreconditionsDecl())),
-                    Tuple.Create("proc_posts", specConfig == SpecsConfig.All ? programAccessor.PostconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PostconditionsDecl())),
+                    Tuple.Create("proc_pres", specConfig == SpecsConfig.All ?  
+                      programAccessor.PreconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PreconditionsDecl())),
+                    Tuple.Create("proc_posts", specConfig == SpecsConfig.All ? 
+                      programAccessor.PostconditionsDecl() : IsaBoogieTerm.LiftExprsToCheckedSpecs(programAccessor.PostconditionsDecl())),
                     //TODO: support abstract procedures
                     Tuple.Create("proc_body", 
                         IsaCommonTerms.SomeOption(new TermTuple(IsaCommonTerms.TermIdentFromName(programAccessor.LocalsDecl()), programAccessor.CfgDecl())))

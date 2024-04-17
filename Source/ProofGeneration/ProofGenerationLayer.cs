@@ -646,7 +646,8 @@ namespace ProofGeneration
             cmdIsaVisitor = new MultiCmdIsaVisitor(afterOptimizationsVarTranslationFactory);
 
             IProgramAccessor beforeAstToCfgProgAccess = null;
-            IProgramAccessor unoptimizedCfgProgAccess = null;
+            IProgramAccessor unoptimizedCfgProgAccess = null; //unoptimized CFG with original variable declarations
+            IProgramAccessor unoptimizedCfgOptVarProgAccess = null; //unoptimized CFG where dead variables are eliminated
             IProgramAccessor beforeCfgToDagProgAccess = null;
             IProgramAccessor beforePassiveProgAccess = null;
             IProgramAccessor passiveProgAccess = null;
@@ -702,60 +703,121 @@ namespace ProofGeneration
             {
                 #region unoptimized cfg program
 
-                var unoptimizedCfgTheoryName =
-                  uniqueNamer.GetName(afterPassificationImpl.Name + "_unoptimized_cfg_prog");
                 var parentAccessorForUnoptimizedCfg = beforeAstToCfgProgAccess;
-                var unoptimizedCfgConfig = 
+                
+                Func<bool, IsaProgramGeneratorConfig> getUnoptimizedCfgConfig = generateLocalsAndParams =>
                   new IsaProgramGeneratorConfig(
                       parentAccessorForUnoptimizedCfg ?? globalDataProgAccess,
                       false,
                       false,
                       false,
-                      parentAccessorForUnoptimizedCfg == null,
-                      parentAccessorForUnoptimizedCfg != null ? SpecsConfig.None : specsConfigDefault,
+                      generateLocalsAndParams,
+                      /* if generate locals and params, then encoding of output variables may change, thus should generate
+                         pre- and postconditions in such a case*/
+                      parentAccessorForUnoptimizedCfg != null && !generateLocalsAndParams ? SpecsConfig.None : specsConfigDefault,
                       !_proofGenConfig.GenerateBeforeAstCfgProg);
-                
-                unoptimizedCfgProgAccess = new IsaProgramGenerator().GetIsaProgram(
-                  unoptimizedCfgTheoryName,
-                  afterPassificationImpl.Name,
-                  beforeOptimizationsData, unoptimizedCfgConfig, beforeOptimizationsVarTranslationFactory,
-                  beforeOptimizationsCFG,
-                  uniqueNamer,
-                  out var programDeclsUnoptimizedCfg,
-                  !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
-                procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized",
-                  unoptimizedCfgProgAccess);
 
-                var unoptimizedCfgProgTheory = new Theory(unoptimizedCfgTheoryName,
-                  new List<string>
-                  {
-                    "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
-                    _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess.TheoryName() : "\"../"+globalDataProgAccess.TheoryName()+"\""
-                  },
-                  programDeclsUnoptimizedCfg);
-                theories.Add(unoptimizedCfgProgTheory);
+                Func<String, IsaProgramGeneratorConfig, BoogieMethodData, IVariableTranslationFactory, Tuple<IProgramAccessor, IList<OuterDecl>>> getUnoptimizedCfgAccess =
+                  (theoryName, config, methodData, factory) =>
+                  { var accessor =
+                      new IsaProgramGenerator().GetIsaProgram(
+                        theoryName,
+                        afterPassificationImpl.Name,
+                        /* pick data after optimizations (allows connecting to CFG-to-DAG proof directly) -->
+                         dead variable elimination step must be handled separately
+                      */
+                        methodData, config, factory,
+                        beforeOptimizationsCFG,
+                        uniqueNamer,
+                        out var programDeclsUnoptimizedCfg,
+                        !CommandLineOptions.Clo.GenerateIsaProgNoProofs);
+                    return Tuple.Create(accessor, programDeclsUnoptimizedCfg);
+                  };
+
+                {
+                  // unoptimized CFG with original variables
+                  
+                  var unoptimizedCfgTheoryName =
+                    uniqueNamer.GetName(afterPassificationImpl.Name + "_unoptimized_cfg_prog");
+
+                  var config = getUnoptimizedCfgConfig(parentAccessorForUnoptimizedCfg != null);
+                  (unoptimizedCfgProgAccess, var programDeclsUnoptimizedCfg) =
+                    getUnoptimizedCfgAccess(
+                      unoptimizedCfgTheoryName,
+                      config,
+                      beforeOptimizationsData,
+                      beforeOptimizationsVarTranslationFactory 
+                    );
+
+                  procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized_orig_var",
+                    unoptimizedCfgProgAccess);
+
+                  var unoptimizedCfgProgTheory = new Theory(unoptimizedCfgTheoryName,
+                    new List<string>
+                    {
+                      "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
+                      _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess.TheoryName() : "\"../"+globalDataProgAccess.TheoryName()+"\""
+                    },
+                    programDeclsUnoptimizedCfg);
+                  theories.Add(unoptimizedCfgProgTheory);
+                }
+
+                if (proofGenInfo.EliminatedDeadVars)
+                {
+                  // unoptimized CFG without dead variables --> different program representation due to DeBruijn indexing
+                  
+                  var unoptimizedCfgOptVarTheoryName =
+                    uniqueNamer.GetName(afterPassificationImpl.Name + "_unoptimized_cfg_opt_var_prog");
+                  
+                  (unoptimizedCfgOptVarProgAccess, var programDeclsUnoptimizedOptVarCfg) =
+                    getUnoptimizedCfgAccess(
+                      unoptimizedCfgOptVarTheoryName,
+                      //since dead variables were eliminated, need to generate the local variable declarations without the dead variables
+                      getUnoptimizedCfgConfig(true), 
+                      afterOptimizationsData,
+                      afterOptimizationsVarTranslationFactory 
+                    );
+                  
+                  procNameToTopLevelPrograms.Add(afterPassificationImpl.Proc.Name + "unoptimized_opt_var", unoptimizedCfgOptVarProgAccess);
+                  
+                  var unoptimizedCfgProgTheory = new Theory(unoptimizedCfgOptVarTheoryName,
+                    new List<string>
+                    {
+                      "Boogie_Lang.Semantics", "Boogie_Lang.TypeSafety", "Boogie_Lang.Util",
+                      _proofGenConfig.GenerateBeforeAstCfgProg ? beforeAstToCfgProgAccess.TheoryName() : "\"../"+globalDataProgAccess.TheoryName()+"\""
+                    },
+                    programDeclsUnoptimizedOptVarCfg);
+                  theories.Add(unoptimizedCfgProgTheory);
+                }
+                else
+                {
+                  // no need for two different representations of unoptimized CFG
+                  unoptimizedCfgOptVarProgAccess = unoptimizedCfgProgAccess;
+                }
 
                 #endregion
             }
 
-            var generateProcForBeforeCfgToDag =
-              //_proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()) &&
-              proofGenInfo.GetOptimizationsFlag();
+            var generateProcForBeforeCfgToDag = proofGenInfo.GetOptimizationsFlag();
             
             if (_proofGenConfig.GenerateBeforeCfgDagProg(proofGenInfo.GetOptimizationsFlag()))
             {
               #region before cfg to dag program
               var beforeCfgToDagTheoryName = uniqueNamer.GetName(afterPassificationImpl.Name + "_before_cfg_to_dag_prog");
 
-              var parentAccessorForBeforeCfgToDag = beforeAstToCfgProgAccess;
+              var parentAccessorForBeforeCfgToDag = unoptimizedCfgOptVarProgAccess ?? beforeAstToCfgProgAccess;
               var beforeCfgToDagConfig = new IsaProgramGeneratorConfig(
                 parentAccessorForBeforeCfgToDag ?? globalDataProgAccess, 
                 false, 
                 false, 
                 false, 
-                parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag(), 
-                //do not generate separate procedure if AST is going to connect directly to the CFG before the DAG
-                parentAccessorForBeforeCfgToDag == null || generateProcForBeforeCfgToDag ? specsConfigDefault : SpecsConfig.None, 
+                parentAccessorForBeforeCfgToDag == null,
+                parentAccessorForBeforeCfgToDag == null || (proofGenInfo.EliminatedDeadVars && parentAccessorForBeforeCfgToDag != unoptimizedCfgOptVarProgAccess) ? 
+                  /* make sure to generate separate pre- and post if no parent accessor or dead variables were eliminated
+                     and the parent accessor has generated the pre- and post without dead variables (which impacts output variable representation)
+                  */
+                  specsConfigDefault :  
+                  SpecsConfig.None, 
                 parentAccessorForBeforeCfgToDag == null || proofGenInfo.GetOptimizationsFlag());
               
               beforeCfgToDagProgAccess = new IsaProgramGenerator().GetIsaProgram(
@@ -1017,7 +1079,7 @@ namespace ProofGeneration
                 beforeOptimizationsCFG,
                 beforeDagCfg,
                 beforeOptAfterOptBlock,
-                unoptimizedCfgProgAccess,
+                unoptimizedCfgOptVarProgAccess,
                 beforeCfgToDagProgAccess,
                 ListCoalescedBlocks,
                 CoalescedBlocksToTarget, 
@@ -1040,14 +1102,8 @@ namespace ProofGeneration
               IDictionary<BigBlock, (Block, Expr, BranchIndicator)> mappingWithHints =
                 new Dictionary<BigBlock, (Block, Expr, BranchIndicator)>();
 
-              //IDictionary<BigBlock, BigBlock> mappingCopyBigblockToOrigBigblock =
-              //proofGenInfo.GetMappingCopyBigblockToOrigBigblock();
               IDictionary<BigBlock, Block> mappingOrigBigBlockToOrigBlock =
                 proofGenInfo.GetMappingOrigBigBlockToOrigBlock();
-
-              
-
-              IDictionary<Block, Block> mappingOrigBlockToCopyBlock = beforeDagOrigBlock.InverseDict();
 
               IDictionary<BigBlock, (Expr, BranchIndicator)> mappingBigBlockToHints =
                 proofGenInfo.GetMappingCopyBigBlockToHints();
@@ -1059,7 +1115,7 @@ namespace ProofGeneration
 
                 var blockToBlockMapToReferTo = proofGenInfo.GetOptimizationsFlag()
                   ? mappingOrigBlockToUnoptimizedCopy
-                  : mappingOrigBlockToCopyBlock;
+                  : beforeDagOrigBlock.InverseDict();
 
                 var copyBlock = blockToBlockMapToReferTo[origBlock];
                 var hints = mappingBigBlockToHints[origBigBlock];
