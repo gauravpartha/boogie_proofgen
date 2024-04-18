@@ -740,7 +740,7 @@ namespace ProofGeneration
                   var unoptimizedCfgTheoryName =
                     uniqueNamer.GetName(afterPassificationImpl.Name + "_unoptimized_cfg_prog");
 
-                  var config = getUnoptimizedCfgConfig(parentAccessorForUnoptimizedCfg != null);
+                  var config = getUnoptimizedCfgConfig(parentAccessorForUnoptimizedCfg == null);
                   (unoptimizedCfgProgAccess, var programDeclsUnoptimizedCfg) =
                     getUnoptimizedCfgAccess(
                       unoptimizedCfgTheoryName,
