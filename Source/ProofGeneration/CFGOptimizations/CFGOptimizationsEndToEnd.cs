@@ -37,7 +37,7 @@ public class CFGOptimizationsEndToEnd
 
   public IEnumerable<OuterDecl> EndToEndProof(
     string entryBlockCfgOptLemma,
-    string cfgOptEndToEndLemma,
+    EndToEndLemmaConfig endToEndLemmaConfig,
     Term vcAssm,
     IProgramAccessor beforeOptProgAccess,
     IProgramAccessor afterOptProgAccess,
@@ -46,6 +46,11 @@ public class CFGOptimizationsEndToEnd
     PhasesTheories phasesTheories,
     string procedureName)
   {
+    if (endToEndLemmaConfig == EndToEndLemmaConfig.DoNotGenerate)
+    {
+      throw new ArgumentException("CFG Optimizations Phase: end-to-end lemma invoked even though disabled");
+    }
+    
     this.programAccessor = programAccessor;
     boogieContext = new BoogieContextIsa(
       IsaCommonTerms.TermIdentFromName("A"),
@@ -99,43 +104,45 @@ public class CFGOptimizationsEndToEnd
         new Proof(new List<string> {proofSb.ToString()})
       );
     result.Add(helperLemma);
-    
-    var endToEndLemma = 
-                new LemmaDecl(
-                    "end_to_end_theorem",
-                    ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
-                    ProcedureIsCorrect(
-                        programAccessor.FunctionsDecl(), 
-                        IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
-                        IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
-                        programAccessor.AxiomsDecl(),
-                        programAccessor.ProcDeclName()),
-                    new Proof(
-                        new List<string>
-                        {
-                            ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util",helperLemmaName))),
-                            ProofUtil.Apply("assumption"),
-                            "using VC apply simp",
-                            ProofUtil.Apply("assumption+"),
-                            ProofUtil.Apply($"unfold {programAccessor.ProcDeclName()}_def"),
-                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.PreconditionsDeclName()+"_def", 
-                                                             beforeOptProgAccess.ProcDeclName()+"_def",
-                                                             "exprs_to_only_checked_spec_1")),
-                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.PostconditionsDeclName()+"_def  ", 
-                                                             beforeOptProgAccess.ProcDeclName()+"_def",
-                                                             "exprs_to_only_checked_spec_2")),
-                            ProofUtil.Apply(ProofUtil.Simp()),
-                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
-                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
-                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
-                            ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.CfgDeclName() + "_def")),
-                            "done"
-                        }
-                    ) );
-    
-    result.Add(endToEndLemma);
-    
-    
+
+    if (endToEndLemmaConfig == EndToEndLemmaConfig.GenerateForProcedure)
+    { 
+        var endToEndLemma = 
+                    new LemmaDecl(
+                        "end_to_end_theorem",
+                        ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
+                        ProcedureIsCorrect(
+                            programAccessor.FunctionsDecl(), 
+                            IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
+                            IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
+                            programAccessor.AxiomsDecl(),
+                            programAccessor.ProcDeclName()),
+                        new Proof(
+                            new List<string>
+                            {
+                                ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util",helperLemmaName))),
+                                ProofUtil.Apply("assumption"),
+                                "using VC apply simp",
+                                ProofUtil.Apply("assumption+"),
+                                ProofUtil.Apply($"unfold {programAccessor.ProcDeclName()}_def"),
+                                ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.PreconditionsDeclName()+"_def", 
+                                                                 beforeOptProgAccess.ProcDeclName()+"_def",
+                                                                 "exprs_to_only_checked_spec_1")),
+                                ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.PostconditionsDeclName()+"_def  ", 
+                                                                 beforeOptProgAccess.ProcDeclName()+"_def",
+                                                                 "exprs_to_only_checked_spec_2")),
+                                ProofUtil.Apply(ProofUtil.Simp()),
+                                ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
+                                ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
+                                ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.ProcDeclName() + "_def")),
+                                ProofUtil.Apply(ProofUtil.Simp(beforeOptProgAccess.CfgDeclName() + "_def")),
+                                "done"
+                            }
+                        ) );
+        
+        result.Add(endToEndLemma);
+    }
+
     return result;
   }
   
@@ -145,7 +152,7 @@ public class CFGOptimizationsEndToEnd
             Term vcAssm,
             IProgramAccessor afterOptProgAccess
         )
-        {
+        {   
             var multiRed = IsaBoogieTerm.RedCFGMulti(
                 BoogieContextIsa.CreateWithNewVarContext(
                     boogieContext,

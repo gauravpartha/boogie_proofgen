@@ -7,18 +7,12 @@ using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.PhasesUtil;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.CfgToDag
 {
-    public enum CfgToDagEndToEndLemma
-    {
-      DoNotGenerate,
-      GenerateForProcedure,
-      GenerateForEntryBlock
-    }
-  
-    public class CfgToDagManager
+  public class CfgToDagManager
     {
         /**
          * cases:
@@ -30,7 +24,7 @@ namespace ProofGeneration.CfgToDag
          */
         public static Theory CfgToDagProof(
             PhasesTheories phasesTheories,
-            CfgToDagEndToEndLemma generateEndToEndLemma,
+            EndToEndLemmaConfig endToEndLemmaConfig,
             bool generatePassificationProof,
             bool generateVcProof,
             Term vcAssm,
@@ -188,11 +182,11 @@ namespace ProofGeneration.CfgToDag
             var theoryOuterDecls = new List<OuterDecl>();
             theoryOuterDecls.Add(cfgToDagLemmasLocale);
 
-            if (generateEndToEndLemma != CfgToDagEndToEndLemma.DoNotGenerate)
+            if (endToEndLemmaConfig != EndToEndLemmaConfig.DoNotGenerate)
             {
                 var endToEndManager = new CfgToDagEndToEnd();
                 var endToEndDecls = endToEndManager.EndToEndProof(
-                    generateEndToEndLemma == CfgToDagEndToEndLemma.GenerateForProcedure,
+                    endToEndLemmaConfig == EndToEndLemmaConfig.GenerateForProcedure,
                     cfgToDagLemmasLocale.Name + "." + entryLemma.Name,
                     phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.Passification, true),
                     vcAssm,

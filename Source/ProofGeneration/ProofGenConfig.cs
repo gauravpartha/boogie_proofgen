@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using ProofGeneration.PhasesUtil;
 
 namespace ProofGeneration
 {
@@ -62,8 +63,8 @@ namespace ProofGeneration
         return AllOptions(false);
       }
         
-      public bool GenerateAstCfgE2E(bool optimizationsHaveAnEffect) => 
-        GenerateAstCfgProof && (!optimizationsHaveAnEffect && GenerateCfgDagE2E); //currently do not produce E2E if optimizations have an effect
+      public bool GenerateAstCfgE2E(bool deadVarsElim) => 
+        GenerateAstCfgProof && (!deadVarsElim && GenerateCfgDagE2E); //currently do not produce E2E if dead variables are eliminated 
 
       public bool GenerateCfgDagE2E => GenerateCfgDagProof && GeneratePassifE2E;
 

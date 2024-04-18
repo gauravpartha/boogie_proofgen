@@ -8,6 +8,7 @@ using ProofGeneration.ASTRepresentation;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.PhasesUtil;
 using ProofGeneration.Util;
 
 namespace ProofGeneration.AstToCfg
@@ -17,7 +18,7 @@ namespace ProofGeneration.AstToCfg
         public static Theory AstToCfgProof(
             string uniqueTheoryName,
             PhasesTheories phasesTheories,
-            bool generateEndtoEnd,
+            EndToEndLemmaConfig endToEndLemmaConfig,
             ProofGenConfig config,
             Term vcAssm,
             AstToCfgProofGenInfo proofGenInfo,
@@ -122,6 +123,11 @@ namespace ProofGeneration.AstToCfg
               }
             }
 
+            if (entryLemma == null)
+            {
+              throw new ProofGenUnexpectedStateException("AST-to-CFG phase: entry lemma not assigned");
+            }
+
             var absValType = new VarType("a");
             var cfgToDagLemmasLocale = new LocaleDecl(
               "ast_to_cfg_lemmas",
@@ -145,12 +151,17 @@ namespace ProofGeneration.AstToCfg
             var theoryOuterDecls = new List<OuterDecl>();
             theoryOuterDecls.Add(cfgToDagLemmasLocale);
 
-            if (generateEndtoEnd && !proofGenInfo.GetOptimizationsFlag())
+            if (endToEndLemmaConfig != EndToEndLemmaConfig.DoNotGenerate)
             {
+              var phaseToConnectTo = config.GenerateCfgOptProof(proofGenInfo.GetOptimizationsFlag())
+                ? PhasesTheories.Phase.CfgOptimizations
+                : PhasesTheories.Phase.CfgToDag;
+              
               var endToEndManager = new AstToCfgEndToEnd();
               var endToEndDecls = endToEndManager.EndToEndProof(
                 entryLemma.Name,
-                phasesTheories.EndToEndLemmaName(PhasesTheories.Phase.CfgToDag, false) + "_theorem_aux",
+                endToEndLemmaConfig,
+                phasesTheories.EndToEndLemmaName(phaseToConnectTo, true) + "_theorem_aux",
                 vcAssm,
                 beforeCfgProgAccess,
                 afterCfgProgAccess,
@@ -167,10 +178,15 @@ namespace ProofGeneration.AstToCfg
               beforeCfgProgAccess.TheoryName(),
               afterCfgProgAccess.TheoryName()
             };
-            
-            if (config.GenerateCfgDagProof) importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag));
-            if (config.GeneratePassifProof) importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.Passification));
-            if (config.GenerateVcProof) importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.Vc));
+
+            if (config.GenerateCfgOptProof(proofGenInfo.GetOptimizationsFlag()))
+            {
+              importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.CfgOptimizations));
+            }
+            else if(config.GenerateCfgDagProof)
+            {
+              importTheories.Add(phasesTheories.TheoryName(PhasesTheories.Phase.CfgToDag));
+            }
 
             return new Theory(
               uniqueTheoryName,
@@ -178,25 +194,6 @@ namespace ProofGeneration.AstToCfg
               theoryOuterDecls
             );
         }
-
-        public static bool PredHasLoop(BigBlock b, ASTRepr ast, out BigBlock predecessor)
-        {
-          IEnumerable<BigBlock> bbs = ast.GetBlocksForwards();
-          BigBlock[] bbsArray = bbs.ToArray();
-
-          for (var i = 0; i < bbsArray.Length; i++)
-          {
-            if (bbsArray[i] == b && i != 0 && bbsArray[i - 1].ec is WhileCmd)
-            {
-              predecessor = bbsArray[i - 1];
-              return true;
-            }
-          }
-
-          predecessor = null;
-          return false;
-        }
-
         private static string GetLemmaName(BigBlock b, IsaUniqueNamer namer, IsaBigBlockInfo bbInfo)
         {
             return namer.GetName(b, "rel_" + bbInfo.CmdsQualifiedName(b).First());

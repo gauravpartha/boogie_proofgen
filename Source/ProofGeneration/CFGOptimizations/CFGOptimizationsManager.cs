@@ -10,6 +10,7 @@ using Microsoft.Boogie;
 using ProofGeneration.BoogieIsaInterface;
 using ProofGeneration.BoogieIsaInterface.VariableTranslation;
 using ProofGeneration.CFGRepresentation;
+using ProofGeneration.PhasesUtil;
 using ProofGeneration.Util;
 using ProofGenUtil;
 
@@ -21,6 +22,7 @@ public class CfgOptimizationsManager
   
   public static Theory CfgOptProof(
     PhasesTheories phasesTheories,
+    EndToEndLemmaConfig endToEndLemmaConfig,
     CFGRepr beforeOptimizations,
     CFGRepr afterOptimizations,
     IDictionary<Block, Block> beforeToAfter, // mapping from current block to target block
@@ -31,7 +33,6 @@ public class CfgOptimizationsManager
     IDictionary<Block, IList<Block>> beforeDagBlockToLoops,
     Term vcAssm,
     string procedureName,
-    bool generateEnd2EndLemma,
     bool generateCfgDagProof,
     IDictionary<Block, Block> selfLoops)
   {
@@ -207,12 +208,12 @@ public class CfgOptimizationsManager
       GetGlobalBlockLemmaName(beforeOptimizations.entry, lemmaNamer), beforeOptimizations.entry,
       afterOptimizations.entry);
     outerDecls.Add(entryLemma);
-    if (generateEnd2EndLemma)
+    if (endToEndLemmaConfig != EndToEndLemmaConfig.DoNotGenerate)
     {
       var endToEndManager = new CFGOptimizationsEndToEnd();
       var endToEndDecls = endToEndManager.EndToEndProof(
         "entry_lemma",
-        "end_to_end",
+        endToEndLemmaConfig,
         vcAssm,
         beforeOptCfgProgAccess,
         afterOptCfgProgAccess,

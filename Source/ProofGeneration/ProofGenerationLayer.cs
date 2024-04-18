@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
@@ -17,6 +16,7 @@ using ProofGeneration.CFGOptimizations;
 using ProofGeneration.CFGRepresentation;
 using ProofGeneration.CfgToDag;
 using ProofGeneration.Passification;
+using ProofGeneration.PhasesUtil;
 using ProofGeneration.ProgramToVCProof;
 using ProofGeneration.Util;
 using ProofGeneration.VCProofGen;
@@ -797,9 +797,7 @@ namespace ProofGeneration
 
                 #endregion
             }
-
-            var generateProcForBeforeCfgToDag = proofGenInfo.GetOptimizationsFlag();
-            
+          
             if (_proofGenConfig.GenerateBeforeCfgDagProg(proofGenInfo.GetOptimizationsFlag()))
             {
               #region before cfg to dag program
@@ -1010,6 +1008,8 @@ namespace ProofGeneration
               #endregion
             }
 
+            var phaseWithEndToEndTheorem = GetPhaseWithEndToEndTheorem(_proofGenConfig, proofGenInfo.GetOptimizationsFlag(), proofGenInfo.EliminatedDeadVars);
+
             IDictionary<Block, IList<Block>> beforeDagBlocktoLoops = null;
             IDictionary<Block, Block> selfLoops = null;
             if (_proofGenConfig.GenerateCfgDagProof)
@@ -1023,9 +1023,7 @@ namespace ProofGeneration
               beforeDagBlocktoLoops = getBeforeDagBlockToLoops(beforeDagAfterDagBlock, beforePassificationCfg, cfgToDagHintManager, out selfLoops);
               var cfgToDagProofTheory = CfgToDagManager.CfgToDagProof(
                 phasesTheories,
-                //hacky: find better solution
-                _proofGenConfig.GenerateCfgDagE2E ? (generateProcForBeforeCfgToDag ? CfgToDagEndToEndLemma.GenerateForProcedure : CfgToDagEndToEndLemma.GenerateForEntryBlock) 
-                                                  : CfgToDagEndToEndLemma.DoNotGenerate,
+                PhasesTheories.EndToEndConfig(_proofGenConfig.GenerateCfgDagE2E, PhasesTheories.Phase.CfgToDag, phaseWithEndToEndTheorem),
                 _proofGenConfig.GeneratePassifProof,
                 _proofGenConfig.GenerateVcProof,
                 vcAssm,
@@ -1076,6 +1074,7 @@ namespace ProofGeneration
               
               var cfgOptimizationsProofTheory = CfgOptimizationsManager.CfgOptProof(
                 phasesTheories,
+                PhasesTheories.EndToEndConfig(_proofGenConfig.GenerateCfgDagE2E, PhasesTheories.Phase.CfgOptimizations, phaseWithEndToEndTheorem),
                 beforeOptimizationsCFG,
                 beforeDagCfg,
                 beforeOptAfterOptBlock,
@@ -1086,7 +1085,6 @@ namespace ProofGeneration
                 beforeDagBlocktoLoops,
                 vcAssm,
                 afterPassificationImpl.Name,
-                _proofGenConfig.GenerateCfgDagE2E,
                 _proofGenConfig.GenerateCfgDagProof,
                 selfLoops);
               theories.Add(cfgOptimizationsProofTheory); 
@@ -1130,13 +1128,14 @@ namespace ProofGeneration
 
               if (!proofGenInfo.GetOptimizationsFlag())
               {
+                //if no optimizations were applied, then directly connect to CFG before CFG-to-DAG
                 astCfgReprInput = beforeDagCfg;
                 blockToBlockMapInput = beforeDagOrigBlock;
                 beforeCfgToDagProgAccessInput = beforeCfgToDagProgAccess;
-
               }
               else
               {
+                //optimizations were applied, then connect to CFG before optimizations
                 astCfgReprInput = beforeOptimizationsCFG;
                 blockToBlockMapInput = mappingUnoptimizedCopyToOrigBlock;
                 beforeCfgToDagProgAccessInput = unoptimizedCfgProgAccess;
@@ -1145,7 +1144,8 @@ namespace ProofGeneration
               var astToCfgProofTheory = AstToCfgManager.AstToCfgProof(
                 phasesTheories.TheoryName(PhasesTheories.Phase.AstToCfg),
                 phasesTheories,
-                _proofGenConfig.GenerateAstCfgE2E(proofGenInfo.GetOptimizationsFlag()),
+                PhasesTheories.EndToEndConfig(_proofGenConfig.GenerateAstCfgE2E(proofGenInfo.EliminatedDeadVars), 
+                  PhasesTheories.Phase.AstToCfg, phaseWithEndToEndTheorem),
                 _proofGenConfig,
                 vcAssm,
                 proofGenInfo,
@@ -1164,6 +1164,41 @@ namespace ProofGeneration
             }
 
             StoreResult(uniqueNamer.GetName(afterPassificationImpl.Proc.Name), theories);
+        }
+
+        /// <summary>
+        /// Return phase that must contain the end-to-end theorem with the corresponding source procedure if
+        /// the generation of end-to-end proofs is enabled.
+        /// </summary>
+        /// <param name="proofGenConfig"></param>
+        /// <param name="cfgOptimzations">Are there CFG optimizations?</param>
+        /// <param name="deadVarsElim">Were dead variables eliminated?</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        private static PhasesTheories.Phase GetPhaseWithEndToEndTheorem(ProofGenConfig proofGenConfig, bool cfgOptimzations, bool deadVarsElim)
+        {
+          if (!cfgOptimzations && deadVarsElim)
+          {
+            throw new ArgumentException("dead variables eliminated but cfg optimizations not marked");
+          }
+          
+          if (proofGenConfig.GenerateAstCfgE2E(deadVarsElim))
+          {
+            return PhasesTheories.Phase.AstToCfg;
+          }
+
+          if (proofGenConfig.GenerateCfgDagE2E && cfgOptimzations)
+          {
+            return PhasesTheories.Phase.CfgOptimizations;
+          }
+
+          /*
+             Note that we could be more fine-grained here and instead return the passification or VC phases, if
+             the CFG-to-DAG phase end-to-end is disabled, but for now we only support the procedure version of the 
+             end-to-end theorem until the CFG-to-DAG phase (the CFG-to-DAG end-to-end is usually disabled only for 
+             debugging purposes).
+          */
+          return PhasesTheories.Phase.CfgToDag;
         }
 
         private static CFGRepr GetCfgBeforeOptimizations(IList<Block> unoptimizedCFGBlocks)

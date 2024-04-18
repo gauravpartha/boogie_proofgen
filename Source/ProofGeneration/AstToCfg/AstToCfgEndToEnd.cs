@@ -35,7 +35,6 @@ namespace ProofGeneration.AstToCfg
         private BoogieContextIsa boogieContext;
         
         private IProgramAccessor beforeCfgProgramAccessor;
-        //private IProgramAccessor afterCfgProgramAccessor;
 
         private readonly string varContextName = "\\<Lambda>0";
 
@@ -43,6 +42,7 @@ namespace ProofGeneration.AstToCfg
 
         public IEnumerable<OuterDecl> EndToEndProof(
             string entryBlockAstLemma,
+            EndToEndLemmaConfig endToEndLemmaConfig,
             string cfgToDagEndToEndLemma,
             Term vcAssm,
             IProgramAccessor beforeCfgProgramAccessor,
@@ -50,8 +50,12 @@ namespace ProofGeneration.AstToCfg
             ASTRepr ast,
             AstToCfgProofGenInfo proofGenInfo)
         {
+            if (endToEndLemmaConfig == EndToEndLemmaConfig.DoNotGenerate)
+            {
+              throw new ArgumentException("end-to-end lemma invoked even though disabled");
+            }
+            
             this.beforeCfgProgramAccessor = beforeCfgProgramAccessor;
-            //this.afterCfgProgramAccessor = afterCfgProgramAccessor;
             
             boogieContext = new BoogieContextIsa(
                 IsaCommonTerms.TermIdentFromName("A"),
@@ -158,92 +162,97 @@ namespace ProofGeneration.AstToCfg
                     new Proof(new List<string> {proofSb.ToString()})
                 );
             result.Add(helperLemma);
-            
-            var assumptions = new List<Term>();
-            
-            string contName = "cont_" + proofGenInfo.GetMappingCopyBigBlockToIndex()[bigblock0];
-            Term contId = IsaCommonTerms.TermIdentFromName(contName);
-            Term initStateId = IsaBoogieTerm.Normal(IsaCommonTerms.TermIdentFromName("ns"));
 
-            Term astDecl = ast.GetAstAsTermList(proofGenInfo);
-            List<string> continuations = ast.GetMainContinuations(proofGenInfo);
-            string continuationsAsString = null;
-            foreach (var str in continuations)
+            if (endToEndLemmaConfig == EndToEndLemmaConfig.GenerateForProcedure)
             {
-              continuationsAsString += str + " ";
-            }
-            
-            var initAstTerm = new TermApp
-            (
-              IsaCommonTerms.TermIdentFromName("init_ast"),
-              astDecl,
-              IsaCommonTerms.TermIdentFromName("ns")
-              );
-            
-            BoogieContextIsa dummyBoogieContext = new BoogieContextIsa(
-              IsaCommonTerms.TermIdentFromName("A"),
-              IsaCommonTerms.TermIdentFromName("M"),
-              IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
-              IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
-              IsaCommonTerms.TermIdentFromName("\\<Omega>")
-            );
-            
-            var bigBlockMultiRedInitAst = IsaBoogieTerm.RedBigBlockMulti(
-              dummyBoogieContext,
-              initAstTerm,
-              IsaBoogieTerm.EndConfigTerm(),
-              IsaBoogieTerm.astId()
-            );
-            
-            assumptions.Add(bigBlockMultiRedInitAst);
-            
-            var bigBlockMultiRed = IsaBoogieTerm.RedBigBlockMulti(
-              dummyBoogieContext,
-              IsaBoogieTerm.StartConfigTerm(bigblock0, contId, beforeCfgProgramAccessor, initStateId),
-              IsaBoogieTerm.EndConfigTerm(),
-              IsaBoogieTerm.astId()
+              var assumptions = new List<Term>();
+
+              string contName = "cont_" + proofGenInfo.GetMappingCopyBigBlockToIndex()[bigblock0];
+              Term contId = IsaCommonTerms.TermIdentFromName(contName);
+              Term initStateId = IsaBoogieTerm.Normal(IsaCommonTerms.TermIdentFromName("ns"));
+
+              Term astDecl = ast.GetAstAsTermList(proofGenInfo);
+              List<string> continuations = ast.GetMainContinuations(proofGenInfo);
+              string continuationsAsString = null;
+              foreach (var str in continuations)
+              {
+                continuationsAsString += str + " ";
+              }
+
+              var initAstTerm = new TermApp
+              (
+                IsaCommonTerms.TermIdentFromName("init_ast"),
+                astDecl,
+                IsaCommonTerms.TermIdentFromName("ns")
               );
 
-            var proofMethods = new List<string>
-            {
-              "using assms",
-              "by (simp add: " + continuationsAsString + ")"
-            };
-            
-            var initializationLemmaName = "initialization";
-            var initializationLemma =
-              new LemmaDecl( 
-                initializationLemmaName,
-                ContextElem.CreateWithAssumptions(assumptions), 
-                bigBlockMultiRed,
-                new Proof(proofMethods)
+              BoogieContextIsa dummyBoogieContext = new BoogieContextIsa(
+                IsaCommonTerms.TermIdentFromName("A"),
+                IsaCommonTerms.TermIdentFromName("M"),
+                IsaCommonTerms.TermIdentFromName("\\<Lambda>"),
+                IsaCommonTerms.TermIdentFromName("\\<Gamma>"),
+                IsaCommonTerms.TermIdentFromName("\\<Omega>")
               );
-            result.Add(initializationLemma);
-            
-            //transform end to end theorem to a compact representation
-            var endToEndLemma = 
+
+              var bigBlockMultiRedInitAst = IsaBoogieTerm.RedBigBlockMulti(
+                dummyBoogieContext,
+                initAstTerm,
+                IsaBoogieTerm.EndConfigTerm(),
+                IsaBoogieTerm.astId()
+              );
+
+              assumptions.Add(bigBlockMultiRedInitAst);
+
+              var bigBlockMultiRed = IsaBoogieTerm.RedBigBlockMulti(
+                dummyBoogieContext,
+                IsaBoogieTerm.StartConfigTerm(bigblock0, contId, beforeCfgProgramAccessor, initStateId),
+                IsaBoogieTerm.EndConfigTerm(),
+                IsaBoogieTerm.astId()
+              );
+
+              var proofMethods = new List<string>
+              {
+                "using assms",
+                "by (simp add: " + continuationsAsString + ")"
+              };
+
+              var initializationLemmaName = "initialization";
+              var initializationLemma =
                 new LemmaDecl(
-                    "end_to_end_theorem_ast",
-                    ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
-                    ProcedureIsCorrect(
-                        beforeCfgProgramAccessor.FunctionsDecl(), 
-                        IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.ConstsDecl()),
-                        IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.GlobalsDecl()),
-                        beforeCfgProgramAccessor.AxiomsDecl(),
-                        beforeCfgProgramAccessor.ProcDecl()),
-                    new Proof(
-                        new List<string>
-                        {
-                            ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util2",helperLemmaName))),
-                            "apply (rule initialization)",
-                            "unfolding " + beforeCfgProgramAccessor.ProcDeclName() + "_def",
-                            "apply assumption " + "using VC apply simp " + " apply assumption+",
-                            ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
-                                             beforeCfgProgramAccessor.ProcDeclName() + "_def " + beforeCfgProgramAccessor.CfgDeclName() + "_def")
-                        }
-                    ) );
-            
-            result.Add(endToEndLemma);
+                  initializationLemmaName,
+                  ContextElem.CreateWithAssumptions(assumptions),
+                  bigBlockMultiRed,
+                  new Proof(proofMethods)
+                );
+              result.Add(initializationLemma);
+
+              //transform end to end theorem to a compact representation
+              var endToEndLemma =
+                new LemmaDecl(
+                  "end_to_end_theorem_ast",
+                  ContextElem.CreateWithAssumptions(new List<Term> { vcAssm }, new List<string> { "VC" }),
+                  ProcedureIsCorrect(
+                    beforeCfgProgramAccessor.FunctionsDecl(),
+                    IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.ConstsDecl()),
+                    IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.GlobalsDecl()),
+                    beforeCfgProgramAccessor.AxiomsDecl(),
+                    beforeCfgProgramAccessor.ProcDecl()),
+                  new Proof(
+                    new List<string>
+                    {
+                      ProofUtil.Apply(ProofUtil.Rule(ProofUtil.OF("end_to_end_util2", helperLemmaName))),
+                      "apply (rule initialization)",
+                      "unfolding " + beforeCfgProgramAccessor.ProcDeclName() + "_def",
+                      "apply assumption " + "using VC apply simp " + " apply assumption+",
+                      ProofUtil.By("simp_all add: exprs_to_only_checked_spec_1 exprs_to_only_checked_spec_2 " +
+                                   beforeCfgProgramAccessor.ProcDeclName() + "_def " +
+                                   beforeCfgProgramAccessor.CfgDeclName() + "_def")
+                    }
+                  ));
+
+              result.Add(endToEndLemma);
+            }
+
             return result;
         }
 

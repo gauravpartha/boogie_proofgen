@@ -1,4 +1,4 @@
-﻿namespace ProofGeneration
+﻿namespace ProofGeneration.PhasesUtil
 {
     public class PhasesTheories
     {
@@ -63,5 +63,21 @@
         {
             return qualify ? theory + "." + name : name;
         }
+
+        public static EndToEndLemmaConfig EndToEndConfig(bool generateEndToEndTheorem, Phase currentPhase, Phase phaseWithProcEndToEnd)
+        {
+          if (!generateEndToEndTheorem)
+          {
+            return EndToEndLemmaConfig.DoNotGenerate;
+          }
+
+          if (currentPhase == phaseWithProcEndToEnd)
+          {
+            return EndToEndLemmaConfig.GenerateForProcedure;
+          }
+
+          return EndToEndLemmaConfig.GenerateForEntryBlock;
+        }
+        
     }
 }
