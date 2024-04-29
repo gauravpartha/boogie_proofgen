@@ -485,8 +485,10 @@ namespace Microsoft.Boogie
     public override Implementation VisitImplementation(Implementation impl)
     {
 
+      #region proofgen
       IDictionary<Block, Block> CoalescedBlocksToTarget = new Dictionary<Block, Block>();
       IDictionary<Block, BlockCoalescingInfo> ListCoalescedBlocks = new Dictionary<Block, BlockCoalescingInfo>();
+      #endregion
       
       //Contract.Requires(impl != null);
       Contract.Ensures(Contract.Result<Implementation>() != null);
@@ -533,6 +535,7 @@ namespace Microsoft.Boogie
 
           if (!multiPredBlocks.Contains(succ))
           {
+            #region proofgen
             if (!ListCoalescedBlocks.ContainsKey(b))
             {
               List<Block> newList = new List<Block>();
@@ -553,6 +556,8 @@ namespace Microsoft.Boogie
             {
               CoalescedBlocksToTarget.Add(b, b);
             }
+            #endregion
+            
             foreach (Cmd /*!*/ cmd in succ.Cmds)
             {
               Contract.Assert(cmd != null);
@@ -606,8 +611,11 @@ namespace Microsoft.Boogie
         }
       }
 
+      #region proofgen
       impl.CoalescedBlocksToTarget = CoalescedBlocksToTarget;
       impl.ListCoalescedBlocks = ListCoalescedBlocks;
+      #endregion
+      
       // Console.WriteLine("Final number of blocks = {0}", impl.Blocks.Count);
       return impl;
     }
