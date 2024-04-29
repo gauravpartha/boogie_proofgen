@@ -11,6 +11,7 @@ namespace ProofGeneration.BoogieIsaInterface
         public Term AxiomsDecl();
         public Term ConstsAndGlobalsDecl();
         public string ConstsDecl();
+        public string UniqueConstsDecl();
         public string GlobalsDecl();
         
         /// <summary>

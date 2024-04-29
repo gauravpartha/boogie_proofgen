@@ -234,6 +234,7 @@ namespace ProofGeneration.AstToCfg
                   ProcedureIsCorrect(
                     beforeCfgProgramAccessor.FunctionsDecl(),
                     IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.ConstsDecl()),
+                    IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.UniqueConstsDecl()),
                     IsaCommonTerms.TermIdentFromName(beforeCfgProgramAccessor.GlobalsDecl()),
                     beforeCfgProgramAccessor.AxiomsDecl(),
                     beforeCfgProgramAccessor.ProcDecl()),
@@ -309,7 +310,7 @@ namespace ProofGeneration.AstToCfg
                 );
         }
 
-        private static Term ProcedureIsCorrect(Term funDecls, Term constantDecls, Term globalDecls, Term axioms,
+        private static Term ProcedureIsCorrect(Term funDecls, Term constantDecls, Term uniqueConstantDecls, Term globalDecls, Term axioms,
             Term procedure)
         {
             var typeInterpId = new SimpleIdentifier("A");
@@ -322,6 +323,7 @@ namespace ProofGeneration.AstToCfg
                       new TermWithExplicitType(new TermIdent(typeInterpId), IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
                       funDecls,
                       constantDecls,
+                      uniqueConstantDecls,
                       globalDecls,
                       axioms,
                       procedure,

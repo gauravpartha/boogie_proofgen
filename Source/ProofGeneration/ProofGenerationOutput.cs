@@ -16,9 +16,6 @@ namespace ProofGeneration
 
         public static void CreateMainDirectory(string fileName, bool onlyUseFileName)
         {
-            IsaUniqueNamer namer = new IsaUniqueNamer();
-            string filename_altered = namer.GetName(fileName);
-          
             if (CommandLineOptions.Clo.DontStoreProofGenFiles)
                 return;
             
@@ -26,9 +23,9 @@ namespace ProofGeneration
                 throw new ProofGenUnexpectedStateException("main directory already set");
 
             if (!onlyUseFileName)
-                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(filename_altered) + "_proofs", false);
+                _mainDir = FreeDirName(Path.GetFileNameWithoutExtension(fileName) + "_proofs", false);
             else
-                _mainDir = filename_altered;
+                _mainDir = fileName;
             Directory.CreateDirectory(_mainDir);
         }
         
@@ -123,7 +120,10 @@ namespace ProofGeneration
                 throw new ProofGenUnexpectedStateException("main directory not yet set");
 
             using var sw = new StreamWriter(Path.Combine(_mainDir, "ROOT"));
-            sw.WriteLine("session " + SessionName(Path.GetFileName(_mainDir)) + " = " + "Boogie_Lang + ");
+
+            var sessionName = new IsaUniqueNamer().GetName(Path.GetFileName(_mainDir));
+              
+            sw.WriteLine("session " + SessionName(sessionName) + " = " + "Boogie_Lang + ");
             
             var subDirs = Directory.EnumerateDirectories(_mainDir).ToList();
             if (subDirs.Any())
