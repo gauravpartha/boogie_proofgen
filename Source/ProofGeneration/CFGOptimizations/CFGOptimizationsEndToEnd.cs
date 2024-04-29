@@ -111,12 +111,13 @@ public class CFGOptimizationsEndToEnd
                     new LemmaDecl(
                         "end_to_end_theorem",
                         ContextElem.CreateWithAssumptions(new List<Term> {vcAssm}, new List<string> {"VC"}),
-                        ProcedureIsCorrect(
+                        IsaBoogieTerm.ProcedureIsCorrectCfg(
                             programAccessor.FunctionsDecl(), 
                             IsaCommonTerms.TermIdentFromName(programAccessor.ConstsDecl()),
+                            IsaCommonTerms.TermIdentFromName(programAccessor.UniqueConstsDecl()),
                             IsaCommonTerms.TermIdentFromName(programAccessor.GlobalsDecl()),
                             programAccessor.AxiomsDecl(),
-                            programAccessor.ProcDeclName()),
+                            IsaCommonTerms.TermIdentFromName(programAccessor.ProcDeclName())),
                         new Proof(
                             new List<string>
                             {
@@ -210,24 +211,4 @@ public class CFGOptimizationsEndToEnd
       finalState);
   }
   
-  public static Term ProcedureIsCorrect(Term funDecls, Term constantDecls, Term globalDecls, Term axioms,
-    string name)
-  {
-    var typeInterpId = new SimpleIdentifier("A");
-    return
-      TermQuantifier.MetaAll(
-        new List<Identifier> {typeInterpId},
-        null,
-        new TermApp(
-          IsaCommonTerms.TermIdentFromName("Semantics.proc_is_correct"),
-          //TODO: here assuming that we use "'a" for the abstract value type carrier t --> make t a parameter somewhere 
-          new TermWithExplicitType(new TermIdent(typeInterpId), 
-            IsaBoogieType.AbstractValueTyFunType(new VarType("a"))),
-          funDecls,
-          constantDecls,
-          globalDecls,
-          axioms,
-          IsaCommonTerms.TermIdentFromName(name),
-          IsaBoogieTerm.SematicsProcSpecSatisfied));
-  }
 }
